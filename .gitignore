@@ -36,6 +36,7 @@ screenshot/mstsc_*.jpg
 
 # Personal working notes, not for the public repo
 src/Edgetree/TODO.md
+edgetree-spec.md
 
 # Local copies of built release exes (also uploaded to GitHub Releases -
 # kept here too just so they don't have to be re-downloaded)
