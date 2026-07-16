@@ -99,12 +99,19 @@ public partial class MainWindow : Window
     // of the two interleaving.
     private int _navigationToken;
 
+    // Debounces FileSystemItem.ExternalChange per folder - a save/copy
+    // operation fires several watcher events in quick succession for what's
+    // really one logical change, so each pending folder gets one timer that
+    // keeps getting restarted until events stop arriving for it.
+    private readonly Dictionary<FileSystemItem, System.Windows.Threading.DispatcherTimer> _pendingExternalRefreshes = new();
+
     public MainWindow()
     {
         InitializeComponent();
         SourceInitialized += MainWindow_SourceInitialized;
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
+        FileSystemItem.ExternalChange += OnFileSystemItemExternalChange;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         SystemParameters.StaticPropertyChanged += SystemParameters_StaticPropertyChanged;
     }
@@ -113,6 +120,23 @@ public partial class MainWindow : Window
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         NativeMethods.MakeToolWindow(hwnd);
+
+        // A second Edgetree launch (any build/version) broadcasts this
+        // instead of opening its own window - see App.OnStartup - so this
+        // instance can come to the foreground the same way the tray icon's
+        // "Open" does, regardless of whether it's currently docked or
+        // hidden to the tray.
+        HwndSource.FromHwnd(hwnd).AddHook(SingleInstanceWndProc);
+    }
+
+    private IntPtr SingleInstanceWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == unchecked((int)NativeMethods.ActivateMessage))
+        {
+            (Application.Current as App)?.RestoreMainWindow();
+            handled = true;
+        }
+        return IntPtr.Zero;
     }
 
     private void MainWindow_Loaded(object? sender, RoutedEventArgs e)
@@ -2417,6 +2441,65 @@ public partial class MainWindow : Window
         if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true } item)
         {
             item.RefreshChildren();
+        }
+    }
+
+    // FileSystemItem.ExternalChange fires on the FileSystemWatcher's own
+    // thread pool thread - hop to the UI thread before touching any
+    // DispatcherTimer/tree state.
+    private void OnFileSystemItemExternalChange(FileSystemItem item)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_pendingExternalRefreshes.TryGetValue(item, out var existing))
+            {
+                existing.Stop();
+                existing.Start();
+                return;
+            }
+
+            var timer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(300)
+            };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                _pendingExternalRefreshes.Remove(item);
+                // Re-checked here (not just at watcher-start time): the
+                // folder may have been collapsed - and its watcher already
+                // stopped - in the gap between the event firing and this
+                // timer elapsing.
+                if (item.IsExpanded)
+                {
+                    RefreshFolderPreservingState(item);
+                }
+            };
+            _pendingExternalRefreshes[item] = timer;
+            timer.Start();
+        });
+    }
+
+    // Same snapshot -> refresh -> replay approach as RefreshAllLoadedFolders,
+    // scoped to just this one folder's own subtree - an external change the
+    // user didn't ask for should disturb whatever they had expanded/selected
+    // as little as possible, unlike a deliberate RefreshFolder_Click/F5 where
+    // losing a grandchild's expanded state is a lot less surprising.
+    private void RefreshFolderPreservingState(FileSystemItem item)
+    {
+        var expandedPaths = new List<string>();
+        CollectExpandedPaths(item, expandedPaths);
+        string? selectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
+
+        item.RefreshChildren();
+
+        foreach (var path in expandedPaths.OrderBy(p => p.Length))
+        {
+            ExpandPathIfPossible(path);
+        }
+        if (selectedPath is not null)
+        {
+            NavigateToPath(selectedPath);
         }
     }
 

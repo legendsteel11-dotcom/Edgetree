@@ -1,6 +1,8 @@
+using System.Threading;
 using System.Windows;
 using System.Windows.Forms;
 using Application = System.Windows.Application;
+using SidebarExplorer.App.Native;
 using SidebarExplorer.App.Services;
 
 namespace SidebarExplorer.App;
@@ -8,6 +10,10 @@ namespace SidebarExplorer.App;
 public partial class App : Application
 {
     private NotifyIcon? _trayIcon;
+
+    // Held for the app's whole lifetime (a field, not a local) so it isn't
+    // released early by the GC - see OnStartup/OnExit.
+    private Mutex? _singleInstanceMutex;
 
     // Minimize-to-tray (MainWindow's "_" button calls Hide(), not Close()) needs
     // some way back - so the icon stays visible regardless of the "always show
@@ -26,6 +32,21 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Named (not per-version) so an old build and a freshly built one
+        // still see each other as the same app - the whole point is blocking
+        // duplicate launches regardless of which exe/version is running.
+        _singleInstanceMutex = new Mutex(true, "Local\\Edgetree-SingleInstance-8f1d6b2e-4a3f-4c9e-9b1a-2d7e5c6f8a90", out bool createdNew);
+        if (!createdNew)
+        {
+            // Another Edgetree process already holds the mutex - ask it to
+            // come to the foreground instead of opening a second window, and
+            // exit before constructing anything (window, tray icon, Strings)
+            // so there's no flicker. MainWindow_SourceInitialized's WndProc
+            // hook is what receives this on the other end.
+            NativeMethods.BroadcastActivateMessage();
+            Environment.Exit(0);
+        }
+
         // Must run before base.OnStartup(e) - that call is what actually
         // constructs the StartupUri (MainWindow) window, and every x:Static
         // Strings.* reference in its XAML resolves to whatever's in these
@@ -75,6 +96,8 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _trayIcon?.Dispose();
+        _singleInstanceMutex?.ReleaseMutex();
+        _singleInstanceMutex?.Dispose();
         base.OnExit(e);
     }
 }
