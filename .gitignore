@@ -31,8 +31,9 @@ Thumbs.db
 *.psd
 *.ai
 
-# Raw RDP screenshot captures (kept locally; cropped versions in screenshot/ are tracked)
+# Raw screenshot captures (kept locally; cropped versions in screenshot/ are tracked)
 screenshot/mstsc_*.jpg
+screenshot/DDPM.Subagent.User_*.png
 
 # Personal working notes, not for the public repo
 src/Edgetree/TODO.md
