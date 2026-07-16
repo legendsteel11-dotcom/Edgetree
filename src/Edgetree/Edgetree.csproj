@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <!-- Explicit rather than left to default from the .csproj filename, so a
+         future file rename can't silently change the shipped exe/dll name
+         again - the C# namespace stays SidebarExplorer.App throughout the
+         source (an app-identity rename, not a source-level one). -->
+    <AssemblyName>Edgetree</AssemblyName>
+    <Product>Edgetree</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\Icons\**\*.png" />
+    <Resource Include="Resources\icon-map.json" />
+    <Resource Include="Resources\app.ico" />
+    <Resource Include="Resources\icon.png" />
+    <Resource Include="Resources\pin.png" />
+  </ItemGroup>
+
+  <!-- Microsoft.VisualBasic.FileIO.FileSystem.Delete*(..., RecycleOption.SendToRecycleBin)
+       (the simplest reliable way to send deleted items to the Recycle Bin) is
+       already available transitively via UseWindowsForms above - an explicit
+       <Reference> here just duplicates and conflicts with it. -->
+
+</Project>

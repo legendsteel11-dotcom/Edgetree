@@ -1,0 +1,1599 @@
+<Window x:Class="SidebarExplorer.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SidebarExplorer.App"
+        xmlns:models="clr-namespace:SidebarExplorer.App.Models"
+        xmlns:converters="clr-namespace:SidebarExplorer.App.Converters"
+        xmlns:services="clr-namespace:SidebarExplorer.App.Services"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        mc:Ignorable="d"
+        x:Name="RootWindow"
+        Title="Edgetree"
+        Icon="pack://application:,,,/Resources/app.ico"
+        WindowStyle="None"
+        AllowsTransparency="False"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="False"
+        Background="#FF252526"
+        Left="0"
+        Top="0"
+        Height="600"
+        Width="280"
+        MouseEnter="MainWindow_MouseEnter"
+        MouseLeave="MainWindow_MouseLeave">
+    <shell:WindowChrome.WindowChrome>
+        <!-- CaptionHeight/ResizeBorderThickness start at 0 (docked: fixed position,
+             no native move/resize). Undock()/Dock() in code-behind flip these when
+             the header is dragged away from / pinned back to the left edge. -->
+        <shell:WindowChrome x:Name="ChromeSettings"
+                             CaptionHeight="0"
+                             ResizeBorderThickness="0"
+                             GlassFrameThickness="0"
+                             CornerRadius="0"
+                             UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+    <Window.Resources>
+        <!-- Applied to every header element except AppIcon (see the TODO note
+             this came from: divider 2px lower, everything but the icon 1px
+             higher). A RenderTransform, not a Margin tweak, so it's a pure
+             visual nudge that doesn't change each element's own layout slot
+             or spacing relative to its neighbors - and it's safe to share one
+             instance across every element that uses it, since none of them
+             ever mutate it at runtime (unlike the color-setting brushes
+             elsewhere in this file, which do and so can't be shared once a
+             sealed Style freezes them). -->
+        <TranslateTransform x:Key="ShiftUp1px"
+                Y="-1"/>
+
+        <SolidColorBrush x:Key="SidebarBackground"
+                Color="#FF1A1A1A"/>
+        <SolidColorBrush x:Key="FavoritesBackground"
+                Color="#FF1C1C1C"/>
+        <SolidColorBrush x:Key="HeaderBackground"
+                Color="#FF1E1E1E"/>
+        <!-- Folder-name colors (see AppSettings.FolderNameColorHex) - kept
+             under these original key names since almost everything else in
+             the app (header/menu chrome, favorites) still uses them as the
+             general default foreground too, not just tree folder rows. -->
+        <SolidColorBrush x:Key="ForegroundText"
+                Color="#FFA8AAAE"/>
+        <SolidColorBrush x:Key="HighlightForeground"
+                Color="#FFF0F2F6"/>
+        <!-- File-name colors (AppSettings.FileNameColorHex) - only ever used
+             by the tree row's own NameText (see the HierarchicalDataTemplate
+             triggers below), for the ShowFileIcons-driven folder/file split.
+             Defaults identical to ForegroundText/HighlightForeground so files
+             look the same as before until customized independently. -->
+        <SolidColorBrush x:Key="FileNameForeground"
+                Color="#FFA8AAAE"/>
+        <SolidColorBrush x:Key="FileNameHighlightForeground"
+                Color="#FFF0F2F6"/>
+        <SolidColorBrush x:Key="HoverBackground"
+                Color="#FF2A2D2E"/>
+        <SolidColorBrush x:Key="TreeRowHoverBackground"
+                Color="#FF2A2C32"/>
+        <!-- Folder/file hover text colors (AppSettings.FolderNameHoverColorHex/
+             FileNameHoverColorHex) - same folder-vs-file split as the name
+             colors above, just for the hover state. -->
+        <SolidColorBrush x:Key="FolderNameHoverForeground"
+                Color="#FFA8AAAE"/>
+        <SolidColorBrush x:Key="FileNameHoverForeground"
+                Color="#FFA8AAAE"/>
+        <SolidColorBrush x:Key="TreeRowSelectedActiveBackground"
+                Color="#FF323438"/>
+        <SolidColorBrush x:Key="TreeGuideLineBrush"
+                Color="#FF323438"/>
+        <SolidColorBrush x:Key="TreeGuideLineActiveBrush"
+                Color="#FF5C5E62"/>
+        <!-- Header/favorites/tree panel-separator lines (AppSettings.
+             PanelDividerColorHex) - a dedicated resource, not a reuse of
+             TreeGuideLineBrush (see the header divider's own comment below
+             for why that used to be the case). -->
+        <SolidColorBrush x:Key="PanelDividerBrush"
+                Color="#FF323438"/>
+
+        <converters:FontSizeToRowPaddingConverter x:Key="FontSizeToRowPaddingConverter"/>
+
+        <!-- Folder icons only (see the HierarchicalDataTemplate's IsDirectory
+             DataTrigger below) - swapped live via Resources[...] = ... in
+             code-behind on toggle, same pattern as the color settings'
+             DynamicResource brushes, so every currently-visible folder row
+             picks it up immediately without per-item property-changed
+             plumbing. -->
+        <Visibility x:Key="FolderIconVisibility">Visible</Visibility>
+        <Visibility x:Key="FileIconVisibility">Visible</Visibility>
+
+        <Style x:Key="ToggleButtonStyle"
+                TargetType="Button">
+            <Setter Property="Background"
+                    Value="Transparent"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource ForegroundText}"/>
+            <Setter Property="BorderThickness"
+                    Value="0"/>
+            <Setter Property="Width"
+                    Value="32"/>
+            <Setter Property="Height"
+                    Value="32"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="3">
+                            <!-- Dimmed by default and brightened on hover (see the
+                                 trigger below) - an Opacity toggle on the whole
+                                 icon rather than recoloring each one's own
+                                 Stroke/Fill individually, since every header
+                                 icon (Path/Ellipse/Image) sets those directly
+                                 rather than inheriting a bindable Foreground the
+                                 way TextBlock does. -->
+                            <ContentPresenter x:Name="Content"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Opacity="0.75"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{StaticResource HoverBackground}"/>
+                                <Setter TargetName="Content"
+                                        Property="Opacity"
+                                        Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Overriding the system selection/hover brushes is the reliable way to
+             re-theme TreeViewItem, since its default ControlTemplate reads these
+             keys directly rather than the Background property. Both the focused
+             (Highlight*) and unfocused (InactiveSelectionHighlight*) variants must
+             be set, or losing focus (the common case for a sidebar utility) falls
+             back to the default light/white selection color. -->
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}"
+                Color="#FF37373D"/>
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}"
+                Color="#FFFFFFFF"/>
+        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}"
+                Color="#FF2A2D2E"/>
+        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}"
+                Color="#FFCCCCCC"/>
+        <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}"
+                Color="#FF2A2D2E"/>
+        <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}"
+                Color="#FFCCCCCC"/>
+
+        <!-- Dark ContextMenu/MenuItem/Separator chrome. The default templates
+             don't respect a plain Background/Foreground Setter for these (same
+             issue we hit with TreeViewItem), so - as before - the reliable fix
+             is a full custom ControlTemplate rather than relying on the theme's
+             own rendering to pick up simple property values. -->
+        <Style x:Key="DarkContextMenuStyle"
+                TargetType="ContextMenu">
+            <!-- A touch darker than the sidebar's own background so the menu
+                 still reads as a distinct surface, without contrasting hard. -->
+            <Setter Property="Background"
+                    Value="#FF282828"/>
+            <Setter Property="BorderBrush"
+                    Value="#FF454545"/>
+            <Setter Property="BorderThickness"
+                    Value="1"/>
+            <Setter Property="Padding"
+                    Value="4,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <StackPanel IsItemsHost="True"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Implicit (no x:Key) rather than assigned via ItemContainerStyle:
+             ItemContainerStyle applies to every item in the ContextMenu
+             regardless of type, and crashes outright when a Separator
+             (mixed in alongside the MenuItems) gets handed a MenuItem-typed
+             style. An implicit style only matches MenuItems, leaving
+             Separators to their own separate implicit style below. -->
+        <Style TargetType="MenuItem">
+            <!-- Vertical padding trimmed from the original 7 - fine on a
+                 high-DPI screen, but the options menu's item count made it run
+                 noticeably tall on HD-class (1366x768) displays. -->
+            <Setter Property="Padding"
+                    Value="14,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Grid>
+                            <Border x:Name="Bd"
+                                    Background="Transparent"
+                                    CornerRadius="4"
+                                    Padding="{TemplateBinding Padding}"
+                                    TextBlock.Foreground="{DynamicResource ForegroundText}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <!-- Reserves no space for regular (non-checkable) items -
+                                         Collapsed items don't participate in Auto-column sizing,
+                                         so every existing menu keeps its current layout untouched.
+                                         Checkable items (see the IsCheckable trigger) switch this
+                                         to Hidden instead, so the check column's width is reserved
+                                         even for their unchecked siblings and everything still lines
+                                         up in a column. -->
+                                    <Path x:Name="CheckMark"
+                                            Grid.Column="0"
+                                            Data="M1,4.5 L4,7.5 L9,1.5"
+                                            Stroke="{DynamicResource ForegroundText}"
+                                            StrokeThickness="1.4"
+                                            StrokeLineJoin="Round"
+                                            StrokeStartLineCap="Round"
+                                            StrokeEndLineCap="Round"
+                                            Width="10"
+                                            Height="8"
+                                            Margin="0,0,8,0"
+                                            VerticalAlignment="Center"
+                                            Visibility="Collapsed"/>
+                                    <ContentPresenter Grid.Column="1"
+                                            ContentSource="Header"
+                                            VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="GestureText"
+                                            Grid.Column="2"
+                                            Text="{TemplateBinding InputGestureText}"
+                                            Foreground="#FF9A9A9A"
+                                            FontSize="11"
+                                            Margin="24,0,0,0"
+                                            VerticalAlignment="Center"/>
+                                    <!-- Submenu items (a MenuItem with child MenuItems, like the
+                                         language picker) have no InputGestureText, so this shares
+                                         the same column - only one of the two is ever visible. -->
+                                    <Path x:Name="SubmenuArrow"
+                                            Grid.Column="2"
+                                            Data="M0,0 L4,4 L0,8"
+                                            Stroke="{DynamicResource ForegroundText}"
+                                            StrokeThickness="1.4"
+                                            StrokeLineJoin="Round"
+                                            StrokeStartLineCap="Round"
+                                            StrokeEndLineCap="Round"
+                                            Margin="24,0,2,0"
+                                            VerticalAlignment="Center"
+                                            Visibility="Collapsed"/>
+                                </Grid>
+                            </Border>
+                            <!-- The part WPF's MenuItem logic actually looks for by name to host
+                                 and position a submenu popup - the previous template omitted it
+                                 entirely, so a MenuItem with children (Role=SubmenuHeader) had
+                                 no way to ever show that submenu; clicking it just did nothing. -->
+                            <Popup x:Name="PART_Popup"
+                                    Placement="Right"
+                                    HorizontalOffset="-2"
+                                    AllowsTransparency="True"
+                                    Focusable="False"
+                                    PopupAnimation="Fade"
+                                    IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                                <Border Background="#FF282828"
+                                        BorderBrush="#FF454545"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="4,6"
+                                        SnapsToDevicePixels="True">
+                                    <StackPanel IsItemsHost="True"/>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled"
+                                    Value="False">
+                                <Setter TargetName="Bd"
+                                        Property="TextBlock.Foreground"
+                                        Value="#FF6A6A6A"/>
+                            </Trigger>
+                            <Trigger Property="IsCheckable"
+                                    Value="True">
+                                <Setter TargetName="CheckMark"
+                                        Property="Visibility"
+                                        Value="Hidden"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked"
+                                    Value="True">
+                                <Setter TargetName="CheckMark"
+                                        Property="Visibility"
+                                        Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="Role"
+                                    Value="SubmenuHeader">
+                                <Setter TargetName="GestureText"
+                                        Property="Visibility"
+                                        Value="Collapsed"/>
+                                <Setter TargetName="SubmenuArrow"
+                                        Property="Visibility"
+                                        Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Used only by the "폴더의 표시 개수" stepper in OptionsMenu below - a
+             plain TextBox there was very hard to actually type into: WPF's
+             Menu manages keyboard/hover focus across its items on its own,
+             and that fought with the TextBox for focus the moment the mouse
+             drifted even slightly outside it. A pair of single-click +/-
+             buttons sidesteps the whole problem - no sustained focus or
+             precise mouse containment needed. -->
+        <Style x:Key="MenuStepperButtonStyle"
+                TargetType="Button">
+            <Setter Property="Width"
+                    Value="20"/>
+            <Setter Property="Height"
+                    Value="20"/>
+            <Setter Property="Background"
+                    Value="#FF3C3C3C"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource ForegroundText}"/>
+            <Setter Property="BorderBrush"
+                    Value="#FF5A5A5A"/>
+            <Setter Property="BorderThickness"
+                    Value="1"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="#FF505050"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A Separator placed inside a Menu/ContextMenu doesn't resolve a
+             plain implicit `TargetType="Separator"` style at all - the
+             ItemContainerGenerator looks it up via the specific
+             MenuItem.SeparatorStyleKey resource key instead, so that's the
+             key this has to be registered under to actually take effect.
+             (That's also why the default two-tone "recessed groove" bevel -
+             meant for light backgrounds - kept showing through as a stray
+             bright/white line with its own baked-in margins no matter what
+             we set on a plain Separator style.) -->
+        <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}"
+                TargetType="Separator">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1"
+                                Background="#26FFFFFF"
+                                Margin="2,4"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Assigned to ExplorerTree itself (not via ItemContainerStyle, unlike
+             ExplorerItemContextMenu below), so it's what shows up when
+             right-clicking empty tree space rather than an actual row. -->
+        <ContextMenu x:Key="ExplorerEmptySpaceContextMenu"
+                Style="{StaticResource DarkContextMenuStyle}">
+            <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
+                    Click="NewFolder_Click"/>
+        </ContextMenu>
+
+        <ContextMenu x:Key="ExplorerItemContextMenu"
+                Style="{StaticResource DarkContextMenuStyle}"
+                Opened="ExplorerItemContextMenu_Opened"
+                PreviewKeyDown="ExplorerItemContextMenu_PreviewKeyDown">
+            <MenuItem Header="{x:Static services:Strings.MenuAddFavorite}"
+                    Click="AddFavorite_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
+                    Click="NewFolder_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuRefresh}"
+                    InputGestureText="F5"
+                    Click="RefreshFolder_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuSort}">
+                <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
+                        IsCheckable="True"
+                        Tag="name"
+                        Click="FolderSortFieldMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortByDate}"
+                        IsCheckable="True"
+                        Tag="date"
+                        Click="FolderSortFieldMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortAscending}"
+                        IsCheckable="True"
+                        Tag="asc"
+                        Click="FolderSortDirectionMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortDescending}"
+                        IsCheckable="True"
+                        Tag="desc"
+                        Click="FolderSortDirectionMenuItem_Click"/>
+            </MenuItem>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuOpen}"
+                    InputGestureText="Enter"
+                    Click="OpenItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuOpenWith}"
+                    Click="OpenWithPicker_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuCopy}"
+                    InputGestureText="Ctrl+C"
+                    Click="CopyItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuPaste}"
+                    InputGestureText="Ctrl+V"
+                    Click="PasteItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuRename}"
+                    InputGestureText="F2"
+                    Click="RenameItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuDelete}"
+                    InputGestureText="Del"
+                    Click="DeleteItem_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuCopyPath}"
+                    Click="CopyPath_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuOpenTerminal}"
+                    Click="OpenTerminal_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuRevealInExplorer}"
+                    Click="RevealInExplorer_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuProperties}"
+                    Click="ShowProperties_Click"/>
+        </ContextMenu>
+
+        <ContextMenu x:Key="OptionsMenu"
+                Style="{StaticResource DarkContextMenuStyle}"
+                Opened="OptionsMenu_Opened">
+            <MenuItem Header="{x:Static services:Strings.MenuAutoCollapse}"
+                    IsCheckable="True"
+                    Click="AutoCollapseMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuAlwaysOnTop}"
+                    IsCheckable="True"
+                    Click="AlwaysOnTopMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuStartWithWindows}"
+                    IsCheckable="True"
+                    Click="StartWithWindowsMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuAlwaysShowTrayIcon}"
+                    IsCheckable="True"
+                    Click="TrayIconMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuShowFolderIcons}"
+                    IsCheckable="True"
+                    Click="ShowFolderIconsMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuShowFileIcons}"
+                    IsCheckable="True"
+                    Click="ShowFileIconsMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuFavoritesAtBottom}"
+                    IsCheckable="True"
+                    Click="FavoritesAtBottomMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuDockOnRight}"
+                    IsCheckable="True"
+                    Click="DockOnRightMenuItem_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuColorSettings}"
+                    Click="ColorSettingsMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuDefaultSort}">
+                <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
+                        IsCheckable="True"
+                        Tag="name"
+                        Click="SortFieldMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortByDate}"
+                        IsCheckable="True"
+                        Tag="date"
+                        Click="SortFieldMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortAscending}"
+                        IsCheckable="True"
+                        Tag="asc"
+                        Click="SortDirectionMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortDescending}"
+                        IsCheckable="True"
+                        Tag="desc"
+                        Click="SortDirectionMenuItem_Click"/>
+            </MenuItem>
+            <!-- StaysOpenOnClick so stepping the value doesn't close the whole
+                 options menu out from under the user. -->
+            <MenuItem StaysOpenOnClick="True"
+                    Focusable="False">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{x:Static services:Strings.MenuMaxItemsPerFolder}"
+                                Foreground="{DynamicResource ForegroundText}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"/>
+                        <Button Content="−"
+                                Style="{StaticResource MenuStepperButtonStyle}"
+                                Click="MaxItemsPerFolderDecrement_Click"/>
+                        <TextBlock Text="25"
+                                Foreground="{DynamicResource ForegroundText}"
+                                Width="26"
+                                TextAlignment="Center"
+                                VerticalAlignment="Center"/>
+                        <Button Content="+"
+                                Style="{StaticResource MenuStepperButtonStyle}"
+                                Click="MaxItemsPerFolderIncrement_Click"/>
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
+            <MenuItem Header="{x:Static services:Strings.MenuLanguage}">
+                <!-- Non-interactive note, not a language choice - IsEnabled
+                     False keeps it unclickable and visually dimmed. -->
+                <MenuItem Header="{x:Static services:Strings.LanguageRestartNote}"
+                        IsEnabled="False"/>
+                <MenuItem Header="한국어"
+                        IsCheckable="True"
+                        Tag="ko"
+                        Click="LanguageMenuItem_Click"/>
+                <MenuItem Header="English"
+                        IsCheckable="True"
+                        Tag="en"
+                        Click="LanguageMenuItem_Click"/>
+            </MenuItem>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuExportSettings}"
+                    Click="ExportSettingsMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuImportSettings}"
+                    Click="ImportSettingsMenuItem_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuAbout}"
+                    Click="AboutMenuItem_Click"/>
+        </ContextMenu>
+
+        <!-- A minimal chevron that rotates 90° on expand, closer to VS Code's
+             arrow than the default Windows TreeViewItem expander glyph. A plain
+             Setter can't target a nested Freezable (RotateTransform) by name, but
+             a Storyboard's TargetProperty path can drill into one directly, so
+             the smooth rotation is done via EnterActions/ExitActions instead. -->
+        <Style x:Key="ExpanderToggleButtonStyle"
+                TargetType="ToggleButton">
+            <Setter Property="Focusable"
+                    Value="False"/>
+            <Setter Property="Width"
+                    Value="16"/>
+            <Setter Property="Height"
+                    Value="16"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid Background="Transparent"
+                                Width="16"
+                                Height="16">
+                            <!-- Open two-segment chevron (no closing/flat edge), so it
+                                 reads as a plain "›" rather than a filled flag shape. -->
+                            <Path x:Name="Arrow"
+                                    Data="M5,3 L9.5,6.5 L5,10"
+                                    Stroke="#FF8A8A8A"
+                                    StrokeThickness="1.4"
+                                    StrokeLineJoin="Round"
+                                    StrokeStartLineCap="Round"
+                                    StrokeEndLineCap="Round"
+                                  HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                  RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="0"/>
+                                </Path.RenderTransform>
+                            </Path>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked"
+                                    Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Arrow"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                             To="90"
+                                                    Duration="0:0:0.12"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Arrow"
+                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                             To="0"
+                                                    Duration="0:0:0.12"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Arrow"
+                                        Property="Stroke"
+                                        Value="{DynamicResource ForegroundText}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ExplorerTreeViewItemStyle"
+                TargetType="TreeViewItem">
+            <!-- Blocks the root TreeView's deliberately huge CacheLength (see
+                 ExplorerTree) from inheriting down here. That cache exists only
+                 to keep the handful of drive-root containers always realized;
+                 a folder can hold up to DisplayCap children - many more once
+                 "더 보기" is used - and has never had the realization problem
+                 the root had, so it keeps WPF's normal one-page-either-side
+                 caching. A local value beats an inherited one, which is what
+                 makes this work. -->
+            <Setter Property="VirtualizingPanel.CacheLengthUnit"
+                    Value="Page"/>
+            <Setter Property="VirtualizingPanel.CacheLength"
+                    Value="1,1"/>
+            <Setter Property="IsExpanded"
+                    Value="{Binding IsExpanded, Mode=TwoWay}"/>
+            <!-- Vertical padding scales with the TreeView's FontSize (see the
+                 converter) so Ctrl+/- zoom shrinks/grows row spacing along with
+                 the text instead of leaving a fixed gap. -->
+            <Setter Property="Padding">
+                <Setter.Value>
+                    <Binding Path="FontSize"
+                             RelativeSource="{RelativeSource AncestorType=TreeView}"
+                             Converter="{StaticResource FontSizeToRowPaddingConverter}"/>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Background"
+                    Value="Transparent"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource ForegroundText}"/>
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Stretch"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="ContextMenu"
+                    Value="{StaticResource ExplorerItemContextMenu}"/>
+            <Setter Property="AllowDrop"
+                    Value="True"/>
+            <EventSetter Event="Expanded"
+                    Handler="TreeViewItem_Expanded"/>
+            <EventSetter Event="PreviewMouseRightButtonDown"
+                    Handler="TreeViewItem_PreviewMouseRightButtonDown"/>
+            <EventSetter Event="PreviewMouseLeftButtonDown"
+                    Handler="TreeViewItem_PreviewMouseLeftButtonDown"/>
+            <EventSetter Event="PreviewMouseMove"
+                    Handler="TreeViewItem_PreviewMouseMove"/>
+            <EventSetter Event="DragEnter"
+                    Handler="TreeViewItem_DragOver"/>
+            <EventSetter Event="DragOver"
+                    Handler="TreeViewItem_DragOver"/>
+            <EventSetter Event="Drop"
+                    Handler="TreeViewItem_Drop"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TreeViewItem">
+                        <StackPanel>
+                            <Border x:Name="RowBorder"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}"
+                                    SnapsToDevicePixels="True">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ToggleButton x:Name="Expander"
+                                            Grid.Column="0"
+                                                  Style="{StaticResource ExpanderToggleButtonStyle}"
+                                                  ClickMode="Press"
+                                                  IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
+                                    <ContentPresenter x:Name="PART_Header"
+                                            Grid.Column="1"
+                                            ContentSource="Header"
+                                                      HorizontalAlignment="Stretch"
+                                            VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <!-- Each nesting level compounds this margin, producing the
+                                 cascading indent that the default template gets "for free" -
+                                 our custom template has to add it back explicitly. The left
+                                 border draws a guide line under the parent arrow's center that
+                                 spans exactly this subtree's rendered height (Border sizes to
+                                 its child), so it reads as one continuous line VS Code-style
+                                 without any per-row depth tracking. -->
+                            <Border x:Name="ItemsHost"
+                                    Visibility="Collapsed"
+                                    Margin="8,0,0,0"
+                                    BorderThickness="1,0,0,0"
+                                    BorderBrush="{DynamicResource TreeGuideLineBrush}"
+                                    Padding="7,0,0,0">
+                                <ItemsPresenter/>
+                            </Border>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded"
+                                    Value="True">
+                                <Setter TargetName="ItemsHost"
+                                        Property="Visibility"
+                                        Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="HasItems"
+                                    Value="False">
+                                <Setter TargetName="Expander"
+                                        Property="Visibility"
+                                        Value="Hidden"/>
+                            </Trigger>
+                            <!-- Brightens this folder's guide line whenever it's an
+                                 ancestor of the currently selected item (maintained by
+                                 MainWindow on TreeView.SelectedItemChanged), so the path
+                                 down to the active selection is easy to trace. -->
+                            <DataTrigger Binding="{Binding IsAncestorOfSelection}"
+                                    Value="True">
+                                <Setter TargetName="ItemsHost"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource TreeGuideLineActiveBrush}"/>
+                            </DataTrigger>
+                            <!-- SourceName="RowBorder" (not plain Property="IsMouseOver", which
+                                 would read the whole TreeViewItem) matters here: a TreeViewItem's
+                                 IsMouseOver is true whenever the pointer is anywhere over its
+                                 rendered bounds, and those bounds include every expanded
+                                 descendant's rows too (they're part of the same control). Without
+                                 this, hovering one deeply nested row lit up its entire hover
+                                 background on every ancestor simultaneously, and moving the mouse
+                                 around the tree made that whole chain flicker on and off.
+                                 RowBorder only spans this row's own header (icon+text) - it's a
+                                 sibling of ItemsHost, not a container of it - so checking
+                                 IsMouseOver there instead correctly scopes to just this row. -->
+                            <Trigger SourceName="RowBorder"
+                                    Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="RowBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowHoverBackground}"/>
+                                <!-- No TargetName: sets TreeViewItem.Foreground itself (see the
+                                     IsSelected trigger below for the same reasoning), which the
+                                     selected-row trigger's Foreground setter still overrides when
+                                     both apply, since it's declared after this one. Folder rows
+                                     pick this up by inheritance (NameText sets no local Foreground
+                                     of its own); file rows have their own explicit hover/selected
+                                     triggers instead (see the HierarchicalDataTemplate below) that
+                                     override this by design. -->
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource FolderNameHoverForeground}"/>
+                            </Trigger>
+                            <!-- Selected background no longer varies with
+                                 Selector.IsSelectionActive: that state flips to False any time
+                                 keyboard focus leaves the tree's focus scope - including while
+                                 the row's own ContextMenu is open - which read as the selection
+                                 highlight flickering on/off on every right-click. Selection now
+                                 always renders the same way regardless of focus. -->
+                            <Trigger Property="IsSelected"
+                                    Value="True">
+                                <Setter TargetName="RowBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
+                            </Trigger>
+                            <!-- No TargetName: this sets TreeViewItem.Foreground itself, which
+                                 the header's TextBlock then picks up by inheritance (it no
+                                 longer sets its own local Foreground). -->
+                            <Trigger Property="IsSelected"
+                                    Value="True">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource HighlightForeground}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ResizeThumbStyle"
+                TargetType="Thumb">
+            <Setter Property="Background"
+                    Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Grid Background="Transparent">
+                            <Border x:Name="Bar"
+                                    Width="1"
+                                    HorizontalAlignment="Center"
+                                    Background="Transparent"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bar"
+                                        Property="Background"
+                                        Value="#FF6B6B6B"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging"
+                                    Value="True">
+                                <Setter TargetName="Bar"
+                                        Property="Background"
+                                        Value="#FF9B9B9B"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A thin, translucent scrollbar thumb (VS Code style) instead of the
+             stock Windows scrollbar chrome. Implicit (no x:Key) so it applies to
+             every ScrollBar in scope, including the TreeView's internal one. -->
+        <Style x:Key="MinimalScrollBarThumb"
+                TargetType="Thumb">
+            <Setter Property="Background"
+                    Value="#33FFFFFF"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="ThumbBorder"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="2"
+                                Margin="1"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="ThumbBorder"
+                                        Property="Background"
+                                        Value="#55FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging"
+                                    Value="True">
+                                <Setter TargetName="ThumbBorder"
+                                        Property="Background"
+                                        Value="#70FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Keyed explicitly (not implicit-by-TargetType) and wired directly onto
+             PART_VerticalScrollBar/PART_HorizontalScrollBar below - relying on
+             implicit TargetType resolution here previously lost to the theme's
+             own ScrollBar styling inside ScrollViewer's default template. -->
+        <Style x:Key="MinimalScrollBarStyle" TargetType="{x:Type ScrollBar}">
+            <Setter Property="Background"
+                    Value="Transparent"/>
+            <!-- Hidden at rest; hit-testing still works at Opacity 0, so moving the
+                 mouse toward the edge is enough to reveal it (VS Code / overlay-
+                 scrollbar style), and it fades back out once the mouse leaves. -->
+            <Setter Property="Opacity"
+                    Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Background="Transparent">
+                            <!-- Track defaults to Vertical and ignores the ScrollBar's own
+                                 Orientation unless explicitly bound - without this, a
+                                 horizontal scrollbar renders as a stray vertical sliver. -->
+                            <Track x:Name="PART_Track"
+                                    IsDirectionReversed="True"
+                                   Orientation="{TemplateBinding Orientation}">
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource MinimalScrollBarThumb}"/>
+                                </Track.Thumb>
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand"
+                                            Opacity="0"
+                                            Focusable="False"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand"
+                                            Opacity="0"
+                                            Focusable="False"/>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <!-- The "thickness" dimension is Width for a vertical scrollbar but
+                 Height for a horizontal one; a single fixed Width made the
+                 horizontal scrollbar's own Track (now orientation-aware) collapse
+                 into a sliver instead of spanning the bottom edge. -->
+            <Style.Triggers>
+                <Trigger Property="Orientation"
+                        Value="Vertical">
+                    <Setter Property="Width"
+                            Value="5"/>
+                </Trigger>
+                <Trigger Property="Orientation"
+                        Value="Horizontal">
+                    <Setter Property="Height"
+                            Value="5"/>
+                </Trigger>
+                <EventTrigger RoutedEvent="Mouse.MouseEnter">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                    To="1"
+                                    Duration="0:0:0.1"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+                <EventTrigger RoutedEvent="Mouse.MouseLeave">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                    To="0"
+                                    Duration="0:0:0.6"
+                                    BeginTime="0:0:0.2"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ScrollViewer's own default template creates PART_VerticalScrollBar /
+             PART_HorizontalScrollBar with no explicit Style, which should resolve
+             our style implicitly - but empirically it kept losing to the theme's
+             own ScrollBar styling. Replacing ScrollViewer's template too, with
+             Style="{StaticResource MinimalScrollBarStyle}" set directly on the
+             parts, removes any ambiguity about which style wins. -->
+        <ControlTemplate x:Key="MinimalScrollViewerTemplate" TargetType="ScrollViewer">
+            <!-- Single-cell overlay, not a Grid with a dedicated Auto column/row for
+                 each ScrollBar: a reserved column stayed reserved (5px wide) even
+                 while the bar itself sat at Opacity 0 between scrolls, so content
+                 never actually reached the container's right/bottom edge - a
+                 permanent sliver-wide gap, most visible once the sidebar became a
+                 free-floating window surrounded by other content instead of flush
+                 against the screen edge. Right/Bottom-aligned ScrollBars drawn on
+                 top of the full-bleed content instead give the true VS Code-style
+                 overlay the styling elsewhere already intended. -->
+            <Grid>
+                <!-- The default ScrollViewer template wraps this in a Border with
+                     Padding="{TemplateBinding Padding}" - our replacement dropped
+                     that wrapper for the minimal scrollbar layout, which silently
+                     made every ScrollViewer.Padding (TreeView's and FavoritesList's
+                     both) a no-op. Margin here restores it. -->
+                <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                         Content="{TemplateBinding Content}"
+                                         CanContentScroll="{TemplateBinding CanContentScroll}"
+                                         Margin="{TemplateBinding Padding}"/>
+                <ScrollBar x:Name="PART_VerticalScrollBar"
+                           Style="{StaticResource MinimalScrollBarStyle}"
+                           Orientation="Vertical"
+                           HorizontalAlignment="Right"
+                           Value="{TemplateBinding VerticalOffset}"
+                           Maximum="{TemplateBinding ScrollableHeight}"
+                           ViewportSize="{TemplateBinding ViewportHeight}"
+                           Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
+                <ScrollBar x:Name="PART_HorizontalScrollBar"
+                           Style="{StaticResource MinimalScrollBarStyle}"
+                           Orientation="Horizontal"
+                           VerticalAlignment="Bottom"
+                           Value="{TemplateBinding HorizontalOffset}"
+                           Maximum="{TemplateBinding ScrollableWidth}"
+                           ViewportSize="{TemplateBinding ViewportWidth}"
+                           Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"/>
+            </Grid>
+        </ControlTemplate>
+
+        <Style x:Key="ExplorerTreeViewStyle"
+                TargetType="TreeView">
+            <!-- Top padding dropped from 8 to 0 - the gap between the top
+                 divider and the first drive row (C:) read as too generous. -->
+            <Setter Property="Padding"
+                    Value="4,0,4,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TreeView">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                SnapsToDevicePixels="True">
+                            <ScrollViewer x:Name="PART_TreeScrollViewer"
+                                    Focusable="False"
+                                    Padding="{TemplateBinding Padding}"
+                                          Template="{StaticResource MinimalScrollViewerTemplate}"
+                                          CanContentScroll="True"
+                                          HorizontalScrollBarVisibility="{Binding Path=(ScrollViewer.HorizontalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}"
+                                          VerticalScrollBarVisibility="{Binding Path=(ScrollViewer.VerticalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}">
+                                <ItemsPresenter/>
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <HierarchicalDataTemplate DataType="{x:Type models:FileSystemItem}"
+                ItemsSource="{Binding Children}">
+            <!-- A horizontal StackPanel measures children with infinite available
+                 width, so TextTrimming never actually engaged - the text just
+                 rendered past the edge and got clipped with no "...". A Grid's
+                 star column constrains the TextBlock to the real remaining width. -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Image x:Name="RowIcon"
+                        Grid.Column="0"
+                        Source="{Binding IconUri}"
+                        Width="16"
+                        Height="16"
+                        Margin="0,0,6,0"
+                       VerticalAlignment="Center"
+                        RenderOptions.BitmapScalingMode="HighQuality"/>
+                <!-- Foreground and FontSize intentionally not set here - both inherit
+                     (Foreground from the TreeViewItem for selection-driven white text,
+                     FontSize from the TreeView so Ctrl+/- zoom can rescale every row). -->
+                <TextBlock x:Name="NameText"
+                           Grid.Column="1"
+                           Text="{Binding Name}"
+                           VerticalAlignment="Center"
+                        TextTrimming="CharacterEllipsis"/>
+                <!-- VS Code-style inline rename: swapped in for NameText while
+                     IsEditing (see the DataTrigger below) instead of opening a
+                     separate popup dialog. Focus/selection and commit/cancel
+                     are handled in code-behind (RenameTextBox_* in MainWindow.xaml.cs). -->
+                <TextBox x:Name="NameEditBox"
+                         Grid.Column="1"
+                         Text="{Binding EditingName, UpdateSourceTrigger=PropertyChanged}"
+                         Visibility="Collapsed"
+                         Background="#FF3C3C3C"
+                         Foreground="White"
+                         CaretBrush="White"
+                         BorderBrush="#FF5A5A5A"
+                         BorderThickness="1"
+                         Padding="2,0"
+                         VerticalAlignment="Center"
+                         IsVisibleChanged="RenameTextBox_IsVisibleChanged"
+                         KeyDown="RenameTextBox_KeyDown"
+                         LostFocus="RenameTextBox_LostFocus"/>
+                <!-- Shown in place of icon+name for the synthetic "… 더 보기 (N)"
+                     row that caps oversized folders (FileSystemItem.DisplayCap);
+                     clicking it reveals the rest (see
+                     TreeViewItem_PreviewMouseLeftButtonDown). -->
+                <TextBlock x:Name="ShowMoreText"
+                           Grid.Column="1"
+                           Text="{Binding ShowMoreLabel}"
+                           VerticalAlignment="Center"
+                           Visibility="Collapsed"
+                           Opacity="0.65"
+                           FontStyle="Italic"
+                           TextTrimming="CharacterEllipsis"/>
+            </Grid>
+            <HierarchicalDataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsEditing}"
+                        Value="True">
+                    <Setter TargetName="NameText"
+                            Property="Visibility"
+                            Value="Collapsed"/>
+                    <Setter TargetName="NameEditBox"
+                            Property="Visibility"
+                            Value="Visible"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsShowMore}"
+                        Value="True">
+                    <Setter TargetName="RowIcon"
+                            Property="Visibility"
+                            Value="Collapsed"/>
+                    <Setter TargetName="NameText"
+                            Property="Visibility"
+                            Value="Collapsed"/>
+                    <Setter TargetName="ShowMoreText"
+                            Property="Visibility"
+                            Value="Visible"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsDirectory}"
+                        Value="True">
+                    <Setter TargetName="RowIcon"
+                            Property="Visibility"
+                            Value="{DynamicResource FolderIconVisibility}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsDirectory}"
+                        Value="False">
+                    <Setter TargetName="RowIcon"
+                            Property="Visibility"
+                            Value="{DynamicResource FileIconVisibility}"/>
+                </DataTrigger>
+                <!-- File rows get their own text color instead of inheriting
+                     ForegroundText/HighlightForeground from the TreeViewItem
+                     (which folder rows still do, unchanged) - the split this
+                     came from (see AppSettings.FileNameColorHex). Declared
+                     normal -> hover -> selected, so a later trigger's Setter
+                     overrides an earlier one's when more than one applies at
+                     once (selected+hovered ends up selected-colored) - same
+                     precedent as the folder-row triggers above. -->
+                <DataTrigger Binding="{Binding IsDirectory}"
+                        Value="False">
+                    <Setter TargetName="NameText"
+                            Property="Foreground"
+                            Value="{DynamicResource FileNameForeground}"/>
+                </DataTrigger>
+                <!-- AncestorType=Border (not TreeViewItem.IsMouseOver, which
+                     would read the whole subtree - see the folder-row hover
+                     trigger's own comment above for why) resolves to
+                     RowBorder, the nearest Border ancestor of NameText in the
+                     visual tree even though RowBorder lives in a different
+                     template (the TreeViewItem's ControlTemplate, not this
+                     HierarchicalDataTemplate) - ElementName/SourceName can't
+                     cross that template boundary, but a visual-tree,
+                     type-based RelativeSource lookup doesn't need to. -->
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsDirectory}"
+                                Value="False"/>
+                        <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}"
+                                Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="NameText"
+                            Property="Foreground"
+                            Value="{DynamicResource FileNameHoverForeground}"/>
+                </MultiDataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsDirectory}"
+                                Value="False"/>
+                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}"
+                                Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="NameText"
+                            Property="Foreground"
+                            Value="{DynamicResource FileNameHighlightForeground}"/>
+                </MultiDataTrigger>
+                <DataTrigger Binding="{Binding IsRoot}"
+                        Value="True">
+                    <Setter TargetName="NameText"
+                            Property="FontWeight"
+                            Value="Bold"/>
+                </DataTrigger>
+            </HierarchicalDataTemplate.Triggers>
+        </HierarchicalDataTemplate>
+
+        <ContextMenu x:Key="FavoriteItemContextMenu"
+                Style="{StaticResource DarkContextMenuStyle}">
+            <MenuItem Header="{x:Static services:Strings.MenuRemoveFavorite}"
+                    Click="RemoveFavorite_Click"/>
+        </ContextMenu>
+
+        <Style x:Key="FavoriteListBoxItemStyle"
+                TargetType="ListBoxItem">
+            <!-- Left inset matches ExplorerTreeViewItemStyle's row Padding (4)
+                 plus its 16-wide expander column, reproduced below via the
+                 icon's own Margin instead of an extra empty column - so a
+                 favorite's folder icon lines up with the tree's folder icons
+                 directly beneath it. Vertical padding reuses the same
+                 FontSize-driven converter as the tree rows (bound to
+                 FavoritesList.FontSize, which itself follows ExplorerTree.FontSize -
+                 see MainWindow.xaml.cs's SetTreeFontSize) so Ctrl+/- zoom scales
+                 favorites row spacing the same way it does the tree's. -->
+            <Setter Property="Padding">
+                <Setter.Value>
+                    <Binding Path="FontSize"
+                             RelativeSource="{RelativeSource AncestorType=ListBox}"
+                             Converter="{StaticResource FontSizeToRowPaddingConverter}"/>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Background"
+                    Value="Transparent"/>
+            <Setter Property="BorderThickness"
+                    Value="0"/>
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Stretch"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="ContextMenu"
+                    Value="{StaticResource FavoriteItemContextMenu}"/>
+            <EventSetter Event="PreviewMouseRightButtonDown"
+                    Handler="FavoriteListBoxItem_PreviewMouseRightButtonDown"/>
+            <EventSetter Event="PreviewMouseLeftButtonDown"
+                    Handler="FavoriteListBoxItem_PreviewMouseLeftButtonDown"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <!-- Fixed, unlike the icon column below - stands in for
+                                         the tree row's own 16-wide expander column, which is
+                                         a separate column from its icon and so never
+                                         collapses. Split out from the icon's own margin so
+                                         the text after a hidden icon still lines up with the
+                                         tree's text (which starts right after its expander)
+                                         instead of collapsing flush left with everything
+                                         else in it. -->
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- Favorites are always folders (see AddFavorite's
+                                     IsDirectory check), so this can react to
+                                     FolderIconVisibility unconditionally - no
+                                     IsDirectory check needed the way the tree
+                                     row's icon has one. -->
+                                <Image Grid.Column="1"
+                                        Source="pack://application:,,,/Resources/Icons/folder.png"
+                                        Width="16"
+                                        Height="16"
+                                        Margin="0,0,6,0"
+                                        VerticalAlignment="Center"
+                                        Visibility="{DynamicResource FolderIconVisibility}"
+                                        RenderOptions.BitmapScalingMode="HighQuality"/>
+                                <!-- FontSize intentionally not set here - inherits down
+                                     from FavoritesList, same reasoning as the tree's row
+                                     TextBlock (see the HierarchicalDataTemplate above). -->
+                                <TextBlock x:Name="FavoriteNameText"
+                                        Grid.Column="2"
+                                        Text="{Binding DisplayName}"
+                                        Foreground="{DynamicResource ForegroundText}"
+                                        VerticalAlignment="Center"
+                                        TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowHoverBackground}"/>
+                                <!-- FavoriteNameText's own Foreground binding (above) would
+                                     otherwise win over inheritance, so this has to target it
+                                     directly rather than setting ListBoxItem.Foreground. -->
+                                <Setter TargetName="FavoriteNameText"
+                                        Property="Foreground"
+                                        Value="{DynamicResource FolderNameHoverForeground}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- FavoritesList otherwise falls back to the default ListBox chrome
+             (stock Windows scrollbar) since it only had ItemContainerStyle set;
+             reusing MinimalScrollViewerTemplate here matches the tree below. -->
+        <Style x:Key="FavoritesListBoxStyle"
+                TargetType="ListBox">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                SnapsToDevicePixels="True">
+                            <ScrollViewer Focusable="False"
+                                    Padding="{TemplateBinding Padding}"
+                                    Template="{StaticResource MinimalScrollViewerTemplate}"
+                                    CanContentScroll="True"
+                                    HorizontalScrollBarVisibility="{Binding Path=(ScrollViewer.HorizontalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}"
+                                    VerticalScrollBarVisibility="{Binding Path=(ScrollViewer.VerticalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}">
+                                <ItemsPresenter/>
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <!-- Single cell, not a content-column + dedicated resize-grip-column split:
+         a reserved "6" column stayed 6px wide even while docked with the grip
+         sitting idle (Background="Transparent" at rest - see ResizeThumbStyle),
+         so the sidebar's real content never reached the window's true right
+         edge. The Thumb below now overlays the content instead, the same fix
+         already applied to the scrollbars for the same reason. -->
+    <Grid>
+        <Grid Background="{DynamicResource SidebarBackground}">
+            <!-- Row1/Row3 are deliberately neutral names, not "FavoritesRow"/
+                 "TreeRow": which one actually hosts the favorites panel vs the
+                 tree depends on the "즐겨찾기를 아래에 표시" option (see
+                 ApplyFavoritesPosition in code-behind), which swaps both the
+                 Grid.Row of FavoritesList/ExplorerTree below AND which of
+                 these two RowDefinitions gets the content-fit-height treatment
+                 vs Height="*" - MainWindow.xaml.cs's FavoritesRowDef/TreeRowDef
+                 properties are the single source of truth for "which is which"
+                 right now. FavoritesSplitterRow's own Grid.Row never changes -
+                 it always sits between whichever row is on top and whichever
+                 is on bottom. -->
+            <Grid.RowDefinitions>
+                <RowDefinition Height="36"/>
+                <RowDefinition x:Name="Row1"
+                        Height="0"/>
+                <RowDefinition x:Name="FavoritesSplitterRow"
+                        Height="0"/>
+                <RowDefinition x:Name="Row3"
+                        Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header. Also doubles as the drag handle: while docked, dragging it
+                 past the system drag threshold detaches the window into a free-
+                 floating one (see HeaderGrid_MouseMove); once floating, WindowChrome's
+                 CaptionHeight takes over native dragging on this same area. -->
+            <!-- IsHitTestVisibleInChrome matters here specifically because of
+                 CaptionHeight: while docked it's 0 (the whole window is already
+                 plain client area, so this has no effect), but once floating
+                 WindowChrome sets CaptionHeight to HeaderHeight and, without this,
+                 treats this whole Grid as native OS caption territory - meaning
+                 clicks here (everywhere except the buttons below, which already
+                 had this set individually) never reached our own MouseLeftButtonDown
+                 handler at all. They fell straight through to Windows' own default
+                 caption handling instead, which explains why double-clicking here
+                 while floating maximized the window instead of running our
+                 dock-toggle logic (see HeaderGrid_MouseLeftButtonDown) - and why,
+                 had this masked drag behavior ever actually needed exercising while
+                 already floating, it would have used native OS move-window
+                 dragging rather than our own DragMove() call below. -->
+            <Grid x:Name="HeaderGrid"
+                    Grid.Row="0"
+                    Background="{DynamicResource HeaderBackground}"
+                    MouseLeftButtonDown="HeaderGrid_MouseLeftButtonDown"
+                    MouseMove="HeaderGrid_MouseMove"
+                    MouseLeftButtonUp="HeaderGrid_MouseLeftButtonUp"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <!-- The app icon IS the collapse/expand toggle now (see
+                     AppIcon_MouseLeftButtonDown) - the separate chevron
+                     button this used to sit next to is gone, so there's
+                     nothing left to click but this while docked, in either
+                     direction. Floating mode still shows it, just as
+                     branding (collapsing to the icon rail is a docked-only
+                     concept). -->
+                <Image x:Name="AppIcon"
+                        Grid.Column="0"
+                        Source="pack://application:,,,/Resources/icon.png"
+                        Width="20"
+                        Height="20"
+                        Margin="8,0,6,0"
+                        VerticalAlignment="Center"
+                        Cursor="Hand"
+                        ToolTip="{x:Static services:Strings.ToolTipToggle}"
+                        MouseLeftButtonDown="AppIcon_MouseLeftButtonDown"
+                        RenderOptions.BitmapScalingMode="HighQuality"/>
+                <TextBlock x:Name="RootPathText"
+                        Grid.Column="1"
+                        Text="{x:Static services:Strings.RootPathLabel}"
+                        Foreground="{DynamicResource ForegroundText}"
+                           VerticalAlignment="Center"
+                        Margin="2,0,8,0"
+                        FontSize="15"
+                        FontWeight="Bold"
+                        Opacity="0.75"
+                           TextTrimming="CharacterEllipsis"/>
+                <Button x:Name="PinButton"
+                        Grid.Column="2"
+                        Style="{StaticResource ToggleButtonStyle}"
+                        Click="PinButton_Click"
+                        Margin="2"
+                        RenderTransform="{StaticResource ShiftUp1px}"
+                        Visibility="Collapsed"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Image Source="pack://application:,,,/Resources/pin.png"
+                            Width="16"
+                            Height="16"
+                            RenderOptions.BitmapScalingMode="HighQuality"/>
+                </Button>
+                <Button x:Name="CollapseAllButton"
+                        Grid.Column="3"
+                        Style="{StaticResource ToggleButtonStyle}"
+                        Click="CollapseAllButton_Click"
+                        Margin="2"
+                        RenderTransform="{StaticResource ShiftUp1px}"
+                        ToolTip="{x:Static services:Strings.ToolTipCollapseAll}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Path Data="M4,10 L8,5 L12,10 Z"
+                            Fill="{DynamicResource ForegroundText}"/>
+                </Button>
+                <Button x:Name="OptionsButton"
+                        Grid.Column="4"
+                        Style="{StaticResource ToggleButtonStyle}"
+                        Click="OptionsButton_Click"
+                        Margin="2"
+                        RenderTransform="{StaticResource ShiftUp1px}"
+                        ToolTip="{x:Static services:Strings.ToolTipOptions}"
+                        ContextMenu="{StaticResource OptionsMenu}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center">
+                        <Ellipse Width="3"
+                                Height="3"
+                                Fill="{DynamicResource ForegroundText}"
+                                Margin="1,0"/>
+                        <Ellipse Width="3"
+                                Height="3"
+                                Fill="{DynamicResource ForegroundText}"
+                                Margin="1,0"/>
+                        <Ellipse Width="3"
+                                Height="3"
+                                Fill="{DynamicResource ForegroundText}"
+                                Margin="1,0"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="MinimizeButton"
+                        Grid.Column="5"
+                        Style="{StaticResource ToggleButtonStyle}"
+                        Click="MinimizeButton_Click"
+                        Margin="2"
+                        RenderTransform="{StaticResource ShiftUp1px}"
+                        ToolTip="{x:Static services:Strings.ToolTipMinimize}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <!-- A filled bar (not a stroked zero-height line) so its
+                         layout bounding box has real width AND height, same
+                         as the close "X" glyph's - a zero-height Path bounds
+                         box was the likely cause of this not lining up with
+                         the other two header buttons. -->
+                    <Rectangle Width="8"
+                            Height="1.5"
+                            RadiusX="0.75"
+                            RadiusY="0.75"
+                            Fill="{DynamicResource ForegroundText}"/>
+                </Button>
+                <!-- A few extra pixels on the right (vs. every other header
+                     button's uniform 2px) so the X glyph reads as centered in
+                     its own hit-box instead of crowding the window's true
+                     right edge. -->
+                <Button x:Name="CloseButton"
+                        Grid.Column="6"
+                        Style="{StaticResource ToggleButtonStyle}"
+                        Click="CloseButton_Click"
+                        Margin="2,2,6,2"
+                        RenderTransform="{StaticResource ShiftUp1px}"
+                        ToolTip="{x:Static services:Strings.ToolTipClose}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Path Data="M4,4 L12,12 M12,4 L4,12"
+                            Stroke="{DynamicResource ForegroundText}"
+                          StrokeThickness="1.5"
+                            StrokeStartLineCap="Round"
+                            StrokeEndLineCap="Round"/>
+                </Button>
+            </Grid>
+
+            <ListBox x:Name="FavoritesList"
+                    Grid.Row="1"
+                    Style="{StaticResource FavoritesListBoxStyle}"
+                    Background="{DynamicResource FavoritesBackground}"
+                    BorderThickness="0,0,0,1"
+                    BorderBrush="{DynamicResource PanelDividerBrush}"
+                    Padding="4,6,4,4"
+                    FontSize="{Binding FontSize, ElementName=ExplorerTree}"
+                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                    ItemContainerStyle="{StaticResource FavoriteListBoxItemStyle}"/>
+
+            <GridSplitter x:Name="FavoritesSplitter"
+                    Grid.Row="2"
+                    Height="4"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Center"
+                    Background="Transparent"
+                    ResizeDirection="Rows"
+                    DragCompleted="FavoritesSplitter_DragCompleted"
+                    MouseDoubleClick="FavoritesSplitter_MouseDoubleClick"/>
+
+            <!-- ScrollUnit="Pixel": without it, ScrollUnit defaults to Item,
+                 which with CanContentScroll=True (see ExplorerTreeViewStyle's
+                 ScrollViewer) makes this root panel scroll in units of whole
+                 drive-root items. An expanded C: rendering 2000px tall still
+                 counts as exactly one unit there, so the scrollbar moved in a
+                 few coarse steps and scroll offsets were meaningless as
+                 pixels. Pixel makes the extent the actual rendered height.
+
+                 CacheLength="1000,1000" with CacheLengthUnit="Item" is what
+                 fixes favorites navigation to a DIFFERENT drive. Temporary
+                 diagnostic logging finally pinned it down: the walk was
+                 failing at its very first step, on the drive root itself -
+                 e.g. "step[0] 'E:' containerFound=False" repeated until it
+                 gave up - while every deeper step succeeded on its first try.
+                 With C: expanded to ~2165px and the viewport only ~432px tall
+                 scrolled to ~595px, the E: row sits ~2165px down, far outside
+                 the default cache (one viewport-page either side), so its
+                 container was never realized and ContainerFromItem returned
+                 null forever. That is the real reason this only reproduced in
+                 floating mode (short viewport -> small cache) and got better
+                 as the per-folder display cap shrank (shorter C: -> E: closer)
+                 - a hard structural miss, not the timing flake several earlier
+                 rounds of retry-tuning assumed. There are only ever a handful
+                 of drive roots, so caching "all of them" costs nothing.
+
+                 Both are deliberately blocked from inheriting down to
+                 individual folders - see ExplorerTreeViewItemStyle, which
+                 re-sets CacheLength locally. Folders keep normal caching:
+                 they were never the problem (the log proves it), and letting
+                 a "reveal everything" cache reach a folder someone expanded
+                 via "더 보기" would realize hundreds of rows for no reason. -->
+            <!-- Also note: do NOT "fix" this by setting IsVirtualizing=False
+                 here. That was tried; it silently un-virtualizes the ENTIRE
+                 tree (the property inherits) and breaks scrolling app-wide. -->
+            <TreeView x:Name="ExplorerTree"
+                    Grid.Row="3"
+                    Style="{StaticResource ExplorerTreeViewStyle}"
+                      Background="{DynamicResource SidebarBackground}"
+                      Foreground="{DynamicResource ForegroundText}"
+                    FontSize="12"
+                    BorderThickness="0"
+                    ContextMenu="{StaticResource ExplorerEmptySpaceContextMenu}"
+                      ItemContainerStyle="{StaticResource ExplorerTreeViewItemStyle}"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      VirtualizingPanel.ScrollUnit="Pixel"
+                      VirtualizingPanel.CacheLengthUnit="Item"
+                      VirtualizingPanel.CacheLength="1000,1000"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                      MouseDoubleClick="ExplorerTree_MouseDoubleClick"
+                      SelectedItemChanged="ExplorerTree_SelectedItemChanged"
+                      KeyDown="ExplorerTree_KeyDown"/>
+
+            <!-- Same divider style FavoritesList already draws between itself
+                 and the tree below, using the same dedicated "영역 구분선"
+                 color (PanelDividerBrush) as that one - anyone who wants it
+                 gone can already do that by picking a color that matches the
+                 background. Declared last (not right after HeaderGrid) so it
+                 paints on top of FavoritesList/ExplorerTree regardless of
+                 which one ApplyFavoritesPosition currently has in Row1 -
+                 needed because the -2 bottom margin below deliberately
+                 overlaps 2px into whichever of them sits in Row1's top edge
+                 (see the TODO note: divider 2px lower, header content 1px
+                 higher, without moving the header row's own height or the
+                 OTHER divider between favorites and the tree). -->
+            <Border Grid.Row="0"
+                    Height="1"
+                    VerticalAlignment="Bottom"
+                    Margin="0,0,0,-2"
+                    Background="{DynamicResource PanelDividerBrush}"/>
+        </Grid>
+
+        <!-- Resize grip: overlaid on the content's right edge (see the note on
+             the root Grid above), not a sibling occupying its own column. -->
+        <Thumb x:Name="ResizeThumb"
+                HorizontalAlignment="Right"
+                Width="6"
+                Style="{StaticResource ResizeThumbStyle}"
+                Cursor="SizeWE"
+               DragDelta="ResizeThumb_DragDelta"/>
+    </Grid>
+</Window>
