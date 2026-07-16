@@ -54,13 +54,24 @@
                 Color="#FF1C1C1C"/>
         <SolidColorBrush x:Key="HeaderBackground"
                 Color="#FF1E1E1E"/>
-        <!-- Folder-name colors (see AppSettings.FolderNameColorHex) - kept
-             under these original key names since almost everything else in
-             the app (header/menu chrome, favorites) still uses them as the
-             general default foreground too, not just tree folder rows. -->
+        <!-- General header/menu/favorites chrome text - fixed, NOT written by
+             ApplyColorSettings (see FolderNameForeground/FolderNameHighlight
+             Foreground below for the customizable tree equivalents these used
+             to double as, until that sharing turned out to mean changing the
+             tree's folder-name color also silently recolored every menu). -->
         <SolidColorBrush x:Key="ForegroundText"
                 Color="#FFA8AAAE"/>
         <SolidColorBrush x:Key="HighlightForeground"
+                Color="#FFF0F2F6"/>
+        <!-- Folder-name colors (AppSettings.FolderNameColorHex/
+             FolderNameHighlightColorHex) - only ever used by the tree's own
+             TreeViewItem style (folder rows inherit these; file rows have
+             their own FileNameForeground/FileNameHighlightForeground pair
+             below). Defaults identical to ForegroundText/HighlightForeground
+             so the tree looks the same as before until customized. -->
+        <SolidColorBrush x:Key="FolderNameForeground"
+                Color="#FFA8AAAE"/>
+        <SolidColorBrush x:Key="FolderNameHighlightForeground"
                 Color="#FFF0F2F6"/>
         <!-- File-name colors (AppSettings.FileNameColorHex) - only ever used
              by the tree row's own NameText (see the HierarchicalDataTemplate
@@ -679,7 +690,7 @@
             <Setter Property="Background"
                     Value="Transparent"/>
             <Setter Property="Foreground"
-                    Value="{DynamicResource ForegroundText}"/>
+                    Value="{DynamicResource FolderNameForeground}"/>
             <Setter Property="HorizontalContentAlignment"
                     Value="Stretch"/>
             <Setter Property="Cursor"
@@ -812,7 +823,7 @@
                             <Trigger Property="IsSelected"
                                     Value="True">
                                 <Setter Property="Foreground"
-                                        Value="{DynamicResource HighlightForeground}"/>
+                                        Value="{DynamicResource FolderNameHighlightForeground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -1259,7 +1270,7 @@
                                 <TextBlock x:Name="FavoriteNameText"
                                         Grid.Column="2"
                                         Text="{Binding DisplayName}"
-                                        Foreground="{DynamicResource ForegroundText}"
+                                        Foreground="{DynamicResource FolderNameForeground}"
                                         VerticalAlignment="Center"
                                         TextTrimming="CharacterEllipsis"/>
                             </Grid>
@@ -1556,7 +1567,7 @@
                     Grid.Row="3"
                     Style="{StaticResource ExplorerTreeViewStyle}"
                       Background="{DynamicResource SidebarBackground}"
-                      Foreground="{DynamicResource ForegroundText}"
+                      Foreground="{DynamicResource FolderNameForeground}"
                     FontSize="12"
                     BorderThickness="0"
                     ContextMenu="{StaticResource ExplorerEmptySpaceContextMenu}"

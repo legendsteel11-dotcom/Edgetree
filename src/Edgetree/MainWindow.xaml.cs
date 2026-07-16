@@ -214,8 +214,8 @@ public partial class MainWindow : Window
     public void ApplyColorSettings()
     {
         SetBrushColor("SidebarBackground", _settings.BackgroundColorHex);
-        SetBrushColor("ForegroundText", _settings.FolderNameColorHex);
-        SetBrushColor("HighlightForeground", _settings.FolderNameHighlightColorHex);
+        SetBrushColor("FolderNameForeground", _settings.FolderNameColorHex);
+        SetBrushColor("FolderNameHighlightForeground", _settings.FolderNameHighlightColorHex);
         SetBrushColor("FileNameForeground", _settings.FileNameColorHex);
         SetBrushColor("FileNameHighlightForeground", _settings.FileNameHighlightColorHex);
         SetBrushColor("TreeRowSelectedActiveBackground", _settings.SelectionColorHex);
