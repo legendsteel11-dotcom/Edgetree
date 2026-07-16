@@ -1,7 +1,21 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
+import AppHeader from './components/AppHeader.vue'
+import HeroSection from './components/HeroSection.vue'
+import ScreenshotCards from './components/ScreenshotCards.vue'
+import FeatureGrid from './components/FeatureGrid.vue'
+import InfoSection from './components/InfoSection.vue'
+import DownloadSection from './components/DownloadSection.vue'
+import AppFooter from './components/AppFooter.vue'
 </script>
 
 <template>
-  <HelloWorld />
+  <AppHeader />
+  <main>
+    <HeroSection />
+    <ScreenshotCards />
+    <FeatureGrid />
+    <InfoSection />
+    <DownloadSection />
+  </main>
+  <AppFooter />
 </template>
