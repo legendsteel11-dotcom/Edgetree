@@ -7,8 +7,7 @@ const images = [
   'context-menu.png',
   'options-menu.png',
   'color-settings.png',
-  // Placeholder until a dedicated screenshot is taken for this one.
-  'options-menu.png',
+  'items-per-folder.png',
 ]
 </script>
 
