@@ -43,9 +43,9 @@ Either way, it's one `.exe` — no installer, just run it.
 - **Drag-to-resize** width while docked
 - **Undock into a floating window**: drag the header past the edge to detach
   it into a normal, freely movable and resizable window (shows in Alt+Tab and
-  the taskbar like any other app); click the pin button, or double-click the
-  header, to snap it back to the edge — remembers its floating position and
-  size across a dock/undock round trip
+  the taskbar like any other app); click the pin button to snap it back to
+  the edge — remembers its floating position and size across a dock/undock
+  round trip
 - **Drive-based root** ("This PC"): all connected drives listed at the top
   level, folders lazily loaded as you expand them
 - **Picks up where you left off**: expanded folders and your last-selected

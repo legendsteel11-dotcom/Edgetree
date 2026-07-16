@@ -631,29 +631,14 @@ public partial class MainWindow : Window
 
     private void HeaderGrid_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        // Double-click toggles dock state directly, mirroring what a drag (see
-        // HeaderGrid_MouseMove, undock-only) and the pin button (dock-only)
-        // already do individually - skip starting a drag-capture sequence for
-        // this click, there's nothing to drag.
-        if (e.ClickCount == 2)
-        {
-            if (_isDocked)
-            {
-                // Dragging (below) hands straight off to DragMove, so the
-                // window immediately follows the cursor somewhere else - but a
-                // double-click undocks with no drag to follow, and docked
-                // position is flush with the screen's top-left corner, so
-                // without an offset the window looked like it hadn't moved at
-                // all despite now being a normal floating window.
-                Undock(offsetFromCorner: true);
-            }
-            else
-            {
-                Dock();
-            }
-            return;
-        }
-
+        // Double-click used to toggle dock state directly here, but that made
+        // a floating window someone deliberately keeps undocked snap straight
+        // back to the edge on any accidental double-click (and, worse, on the
+        // one double-click that recovers a window Windows' own Aero-snap got
+        // stuck maximized - see Dock()/Undock()'s WindowState reset). Docking
+        // is still one click away via the pin button; undocking is still a
+        // header drag (HeaderGrid_MouseMove) - both cover their direction on
+        // their own, so this doesn't need its own third shortcut.
         _headerDragStart = e.GetPosition(this);
         (sender as UIElement)?.CaptureMouse();
     }
@@ -678,7 +663,57 @@ public partial class MainWindow : Window
         _headerDragStart = null;
         (sender as UIElement)?.ReleaseMouseCapture();
 
-        if (_isDocked)
+        // Dragging a maximized window's titlebar restoring it (and following
+        // the cursor from there) is standard Windows behavior - this window
+        // just never did it, since a custom WindowChrome caption doesn't get
+        // that for free.
+        if (WindowState == WindowState.Maximized)
+        {
+            // Just flipping WindowState back to Normal isn't enough on its
+            // own: WPF then repositions the window to RestoreBounds (wherever
+            // it happened to be the last time it was Normal), with no
+            // relation to where the cursor actually is right now.
+            //
+            // An earlier version of this tried to preserve the exact grabbed
+            // point by combining the current cursor position with `start`
+            // (the window-relative point captured back in
+            // HeaderGrid_MouseLeftButtonDown) - but `start` was captured via
+            // GetPosition while the window was still Maximized, and that
+            // turned out not to reliably track the window's true on-screen
+            // bounds, so the computed position carried a growing error into
+            // every repeat maximize/restore cycle instead of fixing it.
+            // Recomputing purely from the CURRENT cursor position (nothing
+            // carried over from a possibly-unreliable earlier read) can't
+            // accumulate error, even if it's not pixel-perfect about which
+            // exact point under the cursor gets grabbed - clamped onto the
+            // screen so it can't end up dragged off it either.
+            var cursorScreen = System.Windows.Forms.Cursor.Position;
+            var dpi = VisualTreeHelper.GetDpi(this);
+            double cursorX = cursorScreen.X / dpi.DpiScaleX;
+            double cursorY = cursorScreen.Y / dpi.DpiScaleY;
+
+            // RestoreBounds - captured before WindowState changes below -
+            // holds this window's actual size right before it got maximized,
+            // which is whatever the user had it resized to (not necessarily
+            // _floatingWidth/Height or the docked ExpandedWidth default), so
+            // restoring to it is what keeps that size instead of silently
+            // snapping back to a smaller default.
+            var restoreBounds = RestoreBounds;
+            double restoredWidth = restoreBounds.Width > 0 ? restoreBounds.Width : (_floatingWidth ?? ClampExpandedWidth(_settings.ExpandedWidth));
+            double restoredHeight = restoreBounds.Height > 0 ? restoreBounds.Height : (_floatingHeight ?? DefaultFloatingHeight);
+
+            WindowState = WindowState.Normal;
+            Width = restoredWidth;
+            Height = restoredHeight;
+
+            double screenLeft = SystemParameters.VirtualScreenLeft;
+            double screenTop = SystemParameters.VirtualScreenTop;
+            double screenRight = screenLeft + SystemParameters.VirtualScreenWidth;
+            double screenBottom = screenTop + SystemParameters.VirtualScreenHeight;
+            Left = Math.Clamp(cursorX - Width / 2, screenLeft, Math.Max(screenLeft, screenRight - Width));
+            Top = Math.Clamp(cursorY - HeaderHeight / 2, screenTop, Math.Max(screenTop, screenBottom - Height));
+        }
+        else if (_isDocked)
         {
             Undock();
         }
@@ -713,6 +748,16 @@ public partial class MainWindow : Window
             return;
         }
         _isDocked = false;
+
+        // Aero-snap (dragging the header to the screen edge, or Win+Up) can
+        // still maximize this window even with no OS titlebar, since
+        // WindowChrome gives it a real caption area while floating (see
+        // ChromeSettings.CaptionHeight below). WPF silently ignores every
+        // Left/Top/Width/Height write below while WindowState stays
+        // Maximized - which is exactly why the pin button/double-click used
+        // to look like it did nothing once a window got stuck that way.
+        // Resetting it here first is what actually unsticks it.
+        WindowState = WindowState.Normal;
 
         // Collapsing to the icon-only rail (and further, auto-hiding to a
         // sliver) only makes sense docked (both are space-saving tricks for a
@@ -804,6 +849,11 @@ public partial class MainWindow : Window
         {
             return;
         }
+
+        // Same Aero-snap reset as Undock() - matters here too, otherwise the
+        // floating bounds snapshotted right below would be the maximized
+        // (full-screen) ones instead of the window's actual floating size.
+        WindowState = WindowState.Normal;
 
         // Snapshot the floating bounds right before they're overwritten below,
         // so a later Undock() can put the window back exactly where/how it
