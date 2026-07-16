@@ -119,7 +119,7 @@
 
 ```bash
 git clone <this-repo-url>
-cd SIDEBARVSCODELIKEEXPLORER
+cd Edgetree
 dotnet run --project src/Edgetree
 ```
 

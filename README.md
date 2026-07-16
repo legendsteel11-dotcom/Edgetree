@@ -128,7 +128,7 @@ Either way, it's one `.exe` — no installer, just run it.
 
 ```bash
 git clone <this-repo-url>
-cd SIDEBARVSCODELIKEEXPLORER
+cd Edgetree
 dotnet run --project src/Edgetree
 ```
 
