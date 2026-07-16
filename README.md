@@ -7,6 +7,17 @@ or right edge of the screen, VS Code Explorer style. It's not meant to replace
 Windows Explorer — it's a quick way to glance at a folder structure and jump
 straight to a file without opening a full Explorer window.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Docked to the left edge](screenshot/docked-left.png) | ![Docked to the right edge](screenshot/docked-right.png) |
+| Docked to the left edge | Docked to the right edge |
+| ![Browsing a wider window](screenshot/browsing.png) | ![Right-click context menu](screenshot/context-menu.png) |
+| Browsing, undocked/wider | Right-click context menu |
+| ![Options menu](screenshot/options-menu.png) | ![Color settings](screenshot/color-settings.png) |
+| Options ("...") menu | Color settings |
+
 ## Features
 
 - **Docked to the screen edge** — left by default, switchable to the right

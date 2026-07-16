@@ -6,6 +6,17 @@
 기본 윈도우 탐색기를 대체하려는 목적이 아니라, 폴더 구조를 빠르게 훑어보고
 파일 위치로 바로 이동하기 위한 보조 도구입니다.
 
+## 스크린샷
+
+| | |
+|---|---|
+| ![좌측 도킹](screenshot/docked-left.png) | ![우측 도킹](screenshot/docked-right.png) |
+| 좌측 가장자리 도킹 | 우측 가장자리 도킹 |
+| ![넓은 창에서 탐색](screenshot/browsing.png) | ![우클릭 컨텍스트 메뉴](screenshot/context-menu.png) |
+| 창모드(넓게)에서 탐색 | 우클릭 컨텍스트 메뉴 |
+| ![옵션 메뉴](screenshot/options-menu.png) | ![색상 설정](screenshot/color-settings.png) |
+| 옵션("...") 메뉴 | 색상 설정 |
+
 ## 주요 기능
 
 - **화면 가장자리 고정 배치** — 기본은 좌측, 옵션 메뉴에서 우측으로도 전환

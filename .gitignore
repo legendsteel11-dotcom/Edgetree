@@ -30,3 +30,6 @@ Thumbs.db
 # Design source files (kept locally, not tracked in git)
 *.psd
 *.ai
+
+# Raw RDP screenshot captures (kept locally; cropped versions in screenshot/ are tracked)
+screenshot/mstsc_*.jpg
