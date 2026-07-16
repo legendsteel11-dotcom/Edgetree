@@ -6,6 +6,15 @@
 기본 윈도우 탐색기를 대체하려는 목적이 아니라, 폴더 구조를 빠르게 훑어보고
 파일 위치로 바로 이동하기 위한 보조 도구입니다.
 
+## 다운로드
+
+[릴리즈 페이지](https://github.com/legendsteel11-dotcom/Edgetree/releases/latest)에서 최신 버전을 받으세요. 매 릴리즈마다 파일 2개가 첨부되어 있습니다.
+
+- **`Edgetree-<버전>-win-x64.exe`** (약 1MB) — [.NET 8 데스크톱 런타임](https://dotnet.microsoft.com/download/dotnet/8.0)이 이미 설치되어 있다면 이걸로.
+- **`Edgetree-<버전>-win-x64-standalone.exe`** (약 160MB) — .NET을 따로 설치할 필요 없이 바로 실행되는 단일 파일. 잘 모르겠거나, 작은 exe가 런타임이 없다는 오류를 낸다면 이걸로.
+
+둘 다 설치 프로그램 없이 exe 파일 하나만 실행하면 됩니다.
+
 ## 스크린샷
 
 | | |
@@ -120,14 +129,24 @@ dotnet build Edgetree.sln
 
 ## 단일 실행 파일로 배포하기
 
+프레임워크 종속 (용량 작음, 대상 PC에 .NET 8 데스크톱 런타임 필요):
+
 ```bash
 dotnet publish src/Edgetree -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
 ```
 
-결과물은 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`
-경로에 생성됩니다. 대상 PC에 .NET 8 데스크톱 런타임이 설치되어 있어야 하며,
-런타임을 함께 포함하려면 `--self-contained true` 옵션을 추가하면 됩니다
-(파일 용량은 커집니다).
+독립 실행형 (용량 큼, 대상 PC에 .NET 설치 불필요):
+
+```bash
+dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+```
+
+`IncludeNativeLibrariesForSelfExtract` 옵션이 핵심입니다 — 이게 없으면 WPF의
+네이티브 연동 DLL(`D3DCompiler_47_cor3.dll`, `wpfgfx_cor3.dll` 등)이 exe 안에
+포함되지 않고 옆에 따로 풀려서, exe 파일 하나만 옮기면 실행이 안 됩니다.
+
+어느 쪽이든 결과물은 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`
+경로에 생성됩니다.
 
 ## 라이선스
 

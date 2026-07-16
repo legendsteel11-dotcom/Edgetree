@@ -7,6 +7,18 @@ or right edge of the screen, VS Code Explorer style. It's not meant to replace
 Windows Explorer — it's a quick way to glance at a folder structure and jump
 straight to a file without opening a full Explorer window.
 
+## Download
+
+Grab the latest build from the [Releases page](https://github.com/legendsteel11-dotcom/Edgetree/releases/latest). Two options are attached to each release:
+
+- **`Edgetree-<version>-win-x64.exe`** (~1 MB) — pick this if you already have
+  the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) installed.
+- **`Edgetree-<version>-win-x64-standalone.exe`** (~160 MB) — a single file
+  with everything bundled in, no .NET install required. Pick this if you're
+  not sure, or if the smaller exe complains about a missing runtime.
+
+Either way, it's one `.exe` — no installer, just run it.
+
 ## Screenshots
 
 | | |
@@ -125,14 +137,25 @@ dotnet build Edgetree.sln
 
 ## Publishing a standalone executable
 
+Framework-dependent (small, needs the .NET 8 Desktop Runtime on the target machine):
+
 ```bash
 dotnet publish src/Edgetree -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true
 ```
 
-The resulting `.exe` is in
-`src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`. Requires
-the .NET 8 Desktop Runtime on the target machine (or add
-`--self-contained true` to bundle the runtime, at the cost of a larger file).
+Self-contained (large, no .NET install needed on the target machine):
+
+```bash
+dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+```
+
+`IncludeNativeLibrariesForSelfExtract` matters here — without it, WPF's native
+interop DLLs (`D3DCompiler_47_cor3.dll`, `wpfgfx_cor3.dll`, etc.) get dropped
+loose next to the exe instead of bundled into it, so the exe stops working the
+moment it's moved on its own.
+
+Either way, the resulting `.exe` is in
+`src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
 
 ## License
 
