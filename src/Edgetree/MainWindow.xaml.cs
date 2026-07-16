@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using System.Text.Json;
 using Microsoft.Win32;
 using System.Windows;
@@ -99,11 +100,26 @@ public partial class MainWindow : Window
     // of the two interleaving.
     private int _navigationToken;
 
-    // Debounces FileSystemItem.ExternalChange per folder - a save/copy
-    // operation fires several watcher events in quick succession for what's
-    // really one logical change, so each pending folder gets one timer that
-    // keeps getting restarted until events stop arriving for it.
-    private readonly Dictionary<FileSystemItem, System.Windows.Threading.DispatcherTimer> _pendingExternalRefreshes = new();
+    // Debounces a changed folder's live-refresh (see StartDriveWatchers) - a
+    // save/copy operation fires several watcher events in quick succession
+    // for what's really one logical change, so each pending folder path gets
+    // one timer that keeps getting restarted until events stop arriving for
+    // it. Keyed by path, not by FileSystemItem: the watcher event only ever
+    // gives a path string, and the item it refers to might not even be
+    // loaded yet.
+    private readonly Dictionary<string, System.Windows.Threading.DispatcherTimer> _pendingExternalRefreshes = new();
+
+    // One recursive watcher per drive root (see StartDriveWatchers), covering
+    // every folder on that drive regardless of expand state - NOT one
+    // watcher per expanded folder, which an earlier version of this used and
+    // which scaled directly with how many folders someone had open. That
+    // turned out to noticeably worsen resize-drag flicker with a large
+    // number of folders expanded, presumably from the sheer count of live
+    // OS-level watcher handles/thread-pool callbacks competing for the UI
+    // thread during a fast-repeating operation - a handful of recursive
+    // watchers (one per drive, however many folders are open) doesn't have
+    // that scaling problem.
+    private readonly List<FileSystemWatcher> _driveWatchers = new();
 
     public MainWindow()
     {
@@ -111,7 +127,6 @@ public partial class MainWindow : Window
         SourceInitialized += MainWindow_SourceInitialized;
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
-        FileSystemItem.ExternalChange += OnFileSystemItemExternalChange;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         SystemParameters.StaticPropertyChanged += SystemParameters_StaticPropertyChanged;
     }
@@ -141,6 +156,9 @@ public partial class MainWindow : Window
 
     private void MainWindow_Loaded(object? sender, RoutedEventArgs e)
     {
+        string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+        VersionFooterText.Text = $"Edgetree v{version}";
+
         _settings = _settingsService.Load();
         FileSystemService.SortField = _settings.SortByDate ? FileSortField.Date : FileSortField.Name;
         FileSystemService.SortDescending = _settings.SortDescending;
@@ -182,6 +200,7 @@ public partial class MainWindow : Window
 
         _roots = FileSystemService.GetDriveRoots();
         ExplorerTree.ItemsSource = _roots;
+        StartDriveWatchers();
 
         // Row sizing for the current favorite count/collapsed state was
         // already handled above by SetExpandedContentVisibility.
@@ -303,6 +322,7 @@ public partial class MainWindow : Window
     {
         ExplorerTree.FontSize = size;
         _settings.TreeFontSize = size;
+        ApplyIconMetrics();
 
         // FavoriteRowHeight scales with ExplorerTree.FontSize (see its own
         // comment), so a fitted favorites panel needs re-fitting to the new
@@ -317,6 +337,11 @@ public partial class MainWindow : Window
         if (!_settingsResetPending)
         {
             SaveCurrentWidth();
+        }
+
+        foreach (var watcher in _driveWatchers)
+        {
+            watcher.Dispose();
         }
     }
 
@@ -491,6 +516,7 @@ public partial class MainWindow : Window
     private void ExitAutoHide()
     {
         _autoHideRehideTimer?.Stop();
+        StopAutoHideOutsideClickWatch();
         _settings.IsAutoHidden = false;
         _settings.IsCollapsed = false;
         _isAutoHideRevealed = false;
@@ -519,14 +545,22 @@ public partial class MainWindow : Window
         SetExpandedContentVisibility(Visibility.Visible);
         AnimateWidth(ClampExpandedWidth(_settings.ExpandedWidth));
         UpdatePinButtonVisibility();
+
+        if (!_settings.AutoHideCloseOnMouseLeave)
+        {
+            StartAutoHideOutsideClickWatch();
+        }
     }
 
     // A short delay (rather than hiding the instant the cursor leaves) so
     // briefly overshooting the sliver's edge on the way in/out doesn't
-    // instantly slam it shut again.
+    // instantly slam it shut again. Only relevant to the default
+    // AutoHideCloseOnMouseLeave mode - the click-outside alternative
+    // (StartAutoHideOutsideClickWatch) doesn't care about the cursor leaving
+    // at all.
     private void MainWindow_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
     {
-        if (!_isDocked || !_settings.IsAutoHidden || !_isAutoHideRevealed)
+        if (!_isDocked || !_settings.IsAutoHidden || !_isAutoHideRevealed || !_settings.AutoHideCloseOnMouseLeave)
         {
             return;
         }
@@ -574,10 +608,72 @@ public partial class MainWindow : Window
             return;
         }
 
+        CloseAutoHideReveal();
+    }
+
+    private void CloseAutoHideReveal()
+    {
         _isAutoHideRevealed = false;
         SetExpandedContentVisibility(Visibility.Collapsed);
         AnimateWidth(AutoHideSliverWidth);
         UpdatePinButtonVisibility();
+    }
+
+    // Alternative to the default AutoHideRehideTimer/MouseLeave close: instead
+    // of closing as soon as the cursor drifts off the peeked-open window, this
+    // keeps it open regardless of the cursor and only closes once the user
+    // actually clicks somewhere outside it - for reading the tree without it
+    // snapping shut over a stray mouse movement. Polls rather than a global
+    // low-level mouse hook - simpler and much lower-risk (no unmanaged hook
+    // handle to leak/crash on if cleanup is ever missed), and a ~120ms
+    // response to a click is imperceptible for this.
+    private System.Windows.Threading.DispatcherTimer? _autoHideOutsideClickTimer;
+
+    private void StartAutoHideOutsideClickWatch()
+    {
+        _autoHideOutsideClickTimer ??= new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(120)
+        };
+        _autoHideOutsideClickTimer.Tick -= AutoHideOutsideClickTimer_Tick;
+        _autoHideOutsideClickTimer.Tick += AutoHideOutsideClickTimer_Tick;
+        _autoHideOutsideClickTimer.Start();
+    }
+
+    private void StopAutoHideOutsideClickWatch()
+    {
+        _autoHideOutsideClickTimer?.Stop();
+    }
+
+    private void AutoHideOutsideClickTimer_Tick(object? sender, EventArgs e)
+    {
+        // Self-terminating safety net: if some other path (pin button,
+        // toggling the option mid-reveal, ...) exited this state without
+        // going through StopAutoHideOutsideClickWatch, this notices within
+        // one tick and stops itself instead of polling forever.
+        if (!_isDocked || !_settings.IsAutoHidden || !_isAutoHideRevealed || _settings.AutoHideCloseOnMouseLeave)
+        {
+            StopAutoHideOutsideClickWatch();
+            return;
+        }
+
+        if (System.Windows.Forms.Control.MouseButtons == System.Windows.Forms.MouseButtons.None)
+        {
+            return;
+        }
+
+        var cursor = System.Windows.Forms.Cursor.Position;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double cursorX = cursor.X / dpi.DpiScaleX;
+        double cursorY = cursor.Y / dpi.DpiScaleY;
+        bool insideWindow = cursorX >= Left && cursorX <= Left + Width && cursorY >= Top && cursorY <= Top + Height;
+        if (insideWindow)
+        {
+            return;
+        }
+
+        StopAutoHideOutsideClickWatch();
+        CloseAutoHideReveal();
     }
 
     private void SetExpandedContentVisibility(Visibility visibility)
@@ -1393,7 +1489,7 @@ public partial class MainWindow : Window
         // "색상 변경" item, neither of which has state to sync here.
         if (sender is ContextMenu
             {
-                Items: [MenuItem autoCollapse, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem favoritesAtBottom, MenuItem dockOnRight, _, _, MenuItem sortMenu, MenuItem maxItemsRow, MenuItem languageMenu, ..]
+                Items: [MenuItem autoCollapse, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, _, MenuItem sortMenu, MenuItem maxItemsRow, MenuItem languageMenu, ..]
             })
         {
             autoCollapse.IsChecked = _settings.AutoCollapseFolders;
@@ -1404,6 +1500,7 @@ public partial class MainWindow : Window
             showFileIcons.IsChecked = _settings.ShowFileIcons;
             favoritesAtBottom.IsChecked = _settings.FavoritesAtBottom;
             dockOnRight.IsChecked = _settings.DockOnRight;
+            autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
 
             if (sortMenu.Items is [MenuItem byName, MenuItem byDate, _, MenuItem ascending, MenuItem descending])
             {
@@ -1900,6 +1997,21 @@ public partial class MainWindow : Window
         }
     }
 
+    private void AutoHideCloseOnLeaveMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.AutoHideCloseOnMouseLeave = menuItem.IsChecked;
+            // Switching away from click-outside mode mid-reveal should stop
+            // watching for one immediately rather than leaving it armed under
+            // the now-inapplicable setting.
+            if (menuItem.IsChecked)
+            {
+                StopAutoHideOutsideClickWatch();
+            }
+        }
+    }
+
     // Same live-swap approach as ApplyColorSettings: replacing the resource
     // dictionary entry is picked up immediately by every row's DynamicResource
     // reference (see the HierarchicalDataTemplate's IsDirectory DataTrigger),
@@ -1907,23 +2019,92 @@ public partial class MainWindow : Window
     private void ApplyFolderIconVisibility()
     {
         Resources["FolderIconVisibility"] = _settings.ShowFolderIcons ? Visibility.Visible : Visibility.Collapsed;
+        ApplyIconMetrics();
     }
 
     private void ApplyFileIconVisibility()
     {
         Resources["FileIconVisibility"] = _settings.ShowFileIcons ? Visibility.Visible : Visibility.Collapsed;
+        ApplyIconMetrics();
+    }
+
+    // Scales the row icon's size and margins with the tree's FontSize - same
+    // proportion FontSizeToRowPaddingConverter already applies to row
+    // padding, so icons and their surrounding gaps grow/shrink along with
+    // Ctrl+/- zoom instead of staying a fixed size that looks increasingly
+    // mismatched against the text around them.
+    //
+    // FileRowIconMargin also carries the folder/file icon cross-toggle fix:
+    // a file row only needs the extra left shift (-16, matching a folder
+    // icon's own width) when folder icons are OFF but file icons are still
+    // ON - that's the one combination where a file row's icon stays visible
+    // while a sibling folder row's has disappeared out from under it,
+    // opening a gap between where the folder's (now icon-less) name sits and
+    // where the file's (still-indented) icon+name sits. Both "everything on"
+    // and "both off" (RowIcon Collapsed there, so its margin is moot) use
+    // the same plain margin folder rows do - deliberately not the -16 shift,
+    // since applying it universally regressed the "file icons off" case
+    // (RowIcon.Visibility no longer being the only thing changing per
+    // FileIconVisibility toggle).
+    private void ApplyIconMetrics()
+    {
+        double scale = ExplorerTree.FontSize / DefaultTreeFontSize;
+        Resources["IconSize"] = 16.0 * scale;
+
+        var plainMargin = new Thickness(0, 0, 6 * scale, 0);
+        Resources["FolderRowIconMargin"] = plainMargin;
+
+        bool needsShift = !_settings.ShowFolderIcons && _settings.ShowFileIcons;
+        Resources["FileRowIconMargin"] = needsShift
+            ? new Thickness(-16 * scale, 0, 6 * scale, 0)
+            : plainMargin;
+
+        // Both off: files lose their reserved (but always-blank, per
+        // ExpanderColumn's own HasItems=False trigger) 16px arrow gutter too,
+        // so a file's name sits flush with the true left edge - to the left
+        // of a sibling folder's still-visible arrow - reading as one
+        // unindented group instead of files looking oddly indented under
+        // folders that no longer even show an icon to justify it.
+        bool bothOff = !_settings.ShowFolderIcons && !_settings.ShowFileIcons;
+        Resources["FileArrowGutterWidth"] = new GridLength(bothOff ? 0 : 16);
     }
 
     private void ColorSettingsMenuItem_Click(object sender, RoutedEventArgs e)
     {
         var window = new ColorSettingsWindow(_settings, ApplyColorSettings) { Owner = this };
+        PositionNearOptionsButton(window);
         window.ShowDialog();
     }
 
     private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
         var window = new AboutWindow { Owner = this };
+        PositionNearOptionsButton(window);
         window.ShowDialog();
+    }
+
+    // Detail windows (color settings, about, ...) used to always open centered
+    // on the main window - starting them near the options menu instead, where
+    // the user's attention already is, means less hunting for where the new
+    // window landed. Clamped to the virtual screen so a window docked near a
+    // screen edge doesn't push most of the dialog off-screen; only Left is
+    // clamped against the dialog's own (fixed, pre-SizeToContent) Width -
+    // these dialogs all use SizeToContent="Height", so the actual height
+    // isn't known yet at this point, and Top is just kept from going above
+    // the screen entirely.
+    private void PositionNearOptionsButton(Window window)
+    {
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+
+        var topLeft = OptionsButton.PointToScreen(new System.Windows.Point(0, OptionsButton.ActualHeight));
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double left = topLeft.X / dpi.DpiScaleX;
+        double top = topLeft.Y / dpi.DpiScaleY;
+
+        double screenLeft = SystemParameters.VirtualScreenLeft;
+        double screenRight = screenLeft + SystemParameters.VirtualScreenWidth;
+        window.Left = Math.Clamp(left, screenLeft, Math.Max(screenLeft, screenRight - window.Width));
+        window.Top = Math.Max(top, SystemParameters.VirtualScreenTop);
     }
 
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
@@ -2077,6 +2258,10 @@ public partial class MainWindow : Window
                 CopyItem_Click(sender, e);
                 e.Handled = true;
                 break;
+            case Key.C when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
+                CopyPath_Click(sender, e);
+                e.Handled = true;
+                break;
             case Key.V when Keyboard.Modifiers == ModifierKeys.Control:
                 PasteItem_Click(sender, e);
                 e.Handled = true;
@@ -2123,6 +2308,7 @@ public partial class MainWindow : Window
             Key.F5 => () => RefreshFolder_Click(sender, e),
             Key.Enter when !menuItemHighlighted => () => OpenItem_Click(sender, e),
             Key.C when Keyboard.Modifiers == ModifierKeys.Control => () => CopyItem_Click(sender, e),
+            Key.C when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) => () => CopyPath_Click(sender, e),
             Key.V when Keyboard.Modifiers == ModifierKeys.Control => () => PasteItem_Click(sender, e),
             _ => null
         };
@@ -2444,40 +2630,127 @@ public partial class MainWindow : Window
         }
     }
 
-    // FileSystemItem.ExternalChange fires on the FileSystemWatcher's own
-    // thread pool thread - hop to the UI thread before touching any
-    // DispatcherTimer/tree state.
-    private void OnFileSystemItemExternalChange(FileSystemItem item)
+    // One recursive FileSystemWatcher per drive root, covering the whole
+    // drive regardless of expand state - see _driveWatchers' own comment for
+    // why this replaced one-watcher-per-expanded-folder. Started once at
+    // startup and left running for the app's lifetime; there are only ever a
+    // handful of drives, so this is cheap compared to a count that scales
+    // with how many folders someone has expanded.
+    private void StartDriveWatchers()
     {
-        Dispatcher.BeginInvoke(() =>
+        foreach (var root in _roots)
         {
-            if (_pendingExternalRefreshes.TryGetValue(item, out var existing))
+            try
             {
-                existing.Stop();
-                existing.Start();
-                return;
-            }
-
-            var timer = new System.Windows.Threading.DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(300)
-            };
-            timer.Tick += (_, _) =>
-            {
-                timer.Stop();
-                _pendingExternalRefreshes.Remove(item);
-                // Re-checked here (not just at watcher-start time): the
-                // folder may have been collapsed - and its watcher already
-                // stopped - in the gap between the event firing and this
-                // timer elapsing.
-                if (item.IsExpanded)
+                var watcher = new FileSystemWatcher(root.FullPath)
                 {
-                    RefreshFolderPreservingState(item);
-                }
-            };
-            _pendingExternalRefreshes[item] = timer;
-            timer.Start();
-        });
+                    IncludeSubdirectories = true,
+                    // Deliberately no NotifyFilters.LastWrite/no Changed
+                    // subscription below - this tree only ever shows a
+                    // folder's list of names, and a file being edited in
+                    // place (same name) doesn't change what that list looks
+                    // like. Watching LastWrite too would mean every
+                    // autosave/log write anywhere on the whole drive resets
+                    // some folder's debounce for a change nothing here
+                    // actually displays differently.
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName
+                };
+                watcher.Created += OnDriveWatcherEvent;
+                watcher.Deleted += OnDriveWatcherEvent;
+                watcher.Renamed += OnDriveWatcherEvent;
+                watcher.EnableRaisingEvents = true;
+                _driveWatchers.Add(watcher);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                // Drive not ready/accessible (empty optical drive, disconnected
+                // network share, ...) right at startup - same tolerance as any
+                // other filesystem race elsewhere in this app; that one drive
+                // just doesn't get live updates.
+            }
+        }
+    }
+
+    // Fires on the FileSystemWatcher's own thread pool thread, for every
+    // change anywhere on the whole drive - only e.FullPath's parent folder is
+    // what might need refreshing (that's the folder whose own listing
+    // changed), and only if it's actually expanded right now.
+    private void OnDriveWatcherEvent(object sender, FileSystemEventArgs e)
+    {
+        if (Path.GetDirectoryName(e.FullPath) is not { } folderPath)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() => QueueExternalRefresh(folderPath));
+    }
+
+    // Debounced per-folder-path - see _pendingExternalRefreshes' own comment.
+    private void QueueExternalRefresh(string folderPath)
+    {
+        if (_pendingExternalRefreshes.TryGetValue(folderPath, out var existing))
+        {
+            existing.Stop();
+            existing.Start();
+            return;
+        }
+
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(300)
+        };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            _pendingExternalRefreshes.Remove(folderPath);
+            if (FindLoadedItemForPath(folderPath) is { IsExpanded: true } item)
+            {
+                RefreshFolderPreservingState(item);
+            }
+        };
+        _pendingExternalRefreshes[folderPath] = timer;
+        timer.Start();
+    }
+
+    // Walks down from the matching drive root by name, same idea as
+    // FindItemForPath, but must NEVER force-load an ancestor folder the user
+    // never opened just to check whether some deeply nested, never-expanded
+    // folder happens to contain the changed path - so this bails out (returns
+    // null) the moment the next segment isn't already an existing, already-
+    // loaded child, instead of loading it like FindItemForPath deliberately does
+    // for restoring saved state.
+    private FileSystemItem? FindLoadedItemForPath(string path)
+    {
+        path = path.TrimEnd('\\');
+        var current = _roots.FirstOrDefault(r =>
+            path.StartsWith(r.FullPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
+        if (current is null)
+        {
+            return null;
+        }
+
+        string relative = path.Substring(current.FullPath.TrimEnd('\\').Length).Trim('\\');
+        if (relative.Length == 0)
+        {
+            return current;
+        }
+
+        foreach (var segment in relative.Split('\\', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!current.ChildrenLoaded)
+            {
+                return null;
+            }
+            var next = current.Children.FirstOrDefault(c =>
+                !c.IsPlaceholder && !c.IsShowMore &&
+                string.Equals(c.Name, segment, StringComparison.OrdinalIgnoreCase));
+            if (next is null)
+            {
+                return null;
+            }
+            current = next;
+        }
+        return current;
     }
 
     // Same snapshot -> refresh -> replay approach as RefreshAllLoadedFolders,

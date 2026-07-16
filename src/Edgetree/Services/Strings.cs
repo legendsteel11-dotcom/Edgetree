@@ -33,9 +33,15 @@ public static class Strings
     public static string MenuShowFileIcons = "파일 아이콘 표시";
     public static string MenuFavoritesAtBottom = "즐겨찾기를 아래에 표시";
     public static string MenuDockOnRight = "화면 우측에 고정";
+    public static string MenuAutoHideCloseOnLeave = "즉시자동숨김";
     public static string MenuColorSettings = "색상 설정";
-    public static string MenuAbout = "정보";
-    public static string MenuLanguage = "언어 / Language";
+    public static string MenuAbout = "앱 정보";
+
+    // Fixed, deliberately not switched by Initialize() below - shown the same
+    // in either language rather than "언어 / Language", since the word
+    // "Language" alone is already understood regardless of which one a user
+    // currently reads.
+    public static readonly string MenuLanguage = "Language";
 
     // Fixed, deliberately not switched by Initialize() below - same reasoning
     // as MenuLanguage just above: whichever language a user currently reads,
@@ -102,6 +108,7 @@ public static class Strings
     public static string AboutAuthorLabel = "제작자";
     public static string AboutDateLabel = "날짜";
     public static string AboutLicenseLabel = "라이센스 요약";
+    public static string AboutGithubLabel = "GitHub";
     public static string AboutAuthorValue = "pjh85336@gmail.com";
     public static string AboutLicenseSummary =
         "MIT 라이선스. 번들된 아이콘은 Material Icon Theme 프로젝트(MIT)에서 가져왔습니다. " +
@@ -164,6 +171,7 @@ public static class Strings
         MenuShowFileIcons = "Show File Icons";
         MenuFavoritesAtBottom = "Show Favorites at Bottom";
         MenuDockOnRight = "Pin to Right Edge";
+        MenuAutoHideCloseOnLeave = "Close Instantly on Mouse Leave";
         MenuColorSettings = "Color Settings";
         MenuAbout = "About";
         MenuDefaultSort = "Default Sort";

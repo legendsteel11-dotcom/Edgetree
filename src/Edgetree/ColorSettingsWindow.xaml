@@ -5,7 +5,7 @@
         Title="{x:Static services:Strings.ColorSettingsTitle}"
         SizeToContent="Height"
         Width="300"
-        WindowStartupLocation="CenterOwner"
+        WindowStartupLocation="Manual"
         ResizeMode="NoResize"
         WindowStyle="None"
         AllowsTransparency="False"
@@ -118,7 +118,8 @@
         </Style>
     </Window.Resources>
 
-    <Border BorderBrush="#FF454545"
+    <Border x:Name="RootBorder"
+            BorderBrush="#FF454545"
             BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>

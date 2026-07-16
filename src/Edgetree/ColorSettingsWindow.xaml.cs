@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using SidebarExplorer.App.Models;
 using MouseButtonEventArgs = System.Windows.Input.MouseButtonEventArgs;
 using Color = System.Windows.Media.Color;
@@ -13,12 +14,41 @@ public partial class ColorSettingsWindow : Window
     private readonly AppSettings _settings;
     private readonly Action _onChanged;
 
+    // Set around the native ColorDialog's own ShowDialog (see PickColor) -
+    // that dialog takes activation away from this window too, which would
+    // otherwise trigger the same "clicked outside the app" flash below for a
+    // completely ordinary in-app interaction (picking a color).
+    private bool _isPickingColor;
+
     public ColorSettingsWindow(AppSettings settings, Action onChanged)
     {
         InitializeComponent();
         _settings = settings;
         _onChanged = onChanged;
         RefreshSwatches();
+        Deactivated += Window_Deactivated;
+    }
+
+    // Nudges attention back to this dialog if the user clicks outside the
+    // whole app while it's open (ShowDialog only blocks its owner, not other
+    // applications, so that's still possible) - see _isPickingColor above for
+    // the one in-app interaction this deliberately ignores.
+    private void Window_Deactivated(object? sender, EventArgs e)
+    {
+        if (_isPickingColor)
+        {
+            return;
+        }
+
+        var flashBrush = new SolidColorBrush(((SolidColorBrush)RootBorder.BorderBrush).Color);
+        RootBorder.BorderBrush = flashBrush;
+        flashBrush.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation
+        {
+            To = Color.FromRgb(0x4F, 0xA8, 0xFF),
+            Duration = TimeSpan.FromMilliseconds(150),
+            AutoReverse = true,
+            RepeatBehavior = new RepeatBehavior(2)
+        });
     }
 
     private void RefreshSwatches()
@@ -139,7 +169,9 @@ public partial class ColorSettingsWindow : Window
         };
 
         var owner = new Win32Window(new System.Windows.Interop.WindowInteropHelper(this).Handle);
+        _isPickingColor = true;
         bool accepted = dialog.ShowDialog(owner) == System.Windows.Forms.DialogResult.OK;
+        _isPickingColor = false;
 
         // Kept even on Cancel - a custom color added to the palette before
         // backing out of that particular pick should still be there next time.

@@ -8,6 +8,7 @@
         xmlns:converters="clr-namespace:SidebarExplorer.App.Converters"
         xmlns:services="clr-namespace:SidebarExplorer.App.Services"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:system="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         x:Name="RootWindow"
         Title="Edgetree"
@@ -116,6 +117,27 @@
              plumbing. -->
         <Visibility x:Key="FolderIconVisibility">Visible</Visibility>
         <Visibility x:Key="FileIconVisibility">Visible</Visibility>
+
+        <!-- Row icon size/margins - see MainWindow.xaml.cs's ApplyIconMetrics
+             for how these three are actually computed (font-size-scaled, and
+             FileRowIconMargin depending on both icon toggles); the values
+             here are just defaults matching FontSize=12 until that first
+             runs. FolderRowIconMargin is also the default Margin every row's
+             RowIcon starts with in the template below - FileRowIconMargin
+             overrides it only for file rows (IsDirectory=False trigger). -->
+        <system:Double x:Key="IconSize">16</system:Double>
+        <Thickness x:Key="FolderRowIconMargin">0,0,6,0</Thickness>
+        <Thickness x:Key="FileRowIconMargin">0,0,6,0</Thickness>
+
+        <!-- The 16px column a file row's TreeViewItem template always
+             reserves for the expand arrow it never shows (folders alone can
+             expand) - only collapsed to 0 when BOTH folder and file icons
+             are off, so a file's name sits flush with the true left edge,
+             to the left of a sibling folder's still-visible arrow, instead
+             of leaving an empty arrow-width gap before it. With either icon
+             type still on, files keep this gutter as before, aligning their
+             icon/name with a folder's icon/name the normal way. -->
+        <GridLength x:Key="FileArrowGutterWidth">16</GridLength>
 
         <Style x:Key="ToggleButtonStyle"
                 TargetType="Button">
@@ -480,6 +502,7 @@
                     Click="DeleteItem_Click"/>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuCopyPath}"
+                    InputGestureText="Ctrl+Shift+C"
                     Click="CopyPath_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpenTerminal}"
                     Click="OpenTerminal_Click"/>
@@ -517,6 +540,9 @@
             <MenuItem Header="{x:Static services:Strings.MenuDockOnRight}"
                     IsCheckable="True"
                     Click="DockOnRightMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuAutoHideCloseOnLeave}"
+                    IsCheckable="True"
+                    Click="AutoHideCloseOnLeaveMenuItem_Click"/>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuColorSettings}"
                     Click="ColorSettingsMenuItem_Click"/>
@@ -723,7 +749,8 @@
                                     SnapsToDevicePixels="True">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="16"/>
+                                        <ColumnDefinition x:Name="ExpanderColumn"
+                                                Width="16"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <ToggleButton x:Name="Expander"
@@ -761,11 +788,18 @@
                                         Property="Visibility"
                                         Value="Visible"/>
                             </Trigger>
+                            <!-- ExpanderColumn's width setter only actually matters combined
+                                 with HasItems=False (a file never has this arrow to begin
+                                 with) - see FileArrowGutterWidth's own comment in the
+                                 Resources block above for when/why it collapses to 0. -->
                             <Trigger Property="HasItems"
                                     Value="False">
                                 <Setter TargetName="Expander"
                                         Property="Visibility"
                                         Value="Hidden"/>
+                                <Setter TargetName="ExpanderColumn"
+                                        Property="Width"
+                                        Value="{DynamicResource FileArrowGutterWidth}"/>
                             </Trigger>
                             <!-- Brightens this folder's guide line whenever it's an
                                  ancestor of the currently selected item (maintained by
@@ -1060,9 +1094,9 @@
                 <Image x:Name="RowIcon"
                         Grid.Column="0"
                         Source="{Binding IconUri}"
-                        Width="16"
-                        Height="16"
-                        Margin="0,0,6,0"
+                        Width="{DynamicResource IconSize}"
+                        Height="{DynamicResource IconSize}"
+                        Margin="{DynamicResource FolderRowIconMargin}"
                        VerticalAlignment="Center"
                         RenderOptions.BitmapScalingMode="HighQuality"/>
                 <!-- Foreground and FontSize intentionally not set here - both inherit
@@ -1137,6 +1171,9 @@
                     <Setter TargetName="RowIcon"
                             Property="Visibility"
                             Value="{DynamicResource FileIconVisibility}"/>
+                    <Setter TargetName="RowIcon"
+                            Property="Margin"
+                            Value="{DynamicResource FileRowIconMargin}"/>
                 </DataTrigger>
                 <!-- File rows get their own text color instead of inheriting
                      ForegroundText/HighlightForeground from the TreeViewItem
@@ -1354,6 +1391,7 @@
                         Height="0"/>
                 <RowDefinition x:Name="Row3"
                         Height="*"/>
+                <RowDefinition Height="20"/>
             </Grid.RowDefinitions>
 
             <!-- Header. Also doubles as the drag handle: while docked, dragging it
@@ -1599,6 +1637,20 @@
                     VerticalAlignment="Bottom"
                     Margin="0,0,0,-2"
                     Background="{DynamicResource PanelDividerBrush}"/>
+
+            <!-- Version footer - same dim treatment as the tree's own "더 보기"
+                 row (inherited foreground at reduced opacity) rather than its
+                 own color, so it reads as a quiet, out-of-the-way label. -->
+            <Border Grid.Row="4"
+                    BorderThickness="0,1,0,0"
+                    BorderBrush="{DynamicResource PanelDividerBrush}">
+                <TextBlock x:Name="VersionFooterText"
+                        Foreground="{DynamicResource ForegroundText}"
+                        Opacity="0.65"
+                        FontSize="11"
+                        VerticalAlignment="Center"
+                        Margin="8,0,0,2"/>
+            </Border>
         </Grid>
 
         <!-- Resize grip: overlaid on the content's right edge (see the note on

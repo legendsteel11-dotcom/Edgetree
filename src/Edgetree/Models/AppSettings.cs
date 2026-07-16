@@ -14,6 +14,15 @@ public class AppSettings
     // ExitAutoHide. Only meaningful alongside IsCollapsed=true (entered by a
     // second click on the already-collapsed icon rail).
     public bool IsAutoHidden { get; set; } = false;
+
+    // "즉시자동숨김" in the options menu. True (default, matches the original
+    // behavior from before this toggle existed) closes the peeked-open reveal
+    // shortly after the cursor leaves it (MainWindow_MouseLeave). False keeps
+    // it open regardless of the cursor and closes only once the user clicks
+    // somewhere outside the window instead (see
+    // MainWindow.StartAutoHideOutsideClickWatch) - for someone who wants to
+    // read the tree without it snapping shut the moment the mouse drifts off.
+    public bool AutoHideCloseOnMouseLeave { get; set; } = true;
     public double TreeFontSize { get; set; } = 12;
     public ObservableCollection<FavoriteEntry> Favorites { get; set; } = new();
     public double FavoritesPanelHeight { get; set; } = 100;

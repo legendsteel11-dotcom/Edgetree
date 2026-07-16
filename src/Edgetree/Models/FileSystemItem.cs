@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.IO;
 using System.Runtime.CompilerServices;
 using SidebarExplorer.App.Services;
 
@@ -55,91 +54,7 @@ public class FileSystemItem : INotifyPropertyChanged
             if (SetField(ref _isExpanded, value) && IsDirectory)
             {
                 OnPropertyChanged(nameof(IconUri));
-                if (value)
-                {
-                    StartWatching();
-                }
-                else
-                {
-                    StopWatching();
-                }
             }
-        }
-    }
-
-    // Live-refresh for whatever's currently expanded: fires (on the
-    // FileSystemWatcher's own thread pool thread, not the UI thread) when a
-    // watched folder's contents change externally - e.g. from Windows
-    // Explorer or any other program. MainWindow subscribes once and owns
-    // marshaling to the UI thread/debouncing/actually refreshing - see its
-    // own remarks for why that lives there instead of here.
-    public static event Action<FileSystemItem>? ExternalChange;
-
-    private FileSystemWatcher? _watcher;
-
-    private void StartWatching()
-    {
-        if (_watcher is not null || !IsDirectory || IsPlaceholder || IsShowMore)
-        {
-            return;
-        }
-
-        try
-        {
-            var watcher = new FileSystemWatcher(FullPath)
-            {
-                // Deliberately no NotifyFilters.LastWrite/no Changed
-                // subscription below - this tree only ever shows a folder's
-                // list of names, and a file being edited in place (same
-                // name) doesn't change what that list looks like. Watching
-                // LastWrite too would mean every autosave/log write nearby
-                // resets the debounce and thrashes a refresh for a change
-                // nothing here actually displays differently.
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName
-            };
-            watcher.Created += OnWatcherEvent;
-            watcher.Deleted += OnWatcherEvent;
-            watcher.Renamed += OnWatcherEvent;
-            watcher.EnableRaisingEvents = true;
-            _watcher = watcher;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            // Folder deleted/unavailable/inaccessible right as we tried to
-            // watch it - same tolerance as any other filesystem race
-            // elsewhere in this app; this folder just doesn't get live
-            // updates, nothing else depends on the watcher existing.
-        }
-    }
-
-    private void StopWatching()
-    {
-        if (_watcher is not { } watcher)
-        {
-            return;
-        }
-        _watcher = null;
-
-        watcher.EnableRaisingEvents = false;
-        watcher.Created -= OnWatcherEvent;
-        watcher.Deleted -= OnWatcherEvent;
-        watcher.Renamed -= OnWatcherEvent;
-        watcher.Dispose();
-    }
-
-    private void OnWatcherEvent(object sender, FileSystemEventArgs e) => ExternalChange?.Invoke(this);
-
-    // Old children/overflow items about to be discarded (see PopulateCapped)
-    // never have IsExpanded set back to false the normal way - nothing sets
-    // it, they're just dropped - which would otherwise leak their
-    // FileSystemWatchers (and everything expanded further down inside them)
-    // indefinitely.
-    private static void StopWatchingRecursive(FileSystemItem item)
-    {
-        item.StopWatching();
-        foreach (var child in item.Children)
-        {
-            StopWatchingRecursive(child);
         }
     }
 
@@ -231,15 +146,6 @@ public class FileSystemItem : INotifyPropertyChanged
     // parked in _overflow behind a single trailing "더 보기" row.
     private void PopulateCapped(List<FileSystemItem> loaded)
     {
-        foreach (var child in Children)
-        {
-            StopWatchingRecursive(child);
-        }
-        foreach (var child in _overflow)
-        {
-            StopWatchingRecursive(child);
-        }
-
         Children.Clear();
         _overflow.Clear();
         _showingAll = false;
