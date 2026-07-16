@@ -3,11 +3,12 @@ import { t } from '../i18n'
 
 const images = [
   'docked-left.png',
-  'docked-right.png',
   'browsing.png',
   'context-menu.png',
   'options-menu.png',
   'color-settings.png',
+  // Placeholder until a dedicated screenshot is taken for this one.
+  'options-menu.png',
 ]
 </script>
 

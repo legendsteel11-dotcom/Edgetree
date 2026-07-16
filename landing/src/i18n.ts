@@ -17,25 +17,21 @@ const dict = {
       github: 'GitHub',
     },
     hero: {
-      eyebrow: 'Windows 파일 탐색기 유틸',
+      eyebrow: 'Windows 폴더/파일 탐색기 유틸',
       title: 'Edgetree',
-      tagline: '화면 가장자리에 항상 붙어있는, VS Code 탐색기 스타일의 가벼운 파일 탐색기',
+      tagline: '화면 가장자리에 항상 붙어있는, VS Code 탐색기 스타일의 가벼운 탐색기',
       description:
-        '윈도우 탐색기를 대체하려는 목적이 아닙니다 — 폴더 구조를 빠르게 훑어보고 파일 위치로 바로 이동하기 위한 보조 도구입니다.',
+        '폴더 구조를 빠르게 훑어보고 파일 위치로 바로 이동하기 위한 보조 도구입니다.',
       ctaDownload: '다운로드',
       ctaGithub: 'GitHub에서 보기',
     },
     screenshots: {
       title: '스크린샷으로 보는 Edgetree',
-      subtitle: '화면 어디에 있든, 어떤 모습으로든 손에 익게',
+      subtitle: '화면 어디에 있든, 익숙한 스타일',
       items: [
         {
-          title: '좌측 도킹',
-          desc: '화면 좌측 가장자리에 붙어 항상 열려 있습니다.',
-        },
-        {
-          title: '우측 도킹',
-          desc: '옵션 메뉴에서 우측 도킹으로 전환할 수 있습니다.',
+          title: '도킹',
+          desc: '화면 좌측 또는 우측 가장자리에 붙어 항상 열려 있습니다. 옵션 메뉴에서 방향을 바로 전환할 수 있습니다.',
         },
         {
           title: '자유 이동 창모드',
@@ -53,6 +49,10 @@ const dict = {
           title: '색상 커스터마이징',
           desc: '폴더명, 파일명, 배경, 선택 영역 등 14가지 색상을 원하는 대로 바꿀 수 있습니다.',
         },
+        {
+          title: '폴더 표시 개수 조정',
+          desc: '폴더 하나에서 한 번에 보여줄 파일 개수를 1~50개 사이로 직접 조절할 수 있습니다.',
+        },
       ],
     },
     features: {
@@ -69,6 +69,8 @@ const dict = {
         { title: '전체 설정 초기화', desc: '확인 창을 거쳐 앱을 처음 상태로 되돌리기' },
         { title: '한국어/영어 지원', desc: '옵션 메뉴에서 언제든 전환' },
         { title: 'Material Icon Theme', desc: '파일/폴더 확장자별 아이콘 자동 적용' },
+        { title: '자동 숨김', desc: '마우스를 가장자리에 올리면 살짝 나타났다가, 벗어나면 다시 얇은 선으로 숨습니다.' },
+        { title: '윈도우 시작과 함께', desc: '윈도우 시작 시 자동으로 실행할 수 있습니다.' },
       ],
     },
     info: {
@@ -106,25 +108,21 @@ const dict = {
       github: 'GitHub',
     },
     hero: {
-      eyebrow: 'Windows File Explorer Utility',
+      eyebrow: 'Windows Folder & File Explorer Utility',
       title: 'Edgetree',
-      tagline: 'A lightweight file explorer that lives at your screen edge, VS Code Explorer style',
+      tagline: 'A lightweight explorer that lives at your screen edge, VS Code Explorer style',
       description:
-        "Not meant to replace Windows Explorer — it's a quick way to glance at a folder structure and jump straight to a file.",
+        "A quick way to glance at a folder structure and jump straight to a file.",
       ctaDownload: 'Download',
       ctaGithub: 'View on GitHub',
     },
     screenshots: {
       title: 'Edgetree in action',
-      subtitle: 'Wherever it sits on screen, it feels right at home',
+      subtitle: 'Wherever it sits on screen, it feels familiar',
       items: [
         {
-          title: 'Docked to the left',
-          desc: 'Anchors to the left edge of your screen, always ready.',
-        },
-        {
-          title: 'Docked to the right',
-          desc: 'Switch to the right edge anytime from the options menu.',
+          title: 'Docking',
+          desc: 'Anchors to the left or right edge of your screen, always ready — switch sides anytime from the options menu.',
         },
         {
           title: 'Floating window mode',
@@ -142,6 +140,10 @@ const dict = {
           title: 'Color customization',
           desc: '14 customizable colors — folder names, file names, backgrounds, selection, and more.',
         },
+        {
+          title: 'Items per folder',
+          desc: 'Adjust how many items each folder shows at once, from 1 to 50.',
+        },
       ],
     },
     features: {
@@ -158,6 +160,8 @@ const dict = {
         { title: 'Reset all settings', desc: 'Back to factory defaults, with a confirmation prompt' },
         { title: 'Korean / English UI', desc: 'Switch languages anytime from the options menu' },
         { title: 'Material Icon Theme', desc: 'Per-extension icons for files and folders' },
+        { title: 'Auto-hide', desc: 'Peeks open when you hover the edge, and quietly hides back to a thin sliver when you move away.' },
+        { title: 'Launch at startup', desc: 'Start automatically when Windows starts.' },
       ],
     },
     info: {

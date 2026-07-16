@@ -6,7 +6,7 @@ const RELEASE_URL = 'https://github.com/legendsteel11-dotcom/Edgetree/releases/l
 
 <template>
   <section id="top" class="hero">
-    <div class="container grid">
+    <div class="container">
       <div class="copy">
         <img src="/icon.png" alt="" width="56" height="56" class="icon" />
         <p class="eyebrow">{{ t.hero.eyebrow }}</p>
@@ -19,7 +19,7 @@ const RELEASE_URL = 'https://github.com/legendsteel11-dotcom/Edgetree/releases/l
         </div>
       </div>
       <div class="shot">
-        <img src="/screenshots/docked-left.png" alt="Edgetree docked to the left edge of the screen" />
+        <img src="/screenshots/fullscreen-context.jpg" alt="Edgetree docked to the left edge of a full screen" />
       </div>
     </div>
   </section>
@@ -29,19 +29,18 @@ const RELEASE_URL = 'https://github.com/legendsteel11-dotcom/Edgetree/releases/l
 .hero {
   padding-top: 64px;
   background:
-    radial-gradient(ellipse 900px 500px at 15% 0%, rgba(47, 143, 234, 0.12), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 50% 0%, rgba(47, 143, 234, 0.12), transparent 60%),
     var(--bg);
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  align-items: center;
-  gap: 48px;
+.copy {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto;
 }
 
 .icon {
-  margin-bottom: 20px;
+  margin: 0 auto 20px;
 }
 
 .eyebrow {
@@ -75,38 +74,25 @@ h1 {
 .cta {
   display: flex;
   gap: 12px;
-  flex-wrap: wrap;
-}
-
-.shot {
-  display: flex;
   justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 56px;
 }
 
 .shot img {
-  max-height: 640px;
-  width: auto;
+  width: 100%;
   border-radius: 10px;
   border: 1px solid var(--border);
   box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.6);
 }
 
-@media (max-width: 900px) {
-  .grid {
-    grid-template-columns: 1fr;
-    text-align: center;
+@media (max-width: 720px) {
+  h1 {
+    font-size: 38px;
   }
 
-  .cta {
-    justify-content: center;
-  }
-
-  .shot {
-    order: -1;
-  }
-
-  .shot img {
-    max-height: 420px;
+  .tagline {
+    font-size: 18px;
   }
 }
 </style>
