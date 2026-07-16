@@ -87,11 +87,14 @@ Either way, it's one `.exe` — no installer, just run it.
   immediately instead of waiting for the next expand
 - **Material Icon Theme** file/folder icons (see
   [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)); drive names shown in bold
-- Header: pin, collapse-all, an **options ("...") menu** (Auto Collapse,
-  always on top, start with Windows, always show the tray icon, show folder
-  icons, show file icons, favorites at bottom, dock to the right edge, color
-  settings, default sort, items per folder, language, export/import settings,
-  about — all remembered), minimize to tray, and close
+- Header: pin, **collapse-all** (toggles: remembers which folders were
+  expanded, collapses everything, then restores exactly that state on a
+  second click), an **options ("...") menu** (Auto Collapse, always on top,
+  start with Windows, always show the tray icon, show folder icons, show
+  file icons, favorites at bottom, dock to the right edge, color settings,
+  default sort, items per folder, language, export/import settings, reset
+  all settings — with a confirmation prompt, about — all remembered),
+  minimize to tray, and close
 - **Minimize to the system tray**: click the tray icon (or its "Open" menu
   item) to restore the window; right-click for Open/Exit
 - **Color settings**: 14 customizable colors — folder name, file name (each

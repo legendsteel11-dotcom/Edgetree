@@ -56,6 +56,7 @@ public static class Strings
     public static string MenuMaxItemsPerFolder = "폴더의 표시 개수";
     public static string MenuExportSettings = "설정 내보내기...";
     public static string MenuImportSettings = "설정 가져오기...";
+    public static string MenuResetSettings = "전체 설정 초기화...";
 
     // Header buttons (ToolTips) and root label
     public static string ToolTipToggle = "접기/펼치기";
@@ -130,6 +131,9 @@ public static class Strings
     public static string SettingsImportedTitle = "설정 가져오기 완료";
     public static string SettingsImportedBody = "설정을 가져왔습니다. 적용하려면 앱을 다시 시작해야 합니다. 지금 다시 시작할까요?";
 
+    public static string ResetSettingsConfirmTitle = "설정 초기화";
+    public static string ResetSettingsConfirmBody = "모든 설정과 즐겨찾기가 앱 기본 상태로 초기화됩니다. 이 작업은 되돌릴 수 없습니다.\n\n초기화 후 적용을 위해 앱을 다시 시작합니다. 계속할까요?";
+
     public static void Initialize(string language)
     {
         if (language != "en")
@@ -171,6 +175,7 @@ public static class Strings
         MenuMaxItemsPerFolder = "Items per Folder";
         MenuExportSettings = "Export Settings...";
         MenuImportSettings = "Import Settings...";
+        MenuResetSettings = "Reset All Settings...";
 
         ToolTipToggle = "Collapse/Expand";
         ToolTipPinLeft = "Pin to Left";
@@ -231,5 +236,8 @@ public static class Strings
         ImportSettingsFailedTitle = "Failed to Import Settings";
         SettingsImportedTitle = "Settings Imported";
         SettingsImportedBody = "Settings were imported. Restarting the app is required to apply them. Restart now?";
+
+        ResetSettingsConfirmTitle = "Reset Settings";
+        ResetSettingsConfirmBody = "All settings and favorites will be reset to the app's default state. This cannot be undone.\n\nThe app will restart afterward to apply it. Continue?";
     }
 }

@@ -70,6 +70,12 @@ public partial class MainWindow : Window
     // null once restored.
     private List<string>? _collapseAllRestorePaths;
 
+    // Set right before shutting down for a settings reset, so
+    // MainWindow_Closing skips SaveCurrentWidth - otherwise it would
+    // overwrite the freshly-saved defaults with the still-live pre-reset
+    // window width/expanded folders/selection on its way out.
+    private bool _settingsResetPending;
+
     private System.Windows.Point? _headerDragStart;
     private FileSystemItem? _selectedItem;
     private bool _isNavigatingFromFavorite;
@@ -284,7 +290,10 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        SaveCurrentWidth();
+        if (!_settingsResetPending)
+        {
+            SaveCurrentWidth();
+        }
     }
 
     private void SystemParameters_StaticPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -1710,6 +1719,32 @@ public partial class MainWindow : Window
             System.Diagnostics.Process.Start(Environment.ProcessPath!);
             Application.Current.Shutdown();
         }
+    }
+
+    // One combined Yes/No (rather than a second "restart now?" prompt after
+    // this one, like Import/Language use) since agreeing to an irreversible
+    // full reset already implies agreeing to the restart it requires.
+    private void ResetSettingsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var result = MessageBox.Show(this, Strings.ResetSettingsConfirmBody, Strings.ResetSettingsConfirmTitle,
+            MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        // Same reasoning as ImportSettingsMenuItem_Click: save the fresh
+        // defaults to disk AND repoint the live _settings, since
+        // MainWindow_Closing (about to run via Shutdown below) would otherwise
+        // re-save whatever _settings references - _settingsResetPending is
+        // what stops it from doing that with the still-live pre-reset
+        // width/expanded folders/selection.
+        _settings = new AppSettings();
+        _settingsService.Save(_settings);
+        _settingsResetPending = true;
+
+        System.Diagnostics.Process.Start(Environment.ProcessPath!);
+        Application.Current.Shutdown();
     }
 
     private void AutoCollapseMenuItem_Click(object sender, RoutedEventArgs e)

@@ -571,6 +571,8 @@
                     Click="ExportSettingsMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuImportSettings}"
                     Click="ImportSettingsMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuResetSettings}"
+                    Click="ResetSettingsMenuItem_Click"/>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuAbout}"
                     Click="AboutMenuItem_Click"/>
