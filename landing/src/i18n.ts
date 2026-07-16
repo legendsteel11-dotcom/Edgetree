@@ -19,7 +19,7 @@ const dict = {
     hero: {
       eyebrow: 'Windows 폴더/파일 탐색기 유틸',
       title: 'Edgetree',
-      tagline: '화면 가장자리에 항상 붙어있는, VS Code 탐색기 스타일의 가벼운 탐색기',
+      tagline: '화면 가장자리에 항상 붙어있는, VS Code 스타일의 가벼운 탐색기',
       description:
         '폴더 구조를 빠르게 훑어보고 파일 위치로 바로 이동하기 위한 보조 도구입니다.',
       ctaDownload: '다운로드',
@@ -66,7 +66,7 @@ const dict = {
         { title: '트레이로 최소화', desc: '트레이 아이콘 클릭 한 번으로 열고 닫기' },
         { title: '폰트 크기 확대/축소', desc: 'Ctrl + / - 로 트리 글자 크기 조절, 행간도 함께' },
         { title: '설정 내보내기/가져오기', desc: 'JSON 파일로 저장해서 다른 PC로 그대로 이동' },
-        { title: '전체 설정 초기화', desc: '확인 창을 거쳐 앱을 처음 상태로 되돌리기' },
+        { title: '폴더/파일 아이콘 토글', desc: '폴더/파일 아이콘을 제거하여 더 깔끔하게 볼 수 있습니다.' },
         { title: '한국어/영어 지원', desc: '옵션 메뉴에서 언제든 전환' },
         { title: 'Material Icon Theme', desc: '파일/폴더 확장자별 아이콘 자동 적용' },
         { title: '자동 숨김', desc: '마우스를 가장자리에 올리면 살짝 나타났다가, 벗어나면 다시 얇은 선으로 숨습니다.' },
@@ -110,7 +110,7 @@ const dict = {
     hero: {
       eyebrow: 'Windows Folder & File Explorer Utility',
       title: 'Edgetree',
-      tagline: 'A lightweight explorer that lives at your screen edge, VS Code Explorer style',
+      tagline: 'A lightweight explorer that lives at your screen edge, VS Code style',
       description:
         "A quick way to glance at a folder structure and jump straight to a file.",
       ctaDownload: 'Download',
@@ -157,7 +157,7 @@ const dict = {
         { title: 'Minimize to tray', desc: 'One click on the tray icon to open or close' },
         { title: 'Font size zoom', desc: 'Ctrl + / - resizes the tree text, row spacing included' },
         { title: 'Export / import settings', desc: 'Save to a JSON file, carry it to another PC' },
-        { title: 'Reset all settings', desc: 'Back to factory defaults, with a confirmation prompt' },
+        { title: 'Folder/file icon toggle', desc: 'Hide folder and file icons for a cleaner look.' },
         { title: 'Korean / English UI', desc: 'Switch languages anytime from the options menu' },
         { title: 'Material Icon Theme', desc: 'Per-extension icons for files and folders' },
         { title: 'Auto-hide', desc: 'Peeks open when you hover the edge, and quietly hides back to a thin sliver when you move away.' },
