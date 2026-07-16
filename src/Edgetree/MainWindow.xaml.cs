@@ -63,6 +63,13 @@ public partial class MainWindow : Window
     private bool _isAutoHideRevealed;
     private System.Windows.Threading.DispatcherTimer? _autoHideRehideTimer;
 
+    // Non-null while "Collapse All" has collapsed the tree via
+    // CollapseAllButton_Click - holds the paths that were expanded right
+    // before, so clicking the button again restores exactly that state
+    // instead of just collapsing an already-collapsed tree. Cleared back to
+    // null once restored.
+    private List<string>? _collapseAllRestorePaths;
+
     private System.Windows.Point? _headerDragStart;
     private FileSystemItem? _selectedItem;
     private bool _isNavigatingFromFavorite;
@@ -1222,11 +1229,34 @@ public partial class MainWindow : Window
         }
     }
 
+    // Same triangle, mirrored vertically - swapped in directly (rather than
+    // rotating the "up" glyph 180 degrees) because animating that rotation
+    // visibly swings the arrow sideways mid-flip instead of reading as a
+    // clean in-place change.
+    private static readonly Geometry CollapseAllArrowUp = Geometry.Parse("M4,10 L8,5 L12,10 Z");
+    private static readonly Geometry CollapseAllArrowDown = Geometry.Parse("M4,5 L8,10 L12,5 Z");
+
     private void CollapseAllButton_Click(object sender, RoutedEventArgs e)
     {
-        foreach (var root in _roots)
+        if (_collapseAllRestorePaths is { } pathsToRestore)
         {
-            CollapseRecursive(root);
+            _collapseAllRestorePaths = null;
+            foreach (var path in pathsToRestore.OrderBy(p => p.Length))
+            {
+                ExpandPathIfPossible(path);
+            }
+            CollapseAllArrow.Data = CollapseAllArrowUp;
+            CollapseAllButton.ToolTip = Strings.ToolTipCollapseAll;
+        }
+        else
+        {
+            _collapseAllRestorePaths = CollectAllExpandedPaths();
+            foreach (var root in _roots)
+            {
+                CollapseRecursive(root);
+            }
+            CollapseAllArrow.Data = CollapseAllArrowDown;
+            CollapseAllButton.ToolTip = Strings.ToolTipRestoreExpanded;
         }
     }
 

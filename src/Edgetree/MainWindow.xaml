@@ -1426,7 +1426,8 @@
                         RenderTransform="{StaticResource ShiftUp1px}"
                         ToolTip="{x:Static services:Strings.ToolTipCollapseAll}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Path Data="M4,10 L8,5 L12,10 Z"
+                    <Path x:Name="CollapseAllArrow"
+                            Data="M4,10 L8,5 L12,10 Z"
                             Fill="{DynamicResource ForegroundText}"/>
                 </Button>
                 <Button x:Name="OptionsButton"

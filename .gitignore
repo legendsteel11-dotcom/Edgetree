@@ -33,3 +33,6 @@ Thumbs.db
 
 # Raw RDP screenshot captures (kept locally; cropped versions in screenshot/ are tracked)
 screenshot/mstsc_*.jpg
+
+# Personal working notes, not for the public repo
+src/Edgetree/TODO.md

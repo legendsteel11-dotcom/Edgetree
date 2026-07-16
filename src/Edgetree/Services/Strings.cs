@@ -66,6 +66,7 @@ public static class Strings
     public static string ToolTipPinLeft = "좌측에 고정";
     public static string ToolTipPinRight = "우측에 고정";
     public static string ToolTipCollapseAll = "모두 접기";
+    public static string ToolTipRestoreExpanded = "펼침 상태 복원";
     public static string ToolTipOptions = "옵션";
     public static string ToolTipMinimize = "트레이로 최소화";
     public static string ToolTipClose = "종료";
@@ -175,6 +176,7 @@ public static class Strings
         ToolTipPinLeft = "Pin to Left";
         ToolTipPinRight = "Pin to Right";
         ToolTipCollapseAll = "Collapse All";
+        ToolTipRestoreExpanded = "Restore Expanded";
         ToolTipOptions = "Options";
         ToolTipMinimize = "Minimize to Tray";
         ToolTipClose = "Exit";
