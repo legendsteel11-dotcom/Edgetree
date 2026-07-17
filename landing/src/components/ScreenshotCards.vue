@@ -44,7 +44,7 @@ const images = [
 .card {
   margin: 0;
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  /* border: 1px solid var(--border); */
   border-radius: 12px;
   overflow: hidden;
   display: flex;

@@ -99,16 +99,20 @@ section {
 }
 
 .btn:hover {
-  transform: translateY(-1px);
+  /* transform: translateY(-1px); */
 }
 
 .btn-primary {
   background: var(--accent);
+  background: #185ea0;
   color: #0b0c0e;
+  color: #dfe0e2;
 }
 
 .btn-primary:hover {
   background: var(--accent-strong);
+    background: #1770c4;
+    color: #ffffff;
 }
 
 .btn-secondary {

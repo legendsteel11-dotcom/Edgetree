@@ -34,7 +34,7 @@ import { t } from '../i18n'
 
 .card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  /* border: 1px solid var(--border); */
   border-radius: 12px;
   padding: 32px;
 }
@@ -52,11 +52,13 @@ import { t } from '../i18n'
 .card li {
   margin-bottom: 8px;
   line-height: 1.6;
+    font-size: 14px;
 }
 
 .card p {
-  line-height: 1.7;
+  line-height: 1.6;
   margin-bottom: 16px;
+    font-size: 14px;
 }
 
 .link {

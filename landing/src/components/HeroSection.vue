@@ -56,8 +56,8 @@ onMounted(ensureReleaseAssetsLoaded)
 }
 
 h1 {
-  font-size: 52px;
-  letter-spacing: -0.03em;
+  font-size: 48px;
+  /* letter-spacing: -0.03em; */
   margin-bottom: 16px;
 }
 
@@ -86,7 +86,7 @@ h1 {
   width: 70%;
   margin: 0 auto;
   border-radius: 10px;
-  border: 1px solid var(--border);
+  /* border: 1px solid var(--border); */
   box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.6);
 }
 

@@ -29,7 +29,7 @@ import { t } from '../i18n'
 
 .step {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  /* border: 1px solid var(--border); */
   border-radius: 12px;
   padding: 20px 24px;
 }

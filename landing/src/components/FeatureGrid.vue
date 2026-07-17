@@ -23,8 +23,8 @@ import { t } from '../i18n'
 <style scoped>
 .alt {
   background: var(--bg-alt);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  /* border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border); */
 }
 
 .grid {
@@ -36,6 +36,7 @@ import { t } from '../i18n'
 .item {
   padding-left: 16px;
   border-left: 2px solid var(--border);
+    border-left: 2px solid #224464;
 }
 
 .item h3 {

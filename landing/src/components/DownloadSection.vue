@@ -28,6 +28,11 @@ onMounted(ensureReleaseAssetsLoaded)
       </div>
 
       <p class="note">{{ t.download.note }}</p>
+
+      <div class="disclaimers">
+        <p>{{ t.download.smartscreenNote }}</p>
+        <p>{{ t.download.virustotalNote }}</p>
+      </div>
     </div>
   </section>
 </template>
@@ -35,8 +40,8 @@ onMounted(ensureReleaseAssetsLoaded)
 <style scoped>
 .alt {
   background: var(--bg-alt);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  /* border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border); */
 }
 
 .grid {
@@ -49,7 +54,7 @@ onMounted(ensureReleaseAssetsLoaded)
 
 .card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  /* border: 1px solid var(--border); */
   border-radius: 12px;
   padding: 32px;
   text-align: center;
@@ -75,6 +80,22 @@ onMounted(ensureReleaseAssetsLoaded)
   margin-top: 28px;
   font-size: 13.5px;
   opacity: 0.75;
+}
+
+.disclaimers {
+  max-width: 560px;
+  margin: 16px auto 0;
+  text-align: center;
+}
+
+.disclaimers p {
+  font-size: 12.5px;
+  line-height: 1.6;
+  opacity: 0.55;
+}
+
+.disclaimers p + p {
+  margin-top: 6px;
 }
 
 @media (max-width: 600px) {
