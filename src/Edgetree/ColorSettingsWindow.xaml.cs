@@ -63,6 +63,7 @@ public partial class ColorSettingsWindow : Window
         HoverBackgroundSwatch.Background = ParseBrush(_settings.HoverBackgroundColorHex);
         FolderNameHoverFontSwatch.Background = ParseBrush(_settings.FolderNameHoverColorHex);
         FileNameHoverFontSwatch.Background = ParseBrush(_settings.FileNameHoverColorHex);
+        ShowMoreFontSwatch.Background = ParseBrush(_settings.ShowMoreColorHex);
         GuideLineSwatch.Background = ParseBrush(_settings.GuideLineColorHex);
         GuideLineActiveSwatch.Background = ParseBrush(_settings.GuideLineActiveColorHex);
         HeaderSwatch.Background = ParseBrush(_settings.HeaderBackgroundColorHex);
@@ -95,6 +96,7 @@ public partial class ColorSettingsWindow : Window
         _settings.HoverBackgroundColorHex = defaults.HoverBackgroundColorHex;
         _settings.FolderNameHoverColorHex = defaults.FolderNameHoverColorHex;
         _settings.FileNameHoverColorHex = defaults.FileNameHoverColorHex;
+        _settings.ShowMoreColorHex = defaults.ShowMoreColorHex;
         _settings.GuideLineColorHex = defaults.GuideLineColorHex;
         _settings.GuideLineActiveColorHex = defaults.GuideLineActiveColorHex;
         _settings.HeaderBackgroundColorHex = defaults.HeaderBackgroundColorHex;
@@ -133,6 +135,9 @@ public partial class ColorSettingsWindow : Window
 
     private void FileNameHoverFontSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         => PickColor(FileNameHoverFontSwatch, () => _settings.FileNameHoverColorHex, hex => _settings.FileNameHoverColorHex = hex);
+
+    private void ShowMoreFontSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        => PickColor(ShowMoreFontSwatch, () => _settings.ShowMoreColorHex, hex => _settings.ShowMoreColorHex = hex);
 
     private void GuideLineSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         => PickColor(GuideLineSwatch, () => _settings.GuideLineColorHex, hex => _settings.GuideLineColorHex = hex);

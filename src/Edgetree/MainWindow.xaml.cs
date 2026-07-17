@@ -40,7 +40,6 @@ public partial class MainWindow : Window
     private const double FloatingResizeBorder = 6;
     private const double DefaultFloatingHeight = 600;
     private const double UndockCornerOffset = 40;
-    private const double AutoHideSliverWidth = 3;
     private const int AutoHideRehideDelayMs = 400;
 
     private readonly SettingsService _settingsService = new();
@@ -70,6 +69,23 @@ public partial class MainWindow : Window
     // instead of just collapsing an already-collapsed tree. Cleared back to
     // null once restored.
     private List<string>? _collapseAllRestorePaths;
+
+    // Non-null right after double-clicking the resize thumb has fit the
+    // window to its widest currently-realized row - holds the width from
+    // just before that, so double-clicking again restores it instead of
+    // re-fitting an already-fitted window. _contentFitWidthApplied is the
+    // width the fit itself actually set, checked against the window's
+    // current Width at the next double-click (see
+    // ResizeThumb_MouseDoubleClick) - if anything moved Width since (a
+    // manual drag, or anything else that changes it), the toggle is stale
+    // and that click fits fresh instead of jumping back to an old value.
+    // Deliberately not keyed off DragDelta specifically: that only catches
+    // this exact Thumb's own drag gesture, and would miss any other way
+    // Width might change between the fit and the next double-click. Not
+    // persisted - a transient in-session gesture like
+    // _collapseAllRestorePaths above, not a setting.
+    private double? _contentFitRestoreWidth;
+    private double? _contentFitWidthApplied;
 
     // Set right before shutting down for a settings reset, so
     // MainWindow_Closing skips SaveCurrentWidth - otherwise it would
@@ -266,6 +282,7 @@ public partial class MainWindow : Window
         SetBrushColor("TreeRowHoverBackground", _settings.HoverBackgroundColorHex);
         SetBrushColor("FolderNameHoverForeground", _settings.FolderNameHoverColorHex);
         SetBrushColor("FileNameHoverForeground", _settings.FileNameHoverColorHex);
+        SetBrushColor("ShowMoreForeground", _settings.ShowMoreColorHex);
         SetBrushColor("TreeGuideLineBrush", _settings.GuideLineColorHex);
         SetBrushColor("TreeGuideLineActiveBrush", _settings.GuideLineActiveColorHex);
         SetBrushColor("PanelDividerBrush", _settings.PanelDividerColorHex);
@@ -322,7 +339,7 @@ public partial class MainWindow : Window
     {
         ExplorerTree.FontSize = size;
         _settings.TreeFontSize = size;
-        ApplyIconMetrics();
+        ApplyLayoutMetrics();
 
         // FavoriteRowHeight scales with ExplorerTree.FontSize (see its own
         // comment), so a fitted favorites panel needs re-fitting to the new
@@ -491,6 +508,10 @@ public partial class MainWindow : Window
             BeginAnimation(LeftProperty, leftAnimation);
         }
     }
+
+    // Clamped defensively at the point of use (like MaxItemsPerFolder/
+    // TabSpacing elsewhere) rather than trusting a hand-edited settings file.
+    private double AutoHideSliverWidth => Math.Clamp(_settings.AutoHideSliverWidth, 3, 8);
 
     // Entered by clicking the app icon a second time while already collapsed
     // to the 44px icon rail - shrinks further to a bare AutoHideSliverWidth
@@ -693,21 +714,25 @@ public partial class MainWindow : Window
         CloseButton.Visibility = visibility;
         FavoritesList.Visibility = visibility;
         FavoritesSplitter.Visibility = visibility;
+        VersionFooterBorder.Visibility = visibility;
 
         // RowDefinition heights don't auto-shrink just because their content is
-        // hidden, so without this the favorites row/splitter would keep
-        // reserving their pixel height as a blank gap in the 44px-wide
-        // icon-only rail. Using the visibility parameter directly (rather than
-        // _settings.IsCollapsed) avoids a timing issue: on the collapsing path
-        // this runs before that flag is actually flipped (see ToggleCollapsed).
+        // hidden, so without this the favorites row/splitter (and the version
+        // footer row) would keep reserving their pixel height as a blank gap
+        // in the 44px-wide icon-only rail. Using the visibility parameter
+        // directly (rather than _settings.IsCollapsed) avoids a timing issue:
+        // on the collapsing path this runs before that flag is actually
+        // flipped (see ToggleCollapsed).
         if (visibility == Visibility.Collapsed)
         {
             FavoritesRowDef.Height = new GridLength(0);
             FavoritesSplitterRow.Height = new GridLength(0);
+            VersionFooterRow.Height = new GridLength(0);
         }
         else
         {
             UpdateFavoritesPanelVisibility();
+            VersionFooterRow.Height = new GridLength(20);
         }
 
         UpdateResizeThumbVisibility();
@@ -1510,7 +1535,7 @@ public partial class MainWindow : Window
         // "색상 변경" item, neither of which has state to sync here.
         if (sender is ContextMenu
             {
-                Items: [MenuItem autoCollapse, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, _, MenuItem sortMenu, MenuItem maxItemsRow, MenuItem languageMenu, ..]
+                Items: [MenuItem autoCollapse, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, MenuItem autoHideSliverWidthRow, _, _, MenuItem sortMenu, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem languageMenu, ..]
             })
         {
             autoCollapse.IsChecked = _settings.AutoCollapseFolders;
@@ -1523,6 +1548,11 @@ public partial class MainWindow : Window
             dockOnRight.IsChecked = _settings.DockOnRight;
             autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
 
+            if (autoHideSliverWidthRow.Header is StackPanel { Children: [_, _, TextBlock sliverWidthValueText, _] })
+            {
+                sliverWidthValueText.Text = _settings.AutoHideSliverWidth.ToString();
+            }
+
             if (sortMenu.Items is [MenuItem byName, MenuItem byDate, _, MenuItem ascending, MenuItem descending])
             {
                 byName.IsChecked = !_settings.SortByDate;
@@ -1534,6 +1564,11 @@ public partial class MainWindow : Window
             if (maxItemsRow.Header is StackPanel { Children: [_, _, TextBlock maxItemsValueText, _] })
             {
                 maxItemsValueText.Text = _settings.MaxItemsPerFolder.ToString();
+            }
+
+            if (tabSpacingRow.Header is StackPanel { Children: [_, _, TextBlock tabSpacingValueText, _] })
+            {
+                tabSpacingValueText.Text = _settings.TabSpacing.ToString();
             }
 
             // languageMenu's first child is the non-interactive restart note
@@ -1576,6 +1611,33 @@ public partial class MainWindow : Window
         // sender is whichever stepper Button was clicked; its logical parent
         // is the row's StackPanel (label, -, value, +) - the value TextBlock
         // sits at the same position regardless of which button fired.
+        if (sender is Button { Parent: StackPanel { Children: [_, _, TextBlock valueText, _] } })
+        {
+            valueText.Text = value.ToString();
+        }
+    }
+
+    private void TabSpacingDecrement_Click(object sender, RoutedEventArgs e)
+        => StepTabSpacing(sender, -1);
+
+    private void TabSpacingIncrement_Click(object sender, RoutedEventArgs e)
+        => StepTabSpacing(sender, +1);
+
+    // Clamped 4~24 per the user-specified range around the original
+    // hardcoded 16. Purely a layout property - unlike MaxItemsPerFolder,
+    // nothing needs re-reading from disk, so applying it immediately is just
+    // ApplyLayoutMetrics recomputing the DynamicResources every row's
+    // template already reads (same live-swap approach as font-size zoom and
+    // the folder/file icon toggles).
+    private void StepTabSpacing(object sender, int delta)
+    {
+        int value = Math.Clamp(_settings.TabSpacing + delta, 4, 24);
+        if (value != _settings.TabSpacing)
+        {
+            _settings.TabSpacing = value;
+            ApplyLayoutMetrics();
+        }
+
         if (sender is Button { Parent: StackPanel { Children: [_, _, TextBlock valueText, _] } })
         {
             valueText.Text = value.ToString();
@@ -2033,6 +2095,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private void AutoHideSliverWidthDecrement_Click(object sender, RoutedEventArgs e)
+        => StepAutoHideSliverWidth(sender, -1);
+
+    private void AutoHideSliverWidthIncrement_Click(object sender, RoutedEventArgs e)
+        => StepAutoHideSliverWidth(sender, +1);
+
+    // Clamped to the user-specified 3~8 range - 3 is the original hardcoded
+    // sliver width (thin enough that going lower risks the mouse missing it
+    // entirely), 8 is thick enough to be an easy target without eating much
+    // screen edge. Purely cosmetic for the next time the window actually
+    // collapses to the sliver (EnterAutoHide/CloseAutoHideReveal both read
+    // the AutoHideSliverWidth property fresh) - not applied live because the
+    // Options button that reaches this setting is itself hidden (see
+    // SetExpandedContentVisibility) for as long as the window is actually
+    // in that collapsed sliver state, so there's no in-place width to
+    // animate to begin with.
+    private void StepAutoHideSliverWidth(object sender, int delta)
+    {
+        double value = Math.Clamp(_settings.AutoHideSliverWidth + delta, 3, 8);
+        if (value != _settings.AutoHideSliverWidth)
+        {
+            _settings.AutoHideSliverWidth = value;
+        }
+
+        if (sender is Button { Parent: StackPanel { Children: [_, _, TextBlock valueText, _] } })
+        {
+            valueText.Text = value.ToString();
+        }
+    }
+
     // Same live-swap approach as ApplyColorSettings: replacing the resource
     // dictionary entry is picked up immediately by every row's DynamicResource
     // reference (see the HierarchicalDataTemplate's IsDirectory DataTrigger),
@@ -2040,48 +2132,64 @@ public partial class MainWindow : Window
     private void ApplyFolderIconVisibility()
     {
         Resources["FolderIconVisibility"] = _settings.ShowFolderIcons ? Visibility.Visible : Visibility.Collapsed;
-        ApplyIconMetrics();
+        ApplyLayoutMetrics();
     }
 
     private void ApplyFileIconVisibility()
     {
         Resources["FileIconVisibility"] = _settings.ShowFileIcons ? Visibility.Visible : Visibility.Collapsed;
-        ApplyIconMetrics();
+        ApplyLayoutMetrics();
     }
 
     // Scales the row icon's size and margins with the tree's FontSize - same
     // proportion FontSizeToRowPaddingConverter already applies to row
     // padding, so icons and their surrounding gaps grow/shrink along with
     // Ctrl+/- zoom instead of staying a fixed size that looks increasingly
-    // mismatched against the text around them.
+    // mismatched against the text around them. Also computes everything
+    // driven by "탭간격" (AppSettings.TabSpacing, user-adjustable 4~24 from
+    // the "..." options menu) - the arrow column width and the guide line's
+    // margin/padding are deliberately NOT zoom-scaled here, matching how
+    // they were fixed literals before TabSpacing existed; only the icon/name
+    // alignment shift below (which already scaled with zoom) keeps doing so.
     //
     // FileRowIconMargin/FileNameMargin also carry the VS Code-style alignment
     // rule: a file never gets its own expand arrow, so a file row's content
-    // naturally sits one indent guide (16px) to the right of where the guide
-    // line beneath a sibling folder's arrow actually falls. Whenever folder
-    // icons are visible, that guide line is what the eye lines up files
-    // against, so file content needs pulling left by that same 16px -
-    // whether the file still shows its own icon (shift the icon so its
-    // center lands under the guide, FileRowIconMargin) or not (shift the
-    // name itself so its left edge lands there instead, FileNameMargin).
-    // "Both off" is the one case that instead collapses the arrow gutter
-    // itself to 0 below, so nothing here needs to shift into it.
-    private void ApplyIconMetrics()
+    // naturally sits one indent guide (TabSpacing px) to the right of where
+    // the guide line beneath a sibling folder's arrow actually falls.
+    // Whenever folder icons are visible, that guide line is what the eye
+    // lines up files against, so file content needs pulling left by that
+    // same amount - whether the file still shows its own icon (shift the
+    // icon so its center lands under the guide, FileRowIconMargin) or not
+    // (shift the name itself so its left edge lands there instead,
+    // FileNameMargin). "Both off" is the one case that instead collapses the
+    // arrow gutter itself to 0 below, so nothing here needs to shift into it.
+    private void ApplyLayoutMetrics()
     {
         double scale = ExplorerTree.FontSize / DefaultTreeFontSize;
         Resources["IconSize"] = 16.0 * scale;
 
+        double tabSpacing = Math.Clamp(_settings.TabSpacing, 4, 24);
+        Resources["TabSpacingWidth"] = new GridLength(tabSpacing);
+        // Split around the guide line's own fixed 1px BorderThickness (see
+        // ExplorerTreeViewItemStyle's ItemsHost) so the line stays centered
+        // under the arrow column above regardless of the current spacing -
+        // half margin before the line, half (minus the line itself) padding
+        // after it, reproducing the original 8/1/7 split exactly at the
+        // default TabSpacing of 16.
+        Resources["TabSpacingGuideMargin"] = new Thickness(tabSpacing / 2, 0, 0, 0);
+        Resources["TabSpacingGuidePadding"] = new Thickness(tabSpacing / 2 - 1, 0, 0, 0);
+
         var plainMargin = new Thickness(0, 0, 6 * scale, 0);
         Resources["FolderRowIconMargin"] = plainMargin;
 
-        // A file's icon needs the 16px pull left whenever it's the thing
-        // sitting in that gutter at all - i.e. whenever file icons are shown,
+        // A file's icon needs the pull left whenever it's the thing sitting
+        // in that gutter at all - i.e. whenever file icons are shown,
         // regardless of whether folder icons are also on (folder icons being
         // off is the pre-existing case this already covered; folder icons
         // being on is the same gutter/guide-line geometry, just with a
         // sibling folder icon now also visible next to it).
         Resources["FileRowIconMargin"] = _settings.ShowFileIcons
-            ? new Thickness(-16 * scale, 0, 6 * scale, 0)
+            ? new Thickness(-tabSpacing * scale, 0, 6 * scale, 0)
             : plainMargin;
 
         // File icons off but folder icons on: RowIcon is Collapsed (see the
@@ -2091,17 +2199,17 @@ public partial class MainWindow : Window
         // rather than under its guide line. Every other combination leaves
         // NameText where it already sits correctly.
         Resources["FileNameMargin"] = _settings.ShowFolderIcons && !_settings.ShowFileIcons
-            ? new Thickness(-16 * scale, 0, 0, 0)
+            ? new Thickness(-tabSpacing * scale, 0, 0, 0)
             : new Thickness(0);
 
         // Both off: files lose their reserved (but always-blank, per
-        // ExpanderColumn's own HasItems=False trigger) 16px arrow gutter too,
-        // so a file's name sits flush with the true left edge - to the left
-        // of a sibling folder's still-visible arrow - reading as one
-        // unindented group instead of files looking oddly indented under
-        // folders that no longer even show an icon to justify it.
+        // ExpanderColumn's own HasItems=False trigger) arrow gutter too, so a
+        // file's name sits flush with the true left edge - to the left of a
+        // sibling folder's still-visible arrow - reading as one unindented
+        // group instead of files looking oddly indented under folders that
+        // no longer even show an icon to justify it.
         bool bothOff = !_settings.ShowFolderIcons && !_settings.ShowFileIcons;
-        Resources["FileArrowGutterWidth"] = new GridLength(bothOff ? 0 : 16);
+        Resources["FileArrowGutterWidth"] = new GridLength(bothOff ? 0 : tabSpacing);
     }
 
     private void ColorSettingsMenuItem_Click(object sender, RoutedEventArgs e)
@@ -3181,12 +3289,194 @@ public partial class MainWindow : Window
         // anchored to the screen edge, since Width alone only grows rightward.
         double rawDelta = _settings.DockOnRight ? -e.HorizontalChange : e.HorizontalChange;
         double newWidth = ClampExpandedWidth(Width + rawDelta);
+        SetExpandedWidthAnchored(newWidth);
+    }
+
+    // Shared anchoring logic between manual drag-resize and the fit/restore
+    // double-click below - right-docked, the window has to slide left by
+    // however much it's growing/shrinking to keep its right edge pinned to
+    // the screen edge, since Width alone only grows/shrinks rightward.
+    private void SetExpandedWidthAnchored(double newWidth)
+    {
+        newWidth = ClampExpandedWidth(newWidth);
         if (_settings.DockOnRight)
         {
             Left -= newWidth - Width;
         }
         Width = newWidth;
         _settings.ExpandedWidth = newWidth;
+    }
+
+    // Double-clicking the resize thumb auto-fits the window to exactly the
+    // widest currently-realized row (tree or favorites) - same "column
+    // divider double-click" convention as FavoritesSplitter_MouseDoubleClick's
+    // height-fit for favorites. A second double-click (while still in the
+    // fitted state) restores the width from just before the fit instead of
+    // fitting again.
+    private void ResizeThumb_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (!CanResizeWidth)
+        {
+            return;
+        }
+
+        // Only "restore" if the window is still exactly at the width the
+        // last fit set it to - if Width has moved since (a manual drag, or
+        // anything else), the pending toggle is stale and this click should
+        // fit fresh from wherever the window is now instead of jumping back
+        // to an old, no-longer-relevant value.
+        bool stillAtLastFit = _contentFitWidthApplied is { } lastFit && Math.Abs(Width - lastFit) < 0.5;
+        if (stillAtLastFit && _contentFitRestoreWidth is { } restoreWidth)
+        {
+            SetExpandedWidthAnchored(restoreWidth);
+            _contentFitRestoreWidth = null;
+            _contentFitWidthApplied = null;
+            return;
+        }
+
+        if (ComputeContentFitWidth() is not { } fitWidth)
+        {
+            return;
+        }
+
+        _contentFitRestoreWidth = Width;
+        SetExpandedWidthAnchored(fitWidth);
+        _contentFitWidthApplied = Width;
+    }
+
+    // Widest currently-realized row's own natural (untrimmed) text width plus
+    // however far that text already sits from the window's left edge (icon,
+    // indent, everything before it) - read directly off the real, already-
+    // laid-out visual tree via TransformToVisual rather than re-deriving the
+    // indent/icon math independently, so this can never drift out of sync
+    // with whatever ApplyLayoutMetrics currently has TabSpacing/icons set to.
+    // Only realized containers are measured - virtualization means a row
+    // scrolled far out of the current view has no visual tree to measure at
+    // all, which matches "fit to the window's current content" rather than
+    // force-realizing a potentially huge, mostly off-screen subtree.
+    private double? ComputeContentFitWidth()
+    {
+        double maxWidth = 0;
+        bool any = false;
+
+        foreach (var textBlock in EnumerateVisibleTreeNameTextBlocks(ExplorerTree))
+        {
+            maxWidth = Math.Max(maxWidth, RowFitWidth(textBlock));
+            any = true;
+        }
+
+        if (FavoritesList.Visibility == Visibility.Visible)
+        {
+            for (int i = 0; i < FavoritesList.Items.Count; i++)
+            {
+                if (FavoritesList.ItemContainerGenerator.ContainerFromIndex(i) is not ListBoxItem favoriteItem)
+                {
+                    continue;
+                }
+                favoriteItem.ApplyTemplate();
+                if (favoriteItem.Template.FindName("FavoriteNameText", favoriteItem) is TextBlock favoriteText)
+                {
+                    maxWidth = Math.Max(maxWidth, RowFitWidth(favoriteText));
+                    any = true;
+                }
+            }
+        }
+
+        // A little breathing room past the longest line, plus the overlay
+        // scrollbar's own width so it doesn't end up sitting on top of (and
+        // re-clipping) the text it was just sized to fully show.
+        return any ? maxWidth + 24 : null;
+    }
+
+    private double RowFitWidth(TextBlock textBlock)
+    {
+        System.Windows.Point origin = textBlock.TransformToVisual(this).Transform(new System.Windows.Point(0, 0));
+        return origin.X + MeasureTextWidth(textBlock);
+    }
+
+    private static double MeasureTextWidth(TextBlock textBlock)
+    {
+        var typeface = new Typeface(textBlock.FontFamily, textBlock.FontStyle, textBlock.FontWeight, textBlock.FontStretch);
+        var formatted = new FormattedText(
+            textBlock.Text,
+            System.Globalization.CultureInfo.CurrentUICulture,
+            System.Windows.FlowDirection.LeftToRight,
+            typeface,
+            textBlock.FontSize,
+            System.Windows.Media.Brushes.Black,
+            VisualTreeHelper.GetDpi(textBlock).PixelsPerDip);
+        return formatted.Width;
+    }
+
+    // Recurses only into already-expanded items, mirroring how the
+    // virtualizing panel itself only ever realizes children under an
+    // expanded parent - an unrealized ContainerFromIndex just returns null
+    // and is skipped, rather than force-generating a container that doesn't
+    // otherwise exist.
+    private static IEnumerable<TextBlock> EnumerateVisibleTreeNameTextBlocks(ItemsControl container)
+    {
+        for (int i = 0; i < container.Items.Count; i++)
+        {
+            if (container.ItemContainerGenerator.ContainerFromIndex(i) is not TreeViewItem item)
+            {
+                continue;
+            }
+
+            if (item.DataContext is FileSystemItem { IsPlaceholder: false, IsShowMore: false, IsEditing: false } &&
+                GetNameTextBlock(item) is { } textBlock)
+            {
+                yield return textBlock;
+            }
+
+            if (item.IsExpanded)
+            {
+                foreach (var nested in EnumerateVisibleTreeNameTextBlocks(item))
+                {
+                    yield return nested;
+                }
+            }
+        }
+    }
+
+    // PART_Header's ContentTemplate is the HierarchicalDataTemplate applied
+    // implicitly (matched by DataType, never assigned through an explicit
+    // ContentTemplate="{StaticResource ...}" anywhere) - ContentTemplate.
+    // FindName on it turned out not to reliably resolve "NameText" the way
+    // an explicit ControlTemplate's FindName does elsewhere in this file
+    // (e.g. the PART_Header lookup right below, or FavoriteNameText's own
+    // lookup for the favorites list), so this walks the real, already-
+    // rendered visual tree instead - it doesn't depend on how the template
+    // got applied, only that the row is actually on screen.
+    private static TextBlock? GetNameTextBlock(TreeViewItem item)
+    {
+        item.ApplyTemplate();
+        if (item.Template.FindName("PART_Header", item) is not ContentPresenter presenter)
+        {
+            return null;
+        }
+        return FindDescendantByName<TextBlock>(presenter, "NameText");
+    }
+
+    // Scoped to whatever subtree is passed in (PART_Header's own content,
+    // not the whole TreeViewItem) so this never accidentally wanders into an
+    // expanded row's own children - those get their own separate call from
+    // EnumerateVisibleTreeNameTextBlocks's own recursion instead.
+    private static T? FindDescendantByName<T>(DependencyObject root, string name) where T : FrameworkElement
+    {
+        int count = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T typed && typed.Name == name)
+            {
+                return typed;
+            }
+            if (FindDescendantByName<T>(child, name) is { } found)
+            {
+                return found;
+            }
+        }
+        return null;
     }
 
     private void SaveCurrentWidth()

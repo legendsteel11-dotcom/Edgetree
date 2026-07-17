@@ -94,6 +94,13 @@
                 Color="#FFA8AAAE"/>
         <SolidColorBrush x:Key="FileNameHoverForeground"
                 Color="#FFA8AAAE"/>
+        <!-- The "…더 보기 (N개)" overflow row's own text color
+             (AppSettings.ShowMoreColorHex) - previously just inherited
+             FolderNameForeground at reduced opacity (see ShowMoreText's own
+             Opacity below); same default so existing users see no change
+             until they customize it separately. -->
+        <SolidColorBrush x:Key="ShowMoreForeground"
+                Color="#FFA8AAAE"/>
         <SolidColorBrush x:Key="TreeRowSelectedActiveBackground"
                 Color="#FF323438"/>
         <SolidColorBrush x:Key="TreeGuideLineBrush"
@@ -135,14 +142,30 @@
         <Thickness x:Key="FileRowIconMargin">0,0,6,0</Thickness>
         <Thickness x:Key="FileNameMargin">0,0,0,0</Thickness>
 
-        <!-- The 16px column a file row's TreeViewItem template always
-             reserves for the expand arrow it never shows (folders alone can
-             expand) - only collapsed to 0 when BOTH folder and file icons
-             are off, so a file's name sits flush with the true left edge,
-             to the left of a sibling folder's still-visible arrow, instead
-             of leaving an empty arrow-width gap before it. With either icon
-             type still on, files keep this gutter as before, aligning their
-             icon/name with a folder's icon/name the normal way. -->
+        <!-- The "탭간격" (tab spacing) family - see MainWindow.xaml.cs's
+             ApplyLayoutMetrics for how these three are actually computed
+             from AppSettings.TabSpacing (user-adjustable 4~24 from the "..."
+             options menu); the values here are just defaults matching the
+             original hardcoded 16px until that first runs.
+             TabSpacingWidth is the expand arrow's own column width
+             (ExplorerTreeViewItemStyle's ExpanderColumn below) - every row,
+             folder or file, reserves this much space for the arrow/gutter.
+             TabSpacingGuideMargin/TabSpacingGuidePadding are the same
+             template's ItemsHost Margin/Padding, which together with its
+             fixed 1px BorderThickness produce the cascading per-level indent
+             and position the guide line under the arrow's own center. -->
+        <GridLength x:Key="TabSpacingWidth">16</GridLength>
+        <Thickness x:Key="TabSpacingGuideMargin">8,0,0,0</Thickness>
+        <Thickness x:Key="TabSpacingGuidePadding">7,0,0,0</Thickness>
+
+        <!-- The column a file row's TreeViewItem template always reserves
+             for the expand arrow it never shows (folders alone can expand) -
+             only collapsed to 0 when BOTH folder and file icons are off, so a
+             file's name sits flush with the true left edge, to the left of a
+             sibling folder's still-visible arrow, instead of leaving an empty
+             arrow-width gap before it. With either icon type still on, files
+             keep this gutter (matching TabSpacingWidth) as before, aligning
+             their icon/name with a folder's icon/name the normal way. -->
         <GridLength x:Key="FileArrowGutterWidth">16</GridLength>
 
         <Style x:Key="ToggleButtonStyle"
@@ -549,6 +572,30 @@
             <MenuItem Header="{x:Static services:Strings.MenuAutoHideCloseOnLeave}"
                     IsCheckable="True"
                     Click="AutoHideCloseOnLeaveMenuItem_Click"/>
+            <!-- StaysOpenOnClick so stepping the value doesn't close the whole
+                 options menu out from under the user. -->
+            <MenuItem StaysOpenOnClick="True"
+                    Focusable="False">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{x:Static services:Strings.MenuAutoHideSliverWidth}"
+                                Foreground="{DynamicResource ForegroundText}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"/>
+                        <Button Content="−"
+                                Style="{StaticResource MenuStepperButtonStyle}"
+                                Click="AutoHideSliverWidthDecrement_Click"/>
+                        <TextBlock Text="3"
+                                Foreground="{DynamicResource ForegroundText}"
+                                Width="26"
+                                TextAlignment="Center"
+                                VerticalAlignment="Center"/>
+                        <Button Content="+"
+                                Style="{StaticResource MenuStepperButtonStyle}"
+                                Click="AutoHideSliverWidthIncrement_Click"/>
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuColorSettings}"
                     Click="ColorSettingsMenuItem_Click"/>
@@ -592,6 +639,30 @@
                         <Button Content="+"
                                 Style="{StaticResource MenuStepperButtonStyle}"
                                 Click="MaxItemsPerFolderIncrement_Click"/>
+                    </StackPanel>
+                </MenuItem.Header>
+            </MenuItem>
+            <!-- StaysOpenOnClick so stepping the value doesn't close the whole
+                 options menu out from under the user. -->
+            <MenuItem StaysOpenOnClick="True"
+                    Focusable="False">
+                <MenuItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{x:Static services:Strings.MenuTabSpacing}"
+                                Foreground="{DynamicResource ForegroundText}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"/>
+                        <Button Content="−"
+                                Style="{StaticResource MenuStepperButtonStyle}"
+                                Click="TabSpacingDecrement_Click"/>
+                        <TextBlock Text="16"
+                                Foreground="{DynamicResource ForegroundText}"
+                                Width="26"
+                                TextAlignment="Center"
+                                VerticalAlignment="Center"/>
+                        <Button Content="+"
+                                Style="{StaticResource MenuStepperButtonStyle}"
+                                Click="TabSpacingIncrement_Click"/>
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
@@ -756,13 +827,14 @@
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition x:Name="ExpanderColumn"
-                                                Width="16"/>
+                                                Width="{DynamicResource TabSpacingWidth}"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <ToggleButton x:Name="Expander"
                                             Grid.Column="0"
                                                   Style="{StaticResource ExpanderToggleButtonStyle}"
                                                   ClickMode="Press"
+                                                  HorizontalAlignment="Center"
                                                   IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
                                     <ContentPresenter x:Name="PART_Header"
                                             Grid.Column="1"
@@ -777,13 +849,16 @@
                                  border draws a guide line under the parent arrow's center that
                                  spans exactly this subtree's rendered height (Border sizes to
                                  its child), so it reads as one continuous line VS Code-style
-                                 without any per-row depth tracking. -->
+                                 without any per-row depth tracking. Margin/Padding are "탭간격"
+                                 (TabSpacingWidth) split around the fixed 1px BorderThickness -
+                                 see ApplyLayoutMetrics - so the line stays centered under the
+                                 arrow above regardless of the current spacing. -->
                             <Border x:Name="ItemsHost"
                                     Visibility="Collapsed"
-                                    Margin="8,0,0,0"
+                                    Margin="{DynamicResource TabSpacingGuideMargin}"
                                     BorderThickness="1,0,0,0"
                                     BorderBrush="{DynamicResource TreeGuideLineBrush}"
-                                    Padding="7,0,0,0">
+                                    Padding="{DynamicResource TabSpacingGuidePadding}">
                                 <ItemsPresenter/>
                             </Border>
                         </StackPanel>
@@ -1138,6 +1213,7 @@
                 <TextBlock x:Name="ShowMoreText"
                            Grid.Column="1"
                            Text="{Binding ShowMoreLabel}"
+                           Foreground="{DynamicResource ShowMoreForeground}"
                            VerticalAlignment="Center"
                            Visibility="Collapsed"
                            Opacity="0.65"
@@ -1408,7 +1484,8 @@
                         Height="0"/>
                 <RowDefinition x:Name="Row3"
                         Height="*"/>
-                <RowDefinition Height="20"/>
+                <RowDefinition x:Name="VersionFooterRow"
+                        Height="20"/>
             </Grid.RowDefinitions>
 
             <!-- Header. Also doubles as the drag handle: while docked, dragging it
@@ -1657,8 +1734,12 @@
 
             <!-- Version footer - same dim treatment as the tree's own "더 보기"
                  row (inherited foreground at reduced opacity) rather than its
-                 own color, so it reads as a quiet, out-of-the-way label. -->
-            <Border Grid.Row="4"
+                 own color, so it reads as a quiet, out-of-the-way label.
+                 Hidden along with the rest of the expanded content (see
+                 SetExpandedContentVisibility) when collapsed to the icon-only
+                 rail - too narrow for this text, which used to just clip. -->
+            <Border x:Name="VersionFooterBorder"
+                    Grid.Row="4"
                     BorderThickness="0,1,0,0"
                     BorderBrush="{DynamicResource PanelDividerBrush}">
                 <TextBlock x:Name="VersionFooterText"
@@ -1666,7 +1747,7 @@
                         Opacity="0.65"
                         FontSize="11"
                         VerticalAlignment="Center"
-                        Margin="8,0,0,2"/>
+                        Margin="8,0,0,4"/>
             </Border>
         </Grid>
 
@@ -1677,6 +1758,7 @@
                 Width="6"
                 Style="{StaticResource ResizeThumbStyle}"
                 Cursor="SizeWE"
-               DragDelta="ResizeThumb_DragDelta"/>
+               DragDelta="ResizeThumb_DragDelta"
+               MouseDoubleClick="ResizeThumb_MouseDoubleClick"/>
     </Grid>
 </Window>

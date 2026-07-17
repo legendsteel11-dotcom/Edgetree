@@ -10,7 +10,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Resources\app.ico</ApplicationIcon>
-    <Version>1.0.3</Version>
+    <Version>1.0.4</Version>
     <!-- Explicit rather than left to default from the .csproj filename, so a
          future file rename can't silently change the shipped exe/dll name
          again - the C# namespace stays SidebarExplorer.App throughout the

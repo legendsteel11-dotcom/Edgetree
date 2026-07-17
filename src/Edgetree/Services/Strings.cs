@@ -33,7 +33,8 @@ public static class Strings
     public static string MenuShowFileIcons = "파일 아이콘 표시";
     public static string MenuFavoritesAtBottom = "즐겨찾기를 아래에 표시";
     public static string MenuDockOnRight = "화면 우측에 고정";
-    public static string MenuAutoHideCloseOnLeave = "즉시자동숨김";
+    public static string MenuAutoHideCloseOnLeave = "즉시 자동 숨김";
+    public static string MenuAutoHideSliverWidth = "자동 숨김 두께";
     public static string MenuColorSettings = "색상 설정";
     public static string MenuAbout = "앱 정보";
 
@@ -49,17 +50,18 @@ public static class Strings
     // click it, so it always shows both.
     public static readonly string LanguageRestartNote = "(재시작 필요 / Restart Required)";
 
-    // Per-folder right-click menu's own sort submenu (still just "정렬") reuses
+    // Per-folder right-click menu's own sort submenu ("정렬 방식") reuses
     // MenuSort/MenuSortByName/etc. below - this is only the options-menu
     // ("...") copy, worded as "default" to distinguish "change how every
     // folder sorts from now on" from that per-folder one.
     public static string MenuDefaultSort = "기본 정렬";
-    public static string MenuSort = "정렬";
+    public static string MenuSort = "정렬 방식";
     public static string MenuSortByName = "이름순";
     public static string MenuSortByDate = "날짜순";
     public static string MenuSortAscending = "오름차순";
     public static string MenuSortDescending = "내림차순";
     public static string MenuMaxItemsPerFolder = "폴더의 표시 개수";
+    public static string MenuTabSpacing = "탭 간격";
     public static string MenuExportSettings = "설정 내보내기...";
     public static string MenuImportSettings = "설정 가져오기...";
     public static string MenuResetSettings = "전체 설정 초기화...";
@@ -95,6 +97,7 @@ public static class Strings
     public static string ColorLabelHoverBackground = "마우스 hover";
     public static string ColorLabelFolderNameHoverFont = "폴더명 마우스 hover";
     public static string ColorLabelFileNameHoverFont = "파일명 마우스 hover";
+    public static string ColorLabelShowMore = "더 보기";
     public static string ColorLabelGuideLine = "탭 구분선";
     public static string ColorLabelGuideLineActive = "탭 구분선 하이라이트";
     public static string ColorLabelHeader = "제목 표시줄 배경";
@@ -172,6 +175,7 @@ public static class Strings
         MenuFavoritesAtBottom = "Show Favorites at Bottom";
         MenuDockOnRight = "Pin to Right Edge";
         MenuAutoHideCloseOnLeave = "Close Instantly on Mouse Leave";
+        MenuAutoHideSliverWidth = "Auto-Hide Thickness";
         MenuColorSettings = "Color Settings";
         MenuAbout = "About";
         MenuDefaultSort = "Default Sort";
@@ -181,6 +185,7 @@ public static class Strings
         MenuSortAscending = "Ascending";
         MenuSortDescending = "Descending";
         MenuMaxItemsPerFolder = "Items per Folder";
+        MenuTabSpacing = "Indent Spacing";
         MenuExportSettings = "Export Settings...";
         MenuImportSettings = "Import Settings...";
         MenuResetSettings = "Reset All Settings...";
@@ -207,6 +212,7 @@ public static class Strings
         ColorLabelHoverBackground = "Mouse Hover";
         ColorLabelFolderNameHoverFont = "Folder Name Mouse Hover";
         ColorLabelFileNameHoverFont = "File Name Mouse Hover";
+        ColorLabelShowMore = "Show More";
         ColorLabelGuideLine = "Guide Line";
         ColorLabelGuideLineActive = "Guide Line Highlight";
         ColorLabelHeader = "Title Bar Background";

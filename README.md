@@ -37,10 +37,14 @@ Either way, it's one `.exe` — no installer, just run it.
   taskbar), hidden from Alt+Tab and the taskbar while docked
 - **Collapse/expand** by clicking the app icon: one click shrinks it to an
   icon-only rail, a second click auto-hides it to a bare sliver at the screen
-  edge that peeks open on mouse-over and quietly re-hides once you move away
-  — pin it back open from the peeked-out state to stop auto-hiding — all with
-  a smooth width animation
-- **Drag-to-resize** width while docked
+  edge that peeks open on mouse-over and, by default, quietly re-hides once
+  you move away (turn off "Close Instantly on Mouse Leave" in the options
+  menu to close it on an outside click instead). The sliver's own thickness
+  is adjustable too, 3–8px from the options menu — pin it back open from the
+  peeked-out state to stop auto-hiding — all with a smooth width animation
+- **Drag-to-resize** width while docked, or double-click the resize line to
+  fit the window to the widest currently-shown row and double-click again to
+  restore the previous width
 - **Undock into a floating window**: drag the header past the edge to detach
   it into a normal, freely movable and resizable window (shows in Alt+Tab and
   the taskbar like any other app); click the pin button to snap it back to
@@ -91,19 +95,20 @@ Either way, it's one `.exe` — no installer, just run it.
   expanded, collapses everything, then restores exactly that state on a
   second click), an **options ("...") menu** (Auto Collapse, always on top,
   start with Windows, always show the tray icon, show folder icons, show
-  file icons, favorites at bottom, dock to the right edge, color settings,
-  default sort, items per folder, language, export/import settings, reset
-  all settings — with a confirmation prompt, about — all remembered),
-  minimize to tray, and close
+  file icons, favorites at bottom, dock to the right edge, close instantly on
+  mouse leave, auto-hide thickness, color settings, default sort, items per
+  folder, indent spacing, language, export/import settings, reset all
+  settings — with a confirmation prompt, about — all remembered), minimize to
+  tray, and close
 - **Minimize to the system tray**: click the tray icon (or its "Open" menu
   item) to restore the window; right-click for Open/Exit
-- **Color settings**: 14 customizable colors — folder name, file name (each
-  with its own selected-highlight and mouse-hover variant), explorer
-  background, favorites background, selection, mouse-hover background, guide
-  line/highlight, title bar background, and the divider line between the
-  title bar/favorites/explorer panels — via Windows' own color picker - the
-  custom palette now sticks around while you move between rows - with a
-  one-click reset to defaults
+- **Color settings**: 15 customizable colors — folder name, file name (each
+  with its own selected-highlight and mouse-hover variant), the "… Show N
+  more" row's own text, explorer background, favorites background,
+  selection, mouse-hover background, guide line/highlight, title bar
+  background, and the divider line between the title bar/favorites/explorer
+  panels — via Windows' own color picker - the custom palette now sticks
+  around while you move between rows - with a one-click reset to defaults
 - **Korean/English UI language**, switchable from the options menu (restarts
   the app to apply)
 - Hand cursor over tree/favorites rows; header icons sit slightly dimmed and
@@ -113,6 +118,9 @@ Either way, it's one `.exe` — no installer, just run it.
 - Rounded corners when floating (undocked) on Windows 11, to match native windows
 - `Ctrl` `+`/`-` to zoom the tree's font size (9–16pt), `Ctrl+0` to reset —
   row spacing scales along with it, in the favorites panel too
+- **Indent spacing**: the per-depth indent width (expand arrow, guide line,
+  and icon/name alignment all included) is adjustable 4–24px from the
+  options menu (16px by default)
 - Selected file's parent folder gets a brighter indent-guide line, VS
   Code-style
 - Unassociated file types fall back to the same "How do you want to open this

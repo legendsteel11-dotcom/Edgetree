@@ -23,6 +23,13 @@ public class AppSettings
     // MainWindow.StartAutoHideOutsideClickWatch) - for someone who wants to
     // read the tree without it snapping shut the moment the mouse drifts off.
     public bool AutoHideCloseOnMouseLeave { get; set; } = true;
+
+    // "자동 숨김 두께" in the options menu - the width (px) of the bare edge
+    // sliver IsAutoHidden collapses to (see MainWindow.xaml.cs's
+    // EnterAutoHide/CloseAutoHideReveal). User-adjustable 3~8; 3 matches the
+    // original hardcoded value, so existing users see no change until they
+    // customize it.
+    public double AutoHideSliverWidth { get; set; } = 3;
     public double TreeFontSize { get; set; } = 12;
     public ObservableCollection<FavoriteEntry> Favorites { get; set; } = new();
     public double FavoritesPanelHeight { get; set; } = 100;
@@ -74,6 +81,11 @@ public class AppSettings
     // folder/file split above, this one was asked to be a clean replacement).
     public string FolderNameHoverColorHex { get; set; } = "#FFA8AAAE";
     public string FileNameHoverColorHex { get; set; } = "#FFA8AAAE";
+
+    // The "…더 보기 (N개)" overflow row's own text color - previously just
+    // inherited FolderNameColorHex at reduced opacity, same default here so
+    // existing users see no change until they customize it separately.
+    public string ShowMoreColorHex { get; set; } = "#FFA8AAAE";
     public string GuideLineColorHex { get; set; } = "#FF323438";
     public string GuideLineActiveColorHex { get; set; } = "#FF5C5E62";
 
@@ -113,6 +125,14 @@ public class AppSettings
     // 보기" (see Models/FileSystemItem.DisplayCap) - user-adjustable 1~50 from
     // the "..." options menu, for low-resolution screens that want fewer rows.
     public int MaxItemsPerFolder { get; set; } = 25;
+
+    // "탭간격" in the options menu - the per-nesting-level indent width in
+    // pixels (also drives the expand arrow's column width and the guide
+    // line's position beneath it, and the file icon/name alignment shift -
+    // see MainWindow.xaml.cs's ApplyLayoutMetrics). User-adjustable 4~24;
+    // 16 matches the original hardcoded value, so existing users see no
+    // change until they touch this.
+    public int TabSpacing { get; set; } = 16;
 
     // Folder icons only - file icons (already distinct per extension) are
     // unaffected either way. A VS Code-minimal-theme-style option: off hides
