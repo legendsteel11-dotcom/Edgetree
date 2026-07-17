@@ -108,7 +108,7 @@ const dict = {
       button: '다운로드',
       note: '어떤 버전을 받아야 할지 모르겠다면 독립 실행형을 선택하세요.',
       smartscreenNote:
-        '실행 파일에 정식 코드 서명 인증서가 없어 Windows에서 "알 수 없는 게시자" 경고가 뜰 수 있습니다 — "추가 정보" → "실행"을 누르시면 정상적으로 실행됩니다.',
+        '실행 파일에 정식 코드 서명 인증서가 없어 Windows에서 "알 수 없는 게시자" 경고가 뜰 수 있습니다 —\n"추가 정보" → "실행"을 누르시면 정상적으로 실행됩니다.',
       virustotalNote:
         'VirusTotal 등에서 일부 백신이 휴리스틱(패턴 기반) 오탐을 표시할 수 있습니다. 서명되지 않은 소규모 개인 개발 프로그램에서 흔히 나타나는 현상이며, 소스 코드가 GitHub에 전부 공개되어 있어 언제든 직접 확인하실 수 있습니다.',
     },
@@ -216,7 +216,7 @@ const dict = {
       button: 'Download',
       note: "Not sure which one? Go with the standalone build.",
       smartscreenNote:
-        "There's no paid code-signing certificate on the exe, so Windows may show an \"Unknown publisher\" SmartScreen warning — click \"More info\" then \"Run anyway\" to proceed.",
+        "There's no paid code-signing certificate on the exe, so Windows may show an \"Unknown publisher\" SmartScreen warning —\nclick \"More info\" then \"Run anyway\" to proceed.",
       virustotalNote:
         'A few antivirus engines on VirusTotal and similar sites may flag it with a generic heuristic detection - common for small, unsigned indie apps. The full source is public on GitHub, so you’re welcome to check it yourself.',
     },

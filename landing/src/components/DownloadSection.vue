@@ -92,6 +92,7 @@ onMounted(ensureReleaseAssetsLoaded)
   font-size: 12.5px;
   line-height: 1.6;
   opacity: 0.55;
+  white-space: pre-line;
 }
 
 .disclaimers p + p {
