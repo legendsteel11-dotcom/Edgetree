@@ -29,12 +29,12 @@ const dict = {
     },
     howto: {
       title: '사용 방법',
-      subtitle: '설치 없이, 네 단계면 충분합니다',
+      subtitle: '제목표시줄의 아이콘 몇 개로 대부분의 동작을 제어합니다',
       steps: [
-        { title: '다운로드 후 실행', desc: '설치 프로그램 없이 exe 파일 하나만 실행하면 바로 시작됩니다.' },
-        { title: '화면 가장자리에 자동 도킹', desc: '기본은 왼쪽, 옵션 메뉴에서 오른쪽으로도 바꿀 수 있습니다.' },
-        { title: '접기/자동 숨김', desc: '아이콘 클릭으로 접고, 마우스를 가장자리에 올리면 다시 펼쳐집니다.' },
-        { title: '즐겨찾기 등록', desc: '자주 쓰는 폴더를 즐겨찾기에 등록해두면 클릭 한 번으로 이동합니다.' },
+        { title: '도킹 / 오토 하이드', desc: '제목표시줄 아이콘 클릭 한 번으로 화면 가장자리에 얇게 숨고, 마우스를 가장자리로 가져가면 다시 펼쳐집니다.' },
+        { title: '오토 하이드 고정 해제', desc: '펼쳐진 상태에서 핀을 클릭하면 오토 하이드가 꺼지고 항상 펼쳐진 상태로 고정됩니다.' },
+        { title: '도킹 / 창모드', desc: '제목바를 드래그하면 자유롭게 움직이는 창모드로 전환되고, 핀을 클릭하면 다시 화면 가장자리에 도킹됩니다.' },
+        { title: '전체 펼침/접기', desc: '제목바의 ▲ 아이콘으로 펼쳐진 폴더 트리 전체를 한 번에 접었다 복원할 수 있습니다.' },
       ],
     },
     screenshots: {
@@ -133,12 +133,12 @@ const dict = {
     },
     howto: {
       title: 'How to Use',
-      subtitle: 'No install required - four steps and you’re set',
+      subtitle: 'A few titlebar controls handle most of it',
       steps: [
-        { title: 'Download & run', desc: 'No installer - just run the single exe file and you’re up and running.' },
-        { title: 'Docks to the screen edge', desc: 'Left by default, switchable to the right from the options menu.' },
-        { title: 'Collapse & auto-hide', desc: 'Click the icon to collapse it, hover the edge to bring it back.' },
-        { title: 'Pin your favorites', desc: 'Add frequently used folders to Favorites and jump there in one click.' },
+        { title: 'Dock / Auto-Hide', desc: 'One click on the titlebar icon tucks it away to a thin sliver at the screen edge; move your mouse there to bring it back.' },
+        { title: 'Unpin Auto-Hide', desc: 'While expanded, click the pin to turn off auto-hide and keep it open for good.' },
+        { title: 'Dock / Floating Window', desc: 'Drag the titlebar to undock into a free-floating window; click the pin again to dock it back.' },
+        { title: 'Collapse / Restore All', desc: 'The ▲ icon on the titlebar collapses or restores every expanded folder in the tree at once.' },
       ],
     },
     screenshots: {
