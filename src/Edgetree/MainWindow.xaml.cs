@@ -215,6 +215,13 @@ public partial class MainWindow : Window
         FileSystemService.SortDescending = _settings.SortDescending;
         FileSystemItem.DisplayCap = Math.Clamp(_settings.MaxItemsPerFolder, 1, 50);
 
+        FileSystemService.SortOverrides.Clear();
+        foreach (var entry in _settings.FolderSortOverrides)
+        {
+            FileSystemService.SortOverrides[FileSystemService.NormalizeSortOverridePath(entry.Path)] =
+                new FolderSortOverride(entry.SortByDate ? FileSortField.Date : FileSortField.Name, entry.SortDescending);
+        }
+
         // Re-applies the Run key every launch rather than only the moment the
         // option is toggled - the previous behavior left a stale registration
         // (wrong exe path) in place forever after the exe was moved/rebuilt,
@@ -1265,8 +1272,14 @@ public partial class MainWindow : Window
     // Expands every ancestor folder down to targetPath, and the target itself,
     // then selects/scrolls it into view in the "내 PC" tree, rather than
     // switching the tree's root - keeps the single fixed-root design favorites
-    // were added on top of.
-    private void NavigateToPath(string targetPath)
+    // were added on top of. pinToTop forces the revealed row to the very top
+    // of the viewport (see FinishReveal) - the right call for a deliberate
+    // favorites click (requirement (b): land at the top, not just visible),
+    // but not for RefreshFolderPreservingState's own quiet reselect after a
+    // resort/background change, where the user's current scroll position
+    // should stay put; defaults to true so every existing caller keeps its
+    // current behavior unless it opts out.
+    private void NavigateToPath(string targetPath, bool pinToTop = true)
     {
         // Bumped here (not just when a navigation finishes and selects
         // something) so a second favorite clicked while RevealChainStep is
@@ -1322,7 +1335,7 @@ public partial class MainWindow : Window
             current = next;
         }
 
-        RevealChain(chain, myToken);
+        RevealChain(chain, myToken, pinToTop);
     }
 
     // Walks the loaded tree returning every fully-revealed ("더 보기" expanded)
@@ -1353,12 +1366,12 @@ public partial class MainWindow : Window
     // items, so each level has to be brought into view and laid out before
     // its own children's containers can be looked up. Starts the (possibly
     // asynchronous - see RevealChainStep) walk down the chain from the root.
-    private void RevealChain(List<FileSystemItem> chain, int token)
+    private void RevealChain(List<FileSystemItem> chain, int token, bool pinToTop = true)
     {
         // Overflow re-capping already ran up-front in NavigateToPath, so the
         // walk starts over a light tree; this only expands the path down to
         // the target and doesn't touch any other folder's expanded state.
-        RevealChainStep(chain, 0, ExplorerTree, token);
+        RevealChainStep(chain, 0, ExplorerTree, token, pinToTop: pinToTop);
     }
 
     // A container not being found isn't necessarily "it'll never exist" - a
@@ -1370,7 +1383,7 @@ public partial class MainWindow : Window
     // second click once whatever was in flight had finished on its own in the
     // meantime. Yielding via the dispatcher and trying again gives that
     // pending work an actual chance to complete first instead.
-    private void RevealChainStep(List<FileSystemItem> chain, int index, ItemsControl container, int token, int attempt = 0)
+    private void RevealChainStep(List<FileSystemItem> chain, int index, ItemsControl container, int token, int attempt = 0, bool pinToTop = true)
     {
         // A newer favorite click superseded this walk while it was waiting on a
         // container - stop rather than risking two walks interleaving their
@@ -1409,7 +1422,7 @@ public partial class MainWindow : Window
                 return;
             }
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
-                new Action(() => RevealChainStep(chain, index, container, token, attempt + 1)));
+                new Action(() => RevealChainStep(chain, index, container, token, attempt + 1, pinToTop)));
             return;
         }
 
@@ -1424,15 +1437,15 @@ public partial class MainWindow : Window
 
         if (index == chain.Count - 1)
         {
-            FinishReveal(treeViewItem, token);
+            FinishReveal(treeViewItem, token, pinToTop);
         }
         else
         {
-            RevealChainStep(chain, index + 1, treeViewItem, token);
+            RevealChainStep(chain, index + 1, treeViewItem, token, pinToTop: pinToTop);
         }
     }
 
-    private void FinishReveal(TreeViewItem treeViewItem, int token)
+    private void FinishReveal(TreeViewItem treeViewItem, int token, bool pinToTop = true)
     {
         // Still guarded while this fires: setting IsSelected raises
         // SelectedItemChanged synchronously, and the guard keeps that from
@@ -1442,6 +1455,21 @@ public partial class MainWindow : Window
         treeViewItem.BringIntoView();
         treeViewItem.Focus();
         EndFavoriteNavigation(token);
+
+        if (!pinToTop)
+        {
+            // RefreshFolderPreservingState's quiet reselect after a sort-
+            // override change or a background disk change (see its own
+            // pinToTop: false call) - the plain BringIntoView above already
+            // scrolled just enough to make the row visible if it wasn't;
+            // forcing it all the way to the top edge below is only correct
+            // for a deliberate favorites click (requirement (b)), and was
+            // exactly what made resorting a folder (or an unrelated
+            // background change elsewhere on the same drive) yank the whole
+            // view to the top out from under whatever the user was actually
+            // looking at.
+            return;
+        }
 
         // Requirement (b): land the favorite at the top of the tree, not just
         // somewhere on screen. Deferred one layout pass (so the chain's final
@@ -1699,36 +1727,123 @@ public partial class MainWindow : Window
         RefreshAllLoadedFolders();
     }
 
-    // Per-folder right-click menu's own "정렬": sort order/direction is still
-    // one global setting (there's no per-folder override to store), so this
-    // changes the exact same fields as the options-menu handlers above - but
-    // reaching for "정렬" on one specific folder reads as "sort THIS folder
-    // now", not "change the app-wide default and re-sort everything I've got
-    // open". Refreshing only the folder that was actually right-clicked keeps
-    // that scoped as expected; every other already-loaded folder just picks
-    // up the new global setting whenever it's next refreshed or re-expanded.
+    // Per-folder right-click menu's own "정렬": this folder gets its own
+    // remembered sort override (see Models.FolderSortOverrideEntry), left
+    // independent of the app-wide default above - reaching for "정렬" on one
+    // specific folder reads as "sort THIS folder this way from now on", not
+    // "change the app-wide default and re-sort everything I've got open".
+    // Cleared via the folder's own override icon or its "전역 정렬 따르기" item
+    // (FolderSortFollowGlobalMenuItem_Click below).
     private void FolderSortFieldMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { Tag: string field })
+        if (sender is not MenuItem { Tag: string field } ||
+            ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsDirectory: true } item)
         {
             return;
         }
 
-        _settings.SortByDate = field == "date";
-        FileSystemService.SortField = _settings.SortByDate ? FileSortField.Date : FileSortField.Name;
-        RefreshFolder_Click(sender, e);
+        var (_, sortDescending) = GetEffectiveFolderSort(item);
+        SetFolderSortOverride(item, sortByDate: field == "date", sortDescending);
     }
 
     private void FolderSortDirectionMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { Tag: string direction })
+        if (sender is not MenuItem { Tag: string direction } ||
+            ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsDirectory: true } item)
         {
             return;
         }
 
-        _settings.SortDescending = direction == "desc";
-        FileSystemService.SortDescending = _settings.SortDescending;
-        RefreshFolder_Click(sender, e);
+        var (sortByDate, _) = GetEffectiveFolderSort(item);
+        SetFolderSortOverride(item, sortByDate, sortDescending: direction == "desc");
+    }
+
+    // "전역 정렬 따르기" - only enabled from the menu when the selected folder
+    // actually has an override (see ExplorerItemContextMenu_Opened); same
+    // action as clicking the folder's own override icon.
+    private void FolderSortFollowGlobalMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true } item)
+        {
+            ClearFolderSortOverride(item);
+        }
+    }
+
+    // What a specific folder's own "정렬" checkboxes should currently show -
+    // its own override if it has one, otherwise the app-wide default.
+    private (bool SortByDate, bool SortDescending) GetEffectiveFolderSort(FileSystemItem item)
+    {
+        var entry = _settings.FolderSortOverrides.FirstOrDefault(o =>
+            string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
+        return entry is not null
+            ? (entry.SortByDate, entry.SortDescending)
+            : (_settings.SortByDate, _settings.SortDescending);
+    }
+
+    // Sets (or updates) this folder's own remembered sort: persists it,
+    // mirrors it into FileSystemService.SortOverrides so LoadChildren picks
+    // it up on every future (re)load of this exact path, flips the live
+    // instance's icon on immediately, and re-sorts it right now. Uses the
+    // state-preserving refresh (like a background external-change refresh),
+    // not the plain RefreshFolder_Click F5 uses - resorting a folder
+    // shouldn't silently collapse whatever subfolders the user had expanded
+    // further down inside it.
+    private void SetFolderSortOverride(FileSystemItem item, bool sortByDate, bool sortDescending)
+    {
+        var entry = _settings.FolderSortOverrides.FirstOrDefault(o =>
+            string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
+        if (entry is null)
+        {
+            entry = new FolderSortOverrideEntry { Path = item.FullPath };
+            _settings.FolderSortOverrides.Add(entry);
+        }
+        entry.SortByDate = sortByDate;
+        entry.SortDescending = sortDescending;
+
+        FileSystemService.SortOverrides[FileSystemService.NormalizeSortOverridePath(item.FullPath)] =
+            new FolderSortOverride(sortByDate ? FileSortField.Date : FileSortField.Name, sortDescending);
+        item.HasSortOverride = true;
+        item.SortOverrideLabel = FileSystemService.FormatSortOverrideLabel(
+            sortByDate ? FileSortField.Date : FileSortField.Name, sortDescending);
+
+        if (item.ChildrenLoaded)
+        {
+            RefreshFolderPreservingState(item);
+        }
+    }
+
+    // Clicking the folder's own override icon: cycles N↑ -> N↓ -> D↑ -> D↓ ->
+    // N↑... instead of clearing it - clearing is now a deliberate context-menu
+    // action only (FolderSortFollowGlobalMenuItem_Click), since a single click
+    // rotating through 4 states is a much faster way to try different sorts
+    // than reopening the menu each time.
+    private void RotateFolderSortOverride(FileSystemItem item)
+    {
+        var (sortByDate, sortDescending) = GetEffectiveFolderSort(item);
+        var (nextByDate, nextDescending) = (sortByDate, sortDescending) switch
+        {
+            (false, false) => (false, true),
+            (false, true) => (true, false),
+            (true, false) => (true, true),
+            (true, true) => (false, false),
+        };
+        SetFolderSortOverride(item, nextByDate, nextDescending);
+    }
+
+    // Drops this folder's own remembered sort so it goes back to picking up
+    // the app-wide default like any other folder - see SetFolderSortOverride.
+    private void ClearFolderSortOverride(FileSystemItem item)
+    {
+        _settings.FolderSortOverrides.RemoveAll(o =>
+            string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
+        FileSystemService.SortOverrides.Remove(FileSystemService.NormalizeSortOverridePath(item.FullPath));
+        item.HasSortOverride = false;
+        item.SortOverrideLabel = string.Empty;
+
+        if (item.ChildrenLoaded)
+        {
+            RefreshFolderPreservingState(item);
+        }
     }
 
     // Re-reads every already-loaded folder from disk under whatever sort
@@ -1746,9 +1861,10 @@ public partial class MainWindow : Window
         // RefreshChildren always rebuilds its Children as fresh, collapsed,
         // unloaded instances, even for a folder nobody had expanded.
         var expandedPaths = new List<string>();
+        var showingAllPaths = new List<string>();
         foreach (var root in _roots)
         {
-            CollectExpandedPaths(root, expandedPaths);
+            CollectExpandedPaths(root, expandedPaths, showingAllPaths);
         }
         string? selectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
 
@@ -1788,6 +1904,10 @@ public partial class MainWindow : Window
         {
             ExpandPathIfPossible(path);
         }
+        foreach (var path in showingAllPaths.OrderBy(p => p.Length))
+        {
+            ShowAllChildrenIfPossible(path);
+        }
 
         // Restoring the selection reuses the exact same reveal/expand/select
         // walk favorites navigation already relies on (including its
@@ -1800,11 +1920,24 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void CollectExpandedPaths(FileSystemItem item, List<string> result)
+    // showingAllPaths collects every folder ("더 보기" clicked, all overflow
+    // rows appended - see FileSystemItem.IsShowingAllChildren) whose full
+    // reveal also needs replaying afterward, not just its IsExpanded - a
+    // RefreshChildren silently re-caps a folder back to DisplayCap+"더 보기"
+    // even when nothing about THAT folder's own sort/contents changed, purely
+    // as a side effect of an ancestor being resorted/refreshed. Also checks
+    // `item` itself (not just its children), so the folder actually being
+    // refreshed has its own showingAll state captured too.
+    private static void CollectExpandedPaths(FileSystemItem item, List<string> expandedPaths, List<string> showingAllPaths)
     {
         if (!item.IsDirectory || !item.ChildrenLoaded)
         {
             return;
+        }
+
+        if (item.IsShowingAllChildren)
+        {
+            showingAllPaths.Add(item.FullPath);
         }
 
         foreach (var child in item.Children)
@@ -1815,9 +1948,9 @@ public partial class MainWindow : Window
             }
             if (child.IsExpanded)
             {
-                result.Add(child.FullPath);
+                expandedPaths.Add(child.FullPath);
             }
-            CollectExpandedPaths(child, result);
+            CollectExpandedPaths(child, expandedPaths, showingAllPaths);
         }
     }
 
@@ -1826,18 +1959,34 @@ public partial class MainWindow : Window
     // an item's children. RefreshAllLoadedFolders never needed that (a root's
     // IsExpanded survives RefreshChildren untouched), but a full app restart
     // rebuilds _roots from scratch, so root-level state needs saving too.
+    // "더 보기" reveal state isn't persisted across restarts (nothing asked
+    // for that, and it's a much less surprising reset on a fresh launch than
+    // mid-session), so its own showingAllPaths output here is discarded.
     private List<string> CollectAllExpandedPaths()
     {
         var result = new List<string>();
+        var discardedShowingAll = new List<string>();
         foreach (var root in _roots)
         {
             if (root.IsExpanded)
             {
                 result.Add(root.FullPath);
             }
-            CollectExpandedPaths(root, result);
+            CollectExpandedPaths(root, result, discardedShowingAll);
         }
         return result;
+    }
+
+    // Replays a folder's "더 보기" reveal after ExpandPathIfPossible has
+    // already loaded it fresh - same model-only approach (no container/
+    // virtualization dependency), see CollectExpandedPaths's own comment.
+    private void ShowAllChildrenIfPossible(string path)
+    {
+        if (FindItemForPath(path) is { } item)
+        {
+            item.EnsureChildrenLoaded();
+            item.ShowAllChildren();
+        }
     }
 
     private void ExpandPathIfPossible(string path)
@@ -2570,6 +2719,36 @@ public partial class MainWindow : Window
             return;
         }
 
+        // The small sort-override icon (see FileSystemItem.HasSortOverride)
+        // rotates this folder's own remembered sort (N↑ -> N↓ -> D↑ -> D↓ ->
+        // N↑...) instead of the row's normal click behavior (select + toggle
+        // expand/collapse) below - matched by name rather than type, since
+        // other Border ancestors exist further up the same row (RowBorder's
+        // hover/selection highlight) that must NOT match. Clearing the
+        // override entirely is a context-menu-only action now (see
+        // FolderSortFollowGlobalMenuItem_Click).
+        if ((e.OriginalSource as DependencyObject)?.FindAncestor<Border>() is { Name: "SortOverrideIconBorder" } &&
+            treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsDirectory: true } overrideItem)
+        {
+            RotateFolderSortOverride(overrideItem);
+
+            // Returning early here used to skip the drag-candidate reset
+            // below entirely (it's normally reached a few lines down, on
+            // every mouse-down regardless of target). A file clicked/selected
+            // right before this left _itemDragCandidate/_itemDragStart
+            // pointing at it; since nothing ever cleared them, the very next
+            // press-and-slightly-move anywhere in the tree (even another
+            // click on this same icon) replayed as a phantom drag of that
+            // stale file onto whatever folder ended up under the cursor after
+            // the resort reshuffled the rows - which is exactly what surfaced
+            // as an unprompted "already exists, overwrite?" dialog after
+            // sorting a folder containing a previously-selected file.
+            _itemDragStart = null;
+            _itemDragCandidate = null;
+            e.Handled = true;
+            return;
+        }
+
         // The built-in expand/collapse arrow already toggles IsExpanded on its own
         // Click; skip our row-click handling for that case to avoid a double toggle.
         bool clickedOnExpander =
@@ -2637,8 +2816,13 @@ public partial class MainWindow : Window
         // drag operation for real files, so any app that accepts a file
         // dropped from Explorer (mail client, another Explorer window, a
         // "drop to open" target, ...) accepts one dropped from here too.
+        // Copy-only (no Move/Link) to match TreeViewItem_DragOver's own fixed
+        // Copy effect for drops coming the other way - offering Move let
+        // Explorer silently default to moving (removing the original) for a
+        // same-drive drop, which read as an inconsistent surprise next to
+        // every external-drop-in always being a safe copy.
         var data = new DataObject(DataFormats.FileDrop, new[] { item.FullPath });
-        DragDrop.DoDragDrop((DependencyObject)sender, data, DragDropEffects.Copy | DragDropEffects.Move | DragDropEffects.Link);
+        DragDrop.DoDragDrop((DependencyObject)sender, data, DragDropEffects.Copy);
     }
 
     // DragEnter/DragOver/Drop all bubble, and every TreeViewItem has its own
@@ -2792,15 +2976,23 @@ public partial class MainWindow : Window
             // there's nothing to refresh on a plain file.
             refreshItem.IsEnabled = isFolder;
 
-            // Sort applies globally either way (see SortFieldMenuItem_Click),
-            // but only makes sense to reach for while looking at a folder.
+            // Only makes sense to reach for while looking at a folder. Shows
+            // that folder's own override if it has one (GetEffectiveFolderSort),
+            // otherwise the app-wide default - either way this submenu always
+            // reflects what THIS folder would sort by if (re)loaded right now.
             sortMenu.IsEnabled = isFolder;
-            if (sortMenu.Items is [MenuItem byName, MenuItem byDate, _, MenuItem ascending, MenuItem descending])
+            if (sortMenu.Items is [MenuItem byName, MenuItem byDate, _, MenuItem ascending, MenuItem descending, _, MenuItem followGlobal])
             {
-                byName.IsChecked = !_settings.SortByDate;
-                byDate.IsChecked = _settings.SortByDate;
-                ascending.IsChecked = !_settings.SortDescending;
-                descending.IsChecked = _settings.SortDescending;
+                bool hasOverride = isFolder && ExplorerTree.SelectedItem is FileSystemItem { HasSortOverride: true };
+                var (sortByDate, sortDescending) = isFolder && ExplorerTree.SelectedItem is FileSystemItem folderItem
+                    ? GetEffectiveFolderSort(folderItem)
+                    : (_settings.SortByDate, _settings.SortDescending);
+
+                byName.IsChecked = !sortByDate;
+                byDate.IsChecked = sortByDate;
+                ascending.IsChecked = !sortDescending;
+                descending.IsChecked = sortDescending;
+                followGlobal.IsEnabled = hasOverride;
             }
 
             // "Open with" only makes sense for files - folders don't have a
@@ -2953,8 +3145,8 @@ public partial class MainWindow : Window
     private void RefreshFolderPreservingState(FileSystemItem item)
     {
         var expandedPaths = new List<string>();
-        CollectExpandedPaths(item, expandedPaths);
-        string? selectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath.TrimEnd('\\');
+        var showingAllPaths = new List<string>();
+        CollectExpandedPaths(item, expandedPaths, showingAllPaths);
 
         item.RefreshChildren();
 
@@ -2962,27 +3154,31 @@ public partial class MainWindow : Window
         {
             ExpandPathIfPossible(path);
         }
-
-        // RefreshChildren only replaces THIS folder's own children with fresh
-        // instances (see its own comment), so the selected item's object
-        // reference - and its on-screen position - is completely untouched
-        // unless the selection actually lived inside this subtree. Without
-        // this check, an unrelated background change anywhere else on the
-        // same watched drive (a browser cache write, antivirus scan, cloud
-        // sync, ...) would re-run the favorite-style reveal walk below on
-        // every keystroke of background disk activity - including its
-        // forced "pin selection to the top of the tree" scroll (see
-        // FinishReveal) - which is what made the current selection jump to
-        // the top line or the tree flicker while the user wasn't doing
-        // anything in the app at all.
-        string refreshedPath = item.FullPath.TrimEnd('\\');
-        bool selectionInsideRefreshedSubtree = selectedPath is not null &&
-            (string.Equals(selectedPath, refreshedPath, StringComparison.OrdinalIgnoreCase) ||
-             selectedPath.StartsWith(refreshedPath + "\\", StringComparison.OrdinalIgnoreCase));
-        if (selectionInsideRefreshedSubtree)
+        foreach (var path in showingAllPaths.OrderBy(p => p.Length))
         {
-            NavigateToPath(selectedPath!);
+            ShowAllChildrenIfPossible(path);
         }
+
+        // Deliberately NOT attempting to reselect the previous selection here,
+        // even when it lived inside this subtree - an earlier version reused
+        // NavigateToPath's favorites-style reveal walk for that (a real
+        // FileSystemItem lookup + container realization + BringIntoView
+        // chain), which turned out to be exactly the wrong tool for a folder
+        // holding dozens+ of "더 보기"-revealed rows: RevealChainStep needs an
+        // actually-realized TreeViewItem container for every step, and a
+        // freshly-rebuilt, freshly-fully-revealed folder's deep rows can
+        // legitimately sit outside the (deliberately un-enlarged, see
+        // ExplorerTreeViewItemStyle) per-folder virtualization cache the
+        // instant after rebuilding - the exact class of bug the whole
+        // favorites-navigation saga was about, now hit from a different angle.
+        // The retries there give up silently after a few attempts, which is
+        // what surfaced as the selection landing on some unrelated row, or the
+        // view jumping somewhere unexpected, when resorting a large folder.
+        // Losing the highlight (selection simply clears if it was inside this
+        // subtree) is a far smaller cost than that, and expand/showingAll
+        // state above - both pure model operations with no container
+        // dependency - already cover what actually matters visually: nothing
+        // the user had open collapses out from under them.
     }
 
     private void OpenItem_Click(object sender, RoutedEventArgs e)

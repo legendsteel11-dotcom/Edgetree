@@ -44,6 +44,14 @@ public class FileSystemItem : INotifyPropertyChanged
     // constructed with no parent - used to bold their row (C:, D:, ...).
     public bool IsRoot => Parent is null;
 
+    // Whether "더 보기" has been clicked and every overflow row is currently
+    // appended to Children - lets a caller that's about to rebuild this
+    // folder's Children from scratch (RefreshChildren via a sort-override
+    // change or a background disk change) know it needs to re-reveal the rest
+    // afterward too, not just re-set IsExpanded (see MainWindow's
+    // CollectExpandedPaths/RefreshFolderPreservingState).
+    public bool IsShowingAllChildren => _showingAll;
+
     public ObservableCollection<FileSystemItem> Children { get; } = new();
 
     public bool IsExpanded
@@ -75,6 +83,33 @@ public class FileSystemItem : INotifyPropertyChanged
         set => SetField(ref _isAncestorOfSelection, value);
     }
 
+    // True when this folder has its own remembered sort override (set via its
+    // right-click "정렬", independent of the app-wide default) - drives the
+    // small icon next to its name. Computed once at construction from
+    // FileSystemService.SortOverrides (same map LoadChildren itself consults
+    // for this folder's own path), then flipped directly by MainWindow when
+    // the override is set/cleared afterward so the icon updates immediately
+    // without a full reload - same externally-maintained pattern as
+    // IsAncestorOfSelection above.
+    private bool _hasSortOverride;
+    public bool HasSortOverride
+    {
+        get => _hasSortOverride;
+        set => SetField(ref _hasSortOverride, value);
+    }
+
+    // "N↑"/"N↓"/"D↑"/"D↓" - which of the 4 sort combinations this folder's
+    // override is currently set to, shown next to the icon above. Only
+    // meaningful while HasSortOverride is true; kept in sync with it by
+    // MainWindow (SetFolderSortOverride/RotateFolderSortOverride/
+    // ClearFolderSortOverride), same externally-maintained pattern.
+    private string _sortOverrideLabel = string.Empty;
+    public string SortOverrideLabel
+    {
+        get => _sortOverrideLabel;
+        set => SetField(ref _sortOverrideLabel, value);
+    }
+
     // Drives the inline VS Code-style rename UI in the tree row's
     // DataTemplate (a TextBox swapped in for the name TextBlock), rather
     // than a separate popup dialog.
@@ -101,6 +136,12 @@ public class FileSystemItem : INotifyPropertyChanged
         Parent = parent;
         if (isDirectory)
         {
+            if (FileSystemService.SortOverrides.TryGetValue(
+                FileSystemService.NormalizeSortOverridePath(fullPath), out var over))
+            {
+                _hasSortOverride = true;
+                _sortOverrideLabel = FileSystemService.FormatSortOverrideLabel(over.Field, over.Descending);
+            }
             Children.Add(new FileSystemItem());
         }
     }

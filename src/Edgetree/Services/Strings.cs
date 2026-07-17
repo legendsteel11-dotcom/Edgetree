@@ -60,6 +60,18 @@ public static class Strings
     public static string MenuSortByDate = "날짜순";
     public static string MenuSortAscending = "오름차순";
     public static string MenuSortDescending = "내림차순";
+
+    // Clears a folder's own remembered sort override (see
+    // Models.FolderSortOverrideEntry) so it goes back to following
+    // MenuDefaultSort - shown in the per-folder "정렬" submenu only when that
+    // folder actually has one (see MainWindow.ExplorerItemContextMenu_Opened).
+    public static string MenuFollowDefaultSort = "전역 정렬 따르기";
+
+    // The folder-row override icon's own ToolTip (see MainWindow.xaml's
+    // SortOverrideIconBorder) - clicking it cycles the sort instead of
+    // clearing it, so this deliberately doesn't reuse MenuFollowDefaultSort's
+    // wording above.
+    public static string SortOverrideIconTooltip = "클릭하여 정렬 전환 (해제는 정렬 메뉴에서)";
     public static string MenuMaxItemsPerFolder = "폴더의 표시 개수";
     public static string MenuTabSpacing = "탭 간격";
     public static string MenuExportSettings = "설정 내보내기...";
@@ -148,6 +160,16 @@ public static class Strings
     {
         if (language != "en")
         {
+#if DEBUG
+            // A quick, unmistakable way to tell a freshly-built Debug run
+            // apart from any already-running instance the single-instance
+            // mutex (see App.OnStartup) might otherwise silently defer to -
+            // e.g. an old Release/tray instance from before this launch that
+            // makes it look like a rebuild "didn't take effect" when it's
+            // actually just not the window on screen. Compiled out entirely
+            // in Release (RootPathLabel never gets this suffix there).
+            RootPathLabel += " (DEBUG)";
+#endif
             return;
         }
 
@@ -184,6 +206,8 @@ public static class Strings
         MenuSortByDate = "By Date";
         MenuSortAscending = "Ascending";
         MenuSortDescending = "Descending";
+        MenuFollowDefaultSort = "Follow Default Sort";
+        SortOverrideIconTooltip = "Click to cycle sort (clear it from the Sort menu)";
         MenuMaxItemsPerFolder = "Items per Folder";
         MenuTabSpacing = "Indent Spacing";
         MenuExportSettings = "Export Settings...";
@@ -253,5 +277,9 @@ public static class Strings
 
         ResetSettingsConfirmTitle = "Reset Settings";
         ResetSettingsConfirmBody = "All settings and favorites will be reset to the app's default state. This cannot be undone.\n\nThe app will restart afterward to apply it. Continue?";
+
+#if DEBUG
+        RootPathLabel += " (DEBUG)";
+#endif
     }
 }

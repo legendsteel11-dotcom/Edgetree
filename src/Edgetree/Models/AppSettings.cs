@@ -119,6 +119,14 @@ public class AppSettings
     public bool SortByDate { get; set; } = false;
     public bool SortDescending { get; set; } = false;
 
+    // Per-folder sort overrides ("정렬" from a specific folder's own right-click
+    // menu, kept independent of the app-wide default above until explicitly
+    // cleared via "전역 정렬 따르기" or the folder's own override icon) - see
+    // FileSystemService.SortOverrides, which mirrors this list at startup and
+    // whenever it changes. A path that no longer exists is simply never
+    // matched again, same tolerance as ExpandedFolderPaths below.
+    public List<FolderSortOverrideEntry> FolderSortOverrides { get; set; } = new();
+
     // How many items a folder shows before collapsing the rest behind "더
     // 보기" (see Models/FileSystemItem.DisplayCap) - user-adjustable 1~50 from
     // the "..." options menu, for low-resolution screens that want fewer rows.
