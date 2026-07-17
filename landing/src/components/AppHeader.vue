@@ -31,7 +31,7 @@ import { t, lang, toggleLang } from '../i18n'
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(26, 26, 26, 0.85);
+  background: rgba(26, 26, 26, 0.05);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
 }
