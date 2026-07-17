@@ -30,7 +30,6 @@ namespace SidebarExplorer.App;
 
 public partial class MainWindow : Window
 {
-    private const double CollapsedWidth = 44;
     private const double MinExpandedWidth = 180;
     private const double MaxExpandedWidth = 1200;
     private const int ToggleAnimationMs = 200;
@@ -203,10 +202,8 @@ public partial class MainWindow : Window
         // just left at their XAML-default (top) positions.
         ApplyFavoritesPosition();
 
-        Width = _settings.IsAutoHidden ? AutoHideSliverWidth
-            : _settings.IsCollapsed ? CollapsedWidth
-            : ClampExpandedWidth(_settings.ExpandedWidth);
-        SetExpandedContentVisibility(_settings.IsCollapsed ? Visibility.Collapsed : Visibility.Visible);
+        Width = _settings.IsAutoHidden ? AutoHideSliverWidth : ClampExpandedWidth(_settings.ExpandedWidth);
+        SetExpandedContentVisibility(_settings.IsAutoHidden ? Visibility.Collapsed : Visibility.Visible);
         PositionToWorkArea();
         UpdateResizeThumbVisibility();
 
@@ -417,11 +414,14 @@ public partial class MainWindow : Window
     private static double ClampExpandedWidth(double width)
         => Math.Clamp(width, MinExpandedWidth, MaxExpandedWidth);
 
-    // The app icon is the collapse/expand toggle now (replacing the old
-    // separate chevron button entirely) - docked, a click steps through
-    // expanded -> icon rail -> auto-hide sliver. Ignored entirely once
-    // auto-hidden (see EnterAutoHide's own comment - the pin button, not
-    // this, is the only way back out from there). Floating has no rail to
+    // The app icon is the auto-hide toggle now - docked and expanded, a
+    // click goes straight to the auto-hide sliver (there used to be an
+    // intermediate icon-only rail stop here, removed since re-clicking the
+    // icon from that state only went deeper into auto-hide rather than back
+    // out - the rail had no way back to normal except undocking, which made
+    // it a dead end rather than a useful resting state). Ignored entirely
+    // once auto-hidden (see EnterAutoHide's own comment - the pin button,
+    // not this, is the way back out from there). Floating has nothing to
     // collapse to, so this is a no-op there; AppIcon is just branding while
     // floating.
     private void AppIcon_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -431,38 +431,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_settings.IsCollapsed)
-        {
-            EnterAutoHide();
-        }
-        else
-        {
-            ToggleCollapsed();
-        }
+        EnterAutoHide();
         e.Handled = true;
-    }
-
-    private void ToggleCollapsed()
-    {
-        bool collapsing = !_settings.IsCollapsed;
-        double targetWidth = collapsing ? CollapsedWidth : ClampExpandedWidth(_settings.ExpandedWidth);
-
-        // Hide labels immediately when collapsing so they don't visibly
-        // squeeze/wrap during the shrink animation.
-        if (collapsing)
-        {
-            SetExpandedContentVisibility(Visibility.Collapsed);
-        }
-        _settings.IsCollapsed = collapsing;
-
-        AnimateWidth(targetWidth, onCompleted: () =>
-        {
-            // Only reveal labels once the window has fully expanded.
-            if (!collapsing)
-            {
-                SetExpandedContentVisibility(Visibility.Visible);
-            }
-        });
     }
 
     // Animates Width toward targetWidth - and, docked to the right edge,
@@ -470,7 +440,22 @@ public partial class MainWindow : Window
     // one) so the right edge stays anchored to the screen edge instead of
     // the whole window drifting as it grows/shrinks (see PositionToWorkArea/
     // ResizeThumb_DragDelta, which anchor that same edge their own way).
-    // Shared by ToggleCollapsed and the auto-hide reveal/re-hide transitions.
+    // Shared by the auto-hide enter/reveal/re-hide transitions.
+    //
+    // Every tick of a top-level Window's own Width/Left animation actually
+    // resizes/moves the real native HWND (a genuine Win32 call) and drags a
+    // full layout/repaint of everything inside along with it - capping the
+    // frame rate here was tried first (a cheap, low-risk change) but only
+    // made the stutter worse: fewer, evenly-spaced-but-still-expensive
+    // frames just made each individual step more visible instead of fixing
+    // the actual per-frame cost. The real fix is what content is exposed
+    // during that per-frame cost - see callers: whichever ones keep the
+    // full tree/favorites content hidden (Collapsed) for the whole
+    // animation and only reveal it once Width has already reached its
+    // target are cheap and smooth; the one that used to reveal content
+    // before animating (MainWindow_MouseEnter) was doing a full TreeView
+    // layout pass on every single resize tick on top of the native resize
+    // itself, which is what actually produced the lag.
     private void AnimateWidth(double targetWidth, Action? onCompleted = null)
     {
         double targetLeft = Left + (Width - targetWidth);
@@ -513,19 +498,24 @@ public partial class MainWindow : Window
     // TabSpacing elsewhere) rather than trusting a hand-edited settings file.
     private double AutoHideSliverWidth => Math.Clamp(_settings.AutoHideSliverWidth, 3, 8);
 
-    // Entered by clicking the app icon a second time while already collapsed
-    // to the 44px icon rail - shrinks further to a bare AutoHideSliverWidth
-    // sliver at the screen edge, which MainWindow_MouseEnter/Leave then peek
-    // open/closed as the mouse crosses it, the same convention as Windows'
-    // own taskbar auto-hide. Forces Topmost on for as long as auto-hide stays
-    // engaged (both the sliver and the temporarily-peeked-open states) -
-    // otherwise a maximized window would cover the sliver and the mouse could
-    // never reach it to reveal it again, regardless of the user's own
-    // "항상 위에 표시" preference. ExitAutoHide restores that preference.
+    // Entered by clicking the app icon while docked and expanded - shrinks
+    // to a bare AutoHideSliverWidth sliver at the screen edge, which
+    // MainWindow_MouseEnter/Leave then peek open/closed as the mouse crosses
+    // it, the same convention as Windows' own taskbar auto-hide. Forces
+    // Topmost on for as long as auto-hide stays engaged (both the sliver and
+    // the temporarily-peeked-open states) - otherwise a maximized window
+    // would cover the sliver and the mouse could never reach it to reveal it
+    // again, regardless of the user's own "항상 위에 표시" preference.
+    // ExitAutoHide restores that preference. Content is hidden immediately,
+    // before the shrink animation starts, so the animation only ever has to
+    // redraw the sliver's own bare background/header on each tick - showing
+    // it before animating (or not hiding it at all) is what used to make the
+    // reveal side of this transition stutter (see AnimateWidth's comment).
     private void EnterAutoHide()
     {
         _settings.IsAutoHidden = true;
         Topmost = true;
+        SetExpandedContentVisibility(Visibility.Collapsed);
         AnimateWidth(AutoHideSliverWidth);
     }
 
@@ -539,18 +529,15 @@ public partial class MainWindow : Window
         _autoHideRehideTimer?.Stop();
         StopAutoHideOutsideClickWatch();
         _settings.IsAutoHidden = false;
-        _settings.IsCollapsed = false;
         _isAutoHideRevealed = false;
         Topmost = _settings.AlwaysOnTop;
         UpdatePinButtonVisibility();
 
-        // The reveal (MainWindow_MouseEnter) that got us here ran while
-        // _settings.IsCollapsed was still true, so it left the resize thumb
-        // hidden/non-hit-testable (see UpdateResizeThumbVisibility) - now
-        // that IsCollapsed is actually false, it needs to be told to show
-        // again, or dragging to resize silently does nothing until some
-        // other, unrelated call happens to refresh it (e.g. docking to the
-        // right, or an undock/re-dock round trip).
+        // MainWindow_MouseEnter (the reveal that got us here) never itself
+        // refreshes the resize thumb, so it's left in whatever state it was
+        // in before the reveal (hidden/non-hit-testable) until something
+        // else calls this - or dragging to resize would silently do nothing
+        // despite the window now being back to a normal, resizable state.
         UpdateResizeThumbVisibility();
     }
 
@@ -563,8 +550,17 @@ public partial class MainWindow : Window
 
         _autoHideRehideTimer?.Stop();
         _isAutoHideRevealed = true;
-        SetExpandedContentVisibility(Visibility.Visible);
-        AnimateWidth(ClampExpandedWidth(_settings.ExpandedWidth));
+        // Deferred until the width animation finishes - matching
+        // EnterAutoHide's own shrink path - so the grow animation only ever
+        // has to redraw the sliver's own bare background/header, not a full
+        // tree/favorites layout pass on every single resize tick. This used
+        // to show content before animating, which was the actual source of
+        // the reveal-side stutter (see AnimateWidth's own comment) - not the
+        // animation itself.
+        AnimateWidth(ClampExpandedWidth(_settings.ExpandedWidth), onCompleted: () =>
+        {
+            SetExpandedContentVisibility(Visibility.Visible);
+        });
         UpdatePinButtonVisibility();
 
         if (!_settings.AutoHideCloseOnMouseLeave)
@@ -719,10 +715,7 @@ public partial class MainWindow : Window
         // RowDefinition heights don't auto-shrink just because their content is
         // hidden, so without this the favorites row/splitter (and the version
         // footer row) would keep reserving their pixel height as a blank gap
-        // in the 44px-wide icon-only rail. Using the visibility parameter
-        // directly (rather than _settings.IsCollapsed) avoids a timing issue:
-        // on the collapsing path this runs before that flag is actually
-        // flipped (see ToggleCollapsed).
+        // in the auto-hide sliver.
         if (visibility == Visibility.Collapsed)
         {
             FavoritesRowDef.Height = new GridLength(0);
@@ -740,15 +733,14 @@ public partial class MainWindow : Window
     }
 
     // The resize thumb only makes sense docked (ResizeMode=NoResize there, so it's
-    // the only way to change width) and expanded (nothing to grab once collapsed
-    // to the icon bar) - floating windows get native edge-resize instead.
-    // Normal expanded-and-docked, or docked and temporarily peeked out of
-    // auto-hide (see MainWindow_MouseEnter) - the icon rail and the hidden
-    // auto-hide sliver are both too narrow to make sense of a drag-resize,
-    // but a peek shows the same full-width content a normal expanded window
-    // does, so it should be resizable the same way while it's up.
+    // the only way to change width) - floating windows get native edge-resize
+    // instead. Normal expanded-and-docked, or docked and temporarily peeked
+    // out of auto-hide (see MainWindow_MouseEnter) - the hidden auto-hide
+    // sliver itself is too narrow to make sense of a drag-resize, but a peek
+    // shows the same full-width content a normal expanded window does, so it
+    // should be resizable the same way while it's up.
     private bool CanResizeWidth
-        => _isDocked && (!_settings.IsCollapsed || (_settings.IsAutoHidden && _isAutoHideRevealed));
+        => _isDocked && (!_settings.IsAutoHidden || _isAutoHideRevealed);
 
     private void UpdateResizeThumbVisibility()
     {
@@ -771,7 +763,7 @@ public partial class MainWindow : Window
     // peeked open out of auto-hide (stop auto-hiding and stay open).
     private void UpdatePinButtonVisibility()
     {
-        bool showForFloatingRedock = !_isDocked && !_settings.IsCollapsed;
+        bool showForFloatingRedock = !_isDocked;
         bool showForAutoHideReveal = _isDocked && _settings.IsAutoHidden && _isAutoHideRevealed;
         PinButton.Visibility = showForFloatingRedock || showForAutoHideReveal ? Visibility.Visible : Visibility.Collapsed;
 
@@ -911,20 +903,15 @@ public partial class MainWindow : Window
         // Resetting it here first is what actually unsticks it.
         WindowState = WindowState.Normal;
 
-        // Collapsing to the icon-only rail (and further, auto-hiding to a
-        // sliver) only makes sense docked (both are space-saving tricks for a
-        // fixed-height edge strip); a freshly undocked window has no reason
-        // to be stuck at either, so expand it.
-        if (_settings.IsCollapsed)
+        // Auto-hiding to a sliver only makes sense docked (a space-saving
+        // trick for a fixed-height edge strip); a freshly undocked window
+        // has no reason to be stuck there, so expand it.
+        if (_settings.IsAutoHidden)
         {
-            _settings.IsCollapsed = false;
-            if (_settings.IsAutoHidden)
-            {
-                _settings.IsAutoHidden = false;
-                _isAutoHideRevealed = false;
-                _autoHideRehideTimer?.Stop();
-                Topmost = _settings.AlwaysOnTop;
-            }
+            _settings.IsAutoHidden = false;
+            _isAutoHideRevealed = false;
+            _autoHideRehideTimer?.Stop();
+            Topmost = _settings.AlwaysOnTop;
             SetExpandedContentVisibility(Visibility.Visible);
         }
         Width = _floatingWidth ?? ClampExpandedWidth(_settings.ExpandedWidth);
@@ -1027,7 +1014,7 @@ public partial class MainWindow : Window
         NativeMethods.SetWindowCornerPreference(hwnd, rounded: false);
         ShowInTaskbar = false;
 
-        Width = _settings.IsCollapsed ? CollapsedWidth : ClampExpandedWidth(_settings.ExpandedWidth);
+        Width = ClampExpandedWidth(_settings.ExpandedWidth);
         PositionToWorkArea();
 
         UpdateResizeThumbVisibility();
@@ -3486,10 +3473,12 @@ public partial class MainWindow : Window
 
     private void SaveCurrentWidth()
     {
-        // Only capture Width as the docked width while actually docked - a
-        // floating window's (possibly much wider) size shouldn't leak into the
-        // docked sidebar's remembered width, since every launch starts docked.
-        if (_isDocked && !_settings.IsCollapsed)
+        // Only capture Width as the docked width while actually docked and
+        // not auto-hidden - a floating window's (possibly much wider) size
+        // shouldn't leak into the docked sidebar's remembered width (every
+        // launch starts docked), and the auto-hide sliver's own tiny width
+        // definitely shouldn't either.
+        if (_isDocked && !_settings.IsAutoHidden)
         {
             _settings.ExpandedWidth = ClampExpandedWidth(Width);
         }

@@ -35,13 +35,13 @@ Either way, it's one `.exe` — no installer, just run it.
 - **Docked to the screen edge** — left by default, switchable to the right
   from the options menu — spanning the full work area height (excludes the
   taskbar), hidden from Alt+Tab and the taskbar while docked
-- **Collapse/expand** by clicking the app icon: one click shrinks it to an
-  icon-only rail, a second click auto-hides it to a bare sliver at the screen
-  edge that peeks open on mouse-over and, by default, quietly re-hides once
-  you move away (turn off "Close Instantly on Mouse Leave" in the options
-  menu to close it on an outside click instead). The sliver's own thickness
-  is adjustable too, 3–8px from the options menu — pin it back open from the
-  peeked-out state to stop auto-hiding — all with a smooth width animation
+- **Auto-hide** by clicking the app icon: shrinks the window to a bare sliver
+  at the screen edge that peeks open on mouse-over and, by default, quietly
+  re-hides once you move away (turn off "Close Instantly on Mouse Leave" in
+  the options menu to close it on an outside click instead). The sliver's own
+  thickness is adjustable too, 3–8px from the options menu — pin it back open
+  from the peeked-out state to stop auto-hiding — all with a smooth width
+  animation
 - **Drag-to-resize** width while docked, or double-click the resize line to
   fit the window to the widest currently-shown row and double-click again to
   restore the previous width

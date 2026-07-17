@@ -67,7 +67,7 @@ public static class Strings
     public static string MenuResetSettings = "전체 설정 초기화...";
 
     // Header buttons (ToolTips) and root label
-    public static string ToolTipToggle = "접기/펼치기";
+    public static string ToolTipToggle = "자동 숨김";
 
     // Which one shows depends on AppSettings.DockOnRight (see
     // MainWindow.xaml.cs's UpdatePinButtonVisibility) - PinButton's ToolTip
@@ -190,7 +190,7 @@ public static class Strings
         MenuImportSettings = "Import Settings...";
         MenuResetSettings = "Reset All Settings...";
 
-        ToolTipToggle = "Collapse/Expand";
+        ToolTipToggle = "Auto-Hide";
         ToolTipPinLeft = "Pin to Left";
         ToolTipPinRight = "Pin to Right";
         ToolTipCollapseAll = "Collapse All";

@@ -1522,13 +1522,12 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <!-- The app icon IS the collapse/expand toggle now (see
+                <!-- The app icon IS the auto-hide toggle now (see
                      AppIcon_MouseLeftButtonDown) - the separate chevron
                      button this used to sit next to is gone, so there's
-                     nothing left to click but this while docked, in either
-                     direction. Floating mode still shows it, just as
-                     branding (collapsing to the icon rail is a docked-only
-                     concept). -->
+                     nothing left to click but this while docked. Floating
+                     mode still shows it, just as branding (auto-hide is a
+                     docked-only concept). -->
                 <Image x:Name="AppIcon"
                         Grid.Column="0"
                         Source="pack://application:,,,/Resources/icon.png"

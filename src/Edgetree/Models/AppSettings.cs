@@ -7,12 +7,10 @@ namespace SidebarExplorer.App.Models;
 public class AppSettings
 {
     public double ExpandedWidth { get; set; } = 240;
-    public bool IsCollapsed { get; set; } = false;
 
-    // Collapsed further still, down to a bare sliver at the screen edge that
-    // peeks open on mouse-over - see MainWindow.xaml.cs's EnterAutoHide/
-    // ExitAutoHide. Only meaningful alongside IsCollapsed=true (entered by a
-    // second click on the already-collapsed icon rail).
+    // Collapsed to a bare sliver at the screen edge that peeks open on
+    // mouse-over - see MainWindow.xaml.cs's EnterAutoHide/ExitAutoHide.
+    // Entered by a single click on the app icon while docked and expanded.
     public bool IsAutoHidden { get; set; } = false;
 
     // "즉시자동숨김" in the options menu. True (default, matches the original
@@ -151,7 +149,7 @@ public class AppSettings
 
     // Docks against the right edge of the work area instead of the left -
     // see MainWindow.xaml.cs's PositionToWorkArea/ResizeThumb_DragDelta/
-    // ToggleCollapsed, all of which branch on this to keep the right edge
+    // AnimateWidth, all of which branch on this to keep the right edge
     // anchored instead of the left one.
     public bool DockOnRight { get; set; } = false;
 
