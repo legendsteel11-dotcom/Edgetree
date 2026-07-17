@@ -1210,16 +1210,21 @@ public partial class MainWindow : Window
         // even below a huge folder (NavigateToPath re-caps overflow first).
         if (sender is ListBoxItem { DataContext: FavoriteEntry entry })
         {
-            // Re-clicking a favorite that's already revealed and selected used
-            // to still re-run the entire walk: re-collapse every other
-            // folder's "more" overflow, re-expand the whole chain level by
-            // level, and re-pin the selection to the top of the tree - all for
-            // an end state identical to what was already on screen, which read
-            // as the whole panel flashing/redrawing. Nothing left to do if the
-            // target is already the current selection.
-            string? currentPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath.TrimEnd('\\');
-            if (currentPath is not null &&
-                string.Equals(currentPath, entry.Path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+            // Re-clicking a favorite that's already revealed, expanded, and
+            // selected used to still re-run the entire walk: re-collapse
+            // every other folder's "more" overflow, re-expand the whole
+            // chain level by level, and re-pin the selection to the top of
+            // the tree - all for an end state identical to what was already
+            // on screen, which read as the whole panel flashing/redrawing.
+            // Nothing left to do only when it's already both selected AND
+            // expanded - IsExpanded matters too, not just the path match: a
+            // favorite added while its own folder was selected but still
+            // collapsed (e.g. right-clicked without ever opening it) would
+            // otherwise match on path alone and skip NavigateToPath - the one
+            // call that actually expands it - leaving it selected but stuck
+            // collapsed until some other selection change knocked it loose.
+            if (ExplorerTree.SelectedItem is FileSystemItem { IsExpanded: true } selected &&
+                string.Equals(selected.FullPath.TrimEnd('\\'), entry.Path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
