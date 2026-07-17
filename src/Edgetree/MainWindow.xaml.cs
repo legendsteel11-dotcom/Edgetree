@@ -144,6 +144,42 @@ public partial class MainWindow : Window
         Closing += MainWindow_Closing;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         SystemParameters.StaticPropertyChanged += SystemParameters_StaticPropertyChanged;
+        SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
+    }
+
+    // Defensive - not a confirmed fix for any specific reported symptom, just
+    // cheap insurance against a real risk this app's own design carries: a
+    // Topmost + tool-window (hidden from Alt+Tab and the taskbar - see
+    // MakeToolWindow) auto-hide sliver is exactly the shape of window that,
+    // if a sleep/resume graphics-driver reset leaves it "up and still
+    // catching clicks but not actually rendering" (a known category of WPF
+    // issue, worse with Topmost), becomes invisible AND unreachable by any
+    // normal means - no taskbar entry, no Alt+Tab entry, just something
+    // silently eating clicks until Task Manager kills it. Re-snapping the
+    // position (in case the monitor/work-area changed while asleep - the
+    // existing SystemParameters_StaticPropertyChanged handler only ever
+    // catches that for the primary monitor's own WorkArea) and cycling
+    // Topmost off/on (nudging DWM to recompose it) on every resume costs
+    // nothing and can only help.
+    private void SystemEvents_PowerModeChanged(object sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode != PowerModes.Resume)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (_isDocked)
+            {
+                PositionToWorkArea();
+            }
+            if (Topmost)
+            {
+                Topmost = false;
+                Topmost = true;
+            }
+        }));
     }
 
     private void MainWindow_SourceInitialized(object? sender, EventArgs e)
@@ -1985,6 +2021,27 @@ public partial class MainWindow : Window
         // re-save whatever _settings references - _settingsResetPending is
         // what stops it from doing that with the still-live pre-reset
         // width/expanded folders/selection.
+        //
+        // settings.json isn't the only place state lives - StartWithWindows
+        // is a Registry Run key (see SetStartWithWindows), entirely outside
+        // that file, so a fresh AppSettings() alone leaves a stale entry
+        // behind: the options menu would show it off (matching the new
+        // default) while the app keeps actually launching at Windows
+        // startup regardless. Only worth doing if it was ever turned on -
+        // TrySetStartWithWindows would just no-op removing an absent value
+        // otherwise, but this skips the Registry write/failure path
+        // entirely for the common case where it was never touched.
+        if (_settings.StartWithWindows)
+        {
+            try
+            {
+                TrySetStartWithWindows(false);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+            {
+            }
+        }
+
         _settings = new AppSettings();
         _settingsService.Save(_settings);
         _settingsResetPending = true;
