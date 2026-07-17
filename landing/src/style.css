@@ -35,6 +35,10 @@ h1, h2, h3 {
   margin: 0;
 }
 
+h2 {
+  font-weight: 400;
+}
+
 p {
   margin: 0;
 }
@@ -69,7 +73,7 @@ section {
 }
 
 .section-heading h2 {
-  font-size: 32px;
+  font-size: 24px;
   letter-spacing: -0.02em;
 }
 
