@@ -25,16 +25,17 @@ public static class Strings
     public static string MenuRemoveFavorite = "즐겨찾기에서 제거";
 
     // Options ("...") menu
-    public static string MenuAutoCollapse = "다른 폴더 자동 접기";
+    public static string MenuAutoCollapse = "폴더 자동 접기";
     public static string MenuAlwaysOnTop = "항상 위에 표시";
-    public static string MenuStartWithWindows = "윈도우 시작 시 실행";
-    public static string MenuAlwaysShowTrayIcon = "트레이 아이콘 항상 표시";
-    public static string MenuShowFolderIcons = "폴더 아이콘 표시";
-    public static string MenuShowFileIcons = "파일 아이콘 표시";
+    public static string MenuStartWithWindows = "부팅 후 자동 시작";
+    public static string MenuAlwaysShowTrayIcon = "트레이 아이콘";
+    public static string MenuShowFolderIcons = "폴더 아이콘";
+    public static string MenuShowFileIcons = "파일 아이콘";
+    public static string MenuHideTitleBarTitle = "제목 표시줄 타이틀 제거";
     public static string MenuFavoritesAtBottom = "즐겨찾기를 아래에 표시";
-    public static string MenuDockOnRight = "화면 우측에 고정";
-    public static string MenuAutoHideCloseOnLeave = "즉시 자동 숨김";
-    public static string MenuAutoHideSliverWidth = "자동 숨김 두께";
+    public static string MenuDockOnRight = "고정 위치 오른쪽";
+    public static string MenuAutoHideCloseOnLeave = "마우스 이탈 시 닫기";
+    public static string MenuAutoHideSliverWidth = "숨김 시 막대 두께";
     public static string MenuColorSettings = "색상 설정";
     public static string MenuAbout = "앱 정보";
 
@@ -54,8 +55,8 @@ public static class Strings
     // MenuSort/MenuSortByName/etc. below - this is only the options-menu
     // ("...") copy, worded as "default" to distinguish "change how every
     // folder sorts from now on" from that per-folder one.
-    public static string MenuDefaultSort = "기본 정렬";
-    public static string MenuSort = "정렬 방식";
+    public static string MenuDefaultSort = "정렬 기본값";
+    public static string MenuSort = "이 폴더의 정렬";
     public static string MenuSortByName = "이름순";
     public static string MenuSortByDate = "날짜순";
     public static string MenuSortAscending = "오름차순";
@@ -72,8 +73,9 @@ public static class Strings
     // clearing it, so this deliberately doesn't reuse MenuFollowDefaultSort's
     // wording above.
     public static string SortOverrideIconTooltip = "클릭하여 정렬 전환 (해제는 정렬 메뉴에서)";
-    public static string MenuMaxItemsPerFolder = "폴더의 표시 개수";
+    public static string MenuMaxItemsPerFolder = "한 번에 표시할 개수";
     public static string MenuTabSpacing = "탭 간격";
+    public static string MenuRowSpacing = "행 간격";
     public static string MenuExportSettings = "설정 내보내기...";
     public static string MenuImportSettings = "설정 가져오기...";
     public static string MenuResetSettings = "전체 설정 초기화...";
@@ -116,6 +118,14 @@ public static class Strings
     public static string ColorLabelPanelDivider = "영역 구분선";
     public static string ButtonDefaults = "기본값";
     public static string ButtonClose = "닫기";
+    public static string ColorThemeDarkMode = "🌙 다크 모드";
+    public static string ColorThemeLightMode = "☀️ 라이트 모드";
+    // Plain (no emoji) versions for use inside a sentence - see
+    // ColorResetConfirmBody.
+    public static string ColorThemeDarkLabel = "다크 모드";
+    public static string ColorThemeLightLabel = "라이트 모드";
+    public static string ColorResetConfirmTitle = "색상 초기화";
+    public static string ColorResetConfirmBody = "현재 {0}에서 설정한 색상값이 초기화됩니다. 진행하시겠습니까?";
 
     // About window
     public static string AboutTitle = "정보";
@@ -176,7 +186,7 @@ public static class Strings
         MenuAddFavorite = "Add to Favorites";
         MenuNewFolder = "New Folder";
         MenuRefresh = "Refresh";
-        MenuAutoCollapse = "Auto Collapse";
+        MenuAutoCollapse = "Accordion Mode";
         MenuOpen = "Open";
         MenuOpenWith = "Open With";
         MenuCopy = "Copy";
@@ -194,9 +204,10 @@ public static class Strings
         MenuAlwaysShowTrayIcon = "Always Show Tray Icon";
         MenuShowFolderIcons = "Show Folder Icons";
         MenuShowFileIcons = "Show File Icons";
+        MenuHideTitleBarTitle = "Hide Title Bar Text";
         MenuFavoritesAtBottom = "Show Favorites at Bottom";
         MenuDockOnRight = "Pin to Right Edge";
-        MenuAutoHideCloseOnLeave = "Close Instantly on Mouse Leave";
+        MenuAutoHideCloseOnLeave = "Close on Mouse Leave";
         MenuAutoHideSliverWidth = "Auto-Hide Thickness";
         MenuColorSettings = "Color Settings";
         MenuAbout = "About";
@@ -209,7 +220,8 @@ public static class Strings
         MenuFollowDefaultSort = "Follow Default Sort";
         SortOverrideIconTooltip = "Click to cycle sort (clear it from the Sort menu)";
         MenuMaxItemsPerFolder = "Items per Folder";
-        MenuTabSpacing = "Indent Spacing";
+        MenuTabSpacing = "Indent Width";
+        MenuRowSpacing = "Row Spacing";
         MenuExportSettings = "Export Settings...";
         MenuImportSettings = "Import Settings...";
         MenuResetSettings = "Reset All Settings...";
@@ -243,6 +255,12 @@ public static class Strings
         ColorLabelPanelDivider = "Panel Divider";
         ButtonDefaults = "Defaults";
         ButtonClose = "Close";
+        ColorThemeDarkMode = "🌙 Dark Mode";
+        ColorThemeLightMode = "☀️ Light Mode";
+        ColorThemeDarkLabel = "Dark Mode";
+        ColorThemeLightLabel = "Light Mode";
+        ColorResetConfirmTitle = "Reset Colors";
+        ColorResetConfirmBody = "This will reset the colors you've set in {0}. Continue?";
 
         AboutTitle = "About";
         AboutVersionLabel = "Version";

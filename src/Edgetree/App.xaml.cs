@@ -4,6 +4,9 @@ using System.Windows.Forms;
 using Application = System.Windows.Application;
 using SidebarExplorer.App.Native;
 using SidebarExplorer.App.Services;
+using Color = System.Windows.Media.Color;
+using ColorConverter = System.Windows.Media.ColorConverter;
+using SolidColorBrush = System.Windows.Media.SolidColorBrush;
 
 namespace SidebarExplorer.App;
 
@@ -91,6 +94,63 @@ public partial class App : Application
         window.Show();
         window.WindowState = WindowState.Normal;
         window.Activate();
+    }
+
+    // General app "chrome" (menus/context menus/the Color Settings and About
+    // dialogs, header icons) - deliberately separate from AppSettings' 15
+    // user-customizable tree colors (see App.xaml's own comment). Called from
+    // MainWindow.ApplyColorSettings, which already runs at startup and on
+    // every color/theme change, so this needs no separate wiring of its own.
+    // Dark values match what used to be hardcoded throughout MainWindow.xaml/
+    // ColorSettingsWindow.xaml/AboutWindow.xaml before this existed - a
+    // hand-picked light palette for the other side, same reasoning as the
+    // tree's own light palette (not a mathematical inversion).
+    public void ApplyChromeTheme(bool isLightMode)
+    {
+        if (isLightMode)
+        {
+            SetChromeBrush("ForegroundText", "#FF3B3B3B");
+            SetChromeBrush("HighlightForeground", "#FF000000");
+            SetChromeBrush("HoverBackground", "#FFE8E8E8");
+            SetChromeBrush("SecondaryForeground", "#FF6E6E6E");
+            SetChromeBrush("PanelBackground", "#FFFFFFFF");
+            SetChromeBrush("PanelBorder", "#FFD4D4D4");
+            SetChromeBrush("SeparatorBrush", "#26000000");
+            SetChromeBrush("ControlBackground", "#FFECECEC");
+            SetChromeBrush("ControlBorder", "#FFC0C0C0");
+            SetChromeBrush("ControlHoverBackground", "#FFDCDCDC");
+            SetChromeBrush("ControlHoverBorder", "#FFA0A0A0");
+            SetChromeBrush("DialogBackground", "#FFFFFFFF");
+            SetChromeBrush("DialogHeaderBackground", "#FFF3F3F3");
+            SetChromeBrush("DialogForeground", "#FF1E1E1E");
+            SetChromeBrush("AccentForeground", "#FF0969DA");
+        }
+        else
+        {
+            SetChromeBrush("ForegroundText", "#FFA8AAAE");
+            SetChromeBrush("HighlightForeground", "#FFF0F2F6");
+            SetChromeBrush("HoverBackground", "#FF2A2D2E");
+            SetChromeBrush("SecondaryForeground", "#FF9A9A9A");
+            SetChromeBrush("PanelBackground", "#FF282828");
+            SetChromeBrush("PanelBorder", "#FF454545");
+            SetChromeBrush("SeparatorBrush", "#26FFFFFF");
+            SetChromeBrush("ControlBackground", "#FF3C3C3C");
+            SetChromeBrush("ControlBorder", "#FF5A5A5A");
+            SetChromeBrush("ControlHoverBackground", "#FF505050");
+            SetChromeBrush("ControlHoverBorder", "#FF7A7A7A");
+            SetChromeBrush("DialogBackground", "#FF252526");
+            SetChromeBrush("DialogHeaderBackground", "#FF2D2D2D");
+            SetChromeBrush("DialogForeground", "#FFCCCCCC");
+            SetChromeBrush("AccentForeground", "#FF4FA8FF");
+        }
+    }
+
+    private void SetChromeBrush(string resourceKey, string hex)
+    {
+        if (ColorConverter.ConvertFromString(hex) is Color color)
+        {
+            Resources[resourceKey] = new SolidColorBrush(color);
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

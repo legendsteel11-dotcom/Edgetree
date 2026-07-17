@@ -9,6 +9,8 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
 using SidebarExplorer.App.Models;
 using SidebarExplorer.App.Native;
 using SidebarExplorer.App.Services;
@@ -271,6 +273,7 @@ public partial class MainWindow : Window
         ApplyColorSettings();
         ApplyFolderIconVisibility();
         ApplyFileIconVisibility();
+        ApplyTitleTextVisibility();
 
         // Deferred rather than done inline above: restoring possibly many
         // expanded folders plus the last selection means synchronous disk
@@ -312,21 +315,59 @@ public partial class MainWindow : Window
     // at startup and again by ColorSettingsWindow after each pick/reset.
     public void ApplyColorSettings()
     {
-        SetBrushColor("SidebarBackground", _settings.BackgroundColorHex);
-        SetBrushColor("FolderNameForeground", _settings.FolderNameColorHex);
-        SetBrushColor("FolderNameHighlightForeground", _settings.FolderNameHighlightColorHex);
-        SetBrushColor("FileNameForeground", _settings.FileNameColorHex);
-        SetBrushColor("FileNameHighlightForeground", _settings.FileNameHighlightColorHex);
-        SetBrushColor("TreeRowSelectedActiveBackground", _settings.SelectionColorHex);
-        SetBrushColor("FavoritesBackground", _settings.HistoryBackgroundColorHex);
-        SetBrushColor("TreeRowHoverBackground", _settings.HoverBackgroundColorHex);
-        SetBrushColor("FolderNameHoverForeground", _settings.FolderNameHoverColorHex);
-        SetBrushColor("FileNameHoverForeground", _settings.FileNameHoverColorHex);
-        SetBrushColor("ShowMoreForeground", _settings.ShowMoreColorHex);
-        SetBrushColor("TreeGuideLineBrush", _settings.GuideLineColorHex);
-        SetBrushColor("TreeGuideLineActiveBrush", _settings.GuideLineActiveColorHex);
-        SetBrushColor("PanelDividerBrush", _settings.PanelDividerColorHex);
-        SetBrushColor("HeaderBackground", _settings.HeaderBackgroundColorHex);
+        bool light = _settings.IsLightMode;
+
+        // Mirrors the light/dark toggle for FormatSortOverrideIconUri, and
+        // refreshes the icon on every already-loaded folder that currently
+        // has a sort override - those were computed once (at construction or
+        // last override change) and otherwise wouldn't notice a theme flip
+        // that happened afterward.
+        FileSystemService.IsLightMode = light;
+        foreach (var root in _roots)
+        {
+            RefreshSortOverrideIconForTheme(root);
+        }
+
+        // Menus/context menus/the Color Settings and About dialogs/header
+        // icons - general chrome, not part of the 15 colors below.
+        (Application.Current as App)?.ApplyChromeTheme(light);
+
+        // pin.png is a light-colored pin (for the dark sidebar background);
+        // pin_Dark.png is the same glyph in a dark color, for when the
+        // sidebar itself is light. Local to MainWindow's own Resources - the
+        // pin button only ever lives here, unlike the shared chrome brushes
+        // above.
+        Resources["PinIconSource"] = new BitmapImage(new Uri(
+            $"pack://application:,,,/Resources/pin{(light ? "_Dark" : "")}.png"));
+
+        // Menu/context-menu drop shadow (see MenuDropShadow's own comment in
+        // the XAML) - the same dark, fairly strong shadow read as too heavy
+        // against a light-mode menu's white background, so light mode gets a
+        // softer one (lower opacity) instead of just reusing the dark value.
+        Resources["MenuDropShadow"] = new DropShadowEffect
+        {
+            Color = Colors.Black,
+            Direction = 270,
+            ShadowDepth = 2,
+            BlurRadius = 8,
+            Opacity = light ? 0.15 : 0.4
+        };
+
+        SetBrushColor("SidebarBackground", light ? _settings.LightBackgroundColorHex : _settings.BackgroundColorHex);
+        SetBrushColor("FolderNameForeground", light ? _settings.LightFolderNameColorHex : _settings.FolderNameColorHex);
+        SetBrushColor("FolderNameHighlightForeground", light ? _settings.LightFolderNameHighlightColorHex : _settings.FolderNameHighlightColorHex);
+        SetBrushColor("FileNameForeground", light ? _settings.LightFileNameColorHex : _settings.FileNameColorHex);
+        SetBrushColor("FileNameHighlightForeground", light ? _settings.LightFileNameHighlightColorHex : _settings.FileNameHighlightColorHex);
+        SetBrushColor("TreeRowSelectedActiveBackground", light ? _settings.LightSelectionColorHex : _settings.SelectionColorHex);
+        SetBrushColor("FavoritesBackground", light ? _settings.LightHistoryBackgroundColorHex : _settings.HistoryBackgroundColorHex);
+        SetBrushColor("TreeRowHoverBackground", light ? _settings.LightHoverBackgroundColorHex : _settings.HoverBackgroundColorHex);
+        SetBrushColor("FolderNameHoverForeground", light ? _settings.LightFolderNameHoverColorHex : _settings.FolderNameHoverColorHex);
+        SetBrushColor("FileNameHoverForeground", light ? _settings.LightFileNameHoverColorHex : _settings.FileNameHoverColorHex);
+        SetBrushColor("ShowMoreForeground", light ? _settings.LightShowMoreColorHex : _settings.ShowMoreColorHex);
+        SetBrushColor("TreeGuideLineBrush", light ? _settings.LightGuideLineColorHex : _settings.GuideLineColorHex);
+        SetBrushColor("TreeGuideLineActiveBrush", light ? _settings.LightGuideLineActiveColorHex : _settings.GuideLineActiveColorHex);
+        SetBrushColor("PanelDividerBrush", light ? _settings.LightPanelDividerColorHex : _settings.PanelDividerColorHex);
+        SetBrushColor("HeaderBackground", light ? _settings.LightHeaderBackgroundColorHex : _settings.HeaderBackgroundColorHex);
     }
 
     private void SetBrushColor(string resourceKey, string hex)
@@ -334,6 +375,31 @@ public partial class MainWindow : Window
         if (ColorConverter.ConvertFromString(hex) is Color color)
         {
             Resources[resourceKey] = new SolidColorBrush(color);
+        }
+    }
+
+    // Every directory's SortOverrideIconUri (override or, absent one, the
+    // global-default preview - see FileSystemItem's constructor) is a plain
+    // cached string computed once, so a theme flip alone wouldn't otherwise
+    // touch an already-realized instance - this walks every already-loaded
+    // folder and recomputes it fresh, mirroring the same override-or-global
+    // resolution the constructor itself does.
+    private static void RefreshSortOverrideIconForTheme(FileSystemItem item)
+    {
+        if (item.IsDirectory)
+        {
+            item.SortOverrideIconUri = FileSystemService.SortOverrides.TryGetValue(
+                FileSystemService.NormalizeSortOverridePath(item.FullPath), out var over)
+                ? FileSystemService.FormatSortOverrideIconUri(over.Field, over.Descending)
+                : FileSystemService.FormatSortOverrideIconUri(FileSystemService.SortField, FileSystemService.SortDescending);
+        }
+
+        if (item.ChildrenLoaded)
+        {
+            foreach (var child in item.Children)
+            {
+                RefreshSortOverrideIconForTheme(child);
+            }
         }
     }
 
@@ -745,7 +811,12 @@ public partial class MainWindow : Window
 
     private void SetExpandedContentVisibility(Visibility visibility)
     {
-        RootPathText.Visibility = visibility;
+        // Not a plain assignment like the rest below - RootPathText also has
+        // its own independent "제목 표시줄 타이틀 제거" setting (see
+        // ApplyTitleTextVisibility), so it stays hidden through this call
+        // whenever that's on, but still hides/shows in step with everything
+        // else here rather than needing a second code path.
+        UpdateRootPathTextVisibility(visibility);
         ExplorerTree.Visibility = visibility;
         CollapseAllButton.Visibility = visibility;
         OptionsButton.Visibility = visibility;
@@ -963,6 +1034,17 @@ public partial class MainWindow : Window
         ChromeSettings.CaptionHeight = HeaderHeight;
         ChromeSettings.ResizeBorderThickness = new Thickness(FloatingResizeBorder);
 
+        // A window styled entirely through WindowChrome (WindowStyle="None")
+        // loses the OS's own drop shadow along with the rest of its native
+        // frame - a bare, nonzero GlassFrameThickness (even just a 1px sliver
+        // on one edge, never actually rendered as glass on Win10/11 without
+        // Mica/Acrylic) is what re-enables DWM's shadow without bringing back
+        // any other native chrome. Only wanted while floating - the docked
+        // sidebar sits flush against the screen edge, where a shadow has
+        // nothing to visually separate it from (see Dock() below, which
+        // zeroes this back out).
+        ChromeSettings.GlassFrameThickness = new Thickness(0, 0, 0, 1);
+
         var hwnd = new WindowInteropHelper(this).Handle;
         NativeMethods.MakeAppWindow(hwnd);
         NativeMethods.SetWindowCornerPreference(hwnd, rounded: true);
@@ -1051,6 +1133,7 @@ public partial class MainWindow : Window
         ResizeMode = ResizeMode.NoResize;
         ChromeSettings.CaptionHeight = 0;
         ChromeSettings.ResizeBorderThickness = new Thickness(0);
+        ChromeSettings.GlassFrameThickness = new Thickness(0);
 
         var hwnd = new WindowInteropHelper(this).Handle;
         NativeMethods.MakeToolWindow(hwnd);
@@ -1591,7 +1674,7 @@ public partial class MainWindow : Window
         // "색상 변경" item, neither of which has state to sync here.
         if (sender is ContextMenu
             {
-                Items: [MenuItem autoCollapse, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, MenuItem autoHideSliverWidthRow, _, _, MenuItem sortMenu, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem languageMenu, ..]
+                Items: [MenuItem autoCollapse, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, MenuItem autoHideSliverWidthRow, _, _, MenuItem sortMenu, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem languageMenu, ..]
             })
         {
             autoCollapse.IsChecked = _settings.AutoCollapseFolders;
@@ -1600,11 +1683,16 @@ public partial class MainWindow : Window
             trayIcon.IsChecked = _settings.AlwaysShowTrayIcon;
             showFolderIcons.IsChecked = _settings.ShowFolderIcons;
             showFileIcons.IsChecked = _settings.ShowFileIcons;
+            hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
             favoritesAtBottom.IsChecked = _settings.FavoritesAtBottom;
             dockOnRight.IsChecked = _settings.DockOnRight;
             autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
 
-            if (autoHideSliverWidthRow.Header is StackPanel { Children: [_, _, TextBlock sliverWidthValueText, _] })
+            // Header is now a Grid (label in a "*" column, this stepper's own
+            // StackPanel right-aligned in an "Auto" one - see MainWindow.xaml)
+            // rather than one flat StackPanel, so the value TextBlock is one
+            // level deeper than it used to be.
+            if (autoHideSliverWidthRow.Header is Grid { Children: [_, StackPanel { Children: [_, TextBlock sliverWidthValueText, _] }] })
             {
                 sliverWidthValueText.Text = _settings.AutoHideSliverWidth.ToString();
             }
@@ -1617,14 +1705,19 @@ public partial class MainWindow : Window
                 descending.IsChecked = _settings.SortDescending;
             }
 
-            if (maxItemsRow.Header is StackPanel { Children: [_, _, TextBlock maxItemsValueText, _] })
+            if (maxItemsRow.Header is Grid { Children: [_, StackPanel { Children: [_, TextBlock maxItemsValueText, _] }] })
             {
                 maxItemsValueText.Text = _settings.MaxItemsPerFolder.ToString();
             }
 
-            if (tabSpacingRow.Header is StackPanel { Children: [_, _, TextBlock tabSpacingValueText, _] })
+            if (tabSpacingRow.Header is Grid { Children: [_, StackPanel { Children: [_, TextBlock tabSpacingValueText, _] }] })
             {
                 tabSpacingValueText.Text = _settings.TabSpacing.ToString();
+            }
+
+            if (rowSpacingRow.Header is Grid { Children: [_, StackPanel { Children: [_, TextBlock rowSpacingValueText, _] }] })
+            {
+                rowSpacingValueText.Text = _settings.RowSpacing.ToString();
             }
 
             // languageMenu's first child is the non-interactive restart note
@@ -1665,9 +1758,11 @@ public partial class MainWindow : Window
         }
 
         // sender is whichever stepper Button was clicked; its logical parent
-        // is the row's StackPanel (label, -, value, +) - the value TextBlock
-        // sits at the same position regardless of which button fired.
-        if (sender is Button { Parent: StackPanel { Children: [_, _, TextBlock valueText, _] } })
+        // is the inner (-, value, +) StackPanel nested in the row's Header
+        // Grid (label in one column, this StackPanel right-aligned in the
+        // other - see MainWindow.xaml) - the value TextBlock sits at the same
+        // position regardless of which button fired.
+        if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
         {
             valueText.Text = value.ToString();
         }
@@ -1694,7 +1789,32 @@ public partial class MainWindow : Window
             ApplyLayoutMetrics();
         }
 
-        if (sender is Button { Parent: StackPanel { Children: [_, _, TextBlock valueText, _] } })
+        if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
+        {
+            valueText.Text = value.ToString();
+        }
+    }
+
+    private void RowSpacingDecrement_Click(object sender, RoutedEventArgs e)
+        => StepRowSpacing(sender, -1);
+
+    private void RowSpacingIncrement_Click(object sender, RoutedEventArgs e)
+        => StepRowSpacing(sender, +1);
+
+    // Clamped -4~+8 per the user-specified range around the existing default
+    // (0 = no change from it). Same live-swap approach as StepTabSpacing -
+    // ApplyLayoutMetrics recomputes RowPadding, which every row's Style
+    // already reads via DynamicResource.
+    private void StepRowSpacing(object sender, int delta)
+    {
+        int value = Math.Clamp(_settings.RowSpacing + delta, -4, 8);
+        if (value != _settings.RowSpacing)
+        {
+            _settings.RowSpacing = value;
+            ApplyLayoutMetrics();
+        }
+
+        if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
         {
             valueText.Text = value.ToString();
         }
@@ -1712,6 +1832,7 @@ public partial class MainWindow : Window
 
         _settings.SortByDate = field == "date";
         FileSystemService.SortField = _settings.SortByDate ? FileSortField.Date : FileSortField.Name;
+        RefreshRootSortOverridePreviewIcons();
         RefreshAllLoadedFolders();
     }
 
@@ -1724,7 +1845,28 @@ public partial class MainWindow : Window
 
         _settings.SortDescending = direction == "desc";
         FileSystemService.SortDescending = _settings.SortDescending;
+        RefreshRootSortOverridePreviewIcons();
         RefreshAllLoadedFolders();
+    }
+
+    // Drive roots are never rebuilt by RefreshAllLoadedFolders (only their
+    // Children are - see its own comment), so a root with no override of its
+    // own would otherwise keep showing a stale preview icon (from whatever
+    // the global default was at its own construction, i.e. app startup) after
+    // the global default changes here. Every other folder's preview icon
+    // self-corrects for free the moment it's rebuilt, since the constructor
+    // reads the current global default - roots just need this one nudge.
+    private void RefreshRootSortOverridePreviewIcons()
+    {
+        string globalIconUri = FileSystemService.FormatSortOverrideIconUri(
+            _settings.SortByDate ? FileSortField.Date : FileSortField.Name, _settings.SortDescending);
+        foreach (var root in _roots)
+        {
+            if (!root.HasSortOverride)
+            {
+                root.SortOverrideIconUri = globalIconUri;
+            }
+        }
     }
 
     // Per-folder right-click menu's own "정렬": this folder gets its own
@@ -1803,7 +1945,7 @@ public partial class MainWindow : Window
         FileSystemService.SortOverrides[FileSystemService.NormalizeSortOverridePath(item.FullPath)] =
             new FolderSortOverride(sortByDate ? FileSortField.Date : FileSortField.Name, sortDescending);
         item.HasSortOverride = true;
-        item.SortOverrideLabel = FileSystemService.FormatSortOverrideLabel(
+        item.SortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(
             sortByDate ? FileSortField.Date : FileSortField.Name, sortDescending);
 
         if (item.ChildrenLoaded)
@@ -1838,7 +1980,11 @@ public partial class MainWindow : Window
             string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
         FileSystemService.SortOverrides.Remove(FileSystemService.NormalizeSortOverridePath(item.FullPath));
         item.HasSortOverride = false;
-        item.SortOverrideLabel = string.Empty;
+        // Not blanked - still previews the (now) app-wide default while this
+        // folder is selected, same reasoning as the constructor's own
+        // fallback (see FileSystemItem's constructor comment).
+        item.SortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(
+            _settings.SortByDate ? FileSortField.Date : FileSortField.Name, _settings.SortDescending);
 
         if (item.ChildrenLoaded)
         {
@@ -2255,6 +2401,32 @@ public partial class MainWindow : Window
         }
     }
 
+    private void HideTitleBarTitleMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.HideTitleBarTitle = menuItem.IsChecked;
+            ApplyTitleTextVisibility();
+        }
+    }
+
+    // Only ever called while the window's content is already expanded (at
+    // startup, or from the options menu - which itself only opens while
+    // expanded), so that's the contentVisibility to reconcile against.
+    private void ApplyTitleTextVisibility() => UpdateRootPathTextVisibility(Visibility.Visible);
+
+    // RootPathText has two independent reasons to be hidden - the general
+    // expand/collapse this window's content goes through (auto-hide sliver,
+    // etc. - see SetExpandedContentVisibility) and the user's own "제목
+    // 표시줄 타이틀 제거" setting - so it's only actually shown when NEITHER
+    // wants it hidden.
+    private void UpdateRootPathTextVisibility(Visibility contentVisibility)
+    {
+        RootPathText.Visibility = contentVisibility == Visibility.Visible && !_settings.HideTitleBarTitle
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
     private void FavoritesAtBottomMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem menuItem)
@@ -2317,7 +2489,7 @@ public partial class MainWindow : Window
             _settings.AutoHideSliverWidth = value;
         }
 
-        if (sender is Button { Parent: StackPanel { Children: [_, _, TextBlock valueText, _] } })
+        if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
         {
             valueText.Text = value.ToString();
         }
@@ -2365,6 +2537,28 @@ public partial class MainWindow : Window
     {
         double scale = ExplorerTree.FontSize / DefaultTreeFontSize;
         Resources["IconSize"] = 16.0 * scale;
+
+        // Grows past its base size once the font is zoomed above default, but
+        // never shrinks below it while zoomed smaller - the sort-override
+        // icon (see MainWindow.xaml's SortOverrideIconBorder) is already a
+        // small, fiddly click target at its base 9x13, so scaling it down
+        // further along with everything else at small font sizes would make
+        // it harder to hit right when a low-resolution/small-window user is
+        // most likely to have reached for a smaller font in the first place.
+        double growOnlyScale = Math.Max(1.0, scale);
+        Resources["SortOverrideIconWidth"] = 9.0 * growOnlyScale;
+        Resources["SortOverrideIconHeight"] = 13.0 * growOnlyScale;
+
+        // Row vertical padding: the font-size-scaled base (was
+        // Converters/FontSizeToRowPaddingConverter's whole job, now folded in
+        // here since it needed this second, independent input too) plus the
+        // user's flat "행 간격" pixel offset - clamped at 0 so a small font
+        // combined with the most negative offset can't go negative. Shared by
+        // both ExplorerTreeViewItemStyle and FavoriteListBoxItemStyle (see
+        // their own comments) so the tree and favorites rows always match.
+        double baseVerticalPadding = scale * 3.0;
+        double verticalPadding = Math.Max(0, baseVerticalPadding + _settings.RowSpacing);
+        Resources["RowPadding"] = new Thickness(4, verticalPadding, 4, verticalPadding);
 
         double tabSpacing = Math.Clamp(_settings.TabSpacing, 4, 24);
         Resources["TabSpacingWidth"] = new GridLength(tabSpacing);
@@ -2621,6 +2815,144 @@ public partial class MainWindow : Window
                 }
                 e.Handled = true;
                 break;
+        }
+    }
+
+    // PageUp/PageDown specifically need the PREVIEW (tunneling) phase, not
+    // the regular bubbling KeyDown every other shortcut above uses -
+    // TreeView/VirtualizingStackPanel has its own built-in PreviewKeyDown
+    // handling for page navigation that runs first regardless of e.Handled
+    // set later during bubbling, and (at least under virtualization here)
+    // it jumps straight to the first/last realized row - Home/End, not a
+    // page - rather than anything usable. Intercepting during Preview stops
+    // that default behavior from ever running.
+    private void ExplorerTree_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.PageDown:
+                JumpToAdjacentVisibleFolder(+1);
+                e.Handled = true;
+                break;
+            case Key.PageUp:
+                JumpToAdjacentVisibleFolder(-1);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    // Moves the selection to the next/previous FOLDER row in whatever's
+    // currently visible (expanded) in the tree, skipping over files - a
+    // quick way to skim folder names without expanding anything or clicking.
+    // Deliberately does NOT reuse NavigateToPath/RevealChain: those exist for
+    // the favorites-click case specifically and come with side effects that
+    // would be wrong here - RecapAllOverflow would silently re-collapse any
+    // "더 보기"-revealed folder the user has open, and every step along the
+    // chain gets force-expanded, neither of which this simple a step-by-one
+    // move should ever trigger (see SelectVisibleItem below instead).
+    private void JumpToAdjacentVisibleFolder(int direction)
+    {
+        var visible = new List<FileSystemItem>();
+        foreach (var root in _roots)
+        {
+            FlattenVisible(root, visible);
+        }
+        if (visible.Count == 0)
+        {
+            return;
+        }
+
+        var current = ExplorerTree.SelectedItem as FileSystemItem;
+        int index = current is null ? -1 : visible.IndexOf(current);
+        // No current selection: PgDn starts just before the first entry, PgUp
+        // just after the last - so the very first step lands on entry 0 (or
+        // Count-1) rather than skipping it.
+        if (index < 0)
+        {
+            index = direction > 0 ? -1 : visible.Count;
+        }
+
+        for (index += direction; index >= 0 && index < visible.Count; index += direction)
+        {
+            var candidate = visible[index];
+            if (candidate.IsDirectory && !candidate.IsPlaceholder && !candidate.IsShowMore)
+            {
+                SelectVisibleItem(candidate);
+                return;
+            }
+        }
+    }
+
+    // Depth-first, visual order, following only ALREADY-expanded folders -
+    // exactly what's currently on screen (or would be, once scrolled to), not
+    // a hypothetical fully-expanded tree.
+    private static void FlattenVisible(FileSystemItem item, List<FileSystemItem> result)
+    {
+        if (item.IsPlaceholder)
+        {
+            return;
+        }
+        result.Add(item);
+        if (item.IsDirectory && item.IsExpanded && item.ChildrenLoaded)
+        {
+            foreach (var child in item.Children)
+            {
+                FlattenVisible(child, result);
+            }
+        }
+    }
+
+    // Selects and scrolls to an item that's already part of the currently-
+    // expanded tree (every ancestor is already expanded - see
+    // JumpToAdjacentVisibleFolder/FlattenVisible), WITHOUT expanding anything
+    // or recapping "더 보기" state the way NavigateToPath's reveal walk would.
+    // Still needs the same realize-container-then-recurse approach as that
+    // walk, since a container this far from the current scroll position may
+    // not exist yet - just without any of ITS side effects.
+    private void SelectVisibleItem(FileSystemItem target)
+    {
+        var chain = new List<FileSystemItem>();
+        for (FileSystemItem? item = target; item is not null; item = item.Parent)
+        {
+            chain.Insert(0, item);
+        }
+        SelectVisibleItemStep(chain, 0, ExplorerTree);
+    }
+
+    private void SelectVisibleItemStep(List<FileSystemItem> chain, int index, ItemsControl container, int attempt = 0)
+    {
+        if (index >= chain.Count)
+        {
+            return;
+        }
+
+        container.UpdateLayout();
+        var item = chain[index];
+        if (container.ItemContainerGenerator.ContainerFromItem(item) is not TreeViewItem treeViewItem)
+        {
+            // Same tolerance as RevealChainStep - a container can genuinely
+            // not exist yet for a level that's mid-realization.
+            if (attempt >= 5)
+            {
+                return;
+            }
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
+                new Action(() => SelectVisibleItemStep(chain, index, container, attempt + 1)));
+            return;
+        }
+
+        treeViewItem.BringIntoView();
+        container.UpdateLayout();
+
+        if (index == chain.Count - 1)
+        {
+            treeViewItem.IsSelected = true;
+            treeViewItem.BringIntoView();
+            treeViewItem.Focus();
+        }
+        else
+        {
+            SelectVisibleItemStep(chain, index + 1, treeViewItem);
         }
     }
 

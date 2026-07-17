@@ -10,7 +10,7 @@
         WindowStyle="None"
         AllowsTransparency="False"
         ShowInTaskbar="False"
-        Background="#FF252526">
+        Background="{DynamicResource DialogBackground}">
     <Window.Resources>
         <Style x:Key="DialogCloseButtonStyle"
                 TargetType="Button">
@@ -38,7 +38,7 @@
                                     Value="True">
                                 <Setter TargetName="Bd"
                                         Property="Background"
-                                        Value="#FF2A2D2E"/>
+                                        Value="{DynamicResource HoverBackground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -49,7 +49,7 @@
         <Style x:Key="AboutRowLabelStyle"
                 TargetType="TextBlock">
             <Setter Property="Foreground"
-                    Value="#FF9A9A9A"/>
+                    Value="{DynamicResource SecondaryForeground}"/>
             <Setter Property="FontSize"
                     Value="12"/>
             <Setter Property="Margin"
@@ -59,7 +59,7 @@
         <Style x:Key="AboutRowValueStyle"
                 TargetType="TextBlock">
             <Setter Property="Foreground"
-                    Value="#FFCCCCCC"/>
+                    Value="{DynamicResource DialogForeground}"/>
             <Setter Property="FontSize"
                     Value="12"/>
             <Setter Property="TextWrapping"
@@ -71,9 +71,9 @@
             <Setter Property="Background"
                     Value="Transparent"/>
             <Setter Property="Foreground"
-                    Value="#FFCCCCCC"/>
+                    Value="{DynamicResource DialogForeground}"/>
             <Setter Property="BorderBrush"
-                    Value="#FF5A5A5A"/>
+                    Value="{DynamicResource ControlBorder}"/>
             <Setter Property="BorderThickness"
                     Value="1"/>
             <Setter Property="FontSize"
@@ -97,10 +97,10 @@
                                     Value="True">
                                 <Setter TargetName="Bd"
                                         Property="Background"
-                                        Value="#FF2A2D2E"/>
+                                        Value="{DynamicResource HoverBackground}"/>
                                 <Setter TargetName="Bd"
                                         Property="BorderBrush"
-                                        Value="#FF7A7A7A"/>
+                                        Value="{DynamicResource ControlHoverBorder}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -110,7 +110,7 @@
     </Window.Resources>
 
     <Border x:Name="RootBorder"
-            BorderBrush="#FF454545"
+            BorderBrush="{DynamicResource PanelBorder}"
             BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
@@ -119,10 +119,10 @@
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0"
-                    Background="#FF2D2D2D"
+                    Background="{DynamicResource DialogHeaderBackground}"
                     MouseLeftButtonDown="HeaderGrid_MouseLeftButtonDown">
                 <TextBlock Text="Edgetree"
-                        Foreground="#FFCCCCCC"
+                        Foreground="{DynamicResource DialogForeground}"
                         FontSize="12"
                         VerticalAlignment="Center"
                         Margin="10,0,0,0"/>
@@ -133,7 +133,7 @@
                         ToolTip="{x:Static services:Strings.ButtonClose}"
                         Click="CloseButton_Click">
                     <Path Data="M4,4 L12,12 M12,4 L4,12"
-                            Stroke="#FFCCCCCC"
+                            Stroke="{DynamicResource DialogForeground}"
                             StrokeThickness="1.5"
                             StrokeStartLineCap="Round"
                             StrokeEndLineCap="Round"/>
@@ -150,7 +150,7 @@
                             Margin="0,0,8,0"
                             RenderOptions.BitmapScalingMode="HighQuality"/>
                     <TextBlock Text="Edgetree"
-                            Foreground="#FFCCCCCC"
+                            Foreground="{DynamicResource DialogForeground}"
                             FontSize="14"
                             FontWeight="Bold"
                             VerticalAlignment="Center"/>
@@ -183,7 +183,7 @@
                 <TextBlock Text="{x:Static services:Strings.AboutGithubLabel}"
                         Style="{StaticResource AboutRowLabelStyle}"/>
                 <TextBlock Text="github.com/legendsteel11-dotcom/Edgetree"
-                        Foreground="#FF4FA8FF"
+                        Foreground="{DynamicResource AccentForeground}"
                         FontSize="12"
                         Cursor="Hand"
                         TextDecorations="Underline"

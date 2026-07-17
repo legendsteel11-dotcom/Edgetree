@@ -4,6 +4,32 @@
              xmlns:local="clr-namespace:SidebarExplorer.App"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <!-- Application-level (not MainWindow.Resources) so ColorSettingsWindow
+             and AboutWindow - separate Window instances with their own resource
+             dictionaries - can share the exact same DynamicResource keys instead
+             of each needing their own copy. Dark-mode defaults declared here;
+             App.ApplyChromeTheme (called from MainWindow.ApplyColorSettings,
+             which runs at startup and on every color/theme change) overwrites
+             all of these live when light mode is on. These are the app's
+             general "chrome" (menus/dialogs/header icons) - deliberately
+             separate from the 15 user-customizable tree colors in
+             AppSettings, which is why changing a tree color has never
+             recolored a menu (see MainWindow.xaml's own ForegroundText
+             comment history). -->
+        <SolidColorBrush x:Key="ForegroundText" Color="#FFA8AAAE"/>
+        <SolidColorBrush x:Key="HighlightForeground" Color="#FFF0F2F6"/>
+        <SolidColorBrush x:Key="HoverBackground" Color="#FF2A2D2E"/>
+        <SolidColorBrush x:Key="SecondaryForeground" Color="#FF9A9A9A"/>
+        <SolidColorBrush x:Key="PanelBackground" Color="#FF282828"/>
+        <SolidColorBrush x:Key="PanelBorder" Color="#FF454545"/>
+        <SolidColorBrush x:Key="SeparatorBrush" Color="#26FFFFFF"/>
+        <SolidColorBrush x:Key="ControlBackground" Color="#FF3C3C3C"/>
+        <SolidColorBrush x:Key="ControlBorder" Color="#FF5A5A5A"/>
+        <SolidColorBrush x:Key="ControlHoverBackground" Color="#FF505050"/>
+        <SolidColorBrush x:Key="ControlHoverBorder" Color="#FF7A7A7A"/>
+        <SolidColorBrush x:Key="DialogBackground" Color="#FF252526"/>
+        <SolidColorBrush x:Key="DialogHeaderBackground" Color="#FF2D2D2D"/>
+        <SolidColorBrush x:Key="DialogForeground" Color="#FFCCCCCC"/>
+        <SolidColorBrush x:Key="AccentForeground" Color="#FF4FA8FF"/>
     </Application.Resources>
 </Application>

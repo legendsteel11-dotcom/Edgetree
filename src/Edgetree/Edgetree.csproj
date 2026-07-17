@@ -10,7 +10,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>Resources\app.ico</ApplicationIcon>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <!-- Explicit rather than left to default from the .csproj filename, so a
          future file rename can't silently change the shipped exe/dll name
          again - the C# namespace stays SidebarExplorer.App throughout the
@@ -25,6 +25,7 @@
     <Resource Include="Resources\app.ico" />
     <Resource Include="Resources\icon.png" />
     <Resource Include="Resources\pin.png" />
+    <Resource Include="Resources\pin_Dark.png" />
   </ItemGroup>
 
   <!-- Microsoft.VisualBasic.FileIO.FileSystem.Delete*(..., RecycleOption.SendToRecycleBin)

@@ -98,6 +98,34 @@ public class AppSettings
     // for a subtle depth hierarchy across the three panels.
     public string HeaderBackgroundColorHex { get; set; } = "#FF1E1E1E";
 
+    // "라이트/다크 모드" toggle above the color rows in ColorSettingsWindow -
+    // which of the two palettes below is currently active/persisted/applied.
+    public bool IsLightMode { get; set; } = false;
+
+    // Light-mode counterpart to each of the 15 dark colors above - a
+    // deliberately hand-picked VS Code Light+-style palette, not a
+    // mathematical inversion of the dark values (which tends to look muddy).
+    // Kept as their own flat, separately-named properties rather than nested
+    // under the dark ones, so existing users' dark customizations keep
+    // deserializing into the exact same fields they always have - adding an
+    // entirely new nested object here would have needed its own migration
+    // path for zero benefit.
+    public string LightBackgroundColorHex { get; set; } = "#FFFFFFFF";
+    public string LightFolderNameColorHex { get; set; } = "#FF3B3B3B";
+    public string LightFolderNameHighlightColorHex { get; set; } = "#FF000000";
+    public string LightFileNameColorHex { get; set; } = "#FF3B3B3B";
+    public string LightFileNameHighlightColorHex { get; set; } = "#FF000000";
+    public string LightSelectionColorHex { get; set; } = "#FFCCE4FF";
+    public string LightHistoryBackgroundColorHex { get; set; } = "#FFF5F5F5";
+    public string LightHoverBackgroundColorHex { get; set; } = "#FFE8E8E8";
+    public string LightFolderNameHoverColorHex { get; set; } = "#FF3B3B3B";
+    public string LightFileNameHoverColorHex { get; set; } = "#FF3B3B3B";
+    public string LightShowMoreColorHex { get; set; } = "#FF6E6E6E";
+    public string LightGuideLineColorHex { get; set; } = "#FFD9D9D9";
+    public string LightGuideLineActiveColorHex { get; set; } = "#FFA0A0A0";
+    public string LightPanelDividerColorHex { get; set; } = "#FFD9D9D9";
+    public string LightHeaderBackgroundColorHex { get; set; } = "#FFF3F3F3";
+
     // "ko" or "en" (see Services/Strings.cs). Restart-only - Strings.Initialize
     // reads this once at process startup, before any window's XAML loads.
     // Defaults to whatever DetectDefaultLanguage below resolves at the
@@ -130,15 +158,23 @@ public class AppSettings
     // How many items a folder shows before collapsing the rest behind "더
     // 보기" (see Models/FileSystemItem.DisplayCap) - user-adjustable 1~50 from
     // the "..." options menu, for low-resolution screens that want fewer rows.
-    public int MaxItemsPerFolder { get; set; } = 25;
+    // Default lowered from 25 to 20 (2026-07-17).
+    public int MaxItemsPerFolder { get; set; } = 20;
 
     // "탭간격" in the options menu - the per-nesting-level indent width in
     // pixels (also drives the expand arrow's column width and the guide
     // line's position beneath it, and the file icon/name alignment shift -
     // see MainWindow.xaml.cs's ApplyLayoutMetrics). User-adjustable 4~24;
-    // 16 matches the original hardcoded value, so existing users see no
-    // change until they touch this.
-    public int TabSpacing { get; set; } = 16;
+    // default lowered from the original hardcoded 16 to 12 (2026-07-17).
+    public int TabSpacing { get; set; } = 12;
+
+    // "행 간격" in the options menu - a flat pixel offset added on top of the
+    // row's own font-size-scaled vertical padding (see
+    // MainWindow.xaml.cs's ApplyLayoutMetrics, which replaced
+    // Converters/FontSizeToRowPaddingConverter's job so this second input
+    // could be folded in). User-adjustable -4~+8 relative to the existing
+    // default, 0 meaning no change from that default.
+    public int RowSpacing { get; set; } = 0;
 
     // Folder icons only - file icons (already distinct per extension) are
     // unaffected either way. A VS Code-minimal-theme-style option: off hides
@@ -149,6 +185,12 @@ public class AppSettings
     // instead - independent toggle, so either can be off while the other
     // stays on.
     public bool ShowFileIcons { get; set; } = true;
+
+    // "제목 표시줄 타이틀 제거" - hides the "내 PC"/"This PC" text in the title bar
+    // (RootPathText), for someone who wants the title bar as bare as possible.
+    // Doesn't touch the Debug-only "(DEBUG)" suffix's own logic (see
+    // Strings.Initialize) - that's a separate, unrelated concern.
+    public bool HideTitleBarTitle { get; set; } = false;
 
     // Swaps the favorites panel and the tree between the top and bottom Grid
     // row - see MainWindow.xaml's Row1/Row3 comment and

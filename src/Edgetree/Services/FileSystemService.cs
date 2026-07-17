@@ -33,6 +33,13 @@ public static class FileSystemService
     public static readonly Dictionary<string, FolderSortOverride> SortOverrides =
         new(StringComparer.OrdinalIgnoreCase);
 
+    // Mirrors AppSettings.IsLightMode - same static pattern as the fields
+    // above, kept in sync by MainWindow.ApplyColorSettings (every color
+    // change, including the light/dark toggle itself, runs through there).
+    // Only consulted by FormatSortOverrideIconUri below, to pick the "_L"
+    // light-mode icon variant.
+    public static bool IsLightMode = false;
+
     // Windows Explorer's own "smart" name sort (digit runs compared as
     // numbers, so "file2" sorts before "file10") - plain ordinal/ordinal-
     // ignore-case comparison sorts "file10" before "file2" character by
@@ -51,12 +58,22 @@ public static class FileSystemService
 
     public static string NormalizeSortOverridePath(string path) => path.TrimEnd('\\');
 
-    // "N↑"/"N↓"/"D↑"/"D↓" - the compact label shown next to a folder's own
-    // sort-override icon (see FileSystemItem.SortOverrideLabel) so the icon
-    // conveys which of the 4 combinations is active without needing separate
-    // per-field icon art.
-    public static string FormatSortOverrideLabel(FileSortField field, bool descending)
-        => (field == FileSortField.Date ? "D" : "N") + (descending ? "↓" : "↑");
+    // Resolves which of the pre-made sort-override icon images (see
+    // FileSystemItem.SortOverrideIconUri) matches the current field/direction
+    // - aliginIconNameAsc.png / aliginIconNameDesc.png / aliginIconDateAsc.png
+    // / aliginIconDateDesc.png under Resources/Icons, provided by the user,
+    // each already encoding both the field (color) and direction (which
+    // triangle is filled) visually, so no separate text label is needed. Each
+    // also has its own "_L" suffixed light-mode variant (also provided by the
+    // user) picked instead whenever IsLightMode is on, since the dark
+    // versions read poorly against a light background.
+    public static string FormatSortOverrideIconUri(FileSortField field, bool descending)
+    {
+        string name = field == FileSortField.Date ? "Date" : "Name";
+        string direction = descending ? "Desc" : "Asc";
+        string suffix = IsLightMode ? "_L" : string.Empty;
+        return $"pack://application:,,,/Resources/Icons/aliginIcon{name}{direction}{suffix}.png";
+    }
 
     public static List<FileSystemItem> GetDriveRoots()
     {

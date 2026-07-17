@@ -10,7 +10,7 @@
         WindowStyle="None"
         AllowsTransparency="False"
         ShowInTaskbar="False"
-        Background="#FF252526">
+        Background="{DynamicResource DialogBackground}">
     <Window.Resources>
         <Style x:Key="DialogCloseButtonStyle"
                 TargetType="Button">
@@ -38,7 +38,7 @@
                                     Value="True">
                                 <Setter TargetName="Bd"
                                         Property="Background"
-                                        Value="#FF2A2D2E"/>
+                                        Value="{DynamicResource HoverBackground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -49,7 +49,7 @@
         <Style x:Key="ColorRowLabelStyle"
                 TargetType="TextBlock">
             <Setter Property="Foreground"
-                    Value="#FFCCCCCC"/>
+                    Value="{DynamicResource DialogForeground}"/>
             <Setter Property="FontSize"
                     Value="12"/>
             <Setter Property="VerticalAlignment"
@@ -63,7 +63,7 @@
             <Setter Property="Height"
                     Value="20"/>
             <Setter Property="BorderBrush"
-                    Value="#FF5A5A5A"/>
+                    Value="{DynamicResource ControlBorder}"/>
             <Setter Property="BorderThickness"
                     Value="1"/>
             <Setter Property="CornerRadius"
@@ -80,9 +80,9 @@
             <Setter Property="Background"
                     Value="Transparent"/>
             <Setter Property="Foreground"
-                    Value="#FFCCCCCC"/>
+                    Value="{DynamicResource DialogForeground}"/>
             <Setter Property="BorderBrush"
-                    Value="#FF5A5A5A"/>
+                    Value="{DynamicResource ControlBorder}"/>
             <Setter Property="BorderThickness"
                     Value="1"/>
             <Setter Property="FontSize"
@@ -106,10 +106,20 @@
                                     Value="True">
                                 <Setter TargetName="Bd"
                                         Property="Background"
-                                        Value="#FF2A2D2E"/>
+                                        Value="{DynamicResource HoverBackground}"/>
                                 <Setter TargetName="Bd"
                                         Property="BorderBrush"
-                                        Value="#FF7A7A7A"/>
+                                        Value="{DynamicResource ControlHoverBorder}"/>
+                            </Trigger>
+                            <!-- A fully custom template has no built-in disabled
+                                 look at all otherwise - ResetDefaultsButton relies
+                                 on this to read as unclickable when colors are
+                                 already at the current theme's defaults. -->
+                            <Trigger Property="IsEnabled"
+                                    Value="False">
+                                <Setter TargetName="Bd"
+                                        Property="Opacity"
+                                        Value="0.4"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -119,19 +129,20 @@
     </Window.Resources>
 
     <Border x:Name="RootBorder"
-            BorderBrush="#FF454545"
+            BorderBrush="{DynamicResource PanelBorder}"
             BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="28"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0"
-                    Background="#FF2D2D2D"
+                    Background="{DynamicResource DialogHeaderBackground}"
                     MouseLeftButtonDown="HeaderGrid_MouseLeftButtonDown">
                 <TextBlock Text="{x:Static services:Strings.ColorSettingsTitle}"
-                        Foreground="#FFCCCCCC"
+                        Foreground="{DynamicResource DialogForeground}"
                         FontSize="12"
                         VerticalAlignment="Center"
                         Margin="10,0,0,0"/>
@@ -142,14 +153,23 @@
                         ToolTip="{x:Static services:Strings.ButtonClose}"
                         Click="CloseButton_Click">
                     <Path Data="M4,4 L12,12 M12,4 L4,12"
-                            Stroke="#FFCCCCCC"
+                            Stroke="{DynamicResource DialogForeground}"
                             StrokeThickness="1.5"
                             StrokeStartLineCap="Round"
                             StrokeEndLineCap="Round"/>
                 </Button>
             </Grid>
 
-            <Grid Grid.Row="1"
+            <!-- Content text (dark/light label) set in code-behind, since it
+                 always reflects whichever mode is CURRENTLY active - see
+                 ThemeToggle_Click. -->
+            <Button x:Name="ThemeToggleButton"
+                    Grid.Row="1"
+                    Style="{StaticResource DialogButtonStyle}"
+                    Margin="16,12,16,0"
+                    Click="ThemeToggle_Click"/>
+
+            <Grid Grid.Row="2"
                     Margin="16">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -262,7 +282,7 @@
                 <Border Grid.Row="7"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
-                        BorderBrush="#FF3A3A3A"
+                        BorderBrush="{DynamicResource PanelBorder}"
                         BorderThickness="0,0,0,1"
                         Margin="0,12,0,4"/>
 
@@ -366,7 +386,8 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="0,18,0,0">
-                    <Button Content="{x:Static services:Strings.ButtonDefaults}"
+                    <Button x:Name="ResetDefaultsButton"
+                            Content="{x:Static services:Strings.ButtonDefaults}"
                             Style="{StaticResource DialogButtonStyle}"
                             Width="70"
                             Margin="0,0,8,0"

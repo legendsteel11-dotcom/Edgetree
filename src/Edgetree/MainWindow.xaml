@@ -5,7 +5,6 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SidebarExplorer.App"
         xmlns:models="clr-namespace:SidebarExplorer.App.Models"
-        xmlns:converters="clr-namespace:SidebarExplorer.App.Converters"
         xmlns:services="clr-namespace:SidebarExplorer.App.Services"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:system="clr-namespace:System;assembly=mscorlib"
@@ -37,6 +36,22 @@
                              UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
     <Window.Resources>
+        <!-- Popups only (context/options menus, submenus) - never the docked
+             sidebar itself, which sits flush against the screen edge with
+             nothing to visually separate from there. Popups already render
+             through a transparent-capable host window (unlike this Window,
+             which is AllowsTransparency="False" - see Dock/Undock's own
+             GlassFrameThickness toggle for how the main window's shadow is
+             handled instead, only while floating in 창모드), so a plain
+             DropShadowEffect works directly here. Cheap to leave applied even
+             while open - it's not re-rendered on any kind of per-frame loop,
+             just once whenever a menu opens. -->
+        <DropShadowEffect x:Key="MenuDropShadow"
+                Color="Black"
+                Direction="270"
+                ShadowDepth="2"
+                BlurRadius="8"
+                Opacity="0.4"/>
         <!-- Applied to every header element except AppIcon (see the TODO note
              this came from: divider 2px lower, everything but the icon 1px
              higher). A RenderTransform, not a Margin tweak, so it's a pure
@@ -55,15 +70,11 @@
                 Color="#FF1C1C1C"/>
         <SolidColorBrush x:Key="HeaderBackground"
                 Color="#FF1E1E1E"/>
-        <!-- General header/menu/favorites chrome text - fixed, NOT written by
-             ApplyColorSettings (see FolderNameForeground/FolderNameHighlight
-             Foreground below for the customizable tree equivalents these used
-             to double as, until that sharing turned out to mean changing the
-             tree's folder-name color also silently recolored every menu). -->
-        <SolidColorBrush x:Key="ForegroundText"
-                Color="#FFA8AAAE"/>
-        <SolidColorBrush x:Key="HighlightForeground"
-                Color="#FFF0F2F6"/>
+        <!-- ForegroundText/HighlightForeground (general header/menu/favorites
+             chrome text) now live in App.xaml instead - Application-level so
+             ColorSettingsWindow/AboutWindow can share them too, see its own
+             comment for why they're deliberately kept separate from the
+             customizable tree colors just below. -->
         <!-- Folder-name colors (AppSettings.FolderNameColorHex/
              FolderNameHighlightColorHex) - only ever used by the tree's own
              TreeViewItem style (folder rows inherit these; file rows have
@@ -83,8 +94,6 @@
                 Color="#FFA8AAAE"/>
         <SolidColorBrush x:Key="FileNameHighlightForeground"
                 Color="#FFF0F2F6"/>
-        <SolidColorBrush x:Key="HoverBackground"
-                Color="#FF2A2D2E"/>
         <SolidColorBrush x:Key="TreeRowHoverBackground"
                 Color="#FF2A2C32"/>
         <!-- Folder/file hover text colors (AppSettings.FolderNameHoverColorHex/
@@ -114,7 +123,6 @@
         <SolidColorBrush x:Key="PanelDividerBrush"
                 Color="#FF323438"/>
 
-        <converters:FontSizeToRowPaddingConverter x:Key="FontSizeToRowPaddingConverter"/>
 
         <!-- Folder icons only (see the HierarchicalDataTemplate's IsDirectory
              DataTrigger below) - swapped live via Resources[...] = ... in
@@ -205,7 +213,7 @@
                                     Value="True">
                                 <Setter TargetName="Bd"
                                         Property="Background"
-                                        Value="{StaticResource HoverBackground}"/>
+                                        Value="{DynamicResource HoverBackground}"/>
                                 <Setter TargetName="Content"
                                         Property="Opacity"
                                         Value="1"/>
@@ -245,21 +253,40 @@
             <!-- A touch darker than the sidebar's own background so the menu
                  still reads as a distinct surface, without contrasting hard. -->
             <Setter Property="Background"
-                    Value="#FF282828"/>
+                    Value="{DynamicResource PanelBackground}"/>
             <Setter Property="BorderBrush"
-                    Value="#FF454545"/>
+                    Value="{DynamicResource PanelBorder}"/>
             <Setter Property="BorderThickness"
                     Value="1"/>
             <Setter Property="Padding"
                     Value="4,6"/>
+            <!-- Compensates for the Border's own Margin below (see its
+                 comment) - without this, reserving that bleed room for the
+                 shadow would also visibly shift the menu 10px down-right from
+                 wherever it's normally placed (e.g. flush under a right-
+                 clicked row). Net effect together: the visible border renders
+                 at exactly the same position as before, just with transparent
+                 room framing it now. -->
+            <Setter Property="HorizontalOffset"
+                    Value="-10"/>
+            <Setter Property="VerticalOffset"
+                    Value="-10"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ContextMenu">
+                        <!-- Margin reserves room for the DropShadowEffect's
+                             blur/offset to actually render into - a Popup
+                             sizes itself to its child's plain layout bounds,
+                             which ignore an Effect entirely, so without this
+                             the shadow was being silently clipped off right at
+                             the popup's own edge (invisible, not just faint). -->
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 Padding="{TemplateBinding Padding}"
+                                Margin="10"
                                 CornerRadius="8"
+                                Effect="{DynamicResource MenuDropShadow}"
                                 SnapsToDevicePixels="True">
                             <StackPanel IsItemsHost="True"/>
                         </Border>
@@ -321,7 +348,7 @@
                                     <TextBlock x:Name="GestureText"
                                             Grid.Column="2"
                                             Text="{TemplateBinding InputGestureText}"
-                                            Foreground="#FF9A9A9A"
+                                            Foreground="{DynamicResource SecondaryForeground}"
                                             FontSize="11"
                                             Margin="24,0,0,0"
                                             VerticalAlignment="Center"/>
@@ -347,16 +374,19 @@
                                  no way to ever show that submenu; clicking it just did nothing. -->
                             <Popup x:Name="PART_Popup"
                                     Placement="Right"
-                                    HorizontalOffset="-2"
+                                    HorizontalOffset="-12"
+                                    VerticalOffset="-10"
                                     AllowsTransparency="True"
                                     Focusable="False"
                                     PopupAnimation="Fade"
                                     IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
-                                <Border Background="#FF282828"
-                                        BorderBrush="#FF454545"
+                                <Border Background="{DynamicResource PanelBackground}"
+                                        BorderBrush="{DynamicResource PanelBorder}"
                                         BorderThickness="1"
                                         CornerRadius="8"
                                         Padding="4,6"
+                                        Margin="10"
+                                        Effect="{DynamicResource MenuDropShadow}"
                                         SnapsToDevicePixels="True">
                                     <StackPanel IsItemsHost="True"/>
                                 </Border>
@@ -416,11 +446,11 @@
             <Setter Property="Height"
                     Value="20"/>
             <Setter Property="Background"
-                    Value="#FF3C3C3C"/>
+                    Value="{DynamicResource ControlBackground}"/>
             <Setter Property="Foreground"
                     Value="{DynamicResource ForegroundText}"/>
             <Setter Property="BorderBrush"
-                    Value="#FF5A5A5A"/>
+                    Value="{DynamicResource ControlBorder}"/>
             <Setter Property="BorderThickness"
                     Value="1"/>
             <Setter Property="Cursor"
@@ -441,7 +471,7 @@
                                     Value="True">
                                 <Setter TargetName="Bd"
                                         Property="Background"
-                                        Value="#FF505050"/>
+                                        Value="{DynamicResource ControlHoverBackground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -464,7 +494,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Separator">
                         <Border Height="1"
-                                Background="#26FFFFFF"
+                                Background="{DynamicResource SeparatorBrush}"
                                 Margin="2,4"/>
                     </ControlTemplate>
                 </Setter.Value>
@@ -569,6 +599,9 @@
             <MenuItem Header="{x:Static services:Strings.MenuShowFileIcons}"
                     IsCheckable="True"
                     Click="ShowFileIconsMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuHideTitleBarTitle}"
+                    IsCheckable="True"
+                    Click="HideTitleBarTitleMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuFavoritesAtBottom}"
                     IsCheckable="True"
                     Click="FavoritesAtBottomMenuItem_Click"/>
@@ -583,23 +616,31 @@
             <MenuItem StaysOpenOnClick="True"
                     Focusable="False">
                 <MenuItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{x:Static services:Strings.MenuAutoHideSliverWidth}"
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                Text="{x:Static services:Strings.MenuAutoHideSliverWidth}"
                                 Foreground="{DynamicResource ForegroundText}"
                                 VerticalAlignment="Center"
                                 Margin="0,0,8,0"/>
-                        <Button Content="−"
-                                Style="{StaticResource MenuStepperButtonStyle}"
-                                Click="AutoHideSliverWidthDecrement_Click"/>
-                        <TextBlock Text="3"
-                                Foreground="{DynamicResource ForegroundText}"
-                                Width="26"
-                                TextAlignment="Center"
-                                VerticalAlignment="Center"/>
-                        <Button Content="+"
-                                Style="{StaticResource MenuStepperButtonStyle}"
-                                Click="AutoHideSliverWidthIncrement_Click"/>
-                    </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                Orientation="Horizontal">
+                            <Button Content="−"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="AutoHideSliverWidthDecrement_Click"/>
+                            <TextBlock Text="3"
+                                    Foreground="{DynamicResource ForegroundText}"
+                                    Width="26"
+                                    TextAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                            <Button Content="+"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="AutoHideSliverWidthIncrement_Click"/>
+                        </StackPanel>
+                    </Grid>
                 </MenuItem.Header>
             </MenuItem>
             <Separator/>
@@ -629,23 +670,31 @@
             <MenuItem StaysOpenOnClick="True"
                     Focusable="False">
                 <MenuItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{x:Static services:Strings.MenuMaxItemsPerFolder}"
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                Text="{x:Static services:Strings.MenuMaxItemsPerFolder}"
                                 Foreground="{DynamicResource ForegroundText}"
                                 VerticalAlignment="Center"
                                 Margin="0,0,8,0"/>
-                        <Button Content="−"
-                                Style="{StaticResource MenuStepperButtonStyle}"
-                                Click="MaxItemsPerFolderDecrement_Click"/>
-                        <TextBlock Text="25"
-                                Foreground="{DynamicResource ForegroundText}"
-                                Width="26"
-                                TextAlignment="Center"
-                                VerticalAlignment="Center"/>
-                        <Button Content="+"
-                                Style="{StaticResource MenuStepperButtonStyle}"
-                                Click="MaxItemsPerFolderIncrement_Click"/>
-                    </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                Orientation="Horizontal">
+                            <Button Content="−"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="MaxItemsPerFolderDecrement_Click"/>
+                            <TextBlock Text="25"
+                                    Foreground="{DynamicResource ForegroundText}"
+                                    Width="26"
+                                    TextAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                            <Button Content="+"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="MaxItemsPerFolderIncrement_Click"/>
+                        </StackPanel>
+                    </Grid>
                 </MenuItem.Header>
             </MenuItem>
             <!-- StaysOpenOnClick so stepping the value doesn't close the whole
@@ -653,23 +702,63 @@
             <MenuItem StaysOpenOnClick="True"
                     Focusable="False">
                 <MenuItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{x:Static services:Strings.MenuTabSpacing}"
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                Text="{x:Static services:Strings.MenuTabSpacing}"
                                 Foreground="{DynamicResource ForegroundText}"
                                 VerticalAlignment="Center"
                                 Margin="0,0,8,0"/>
-                        <Button Content="−"
-                                Style="{StaticResource MenuStepperButtonStyle}"
-                                Click="TabSpacingDecrement_Click"/>
-                        <TextBlock Text="16"
+                        <StackPanel Grid.Column="1"
+                                Orientation="Horizontal">
+                            <Button Content="−"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="TabSpacingDecrement_Click"/>
+                            <TextBlock Text="16"
+                                    Foreground="{DynamicResource ForegroundText}"
+                                    Width="26"
+                                    TextAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                            <Button Content="+"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="TabSpacingIncrement_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </MenuItem.Header>
+            </MenuItem>
+            <!-- StaysOpenOnClick so stepping the value doesn't close the whole
+                 options menu out from under the user. -->
+            <MenuItem StaysOpenOnClick="True"
+                    Focusable="False">
+                <MenuItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                Text="{x:Static services:Strings.MenuRowSpacing}"
                                 Foreground="{DynamicResource ForegroundText}"
-                                Width="26"
-                                TextAlignment="Center"
-                                VerticalAlignment="Center"/>
-                        <Button Content="+"
-                                Style="{StaticResource MenuStepperButtonStyle}"
-                                Click="TabSpacingIncrement_Click"/>
-                    </StackPanel>
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"/>
+                        <StackPanel Grid.Column="1"
+                                Orientation="Horizontal">
+                            <Button Content="−"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="RowSpacingDecrement_Click"/>
+                            <TextBlock Text="0"
+                                    Foreground="{DynamicResource ForegroundText}"
+                                    Width="26"
+                                    TextAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                            <Button Content="+"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="RowSpacingIncrement_Click"/>
+                        </StackPanel>
+                    </Grid>
                 </MenuItem.Header>
             </MenuItem>
             <MenuItem Header="{x:Static services:Strings.MenuLanguage}">
@@ -786,16 +875,13 @@
                     Value="1,1"/>
             <Setter Property="IsExpanded"
                     Value="{Binding IsExpanded, Mode=TwoWay}"/>
-            <!-- Vertical padding scales with the TreeView's FontSize (see the
-                 converter) so Ctrl+/- zoom shrinks/grows row spacing along with
-                 the text instead of leaving a fixed gap. -->
-            <Setter Property="Padding">
-                <Setter.Value>
-                    <Binding Path="FontSize"
-                             RelativeSource="{RelativeSource AncestorType=TreeView}"
-                             Converter="{StaticResource FontSizeToRowPaddingConverter}"/>
-                </Setter.Value>
-            </Setter>
+            <!-- Vertical padding scales with the TreeView's FontSize AND the
+                 user's own "행 간격" adjustment - both folded together in
+                 ApplyLayoutMetrics (see RowPadding there) rather than a
+                 converter, since a converter bound to just one property
+                 (FontSize) had no clean way to take this second input too. -->
+            <Setter Property="Padding"
+                    Value="{DynamicResource RowPadding}"/>
             <Setter Property="Background"
                     Value="Transparent"/>
             <Setter Property="Foreground"
@@ -1229,47 +1315,40 @@
                 <!-- Shown only when this folder has its own remembered sort
                      (HasSortOverride - see FileSystemItem and
                      Services/FileSystemService.SortOverrides), independent of
-                     the app-wide default. Click clears it (see
+                     the app-wide default. Click rotates it (see
                      TreeViewItem_PreviewMouseLeftButtonDown's
-                     clickedOnSortOverrideIcon check) - same action as the
-                     folder's own "정렬 -> 전역 정렬 따르기" menu item. Wrapped in
-                     its own Border so that check can find the click by name
-                     without also matching some other Border further up the
-                     row (RowBorder's hover/selection highlight, etc). -->
+                     clickedOnSortOverrideIcon check) - clearing it entirely is
+                     the folder's own "정렬 -> 전역 정렬 따르기" menu item instead.
+                     Wrapped in its own Border so that check can find the click
+                     by name without also matching some other Border further
+                     up the row (RowBorder's hover/selection highlight, etc). -->
                 <Border x:Name="SortOverrideIconBorder"
                         Grid.Column="2"
                         Visibility="Collapsed"
                         Background="Transparent"
                         Margin="4,0,12,0"
-                        Padding="3"
+                        Padding="10,0"
                         Cursor="Hand"
                         ToolTip="{x:Static services:Strings.SortOverrideIconTooltip}">
-                    <!-- Right margin (10) clears the overlay scrollbar's 5px hit-
-                         test width (MinimalScrollBarStyle) plus a little slack -
-                         it's drawn on top of full-bleed row content (see
-                         MinimalScrollViewerTemplate) and still hit-tests at
-                         Opacity 0, so without this gap it silently steals clicks
-                         meant for this icon. Padding widens the actual clickable
-                         area beyond just the glyph itself, which is otherwise a
-                         fiddly target to land a click on. -->
-                    <StackPanel Orientation="Horizontal">
-                        <!-- N/D + arrow (FileSystemService.FormatSortOverrideLabel) -
-                             which of the 4 rotation states a click on the icon
-                             just beside it would currently be sitting at. -->
-                        <TextBlock Text="{Binding SortOverrideLabel}"
-                                VerticalAlignment="Center"
-                                FontSize="9"
-                                Margin="0,0,2,0"
-                                Foreground="{DynamicResource ShowMoreForeground}"
-                                Opacity="0.7"/>
-                        <Path Data="M0,5 L5,0 L10,5 Z M0,6 L5,11 L10,6 Z"
-                                Fill="{DynamicResource ShowMoreForeground}"
-                                Opacity="0.7"
-                                Width="10"
-                                Height="11"
-                                Stretch="Uniform"
-                                VerticalAlignment="Center"/>
-                    </StackPanel>
+                    <!-- Right margin (12) clears the overlay scrollbar's 5px
+                         hit-test width (MinimalScrollBarStyle) plus a little
+                         slack - it's drawn on top of full-bleed row content
+                         (see MinimalScrollViewerTemplate) and still hit-tests
+                         at Opacity 0, so without this gap it silently steals
+                         clicks meant for this icon. Padding (6 horizontal,
+                         0 vertical - the 13px-tall image already fits inside
+                         the row's existing height set by the 16px folder/file
+                         icon, so any vertical padding here would be what
+                         pushes the row taller only while this icon shows)
+                         widens the actual clickable area well beyond the
+                         image itself, which is otherwise a fiddly target to
+                         land a click on. -->
+                    <Image Source="{Binding SortOverrideIconUri}"
+                            Width="{DynamicResource SortOverrideIconWidth}"
+                            Height="{DynamicResource SortOverrideIconHeight}"
+                            Stretch="Uniform"
+                            VerticalAlignment="Center"
+                            RenderOptions.BitmapScalingMode="HighQuality"/>
                 </Border>
             </Grid>
             <HierarchicalDataTemplate.Triggers>
@@ -1423,17 +1502,13 @@
                  icon's own Margin instead of an extra empty column - so a
                  favorite's folder icon lines up with the tree's folder icons
                  directly beneath it. Vertical padding reuses the same
-                 FontSize-driven converter as the tree rows (bound to
-                 FavoritesList.FontSize, which itself follows ExplorerTree.FontSize -
-                 see MainWindow.xaml.cs's SetTreeFontSize) so Ctrl+/- zoom scales
-                 favorites row spacing the same way it does the tree's. -->
-            <Setter Property="Padding">
-                <Setter.Value>
-                    <Binding Path="FontSize"
-                             RelativeSource="{RelativeSource AncestorType=ListBox}"
-                             Converter="{StaticResource FontSizeToRowPaddingConverter}"/>
-                </Setter.Value>
-            </Setter>
+                 RowPadding resource as the tree rows (see
+                 ExplorerTreeViewItemStyle and MainWindow.xaml.cs's
+                 ApplyLayoutMetrics) so Ctrl+/- zoom AND the "행 간격" setting
+                 both scale favorites row spacing the same way they do the
+                 tree's. -->
+            <Setter Property="Padding"
+                    Value="{DynamicResource RowPadding}"/>
             <Setter Property="Background"
                     Value="Transparent"/>
             <Setter Property="BorderThickness"
@@ -1645,7 +1720,7 @@
                         RenderTransform="{StaticResource ShiftUp1px}"
                         Visibility="Collapsed"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Image Source="pack://application:,,,/Resources/pin.png"
+                    <Image Source="{DynamicResource PinIconSource}"
                             Width="16"
                             Height="16"
                             RenderOptions.BitmapScalingMode="HighQuality"/>
@@ -1799,7 +1874,8 @@
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                       MouseDoubleClick="ExplorerTree_MouseDoubleClick"
                       SelectedItemChanged="ExplorerTree_SelectedItemChanged"
-                      KeyDown="ExplorerTree_KeyDown"/>
+                      KeyDown="ExplorerTree_KeyDown"
+                      PreviewKeyDown="ExplorerTree_PreviewKeyDown"/>
 
             <!-- Same divider style FavoritesList already draws between itself
                  and the tree below, using the same dedicated "영역 구분선"

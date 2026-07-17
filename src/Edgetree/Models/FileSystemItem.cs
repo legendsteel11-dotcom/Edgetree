@@ -98,16 +98,17 @@ public class FileSystemItem : INotifyPropertyChanged
         set => SetField(ref _hasSortOverride, value);
     }
 
-    // "N↑"/"N↓"/"D↑"/"D↓" - which of the 4 sort combinations this folder's
-    // override is currently set to, shown next to the icon above. Only
-    // meaningful while HasSortOverride is true; kept in sync with it by
-    // MainWindow (SetFolderSortOverride/RotateFolderSortOverride/
-    // ClearFolderSortOverride), same externally-maintained pattern.
-    private string _sortOverrideLabel = string.Empty;
-    public string SortOverrideLabel
+    // Which of the 4 pre-made sort-override icon images (see
+    // FileSystemService.FormatSortOverrideIconUri) matches this folder's
+    // current override. Only meaningful while HasSortOverride is true; kept
+    // in sync with it by MainWindow (SetFolderSortOverride/
+    // RotateFolderSortOverride/ClearFolderSortOverride), same
+    // externally-maintained pattern.
+    private string _sortOverrideIconUri = string.Empty;
+    public string SortOverrideIconUri
     {
-        get => _sortOverrideLabel;
-        set => SetField(ref _sortOverrideLabel, value);
+        get => _sortOverrideIconUri;
+        set => SetField(ref _sortOverrideIconUri, value);
     }
 
     // Drives the inline VS Code-style rename UI in the tree row's
@@ -136,11 +137,21 @@ public class FileSystemItem : INotifyPropertyChanged
         Parent = parent;
         if (isDirectory)
         {
+            // Always resolves to SOME icon - this folder's own override if it
+            // has one, otherwise what the app-wide default would sort it by -
+            // so the icon shown while merely selected (see MainWindow.xaml's
+            // IsSelected trigger) previews the sort that's actually in effect
+            // right now instead of rendering blank until an override exists.
             if (FileSystemService.SortOverrides.TryGetValue(
                 FileSystemService.NormalizeSortOverridePath(fullPath), out var over))
             {
                 _hasSortOverride = true;
-                _sortOverrideLabel = FileSystemService.FormatSortOverrideLabel(over.Field, over.Descending);
+                _sortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(over.Field, over.Descending);
+            }
+            else
+            {
+                _sortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(
+                    FileSystemService.SortField, FileSystemService.SortDescending);
             }
             Children.Add(new FileSystemItem());
         }
