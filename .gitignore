@@ -31,9 +31,13 @@ Thumbs.db
 *.psd
 *.ai
 
-# Raw screenshot captures (kept locally; cropped versions in screenshot/ are tracked)
+# Raw screenshot captures (kept locally; cropped versions in screenshot/ are
+# tracked). DDPM.Subagent.User_*.png has no directory prefix - these get
+# pasted next to whatever doc referenced them (TODO.md's own folder included),
+# not just into screenshot/, so it's intentionally unanchored to catch it
+# wherever it lands.
 screenshot/mstsc_*.jpg
-screenshot/DDPM.Subagent.User_*.png
+DDPM.Subagent.User_*.png
 
 # Personal working notes, not for the public repo
 src/Edgetree/TODO.md

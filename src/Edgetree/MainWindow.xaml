@@ -118,16 +118,22 @@
         <Visibility x:Key="FolderIconVisibility">Visible</Visibility>
         <Visibility x:Key="FileIconVisibility">Visible</Visibility>
 
-        <!-- Row icon size/margins - see MainWindow.xaml.cs's ApplyIconMetrics
-             for how these three are actually computed (font-size-scaled, and
-             FileRowIconMargin depending on both icon toggles); the values
-             here are just defaults matching FontSize=12 until that first
-             runs. FolderRowIconMargin is also the default Margin every row's
+        <!-- Row icon/name size/margins - see MainWindow.xaml.cs's
+             ApplyIconMetrics for how these four are actually computed
+             (font-size-scaled, and FileRowIconMargin/FileNameMargin
+             depending on both icon toggles); the values here are just
+             defaults matching FontSize=12 until that first runs.
+             FolderRowIconMargin is also the default Margin every row's
              RowIcon starts with in the template below - FileRowIconMargin
-             overrides it only for file rows (IsDirectory=False trigger). -->
+             overrides it only for file rows (IsDirectory=False trigger).
+             FileNameMargin likewise only applies to a file row's NameText/
+             NameEditBox, for the one combination (folder icons on, file
+             icons off) where RowIcon is Collapsed and so can't carry the
+             alignment shift itself. -->
         <system:Double x:Key="IconSize">16</system:Double>
         <Thickness x:Key="FolderRowIconMargin">0,0,6,0</Thickness>
         <Thickness x:Key="FileRowIconMargin">0,0,6,0</Thickness>
+        <Thickness x:Key="FileNameMargin">0,0,0,0</Thickness>
 
         <!-- The 16px column a file row's TreeViewItem template always
              reserves for the expand arrow it never shows (folders alone can
@@ -1174,6 +1180,17 @@
                     <Setter TargetName="RowIcon"
                             Property="Margin"
                             Value="{DynamicResource FileRowIconMargin}"/>
+                    <!-- Only actually non-zero when file icons are off and
+                         folder icons are on (see ApplyIconMetrics) - the one
+                         case where RowIcon is Collapsed and can't carry the
+                         guide-line alignment shift itself, so the name/edit
+                         box take it instead. -->
+                    <Setter TargetName="NameText"
+                            Property="Margin"
+                            Value="{DynamicResource FileNameMargin}"/>
+                    <Setter TargetName="NameEditBox"
+                            Property="Margin"
+                            Value="{DynamicResource FileNameMargin}"/>
                 </DataTrigger>
                 <!-- File rows get their own text color instead of inheriting
                      ForegroundText/HighlightForeground from the TreeViewItem

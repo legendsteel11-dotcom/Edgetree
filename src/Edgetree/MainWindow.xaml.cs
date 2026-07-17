@@ -625,15 +625,22 @@ public partial class MainWindow : Window
     // actually clicks somewhere outside it - for reading the tree without it
     // snapping shut over a stray mouse movement. Polls rather than a global
     // low-level mouse hook - simpler and much lower-risk (no unmanaged hook
-    // handle to leak/crash on if cleanup is ever missed), and a ~120ms
-    // response to a click is imperceptible for this.
+    // handle to leak/crash on if cleanup is ever missed). 30ms (not the
+    // original 120ms) because this only samples the instantaneous
+    // MouseButtons state once per tick: an ordinary click's whole down-to-up
+    // span is often shorter than 120ms, so it could fall entirely between
+    // two ticks and never get seen at all - read as the first click outside
+    // being silently swallowed, closing only on a second, luckier-timed
+    // click. 30ms shrinks that blind spot enough to catch it reliably while
+    // still being cheap (only runs while the panel is peeked open in
+    // click-outside mode).
     private System.Windows.Threading.DispatcherTimer? _autoHideOutsideClickTimer;
 
     private void StartAutoHideOutsideClickWatch()
     {
         _autoHideOutsideClickTimer ??= new System.Windows.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(120)
+            Interval = TimeSpan.FromMilliseconds(30)
         };
         _autoHideOutsideClickTimer.Tick -= AutoHideOutsideClickTimer_Tick;
         _autoHideOutsideClickTimer.Tick += AutoHideOutsideClickTimer_Tick;
@@ -1178,6 +1185,20 @@ public partial class MainWindow : Window
         // even below a huge folder (NavigateToPath re-caps overflow first).
         if (sender is ListBoxItem { DataContext: FavoriteEntry entry })
         {
+            // Re-clicking a favorite that's already revealed and selected used
+            // to still re-run the entire walk: re-collapse every other
+            // folder's "more" overflow, re-expand the whole chain level by
+            // level, and re-pin the selection to the top of the tree - all for
+            // an end state identical to what was already on screen, which read
+            // as the whole panel flashing/redrawing. Nothing left to do if the
+            // target is already the current selection.
+            string? currentPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath.TrimEnd('\\');
+            if (currentPath is not null &&
+                string.Equals(currentPath, entry.Path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             // The walk is asynchronous (RevealChainStep defers via the
             // dispatcher), so the "navigating from a favorite" guard is set and
             // cleared inside NavigateToPath / the walk itself, not around this
@@ -2034,18 +2055,17 @@ public partial class MainWindow : Window
     // Ctrl+/- zoom instead of staying a fixed size that looks increasingly
     // mismatched against the text around them.
     //
-    // FileRowIconMargin also carries the folder/file icon cross-toggle fix:
-    // a file row only needs the extra left shift (-16, matching a folder
-    // icon's own width) when folder icons are OFF but file icons are still
-    // ON - that's the one combination where a file row's icon stays visible
-    // while a sibling folder row's has disappeared out from under it,
-    // opening a gap between where the folder's (now icon-less) name sits and
-    // where the file's (still-indented) icon+name sits. Both "everything on"
-    // and "both off" (RowIcon Collapsed there, so its margin is moot) use
-    // the same plain margin folder rows do - deliberately not the -16 shift,
-    // since applying it universally regressed the "file icons off" case
-    // (RowIcon.Visibility no longer being the only thing changing per
-    // FileIconVisibility toggle).
+    // FileRowIconMargin/FileNameMargin also carry the VS Code-style alignment
+    // rule: a file never gets its own expand arrow, so a file row's content
+    // naturally sits one indent guide (16px) to the right of where the guide
+    // line beneath a sibling folder's arrow actually falls. Whenever folder
+    // icons are visible, that guide line is what the eye lines up files
+    // against, so file content needs pulling left by that same 16px -
+    // whether the file still shows its own icon (shift the icon so its
+    // center lands under the guide, FileRowIconMargin) or not (shift the
+    // name itself so its left edge lands there instead, FileNameMargin).
+    // "Both off" is the one case that instead collapses the arrow gutter
+    // itself to 0 below, so nothing here needs to shift into it.
     private void ApplyIconMetrics()
     {
         double scale = ExplorerTree.FontSize / DefaultTreeFontSize;
@@ -2054,10 +2074,25 @@ public partial class MainWindow : Window
         var plainMargin = new Thickness(0, 0, 6 * scale, 0);
         Resources["FolderRowIconMargin"] = plainMargin;
 
-        bool needsShift = !_settings.ShowFolderIcons && _settings.ShowFileIcons;
-        Resources["FileRowIconMargin"] = needsShift
+        // A file's icon needs the 16px pull left whenever it's the thing
+        // sitting in that gutter at all - i.e. whenever file icons are shown,
+        // regardless of whether folder icons are also on (folder icons being
+        // off is the pre-existing case this already covered; folder icons
+        // being on is the same gutter/guide-line geometry, just with a
+        // sibling folder icon now also visible next to it).
+        Resources["FileRowIconMargin"] = _settings.ShowFileIcons
             ? new Thickness(-16 * scale, 0, 6 * scale, 0)
             : plainMargin;
+
+        // File icons off but folder icons on: RowIcon is Collapsed (see the
+        // HierarchicalDataTemplate's IsDirectory trigger), so the margin
+        // above never renders - the name text itself needs the same pull
+        // left instead, or a file's name sits flush with a folder's icon
+        // rather than under its guide line. Every other combination leaves
+        // NameText where it already sits correctly.
+        Resources["FileNameMargin"] = _settings.ShowFolderIcons && !_settings.ShowFileIcons
+            ? new Thickness(-16 * scale, 0, 0, 0)
+            : new Thickness(0);
 
         // Both off: files lose their reserved (but always-blank, per
         // ExpanderColumn's own HasItems=False trigger) 16px arrow gutter too,
@@ -2762,7 +2797,7 @@ public partial class MainWindow : Window
     {
         var expandedPaths = new List<string>();
         CollectExpandedPaths(item, expandedPaths);
-        string? selectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
+        string? selectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath.TrimEnd('\\');
 
         item.RefreshChildren();
 
@@ -2770,9 +2805,26 @@ public partial class MainWindow : Window
         {
             ExpandPathIfPossible(path);
         }
-        if (selectedPath is not null)
+
+        // RefreshChildren only replaces THIS folder's own children with fresh
+        // instances (see its own comment), so the selected item's object
+        // reference - and its on-screen position - is completely untouched
+        // unless the selection actually lived inside this subtree. Without
+        // this check, an unrelated background change anywhere else on the
+        // same watched drive (a browser cache write, antivirus scan, cloud
+        // sync, ...) would re-run the favorite-style reveal walk below on
+        // every keystroke of background disk activity - including its
+        // forced "pin selection to the top of the tree" scroll (see
+        // FinishReveal) - which is what made the current selection jump to
+        // the top line or the tree flicker while the user wasn't doing
+        // anything in the app at all.
+        string refreshedPath = item.FullPath.TrimEnd('\\');
+        bool selectionInsideRefreshedSubtree = selectedPath is not null &&
+            (string.Equals(selectedPath, refreshedPath, StringComparison.OrdinalIgnoreCase) ||
+             selectedPath.StartsWith(refreshedPath + "\\", StringComparison.OrdinalIgnoreCase));
+        if (selectionInsideRefreshedSubtree)
         {
-            NavigateToPath(selectedPath);
+            NavigateToPath(selectedPath!);
         }
     }
 
