@@ -59,7 +59,7 @@ const dict = {
         },
         {
           title: '색상 커스터마이징',
-          desc: '폴더명, 파일명, 배경, 선택 영역 등 14가지 색상을 원하는 대로 바꿀 수 있습니다.',
+          desc: '폴더명, 파일명, 배경, 선택 영역 등 색상을 원하는 대로 바꿀 수 있고, 다크/라이트 모드를 각각 따로 지정할 수 있습니다.',
         },
         {
           title: '폴더 즐겨찾기',
@@ -78,9 +78,9 @@ const dict = {
         { title: '파일 관리', desc: '다른 앱으로 파일을 바로 드래그하고, 복사/붙여넣기/이름변경/속성 등을 지원하며 외부 변경사항도 실시간 반영됩니다.' },
         { title: '즐겨찾기', desc: '자주 쓰는 폴더를 등록해 클릭 한 번으로 이동, 영역 위치도 상/하로 바꿀 수 있습니다.' },
         { title: '폴더/파일 아이콘 토글', desc: '폴더/파일 아이콘을 숨겨서 더 심플하게 볼 수 있습니다.' },
-        { title: '탭 간격 조정', desc: '들여쓰기 폭을 취향대로 좁히거나 넓힐 수 있습니다.' },
+        { title: '탭 간격 및 행 간격 조정', desc: '들여쓰기 폭과 행 간격을 각각 취향대로 좁히거나 넓힐 수 있습니다.' },
         { title: '정렬 옵션', desc: '이름·날짜 기준 오름차순/내림차순. 폴더별로 전역 설정과 별개로 정렬을 지정하고, 언제든 해제할 수 있습니다.' },
-        { title: '색상 커스터마이징', desc: '거의 모든 화면 요소의 색상을 원하는 대로 지정할 수 있습니다.' },
+        { title: '색상 커스터마이징', desc: '거의 모든 화면 요소의 색상을 원하는 대로 지정할 수 있고, 다크/라이트 모드를 지원합니다.' },
         { title: '폰트 크기 조정', desc: 'Ctrl +/- 로 트리 글자 크기 조절, Ctrl+0으로 기본값 복원.' },
         { title: '설정 내보내기/가져오기/초기화', desc: 'JSON으로 저장·복원하고, 전체 초기화 시 레지스트리까지 깔끔하게 정리됩니다.' },
         { title: '한국어/영어 지원', desc: '옵션 메뉴에서 언제든 언어를 전환할 수 있습니다.' },
@@ -167,7 +167,7 @@ const dict = {
         },
         {
           title: 'Color customization',
-          desc: '14 customizable colors — folder names, file names, backgrounds, selection, and more.',
+          desc: 'Customizable colors for folder names, file names, backgrounds, selection, and more — with separate dark and light palettes.',
         },
         {
           title: 'Items per folder',
@@ -186,9 +186,9 @@ const dict = {
         { title: 'File Management', desc: 'Drag files straight into other apps, plus copy/paste/rename/properties, with live updates when files change externally.' },
         { title: 'Favorites', desc: 'Pin frequently used folders and jump to them in one click; switch the panel to the top or bottom.' },
         { title: 'Folder/File Icon Toggle', desc: 'Hide folder and file icons for a cleaner look.' },
-        { title: 'Indent Spacing', desc: "Adjust the tree's indent width to taste." },
+        { title: 'Indent & Row Spacing', desc: "Adjust the tree's indent width and row spacing independently, to taste." },
         { title: 'Sort Options', desc: "Sort by name or date, ascending or descending. Each folder can keep its own sort independent of the global default, and you can clear it anytime." },
-        { title: 'Color Customization', desc: 'Recolor nearly every visible element to your liking.' },
+        { title: 'Color Customization', desc: 'Recolor nearly every visible element to your liking, with separate dark and light modes.' },
         { title: 'Font Size', desc: 'Ctrl +/- resizes the tree text, Ctrl+0 resets it.' },
         { title: 'Export / Import / Reset Settings', desc: "Save and restore settings as JSON - a full reset also cleans up the Windows registry entry." },
         { title: 'Korean / English UI', desc: 'Switch languages anytime from the options menu.' },
