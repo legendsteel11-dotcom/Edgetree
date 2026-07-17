@@ -23,7 +23,8 @@ const dict = {
       tagline: '화면 가장자리에 항상 붙어있는, VS Code 스타일의 가벼운 탐색기',
       description:
         '폴더 구조를 빠르게 훑어보고 파일 위치로 바로 이동하기 위한 보조 도구입니다.',
-      ctaDownload: '다운로드',
+      ctaDownloadStandalone: '독립 실행형 다운로드',
+      ctaDownloadStandard: '일반 버전 다운로드',
       ctaGithub: 'GitHub에서 보기',
     },
     howto: {
@@ -126,7 +127,8 @@ const dict = {
       tagline: 'A lightweight explorer that lives at your screen edge, VS Code style',
       description:
         "A quick way to glance at a folder structure and jump straight to a file.",
-      ctaDownload: 'Download',
+      ctaDownloadStandalone: 'Download Standalone',
+      ctaDownloadStandard: 'Download Standard',
       ctaGithub: 'View on GitHub',
     },
     howto: {

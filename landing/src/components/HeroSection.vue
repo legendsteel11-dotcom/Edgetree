@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { t } from '../i18n'
+import { standardDownloadUrl, standaloneDownloadUrl, ensureReleaseAssetsLoaded } from '../releaseAssets'
 
-const RELEASE_URL = 'https://github.com/legendsteel11-dotcom/Edgetree/releases/latest'
+onMounted(ensureReleaseAssetsLoaded)
 </script>
 
 <template>
@@ -14,7 +16,8 @@ const RELEASE_URL = 'https://github.com/legendsteel11-dotcom/Edgetree/releases/l
         <p class="tagline">{{ t.hero.tagline }}</p>
         <p class="description">{{ t.hero.description }}</p>
         <div class="cta">
-          <a class="btn btn-primary" :href="RELEASE_URL" target="_blank" rel="noopener">{{ t.hero.ctaDownload }}</a>
+          <a class="btn btn-primary" :href="standaloneDownloadUrl" target="_blank" rel="noopener">{{ t.hero.ctaDownloadStandalone }}</a>
+          <a class="btn btn-secondary" :href="standardDownloadUrl" target="_blank" rel="noopener">{{ t.hero.ctaDownloadStandard }}</a>
           <a class="btn btn-secondary" href="https://github.com/legendsteel11-dotcom/Edgetree" target="_blank" rel="noopener">{{ t.hero.ctaGithub }}</a>
         </div>
       </div>
