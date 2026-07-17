@@ -83,7 +83,8 @@ h1 {
 }
 
 .shot img {
-  width: 100%;
+  width: 70%;
+  margin: 0 auto;
   border-radius: 10px;
   border: 1px solid var(--border);
   box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.6);
@@ -96,6 +97,11 @@ h1 {
 
   .tagline {
     font-size: 18px;
+  }
+
+  .shot img {
+    width: 90%;
+    margin: 0 auto;
   }
 }
 </style>
