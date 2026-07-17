@@ -11,6 +11,7 @@ import { t, lang, toggleLang } from '../i18n'
       </a>
 
       <nav class="nav">
+        <a href="#howto">{{ t.nav.howto }}</a>
         <a href="#screenshots">{{ t.nav.screenshots }}</a>
         <a href="#features">{{ t.nav.features }}</a>
         <a href="#download">{{ t.nav.download }}</a>
@@ -31,9 +32,9 @@ import { t, lang, toggleLang } from '../i18n'
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(26, 26, 26, 0.05);
+  background: rgba(26, 26, 26, 0.5);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--border);
+  /* border-bottom: 1px solid var(--border); */
 }
 
 .bar {
