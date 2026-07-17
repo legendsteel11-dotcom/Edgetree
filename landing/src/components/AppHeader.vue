@@ -11,9 +11,9 @@ import { t, lang, toggleLang } from '../i18n'
       </a>
 
       <nav class="nav">
-        <a href="#howto">{{ t.nav.howto }}</a>
         <a href="#screenshots">{{ t.nav.screenshots }}</a>
         <a href="#features">{{ t.nav.features }}</a>
+        <a href="#howto">{{ t.nav.howto }}</a>
         <a href="#download">{{ t.nav.download }}</a>
         <a href="https://github.com/legendsteel11-dotcom/Edgetree" target="_blank" rel="noopener">{{ t.nav.github }}</a>
       </nav>

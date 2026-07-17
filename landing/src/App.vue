@@ -13,9 +13,9 @@ import AppFooter from './components/AppFooter.vue'
   <AppHeader />
   <main>
     <HeroSection />
-    <HowToUseSection />
     <ScreenshotCards />
     <FeatureGrid />
+    <HowToUseSection />
     <InfoSection />
     <DownloadSection />
   </main>

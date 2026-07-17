@@ -11,9 +11,9 @@ export function toggleLang() {
 const dict = {
   ko: {
     nav: {
-      howto: '사용법',
-      screenshots: '스크린샷',
-      features: '기능',
+      howto: '사용방법',
+      screenshots: '주요기능',
+      features: '기타기능',
       download: '다운로드',
       github: 'GitHub',
     },
@@ -28,8 +28,7 @@ const dict = {
       ctaGithub: 'GitHub에서 보기',
     },
     howto: {
-      title: '사용 방법',
-      subtitle: '제목표시줄의 아이콘 몇 개로 대부분의 동작을 제어합니다',
+      title: '사용방법',
       steps: [
         { title: '도킹 / 자동접기/펼치기', desc: '제목표시줄 아이콘 클릭 한 번으로 화면 가장자리에 얇게 숨고, 마우스를 가장자리로 가져가면 다시 펼쳐집니다.' },
         { title: '자동접기/펼치기 고정 해제', desc: '펼쳐진 상태에서 핀을 클릭하면 자동접기/펼치기가 꺼지고 항상 펼쳐진 상태로 고정됩니다.' },
@@ -38,8 +37,7 @@ const dict = {
       ],
     },
     screenshots: {
-      title: '주요 기능',
-      subtitle: '화면 어디에 있든, 익숙한 스타일',
+      title: '주요기능',
       items: [
         {
           title: '도킹/자동 접기',
@@ -68,8 +66,7 @@ const dict = {
       ],
     },
     features: {
-      title: '전체 기능',
-      subtitle: '현재까지 구현된 기능 명세',
+      title: '기타기능',
       items: [
         { title: '폴더 트리뷰', desc: 'VS Code 스타일 트리 탐색 — 전체 접기/복원, 자동 접기 토글, 폴더당 표시 개수 제한으로 큰 폴더도 빠르게 열립니다.' },
         { title: '도킹 및 창모드', desc: '화면 좌/우 도킹과 자유 이동 창모드를 오가고, 바깥 라인 더블클릭으로 창 크기를 자동으로 맞출 수 있습니다.' },
@@ -99,8 +96,7 @@ const dict = {
       licenseLink: 'LICENSE.md 전문 보기',
     },
     download: {
-      title: '지금 다운로드',
-      subtitle: '설치 프로그램 없이, exe 파일 하나면 충분합니다',
+      title: '다운로드',
       standardTitle: '일반 버전',
       standardDesc: '~1 MB · .NET 8 데스크톱 런타임 필요',
       standaloneTitle: '독립 실행형',
@@ -120,8 +116,8 @@ const dict = {
   en: {
     nav: {
       howto: 'How to Use',
-      screenshots: 'Screenshots',
-      features: 'Features',
+      screenshots: 'Key Features',
+      features: 'More Features',
       download: 'Download',
       github: 'GitHub',
     },
@@ -137,7 +133,6 @@ const dict = {
     },
     howto: {
       title: 'How to Use',
-      subtitle: 'A few titlebar controls handle most of it',
       steps: [
         { title: 'Dock / Auto-Hide', desc: 'One click on the titlebar icon tucks it away to a thin sliver at the screen edge; move your mouse there to bring it back.' },
         { title: 'Unpin Auto-Hide', desc: 'While expanded, click the pin to turn off auto-hide and keep it open for good.' },
@@ -146,8 +141,7 @@ const dict = {
       ],
     },
     screenshots: {
-      title: 'Edgetree in action',
-      subtitle: 'Wherever it sits on screen, it feels familiar',
+      title: 'Key Features',
       items: [
         {
           title: 'Docking',
@@ -176,8 +170,7 @@ const dict = {
       ],
     },
     features: {
-      title: 'And more',
-      subtitle: "What didn't fit in a screenshot",
+      title: 'More Features',
       items: [
         { title: 'Folder Tree View', desc: "VS Code-style tree browsing - collapse/restore all, Auto Collapse, and a per-folder item cap keep even huge folders fast." },
         { title: 'Docking & Window Mode', desc: "Dock to either screen edge or float as a free window - double-click the edge to auto-fit the width." },
@@ -207,8 +200,7 @@ const dict = {
       licenseLink: 'Read the full LICENSE.md',
     },
     download: {
-      title: 'Download Now',
-      subtitle: 'No installer — just one exe file',
+      title: 'Download',
       standardTitle: 'Standard',
       standardDesc: '~1 MB · requires .NET 8 Desktop Runtime',
       standaloneTitle: 'Standalone',

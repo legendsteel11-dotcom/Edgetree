@@ -16,7 +16,6 @@ const images = [
     <div class="container">
       <div class="section-heading">
         <h2>{{ t.screenshots.title }}</h2>
-        <p>{{ t.screenshots.subtitle }}</p>
       </div>
 
       <div class="grid">

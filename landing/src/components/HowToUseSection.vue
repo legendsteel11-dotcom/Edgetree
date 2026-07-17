@@ -7,7 +7,6 @@ import { t } from '../i18n'
     <div class="container">
       <div class="section-heading">
         <h2>{{ t.howto.title }}</h2>
-        <p>{{ t.howto.subtitle }}</p>
       </div>
 
       <div class="grid">

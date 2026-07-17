@@ -77,12 +77,6 @@ section {
   letter-spacing: -0.02em;
 }
 
-.section-heading p {
-  margin-top: 12px;
-  font-size: 17px;
-  color: var(--text);
-}
-
 .btn {
   display: inline-flex;
   align-items: center;

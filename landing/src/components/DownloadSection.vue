@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { t } from '../i18n'
-import { standardDownloadUrl, standaloneDownloadUrl, ensureReleaseAssetsLoaded } from '../releaseAssets'
+import { standardDownloadUrl, standaloneDownloadUrl, releaseVersion, ensureReleaseAssetsLoaded } from '../releaseAssets'
 
 onMounted(ensureReleaseAssetsLoaded)
 </script>
@@ -11,18 +11,19 @@ onMounted(ensureReleaseAssetsLoaded)
     <div class="container">
       <div class="section-heading">
         <h2>{{ t.download.title }}</h2>
-        <p>{{ t.download.subtitle }}</p>
       </div>
 
       <div class="grid">
         <div class="card">
           <h3>{{ t.download.standardTitle }}</h3>
           <p>{{ t.download.standardDesc }}</p>
+          <p v-if="releaseVersion" class="version">{{ releaseVersion }}</p>
           <a class="btn btn-secondary" :href="standardDownloadUrl" target="_blank" rel="noopener">{{ t.download.button }}</a>
         </div>
         <div class="card highlight">
           <h3>{{ t.download.standaloneTitle }}</h3>
           <p>{{ t.download.standaloneDesc }}</p>
+          <p v-if="releaseVersion" class="version">{{ releaseVersion }}</p>
           <a class="btn btn-primary" :href="standaloneDownloadUrl" target="_blank" rel="noopener">{{ t.download.button }}</a>
         </div>
       </div>
@@ -73,6 +74,12 @@ onMounted(ensureReleaseAssetsLoaded)
 .card p {
   font-size: 14px;
   margin-bottom: 20px;
+}
+
+.card p.version {
+  font-size: 12.5px;
+  opacity: 0.55;
+  margin-top: -12px;
 }
 
 .note {

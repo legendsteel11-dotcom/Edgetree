@@ -15,6 +15,9 @@ const RELEASE_API_URL = 'https://api.github.com/repos/legendsteel11-dotcom/Edget
 // this never needs touching again as new versions ship.
 export const standardDownloadUrl = ref(RELEASE_URL)
 export const standaloneDownloadUrl = ref(RELEASE_URL)
+// Empty until the API call resolves - DownloadSection only renders the
+// version line once this has a value, rather than showing a placeholder.
+export const releaseVersion = ref('')
 
 let loadStarted = false
 
@@ -33,6 +36,7 @@ export function ensureReleaseAssetsLoaded() {
 
       if (standard) standardDownloadUrl.value = standard.browser_download_url
       if (standalone) standaloneDownloadUrl.value = standalone.browser_download_url
+      if (release?.tag_name) releaseVersion.value = release.tag_name
     })
     .catch(() => {
       // Leave both pointed at the releases page - already a working fallback.
