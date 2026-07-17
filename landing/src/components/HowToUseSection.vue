@@ -11,8 +11,7 @@ import { t } from '../i18n'
       </div>
 
       <div class="grid">
-        <div v-for="(step, i) in t.howto.steps" :key="step.title" class="step">
-          <span class="num">{{ i + 1 }}</span>
+        <div v-for="step in t.howto.steps" :key="step.title" class="step">
           <h3>{{ step.title }}</h3>
           <p>{{ step.desc }}</p>
         </div>
@@ -32,25 +31,12 @@ import { t } from '../i18n'
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 28px 24px;
-}
-
-.num {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--accent-bg);
-  color: var(--accent-strong);
-  font-weight: 700;
-  font-size: 15px;
-  margin-bottom: 16px;
+  padding: 20px 24px;
 }
 
 .step h3 {
   font-size: 16px;
+  font-weight: 400;
   margin-bottom: 8px;
 }
 

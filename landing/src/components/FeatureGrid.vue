@@ -39,13 +39,14 @@ import { t } from '../i18n'
 }
 
 .item h3 {
-  font-size: 15px;
+  font-size: 16px;
+  font-weight: 400;
   margin-bottom: 6px;
   color: var(--text-strong);
 }
 
 .item p {
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.6;
 }
 

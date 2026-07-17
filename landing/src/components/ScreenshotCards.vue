@@ -73,7 +73,8 @@ figcaption {
 }
 
 h3 {
-  font-size: 17px;
+  font-size: 16px;
+  font-weight: 400;
   margin-bottom: 8px;
 }
 

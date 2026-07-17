@@ -58,12 +58,12 @@ img {
 }
 
 section {
-  padding: 64px 0;
+  padding: 32px 0;
 }
 
 @media (max-width: 720px) {
   section {
-    padding: 32px 0;
+    padding: 24px 0;
   }
 }
 
