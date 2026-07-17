@@ -2,6 +2,8 @@
 
 [한국어 안내](README-ko.md)
 
+https://edgetree.vercel.app/
+
 A lightweight, always-on-hand file explorer for Windows that docks to the left
 or right edge of the screen, VS Code Explorer style. It's not meant to replace
 Windows Explorer — it's a quick way to glance at a folder structure and jump
