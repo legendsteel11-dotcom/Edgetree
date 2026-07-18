@@ -129,7 +129,17 @@ public partial class MainWindow : Window
     // it. Keyed by path, not by FileSystemItem: the watcher event only ever
     // gives a path string, and the item it refers to might not even be
     // loaded yet.
-    private readonly Dictionary<string, System.Windows.Threading.DispatcherTimer> _pendingExternalRefreshes = new();
+    private readonly Dictionary<string, PendingExternalRefresh> _pendingExternalRefreshes = new();
+
+    // The debounce timer for one folder, plus when that folder's most recent
+    // change was reported - the timestamp is what lets the tick tell a listing
+    // that predates the change from one already re-read after it (see
+    // QueueExternalRefresh).
+    private sealed class PendingExternalRefresh(System.Windows.Threading.DispatcherTimer timer)
+    {
+        public System.Windows.Threading.DispatcherTimer Timer { get; } = timer;
+        public long LastEventTicks { get; set; } = Environment.TickCount64;
+    }
 
     // One recursive watcher per drive root (see StartDriveWatchers), covering
     // every folder on that drive regardless of expand state - NOT one
@@ -3550,7 +3560,7 @@ public partial class MainWindow : Window
         // auto-generated code-behind field the way named elements in the main
         // visual tree do, so these have to be found by position on the
         // ContextMenu itself instead.
-        if (sender is ContextMenu { Items: [MenuItem addFavoriteItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, _, _, _, _, _, MenuItem openWithCodeItem, ..] })
+        if (sender is ContextMenu { Items: [MenuItem addFavoriteItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem searchInFolderItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, _, _, _, _, _, MenuItem openWithCodeItem, ..] })
         {
             bool isFolder = ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true };
             addFavoriteItem.IsEnabled = isFolder;
@@ -3562,6 +3572,9 @@ public partial class MainWindow : Window
             // Refresh re-reads the selected folder's own contents from disk -
             // there's nothing to refresh on a plain file.
             refreshItem.IsEnabled = isFolder;
+
+            // The search scope is always a folder (see StartScopeScan).
+            searchInFolderItem.IsEnabled = isFolder;
 
             // Only makes sense to reach for while looking at a folder. Shows
             // that folder's own override if it has one (GetEffectiveFolderSort),
@@ -3673,8 +3686,9 @@ public partial class MainWindow : Window
     {
         if (_pendingExternalRefreshes.TryGetValue(folderPath, out var existing))
         {
-            existing.Stop();
-            existing.Start();
+            existing.LastEventTicks = Environment.TickCount64;
+            existing.Timer.Stop();
+            existing.Timer.Start();
             return;
         }
 
@@ -3682,16 +3696,38 @@ public partial class MainWindow : Window
         {
             Interval = TimeSpan.FromMilliseconds(300)
         };
+        var pending = new PendingExternalRefresh(timer);
         timer.Tick += (_, _) =>
         {
             timer.Stop();
             _pendingExternalRefreshes.Remove(folderPath);
-            if (FindLoadedItemForPath(folderPath) is { IsExpanded: true } item)
+            if (FindLoadedItemForPath(folderPath) is not { IsExpanded: true } item)
             {
-                RefreshFolderPreservingState(item);
+                return;
             }
+
+            // Nothing to redo if this folder was already re-read from disk
+            // after the change was reported. Expanding a folder reads it fresh,
+            // so a watcher event landing in that same moment would otherwise
+            // tear down every child and rebuild it - and RefreshChildren
+            // emptying then refilling a mid-list folder makes the tree's total
+            // height collapse and grow again, which clamps the ScrollViewer's
+            // offset and yanks the view upward. That is the intermittent
+            // "expanding a folder sometimes jumps the view to the top" report:
+            // rare because it needs a real background change to land inside
+            // that window, and unrelated to how big the folder is.
+            //
+            // Comparing timestamps rather than just skipping anything recently
+            // loaded keeps this exact: a change that genuinely lands after the
+            // read still refreshes, so nothing goes stale.
+            if (item.LastLoadedTicks > pending.LastEventTicks)
+            {
+                return;
+            }
+
+            RefreshFolderPreservingState(item);
         };
-        _pendingExternalRefreshes[folderPath] = timer;
+        _pendingExternalRefreshes[folderPath] = pending;
         timer.Start();
     }
 
@@ -4419,8 +4455,6 @@ public partial class MainWindow : Window
     private static readonly Geometry SearchGlyphBack =
         Geometry.Parse("M10,3 L5,8 L10,13");
 
-    private System.Windows.Media.Animation.Storyboard? _searchScanPulse;
-
     private void InitializeSearch()
     {
         SearchResultsList.ItemsSource = _searchRows;
@@ -4435,24 +4469,6 @@ public partial class MainWindow : Window
             RunSearchFilter();
         };
 
-        // Honest "scanning is active" indicator - a pulsing thin bar. A real
-        // percentage gauge would be misleading: Directory.EnumerateFiles can
-        // block for seconds on a large/slow subtree, so the file count doesn't
-        // advance steadily (it stalls then jumps), and there's no total known
-        // up front. Only shown while a scan runs (see SetSearchScanning).
-        var pulse = new System.Windows.Media.Animation.DoubleAnimation
-        {
-            From = 1.0,
-            To = 0.3,
-            Duration = TimeSpan.FromMilliseconds(650),
-            AutoReverse = true,
-            RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
-        };
-        System.Windows.Media.Animation.Storyboard.SetTarget(pulse, SearchScanIndicator);
-        System.Windows.Media.Animation.Storyboard.SetTargetProperty(pulse, new PropertyPath(OpacityProperty));
-        _searchScanPulse = new System.Windows.Media.Animation.Storyboard();
-        _searchScanPulse.Children.Add(pulse);
-
         _searchScopeFolder = _settings.LastSearchFolder;
         _searchSortMode = (SearchSortMode)Math.Clamp(_settings.SearchSortMode, 0, 4);
         UpdateSearchScopeText();
@@ -4462,21 +4478,10 @@ public partial class MainWindow : Window
     // Whether a search scope (a picked folder) is currently set at all.
     private bool HasSearchScope => _searchScopeFolder is { Length: > 0 };
 
-    // Toggles the scanning flag and the pulsing activity indicator together.
-    private void SetSearchScanning(bool scanning)
-    {
-        _searchScanning = scanning;
-        if (scanning)
-        {
-            SearchScanIndicator.Visibility = Visibility.Visible;
-            _searchScanPulse?.Begin();
-        }
-        else
-        {
-            _searchScanPulse?.Stop();
-            SearchScanIndicator.Visibility = Visibility.Collapsed;
-        }
-    }
+    // Kept as a method rather than assigning _searchScanning directly at its
+    // several call sites: it used to drive the pulsing indicator too, and the
+    // single choke point is worth keeping for whatever replaces that.
+    private void SetSearchScanning(bool scanning) => _searchScanning = scanning;
 
     // (Re)scans the current scope folder. Used by the refresh button and the
     // lazy first scan when the view opens.
@@ -4560,12 +4565,13 @@ public partial class MainWindow : Window
             // Fresh history recall each time the view opens.
             _searchHistoryNavIndex = -1;
 
-            // Lazy first scan: a remembered scope isn't walked at startup, only
-            // when search is actually opened, and only once per session unless
-            // the user hits refresh (or changes scope).
+            // Lazy first index: a remembered scope isn't touched at startup,
+            // only when search is actually opened, and only once per session
+            // unless the user hits refresh (or changes scope). Usually costs a
+            // file read rather than a full walk now - see LoadCachedIndexOrScan.
             if (HasSearchScope && _searchEntries.Count == 0 && !_searchScanning)
             {
-                RescanCurrentScope();
+                LoadCachedIndexOrScan();
             }
             else
             {
@@ -4605,12 +4611,98 @@ public partial class MainWindow : Window
 
         if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
         {
-            _searchScopeFolder = dialog.SelectedPath;
-            _settings.LastSearchFolder = _searchScopeFolder;
-            _settingsService.Save(_settings);
-            UpdateSearchScopeText();
-            StartScopeScan(new[] { _searchScopeFolder });
+            SetSearchScope(dialog.SelectedPath);
         }
+    }
+
+    // Points the search at a folder: persists it as the remembered scope,
+    // relabels the header, and gets an index for it - from disk if one was
+    // saved for this exact folder, otherwise by scanning.
+    private void SetSearchScope(string folder)
+    {
+        _searchScopeFolder = folder;
+        _settings.LastSearchFolder = _searchScopeFolder;
+        _settingsService.Save(_settings);
+        UpdateSearchScopeText();
+        LoadCachedIndexOrScan();
+    }
+
+    // The saved index is used as-is, with no background re-scan behind it: on
+    // the share this was built for, re-scanning costs minutes of network
+    // traffic, and spending that on every launch - for a session where the user
+    // may not search at all - is worse than working from a slightly old index
+    // and saying so. Refreshing stays an explicit choice.
+    private void LoadCachedIndexOrScan()
+    {
+        if (_searchScopeFolder is not { Length: > 0 } folder)
+        {
+            return;
+        }
+
+        // A cache for a folder that has since been removed (or a share that
+        // isn't mounted right now) would hand back results that can't lead
+        // anywhere - fall through to the scan, which reports it properly.
+        if (Directory.Exists(folder) && SearchIndexCache.TryLoad(folder) is { } cached)
+        {
+            _searchScanCts?.Cancel();
+            SetSearchScanning(false);
+            _searchEntries.Clear();
+            _searchEntries.AddRange(cached.Entries);
+            _searchIndexSavedAtUtc = cached.SavedAtUtc;
+            _searchDisplayLimit = SearchResultDisplayCap;
+            RunSearchFilter();
+            return;
+        }
+
+        StartScopeScan(new[] { folder });
+    }
+
+    // When the in-memory index was written to disk, or null while it came from
+    // a scan this session (i.e. it's current, and the status line has no age to
+    // report).
+    private DateTime? _searchIndexSavedAtUtc;
+
+    // "3일 전" and friends - deliberately coarse. The point is only to let the
+    // user judge whether something they created recently could be missing.
+    private static string FormatSearchIndexAge(DateTime savedAtUtc)
+    {
+        var age = DateTime.UtcNow - savedAtUtc;
+        if (age < TimeSpan.FromMinutes(1))
+        {
+            return Strings.SearchAgeJustNow;
+        }
+        if (age < TimeSpan.FromHours(1))
+        {
+            return string.Format(Strings.SearchAgeMinutes, (int)age.TotalMinutes);
+        }
+        if (age < TimeSpan.FromDays(1))
+        {
+            return string.Format(Strings.SearchAgeHours, (int)age.TotalHours);
+        }
+        return string.Format(Strings.SearchAgeDays, (int)age.TotalDays);
+    }
+
+    // Tree folder right-click -> "이 폴더에서 검색". Scope first, then switch:
+    // SetSearchViewActive's lazy first scan only fires when nothing is indexed
+    // AND nothing is scanning, so starting the scan here means the switch
+    // won't queue a second one for the scope we just replaced.
+    private void SearchInFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsDirectory: true } item)
+        {
+            return;
+        }
+
+        // Cleared before the scan starts, so the streaming filter doesn't
+        // immediately answer the PREVIOUS query against this new folder - the
+        // user came here from the tree with a new folder in mind, not to re-run
+        // whatever they last typed. (The folder-picker button deliberately
+        // does NOT clear: changing scope from inside the search view, query
+        // still in the box, reads as "same search, different folder".)
+        SearchBox.Clear();
+
+        SetSearchScope(item.FullPath);
+        SetSearchViewActive(true);
     }
 
     private void SearchRefreshButton_Click(object sender, RoutedEventArgs e)
@@ -4634,6 +4726,10 @@ public partial class MainWindow : Window
         _searchEntries.Clear();
         _searchDisplayLimit = SearchResultDisplayCap;
         SetSearchRows(new List<SearchRow>());
+        // Whatever was loaded from disk is gone along with the entries above, so
+        // the age must go too - otherwise a scan cancelled halfway would leave
+        // the status line reporting an age for an index that no longer exists.
+        _searchIndexSavedAtUtc = null;
 
         var existingRoots = roots.Where(Directory.Exists).ToList();
         if (existingRoots.Count == 0)
@@ -4687,6 +4783,16 @@ public partial class MainWindow : Window
             {
                 SetSearchScanning(false);
                 RunSearchFilter();
+
+                // Only a completed scan is worth saving - a cancelled one holds
+                // whatever fraction of the folder it got through, which would
+                // then look like a complete index on the next launch. Handed to
+                // a worker so serializing a large index doesn't freeze the UI;
+                // the list is finished being written by now, but it's copied
+                // rather than shared since the next scan clears the original.
+                var snapshot = _searchEntries.ToList();
+                string scopeToSave = existingRoots[0];
+                _ = Task.Run(() => SearchIndexCache.Save(scopeToSave, snapshot));
             }
         }
         catch (OperationCanceledException)
@@ -4967,6 +5073,14 @@ public partial class MainWindow : Window
         {
             SearchStatusText.Text = Strings.SearchScopeNone;
         }
+        else if (_searchIndexSavedAtUtc is { } savedAt)
+        {
+            // Takes the idle line's place rather than sitting next to it: this
+            // one carries the same "now type something" moment AND the age,
+            // which the narrow panel has no room to show both of.
+            SearchStatusText.Text = string.Format(
+                Strings.SearchStatusCached, FormatSearchIndexAge(savedAt));
+        }
         else
         {
             SearchStatusText.Text = Strings.SearchStatusEmpty;
@@ -5111,6 +5225,22 @@ public partial class MainWindow : Window
     // below) rather than gluing the file itself to the very top.
     private void ActivateSearchResult(FileSearchService.SearchEntry entry)
     {
+        // A result can now outlive the file it names: the index may have been
+        // loaded from disk (see SearchIndexCache) and the file deleted or moved
+        // since that scan. Without this check the navigation just walks to a
+        // path that isn't there and quietly gives up, dropping the user into
+        // the tree somewhere with no explanation. Say it instead, and drop the
+        // row so the list corrects itself as stale hits are found.
+        if (!File.Exists(entry.FullPath))
+        {
+            _searchEntries.Remove(entry);
+            RunSearchFilter();
+            // After the filter, which would otherwise overwrite this with a
+            // plain result count.
+            SearchStatusText.Text = Strings.SearchResultMissing;
+            return;
+        }
+
         // Opening a result is a strong "this query was useful" signal, so
         // remember it - live typing alone never commits history (that would
         // spam it with every prefix), only an explicit Enter or this do.

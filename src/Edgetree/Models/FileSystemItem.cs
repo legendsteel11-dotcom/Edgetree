@@ -197,6 +197,14 @@ public class FileSystemItem : INotifyPropertyChanged
     // re-read from disk.
     public bool ChildrenLoaded => _childrenLoaded;
 
+    // When Children were last actually read off the disk. The live
+    // external-change refresh (MainWindow's QueueExternalRefresh) compares this
+    // against the moment a change was reported, to tell "our listing predates
+    // that change" from "we already re-read it afterwards, so there's nothing
+    // to redo". Environment.TickCount64, not DateTime - monotonic, so a system
+    // clock change can't make a fresh load look ancient.
+    public long LastLoadedTicks { get; private set; }
+
     public void EnsureChildrenLoaded()
     {
         if (_childrenLoaded || !IsDirectory)
@@ -206,6 +214,7 @@ public class FileSystemItem : INotifyPropertyChanged
         _childrenLoaded = true;
 
         PopulateCapped(FileSystemService.LoadChildren(FullPath, this));
+        LastLoadedTicks = Environment.TickCount64;
     }
 
     // Fills Children with at most DisplayCap items; anything beyond that is

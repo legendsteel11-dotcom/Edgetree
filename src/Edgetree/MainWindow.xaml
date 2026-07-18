@@ -542,6 +542,12 @@
             <MenuItem Header="{x:Static services:Strings.MenuRefresh}"
                     InputGestureText="F5"
                     Click="RefreshFolder_Click"/>
+            <!-- Grouped with the other "do something to this folder" actions
+                 rather than hidden behind the search view's own folder picker:
+                 the user is already looking at the folder they want to search,
+                 and reaching for the picker means browsing back to it. -->
+            <MenuItem Header="{x:Static services:Strings.MenuSearchInFolder}"
+                    Click="SearchInFolder_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuSort}">
                 <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
                         IsCheckable="True"
@@ -1600,16 +1606,18 @@
 
         <Style x:Key="FavoriteListBoxItemStyle"
                 TargetType="ListBoxItem">
-            <!-- Left inset matches ExplorerTreeViewItemStyle's row Padding (4)
-                 plus its 16-wide expander column, reproduced below via the
-                 icon's own Margin instead of an extra empty column - so a
-                 favorite's folder icon lines up with the tree's folder icons
-                 directly beneath it. Vertical padding reuses the same
-                 RowPadding resource as the tree rows (see
-                 ExplorerTreeViewItemStyle and MainWindow.xaml.cs's
-                 ApplyLayoutMetrics) so Ctrl+/- zoom AND the "행 간격" setting
-                 both scale favorites row spacing the same way they do the
-                 tree's. -->
+            <!-- A favorite row has to line up with the tree rows directly
+                 beneath it, so it mirrors ExplorerTreeViewItemStyle's metrics
+                 by sharing the very same resources rather than restating their
+                 default values: RowPadding (Ctrl+/- zoom and "행 간격"),
+                 TabSpacingWidth for the expander stand-in column ("탭 간격"),
+                 and IconSize/FolderRowIconMargin for the folder icon. Those
+                 last three used to be hardcoded here at their defaults (16 /
+                 16 / 6), which held only while the user left every metric
+                 alone - change the indent width, or zoom the font, and the
+                 favorites panel alone stayed put while the tree moved. -->
+            <!-- ApplyLayoutMetrics in MainWindow.xaml.cs is what recomputes all
+                 of them; everything here is DynamicResource so it lands live. -->
             <Setter Property="Padding"
                     Value="{DynamicResource RowPadding}"/>
             <Setter Property="Background"
@@ -1635,15 +1643,17 @@
                                 SnapsToDevicePixels="True">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <!-- Fixed, unlike the icon column below - stands in for
-                                         the tree row's own 16-wide expander column, which is
-                                         a separate column from its icon and so never
-                                         collapses. Split out from the icon's own margin so
-                                         the text after a hidden icon still lines up with the
-                                         tree's text (which starts right after its expander)
-                                         instead of collapsing flush left with everything
-                                         else in it. -->
-                                    <ColumnDefinition Width="16"/>
+                                    <!-- Stands in for the tree row's own expander column,
+                                         which is a separate column from its icon and so
+                                         never collapses. Split out from the icon's own
+                                         margin so the text after a hidden icon still lines
+                                         up with the tree's text (which starts right after
+                                         its expander) instead of collapsing flush left with
+                                         everything else in it. Shares ExpanderColumn's
+                                         TabSpacingWidth rather than hardcoding its default
+                                         width, so the "탭 간격" option moves favorites and
+                                         tree rows together. -->
+                                    <ColumnDefinition Width="{DynamicResource TabSpacingWidth}"/>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
@@ -1654,9 +1664,9 @@
                                      row's icon has one. -->
                                 <Image Grid.Column="1"
                                         Source="pack://application:,,,/Resources/Icons/folder.png"
-                                        Width="16"
-                                        Height="16"
-                                        Margin="0,0,6,0"
+                                        Width="{DynamicResource IconSize}"
+                                        Height="{DynamicResource IconSize}"
+                                        Margin="{DynamicResource FolderRowIconMargin}"
                                         VerticalAlignment="Center"
                                         Visibility="{DynamicResource FolderIconVisibility}"
                                         RenderOptions.BitmapScalingMode="HighQuality"/>
@@ -2377,22 +2387,29 @@
                             Background="{DynamicResource PanelDividerBrush}"/>
                 </StackPanel>
 
-                <!-- Status line: scanning progress / result count / hints, over
-                     a thin pulsing bar shown only while a scan runs (see
-                     SetSearchScanning) - an honest "working" indicator, not a
-                     fake percentage. -->
+                <!-- Status line: scanning progress / result count / hints.
+                     Single line by design - this panel is narrow enough that
+                     wrapping costs a whole second row for text that's usually
+                     transient, so the strings are kept short instead and the
+                     ellipsis below is only a backstop for the narrowest widths
+                     (CharacterEllipsis, NOT MiddleEllipsis - that one compiles
+                     but throws at runtime when the XAML is parsed). -->
                 <StackPanel Grid.Row="1">
                     <TextBlock x:Name="SearchStatusText"
                             Text="{x:Static services:Strings.SearchStatusEmpty}"
                             Foreground="{DynamicResource ShowMoreForeground}"
                             Opacity="0.8"
                             FontSize="11"
+                            TextTrimming="CharacterEllipsis"
                             Margin="10,6,10,4"/>
-                    <Border x:Name="SearchScanIndicator"
-                            Height="2"
-                            Margin="10,0,10,4"
-                            Background="{DynamicResource AccentForeground}"
-                            Visibility="Collapsed"/>
+                    <!-- The pulsing progress bar that used to live here was
+                         removed deliberately. A running indicator is the
+                         universal idiom for "wait, don't touch anything" - and
+                         search results actually stream in *during* the scan, so
+                         it was talking users out of the one thing they could
+                         already do. The status line's own live count carries
+                         the "something is happening" job on its own, and now
+                         says outright that searching already works. -->
                 </StackPanel>
 
                 <!-- Results: two lines per entry - dim italic folder path over

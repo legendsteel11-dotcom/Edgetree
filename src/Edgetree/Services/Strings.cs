@@ -72,6 +72,10 @@ public static class Strings
     // folder actually has one (see MainWindow.ExplorerItemContextMenu_Opened).
     public static string MenuFollowDefaultSort = "전역 정렬 따르기";
 
+    // Tree folder right-click -> jumps to the search view with this folder
+    // already set as the scope (see MainWindow.SearchInFolder_Click).
+    public static string MenuSearchInFolder = "이 폴더에서 검색";
+
     // Both sort icons - a folder row's own override icon (MainWindow.xaml's
     // SortOverrideIconBorder) and the search view's sort button - rotate
     // through their states on click, with nothing but a small image to say
@@ -127,16 +131,40 @@ public static class Strings
     public static string SearchBrowseFolderDialogTitle = "검색할 폴더를 선택하세요";
     public static string SearchScopeNone = "검색할 폴더를 선택하세요 →";
     public static string SearchBoxPlaceholder = "검색";
-    // {0} = files scanned so far.
-    public static string SearchStatusScanning = "인덱싱 중… ({0})";
+    // {0} = files scanned so far. The "검색 가능" half is the whole point:
+    // results stream in while the scan runs, but nothing said so - and the
+    // pulsing bar that used to sit under this line actively implied the
+    // opposite (see the note where it was removed in MainWindow.xaml).
+    public static string SearchStatusScanning = "인덱싱 중… ({0}) · 검색 가능";
     // {0} = result count.
     public static string SearchStatusResults = "{0}개 결과";
     // {0} = shown, {1} = total (results were capped for display).
     public static string SearchStatusResultsCapped = "{0} / {1}개 결과 표시";
     public static string SearchStatusNoResults = "결과 없음";
-    public static string SearchStatusTooBroad = "검색어가 너무 광범위합니다 (글자나 숫자를 포함하세요)";
-    public static string SearchStatusEmpty = "검색어를 입력하세요 (부분일치, *? 와일드카드, ↑↓:검색기록)";
-    public static string SearchStatusScopeMissing = "폴더를 찾을 수 없습니다. 새로고침하거나 다른 폴더를 선택하세요.";
+    // These three all have to survive a docked sidebar's width, which is far
+    // narrower than a normal dialog - full sentences get clipped mid-word
+    // there. Written as terse fragments on purpose; the search box's own
+    // placeholder already supplies the "type something" instruction, so the
+    // idle line spends its width on the matching rules instead, which are the
+    // part nobody can guess.
+    // Shown instead of a fresh scan's line when the index came off disk. The age
+    // is the important half - a file created since that moment simply won't
+    // appear, and without the age there's nothing to explain the absence (see
+    // SearchIndexCache's note). {0} = a SearchAge* string below.
+    public static string SearchStatusCached = "인덱스 {0} · 새로고침으로 갱신";
+    public static string SearchAgeJustNow = "방금";
+    // {0} = whole minutes / hours / days since the scan.
+    public static string SearchAgeMinutes = "{0}분 전";
+    public static string SearchAgeHours = "{0}시간 전";
+    public static string SearchAgeDays = "{0}일 전";
+
+    // A result whose file is gone - only reachable once an index can outlive
+    // the files it names (see SearchIndexCache).
+    public static string SearchResultMissing = "삭제되었거나 이동된 파일입니다";
+
+    public static string SearchStatusTooBroad = "너무 광범위함 · 글자나 숫자 포함";
+    public static string SearchStatusEmpty = "부분일치 · *? 와일드카드 · ↑↓ 기록";
+    public static string SearchStatusScopeMissing = "폴더 없음 · 새로고침하거나 다시 선택";
 
     // Color settings window
     public static string ColorSettingsTitle = "색상 설정";
@@ -264,6 +292,7 @@ public static class Strings
         MenuSortAscending = "Ascending";
         MenuSortDescending = "Descending";
         MenuFollowDefaultSort = "Follow Default Sort";
+        MenuSearchInFolder = "Search in This Folder";
         SortTooltipFormat = "Sort: {0} (click to cycle)";
         SortModeFollowGlobal = "Follow default";
         SortModeFolderGroup = "Group by folder";
@@ -299,13 +328,21 @@ public static class Strings
         SearchBrowseFolderDialogTitle = "Choose a folder to search";
         SearchScopeNone = "Choose a folder to search →";
         SearchBoxPlaceholder = "Search";
-        SearchStatusScanning = "Indexing… ({0})";
+        SearchStatusScanning = "Indexing… ({0}) · you can search now";
         SearchStatusResults = "{0} results";
         SearchStatusResultsCapped = "Showing {0} of {1} results";
         SearchStatusNoResults = "No results";
-        SearchStatusTooBroad = "Search is too broad (include a letter or digit)";
-        SearchStatusEmpty = "Type to search (substring, * ? wildcards, ↑↓: history)";
-        SearchStatusScopeMissing = "Folder not found. Refresh or choose another folder.";
+        SearchStatusCached = "Index from {0} · refresh to update";
+        SearchAgeJustNow = "just now";
+        SearchAgeMinutes = "{0} min ago";
+        SearchAgeHours = "{0}h ago";
+        SearchAgeDays = "{0}d ago";
+
+        SearchResultMissing = "That file was deleted or moved";
+
+        SearchStatusTooBroad = "Too broad · add a letter or digit";
+        SearchStatusEmpty = "Substring · * ? wildcards · ↑↓ history";
+        SearchStatusScopeMissing = "Folder missing · refresh or re-pick";
 
         ColorSettingsTitle = "Color Settings";
         ColorLabelBackground = "Explorer Background";
