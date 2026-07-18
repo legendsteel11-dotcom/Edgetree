@@ -732,6 +732,42 @@
                         Tag="desc"
                         Click="SortDirectionMenuItem_Click"/>
             </MenuItem>
+            <!-- Font size leads the stepper group deliberately: it was
+                 keyboard-only (Ctrl +/-) until a user with presbyopia asked for
+                 "a way to change the font size" while row/indent spacing were
+                 both sitting right here in the menu. Someone who finds text
+                 hard to read looks in the settings menu, not a shortcut list -
+                 so the row carries the shortcut in its own label too. -->
+            <MenuItem StaysOpenOnClick="True"
+                    Focusable="False">
+                <MenuItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                Text="{x:Static services:Strings.MenuFontSize}"
+                                Foreground="{DynamicResource ForegroundText}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"/>
+                        <StackPanel Grid.Column="1"
+                                Orientation="Horizontal">
+                            <Button Content="−"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="FontSizeDecrement_Click"/>
+                            <TextBlock Text="12"
+                                    Foreground="{DynamicResource ForegroundText}"
+                                    Width="26"
+                                    TextAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                            <Button Content="+"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="FontSizeIncrement_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </MenuItem.Header>
+            </MenuItem>
             <!-- StaysOpenOnClick so stepping the value doesn't close the whole
                  options menu out from under the user. -->
             <MenuItem StaysOpenOnClick="True"

@@ -86,6 +86,10 @@ public static class Strings
     public static string SortModeNameDesc = "이름 내림차순";
     public static string SortModeDateAsc = "날짜 오름차순";
     public static string SortModeDateDesc = "날짜 내림차순";
+    // Carries its own shortcut in the label - this setting existed as Ctrl +/-
+    // only, and a user who needed it didn't find it (see the XAML comment on
+    // the row itself).
+    public static string MenuFontSize = "글꼴 크기 (Ctrl +/-)";
     public static string MenuMaxItemsPerFolder = "한 번에 표시할 개수";
     public static string MenuTabSpacing = "탭 간격";
     public static string MenuRowSpacing = "행 간격";
@@ -267,6 +271,7 @@ public static class Strings
         SortModeNameDesc = "Name descending";
         SortModeDateAsc = "Date ascending";
         SortModeDateDesc = "Date descending";
+        MenuFontSize = "Font Size (Ctrl +/-)";
         MenuMaxItemsPerFolder = "Items per Folder";
         MenuTabSpacing = "Indent Width";
         MenuRowSpacing = "Row Spacing";

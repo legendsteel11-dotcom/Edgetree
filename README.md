@@ -118,8 +118,9 @@ Either way, it's one `.exe` — no installer, just run it.
 - **About** window: version, author, build date, license summary (including
   a plain-language no-warranty note)
 - Rounded corners when floating (undocked) on Windows 11, to match native windows
-- `Ctrl` `+`/`-` to zoom the tree's font size (9–16pt), `Ctrl+0` to reset —
-  row spacing scales along with it, in the favorites panel too
+- **Font size**: adjustable 9–20pt from the options menu (12pt by default), or
+  with `Ctrl` `+`/`-`; `Ctrl+0` resets. Icon sizes and row spacing scale along
+  with it, in the favorites panel too
 - **Indent spacing**: the per-depth indent width (expand arrow, guide line,
   and icon/name alignment all included) is adjustable 4–24px from the
   options menu (16px by default)

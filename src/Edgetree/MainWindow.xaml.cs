@@ -35,7 +35,12 @@ public partial class MainWindow : Window
     private const double MinExpandedWidth = 180;
     private const double MaxExpandedWidth = 1200;
     private const int ToggleAnimationMs = 200;
-    private static readonly double[] TreeFontSizeSteps = { 9, 10, 11, 12, 13, 14, 15, 16 };
+    // Topped out at 16 until a user asked for larger text for presbyopia; the
+    // extra steps go to 20, which is where a docked sidebar of realistic width
+    // still holds a useful amount of a file name. Everything that matters
+    // scales off this (see ApplyLayoutMetrics: icons, row padding, indent
+    // margins), so the extra steps needed no other layout work.
+    private static readonly double[] TreeFontSizeSteps = { 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
     private const double DefaultTreeFontSize = 12;
     private const double HeaderHeight = 36;
     private const double FloatingResizeBorder = 6;
@@ -1876,7 +1881,7 @@ public partial class MainWindow : Window
         // "색상 변경" item, neither of which has state to sync here.
         if (sender is ContextMenu
             {
-                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, MenuItem autoHideSliverWidthRow, _, _, MenuItem sortMenu, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem languageMenu, ..]
+                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, MenuItem autoHideSliverWidthRow, _, _, MenuItem sortMenu, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem languageMenu, ..]
             })
         {
             // Nothing expanded means nothing to collapse - grey it out rather
@@ -1909,6 +1914,13 @@ public partial class MainWindow : Window
                 byDate.IsChecked = _settings.SortByDate;
                 ascending.IsChecked = !_settings.SortDescending;
                 descending.IsChecked = _settings.SortDescending;
+            }
+
+            // Read off the live tree, not _settings - the two agree, but the
+            // tree is what SetTreeFontSize actually drives.
+            if (fontSizeRow.Header is Grid { Children: [_, StackPanel { Children: [_, TextBlock fontSizeValueText, _] }] })
+            {
+                fontSizeValueText.Text = ((int)ExplorerTree.FontSize).ToString();
             }
 
             if (maxItemsRow.Header is Grid { Children: [_, StackPanel { Children: [_, TextBlock maxItemsValueText, _] }] })
@@ -1998,6 +2010,27 @@ public partial class MainWindow : Window
         if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
         {
             valueText.Text = value.ToString();
+        }
+    }
+
+    private void FontSizeDecrement_Click(object sender, RoutedEventArgs e)
+        => StepTreeFontSizeFromMenu(sender, -1);
+
+    private void FontSizeIncrement_Click(object sender, RoutedEventArgs e)
+        => StepTreeFontSizeFromMenu(sender, +1);
+
+    // The menu's own view of the Ctrl +/- zoom. Unlike the other steppers here
+    // the value doesn't live in _settings alone (ExplorerTree.FontSize is the
+    // live source StepTreeFontSize walks), so this just delegates and then
+    // reads back whatever step it actually landed on - which is also how the
+    // display stays right at either end of the range, where a click is a no-op.
+    private void StepTreeFontSizeFromMenu(object sender, int direction)
+    {
+        StepTreeFontSize(direction);
+
+        if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
+        {
+            valueText.Text = ((int)ExplorerTree.FontSize).ToString();
         }
     }
 
