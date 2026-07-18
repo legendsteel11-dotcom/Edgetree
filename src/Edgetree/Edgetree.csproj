@@ -24,8 +24,6 @@
     <Resource Include="Resources\icon-map.json" />
     <Resource Include="Resources\app.ico" />
     <Resource Include="Resources\icon.png" />
-    <Resource Include="Resources\pin.png" />
-    <Resource Include="Resources\pin_Dark.png" />
   </ItemGroup>
 
   <!-- Microsoft.VisualBasic.FileIO.FileSystem.Delete*(..., RecycleOption.SendToRecycleBin)

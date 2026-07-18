@@ -145,6 +145,7 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
+        SizeChanged += MainWindow_SizeChanged;
         SystemParameters.StaticPropertyChanged += SystemParameters_StaticPropertyChanged;
         SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
     }
@@ -248,6 +249,7 @@ public partial class MainWindow : Window
         ApplyFavoritesPosition();
 
         Width = _settings.IsAutoHidden ? AutoHideSliverWidth : ClampExpandedWidth(_settings.ExpandedWidth);
+        ApplyHeaderMetrics();
         SetExpandedContentVisibility(_settings.IsAutoHidden ? Visibility.Collapsed : Visibility.Visible);
         PositionToWorkArea();
         UpdateResizeThumbVisibility();
@@ -304,6 +306,13 @@ public partial class MainWindow : Window
         {
             NavigateToPath(lastSelectedPath);
         }
+
+        // Nothing restored expanded means the title bar's collapse toggle has
+        // nothing to collapse - start it greyed out. (Each restored expansion
+        // above already raised TreeViewItem.Expanded, so this is really only
+        // deciding the empty case; it's called unconditionally anyway rather
+        // than relying on that ordering.)
+        UpdateCollapseAllButtonState();
     }
 
     // Replaces the resource dictionary entries with brand-new brushes, rather
@@ -333,14 +342,6 @@ public partial class MainWindow : Window
         // Menus/context menus/the Color Settings and About dialogs/header
         // icons - general chrome, not part of the 15 colors below.
         (Application.Current as App)?.ApplyChromeTheme(light);
-
-        // pin.png is a light-colored pin (for the dark sidebar background);
-        // pin_Dark.png is the same glyph in a dark color, for when the
-        // sidebar itself is light. Local to MainWindow's own Resources - the
-        // pin button only ever lives here, unlike the shared chrome brushes
-        // above.
-        Resources["PinIconSource"] = new BitmapImage(new Uri(
-            $"pack://application:,,,/Resources/pin{(light ? "_Dark" : "")}.png"));
 
         // Menu/context-menu drop shadow (see MenuDropShadow's own comment in
         // the XAML) - the same dark, fairly strong shadow read as too heavy
@@ -396,10 +397,17 @@ public partial class MainWindow : Window
     {
         if (item.IsDirectory)
         {
-            item.SortOverrideIconUri = FileSystemService.SortOverrides.TryGetValue(
-                FileSystemService.NormalizeSortOverridePath(item.FullPath), out var over)
-                ? FileSystemService.FormatSortOverrideIconUri(over.Field, over.Descending)
-                : FileSystemService.FormatSortOverrideIconUri(FileSystemService.SortField, FileSystemService.SortDescending);
+            if (FileSystemService.SortOverrides.TryGetValue(
+                FileSystemService.NormalizeSortOverridePath(item.FullPath), out var over))
+            {
+                item.SortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(over.Field, over.Descending);
+                item.SortOverrideTooltip = FileSystemService.FormatSortTooltip(over.Field, over.Descending);
+            }
+            else
+            {
+                item.SortOverrideIconUri = FileSystemService.NoSortOverrideIconUri;
+                item.SortOverrideTooltip = FileSystemService.NoSortOverrideTooltip;
+            }
         }
 
         if (item.ChildrenLoaded)
@@ -905,15 +913,50 @@ public partial class MainWindow : Window
     // peeked open out of auto-hide (stop auto-hiding and stay open).
     private void UpdatePinButtonVisibility()
     {
-        bool showForFloatingRedock = !_isDocked;
-        bool showForAutoHideReveal = _isDocked && _settings.IsAutoHidden && _isAutoHideRevealed;
-        PinButton.Visibility = showForFloatingRedock || showForAutoHideReveal ? Visibility.Visible : Visibility.Collapsed;
+        bool usableForFloatingRedock = !_isDocked;
+        bool usableForAutoHideReveal = _isDocked && _settings.IsAutoHidden && _isAutoHideRevealed;
+
+        // Greyed out rather than hidden when pinning doesn't apply (already
+        // docked and pinned): a button that disappears shifts every other
+        // header icon sideways, which read as confusing - a dimmed pin stays
+        // put and says "not available here" instead. See the IsEnabled trigger
+        // in ToggleButtonStyle.
+        PinButton.IsEnabled = usableForFloatingRedock || usableForAutoHideReveal;
+
+        // It still hides completely along with the rest of the header when the
+        // window collapses to the auto-hide sliver - mirroring one of the
+        // buttons SetExpandedContentVisibility drives keeps that in step.
+        PinButton.Visibility = CloseButton.Visibility;
 
         // Which edge re-docking/pinning actually snaps to depends on
         // DockOnRight, so the tooltip can't be one fixed string the way the
         // header's other buttons' tooltips are.
         PinButton.ToolTip = _settings.DockOnRight ? Strings.ToolTipPinRight : Strings.ToolTipPinLeft;
     }
+
+    // The header's icon buttons are fixed-size, and the title between them is
+    // the only flexible column - so once it has been squeezed to nothing, a
+    // narrower window just pushes the buttons out past the right edge. Stepping
+    // their size and spacing down keeps the whole row inside the window all the
+    // way to MinExpandedWidth (180), where 6 buttons at 24px + the app icon
+    // still fit. Read via DynamicResource by ToggleButtonStyle and the header
+    // buttons' own margins.
+    private void ApplyHeaderMetrics()
+    {
+        double width = ActualWidth > 0 ? ActualWidth : Width;
+        var (size, gap, closeGap) = width switch
+        {
+            >= 250 => (32.0, 2.0, 6.0),
+            >= 210 => (28.0, 1.0, 4.0),
+            _ => (24.0, 0.0, 2.0),
+        };
+
+        Resources["HeaderButtonSize"] = size;
+        Resources["HeaderButtonMargin"] = new Thickness(gap);
+        Resources["HeaderCloseButtonMargin"] = new Thickness(gap, gap, closeGap, gap);
+    }
+
+    private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e) => ApplyHeaderMetrics();
 
     private void HeaderGrid_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -1702,6 +1745,85 @@ public partial class MainWindow : Window
             CollapseAllArrow.Data = CollapseAllArrowDown;
             CollapseAllButton.ToolTip = Strings.ToolTipRestoreExpanded;
         }
+
+        UpdateCollapseAllButtonState();
+    }
+
+    // The title bar's collapse/restore toggle has nothing to do when nothing is
+    // expanded AND there's no remembered set to restore - which is exactly the
+    // state the options menu's one-shot "모든 펼친 폴더 접기" leaves behind. Grey it
+    // out then (see ToggleButtonStyle's IsEnabled trigger); expanding any folder
+    // lights it back up.
+    private void UpdateCollapseAllButtonState()
+    {
+        CollapseAllButton.IsEnabled = _collapseAllRestorePaths is { Count: > 0 } || HasAnyExpandedFolder();
+    }
+
+    // Cheaper than CollectAllExpandedPaths for this yes/no question - stops at
+    // the first expanded folder instead of materializing every path.
+    private bool HasAnyExpandedFolder()
+    {
+        foreach (var root in _roots)
+        {
+            if (root.IsExpanded || HasExpandedDescendant(root))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool HasExpandedDescendant(FileSystemItem item)
+    {
+        if (!item.ChildrenLoaded)
+        {
+            return false;
+        }
+
+        foreach (var child in item.Children)
+        {
+            if (!child.IsDirectory || child.IsPlaceholder || child.IsShowMore)
+            {
+                continue;
+            }
+            if (child.IsExpanded || HasExpandedDescendant(child))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void ExplorerTree_ItemExpandedOrCollapsed(object sender, RoutedEventArgs e)
+        => UpdateCollapseAllButtonState();
+
+    // The options-menu "모든 펼친 폴더 접기" - a one-shot cleanup, unlike the title
+    // bar's collapse button next to it (a toggle that remembers what was open
+    // so a second click restores it). Deliberately also clears that toggle's
+    // remembered set and puts its arrow back to "collapse": without that, one
+    // click on the title bar would undo the tidy-up the user just confirmed.
+    private void CollapseAllExpandedMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var result = MessageBox.Show(
+            this,
+            Strings.CollapseAllConfirmBody,
+            Strings.CollapseAllConfirmTitle,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        foreach (var root in _roots)
+        {
+            CollapseRecursive(root);
+        }
+
+        _collapseAllRestorePaths = null;
+        CollapseAllArrow.Data = CollapseAllArrowUp;
+        CollapseAllButton.ToolTip = Strings.ToolTipCollapseAll;
+        UpdateCollapseAllButtonState();
     }
 
     private static void CollapseRecursive(FileSystemItem item)
@@ -1754,9 +1876,13 @@ public partial class MainWindow : Window
         // "색상 변경" item, neither of which has state to sync here.
         if (sender is ContextMenu
             {
-                Items: [MenuItem autoCollapse, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, MenuItem autoHideSliverWidthRow, _, _, MenuItem sortMenu, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem languageMenu, ..]
+                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, MenuItem autoHideSliverWidthRow, _, _, MenuItem sortMenu, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem languageMenu, ..]
             })
         {
+            // Nothing expanded means nothing to collapse - grey it out rather
+            // than offering a confirmation prompt that would do nothing.
+            collapseAllExpanded.IsEnabled = CollectAllExpandedPaths().Count > 0;
+
             autoCollapse.IsChecked = _settings.AutoCollapseFolders;
             alwaysOnTop.IsChecked = _settings.AlwaysOnTop;
             startWithWindows.IsChecked = _settings.StartWithWindows;
@@ -1912,7 +2038,6 @@ public partial class MainWindow : Window
 
         _settings.SortByDate = field == "date";
         FileSystemService.SortField = _settings.SortByDate ? FileSortField.Date : FileSortField.Name;
-        RefreshRootSortOverridePreviewIcons();
         RefreshAllLoadedFolders();
     }
 
@@ -1925,28 +2050,7 @@ public partial class MainWindow : Window
 
         _settings.SortDescending = direction == "desc";
         FileSystemService.SortDescending = _settings.SortDescending;
-        RefreshRootSortOverridePreviewIcons();
         RefreshAllLoadedFolders();
-    }
-
-    // Drive roots are never rebuilt by RefreshAllLoadedFolders (only their
-    // Children are - see its own comment), so a root with no override of its
-    // own would otherwise keep showing a stale preview icon (from whatever
-    // the global default was at its own construction, i.e. app startup) after
-    // the global default changes here. Every other folder's preview icon
-    // self-corrects for free the moment it's rebuilt, since the constructor
-    // reads the current global default - roots just need this one nudge.
-    private void RefreshRootSortOverridePreviewIcons()
-    {
-        string globalIconUri = FileSystemService.FormatSortOverrideIconUri(
-            _settings.SortByDate ? FileSortField.Date : FileSortField.Name, _settings.SortDescending);
-        foreach (var root in _roots)
-        {
-            if (!root.HasSortOverride)
-            {
-                root.SortOverrideIconUri = globalIconUri;
-            }
-        }
     }
 
     // Per-folder right-click menu's own "정렬": this folder gets its own
@@ -2025,8 +2129,9 @@ public partial class MainWindow : Window
         FileSystemService.SortOverrides[FileSystemService.NormalizeSortOverridePath(item.FullPath)] =
             new FolderSortOverride(sortByDate ? FileSortField.Date : FileSortField.Name, sortDescending);
         item.HasSortOverride = true;
-        item.SortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(
-            sortByDate ? FileSortField.Date : FileSortField.Name, sortDescending);
+        var field = sortByDate ? FileSortField.Date : FileSortField.Name;
+        item.SortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(field, sortDescending);
+        item.SortOverrideTooltip = FileSystemService.FormatSortTooltip(field, sortDescending);
 
         if (item.ChildrenLoaded)
         {
@@ -2039,17 +2144,35 @@ public partial class MainWindow : Window
     // action only (FolderSortFollowGlobalMenuItem_Click), since a single click
     // rotating through 4 states is a much faster way to try different sorts
     // than reopening the menu each time.
+    // Five-state click rotation, mirroring the search view's sort button:
+    // 전역 따름(neutral) -> 이름↑ -> 이름↓ -> 날짜↑ -> 날짜↓ -> 전역 따름.
+    // Folding "follow the global sort" into the cycle means the override can be
+    // cleared by clicking the icon itself, instead of only via the right-click
+    // menu's "전역 정렬 따르기".
     private void RotateFolderSortOverride(FileSystemItem item)
     {
-        var (sortByDate, sortDescending) = GetEffectiveFolderSort(item);
-        var (nextByDate, nextDescending) = (sortByDate, sortDescending) switch
+        if (!item.HasSortOverride)
         {
-            (false, false) => (false, true),
-            (false, true) => (true, false),
-            (true, false) => (true, true),
-            (true, true) => (false, false),
-        };
-        SetFolderSortOverride(item, nextByDate, nextDescending);
+            SetFolderSortOverride(item, sortByDate: false, sortDescending: false);
+            return;
+        }
+
+        var (sortByDate, sortDescending) = GetEffectiveFolderSort(item);
+        switch (sortByDate, sortDescending)
+        {
+            case (false, false):
+                SetFolderSortOverride(item, sortByDate: false, sortDescending: true);
+                break;
+            case (false, true):
+                SetFolderSortOverride(item, sortByDate: true, sortDescending: false);
+                break;
+            case (true, false):
+                SetFolderSortOverride(item, sortByDate: true, sortDescending: true);
+                break;
+            default:
+                ClearFolderSortOverride(item);
+                break;
+        }
     }
 
     // Drops this folder's own remembered sort so it goes back to picking up
@@ -2060,11 +2183,10 @@ public partial class MainWindow : Window
             string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
         FileSystemService.SortOverrides.Remove(FileSystemService.NormalizeSortOverridePath(item.FullPath));
         item.HasSortOverride = false;
-        // Not blanked - still previews the (now) app-wide default while this
-        // folder is selected, same reasoning as the constructor's own
-        // fallback (see FileSystemItem's constructor comment).
-        item.SortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(
-            _settings.SortByDate ? FileSortField.Date : FileSortField.Name, _settings.SortDescending);
+        // Back to the neutral "follows the global sort" icon - the rotation's
+        // starting point (see RotateFolderSortOverride).
+        item.SortOverrideIconUri = FileSystemService.NoSortOverrideIconUri;
+        item.SortOverrideTooltip = FileSystemService.NoSortOverrideTooltip;
 
         if (item.ChildrenLoaded)
         {
@@ -4349,12 +4471,19 @@ public partial class MainWindow : Window
     // yet, so it's used as-is for both themes.
     private void UpdateSearchSortIcon()
     {
-        string uri = _searchSortMode == SearchSortMode.FolderGroup
-            ? "pack://application:,,,/Resources/Icons/aliginIconDefault.png"
-            : FileSystemService.FormatSortOverrideIconUri(
-                _searchSortMode is SearchSortMode.DateAsc or SearchSortMode.DateDesc ? FileSortField.Date : FileSortField.Name,
-                _searchSortMode is SearchSortMode.NameDesc or SearchSortMode.DateDesc);
-        SearchSortIcon.Source = new BitmapImage(new Uri(uri));
+        if (_searchSortMode == SearchSortMode.FolderGroup)
+        {
+            SearchSortIcon.Source = new BitmapImage(new Uri(FileSystemService.NoSortOverrideIconUri));
+            SearchSortButton.ToolTip = string.Format(Strings.SortTooltipFormat, Strings.SortModeFolderGroup);
+            return;
+        }
+
+        var field = _searchSortMode is SearchSortMode.DateAsc or SearchSortMode.DateDesc
+            ? FileSortField.Date
+            : FileSortField.Name;
+        bool descending = _searchSortMode is SearchSortMode.NameDesc or SearchSortMode.DateDesc;
+        SearchSortIcon.Source = new BitmapImage(new Uri(FileSystemService.FormatSortOverrideIconUri(field, descending)));
+        SearchSortButton.ToolTip = FileSystemService.FormatSortTooltip(field, descending);
     }
 
     // Cycles 폴더그룹 -> 이름↑ -> 이름↓ -> 날짜↑ -> 날짜↓ -> 폴더그룹. Folder-group

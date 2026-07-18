@@ -98,17 +98,28 @@ public class FileSystemItem : INotifyPropertyChanged
         set => SetField(ref _hasSortOverride, value);
     }
 
-    // Which of the 4 pre-made sort-override icon images (see
-    // FileSystemService.FormatSortOverrideIconUri) matches this folder's
-    // current override. Only meaningful while HasSortOverride is true; kept
-    // in sync with it by MainWindow (SetFolderSortOverride/
-    // RotateFolderSortOverride/ClearFolderSortOverride), same
-    // externally-maintained pattern.
+    // Which of the sort-icon images this folder's row currently shows: one of
+    // the 4 field/direction images (see FileSystemService.FormatSortOverride-
+    // IconUri) while it has an override, or the neutral "follows the global
+    // sort" one when it doesn't. Kept in sync with HasSortOverride by
+    // MainWindow (SetFolderSortOverride/RotateFolderSortOverride/
+    // ClearFolderSortOverride), same externally-maintained pattern.
     private string _sortOverrideIconUri = string.Empty;
     public string SortOverrideIconUri
     {
         get => _sortOverrideIconUri;
         set => SetField(ref _sortOverrideIconUri, value);
+    }
+
+    // That icon's ToolTip, naming the state it's showing ("정렬: 이름 오름차순
+    // (클릭하여 전환)") - always set together with the icon above, since the
+    // image alone doesn't say which sort is active. Per-item rather than one
+    // static string on the Border, precisely because it differs per folder.
+    private string _sortOverrideTooltip = string.Empty;
+    public string SortOverrideTooltip
+    {
+        get => _sortOverrideTooltip;
+        set => SetField(ref _sortOverrideTooltip, value);
     }
 
     // Drives the inline VS Code-style rename UI in the tree row's
@@ -138,20 +149,23 @@ public class FileSystemItem : INotifyPropertyChanged
         if (isDirectory)
         {
             // Always resolves to SOME icon - this folder's own override if it
-            // has one, otherwise what the app-wide default would sort it by -
-            // so the icon shown while merely selected (see MainWindow.xaml's
-            // IsSelected trigger) previews the sort that's actually in effect
-            // right now instead of rendering blank until an override exists.
+            // has one, otherwise the neutral one - so the icon shown while
+            // merely selected (see MainWindow.xaml's IsSelected trigger) is
+            // there to click instead of rendering blank until an override
+            // exists.
             if (FileSystemService.SortOverrides.TryGetValue(
                 FileSystemService.NormalizeSortOverridePath(fullPath), out var over))
             {
                 _hasSortOverride = true;
                 _sortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(over.Field, over.Descending);
+                _sortOverrideTooltip = FileSystemService.FormatSortTooltip(over.Field, over.Descending);
             }
             else
             {
-                _sortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(
-                    FileSystemService.SortField, FileSystemService.SortDescending);
+                // No override - the neutral icon, which is also the first stop
+                // in the click-rotation ("follow the global sort").
+                _sortOverrideIconUri = FileSystemService.NoSortOverrideIconUri;
+                _sortOverrideTooltip = FileSystemService.NoSortOverrideTooltip;
             }
             Children.Add(new FileSystemItem());
         }

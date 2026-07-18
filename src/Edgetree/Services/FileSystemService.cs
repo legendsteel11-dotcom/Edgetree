@@ -72,6 +72,12 @@ public static class FileSystemService
     // also has its own "_L" suffixed light-mode variant (also provided by the
     // user) picked instead whenever IsLightMode is on, since the dark
     // versions read poorly against a light background.
+    // Shown for a folder with NO override of its own - i.e. "follows the global
+    // sort". Same neutral icon the search view's sort button uses for its own
+    // default state, and deliberately without an "_L" light variant (it's a
+    // mid-tone that reads on both themes), so it never changes with IsLightMode.
+    public const string NoSortOverrideIconUri = "pack://application:,,,/Resources/Icons/aliginIconDefault.png";
+
     public static string FormatSortOverrideIconUri(FileSortField field, bool descending)
     {
         string name = field == FileSortField.Date ? "Date" : "Name";
@@ -79,6 +85,18 @@ public static class FileSystemService
         string suffix = IsLightMode ? "_L" : string.Empty;
         return $"pack://application:,,,/Resources/Icons/aliginIcon{name}{direction}{suffix}.png";
     }
+
+    // The ToolTip naming whichever sort the icon above is currently showing -
+    // see Strings.SortTooltipFormat for why the icons don't stand alone.
+    public static string FormatSortTooltip(FileSortField field, bool descending)
+        => string.Format(Strings.SortTooltipFormat, field == FileSortField.Date
+            ? (descending ? Strings.SortModeDateDesc : Strings.SortModeDateAsc)
+            : (descending ? Strings.SortModeNameDesc : Strings.SortModeNameAsc));
+
+    // Same, for the neutral icon's own state. A property rather than a cached
+    // string so it picks up the English strings after Strings.Initialize.
+    public static string NoSortOverrideTooltip
+        => string.Format(Strings.SortTooltipFormat, Strings.SortModeFollowGlobal);
 
     public static List<FileSystemItem> GetDriveRoots()
     {

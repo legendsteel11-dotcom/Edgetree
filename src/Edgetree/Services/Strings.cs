@@ -27,6 +27,9 @@ public static class Strings
 
     // Options ("...") menu
     public static string MenuAutoCollapse = "폴더 자동 접기";
+    public static string MenuCollapseAllExpanded = "모든 펼친 폴더 접기";
+    public static string CollapseAllConfirmTitle = "모든 펼친 폴더 접기";
+    public static string CollapseAllConfirmBody = "모든 펼쳐졌던 폴더를 접겠습니까?";
     public static string MenuAlwaysOnTop = "항상 위에 표시";
     public static string MenuStartWithWindows = "부팅 후 자동 시작";
     public static string MenuAlwaysShowTrayIcon = "트레이 아이콘";
@@ -69,11 +72,20 @@ public static class Strings
     // folder actually has one (see MainWindow.ExplorerItemContextMenu_Opened).
     public static string MenuFollowDefaultSort = "전역 정렬 따르기";
 
-    // The folder-row override icon's own ToolTip (see MainWindow.xaml's
-    // SortOverrideIconBorder) - clicking it cycles the sort instead of
-    // clearing it, so this deliberately doesn't reuse MenuFollowDefaultSort's
-    // wording above.
-    public static string SortOverrideIconTooltip = "클릭하여 정렬 전환 (해제는 정렬 메뉴에서)";
+    // Both sort icons - a folder row's own override icon (MainWindow.xaml's
+    // SortOverrideIconBorder) and the search view's sort button - rotate
+    // through their states on click, with nothing but a small image to say
+    // which one is active. Their ToolTip names the current state outright,
+    // since field (color) and direction (which triangle is filled) are easy to
+    // misread at that size. {0} is one of the SortMode* labels below; built by
+    // FileSystemService.FormatSortTooltip/NoSortOverrideTooltip.
+    public static string SortTooltipFormat = "정렬: {0} (클릭하여 전환)";
+    public static string SortModeFollowGlobal = "전역 설정 따름";
+    public static string SortModeFolderGroup = "폴더별 묶기";
+    public static string SortModeNameAsc = "이름 오름차순";
+    public static string SortModeNameDesc = "이름 내림차순";
+    public static string SortModeDateAsc = "날짜 오름차순";
+    public static string SortModeDateDesc = "날짜 내림차순";
     public static string MenuMaxItemsPerFolder = "한 번에 표시할 개수";
     public static string MenuTabSpacing = "탭 간격";
     public static string MenuRowSpacing = "행 간격";
@@ -107,7 +119,6 @@ public static class Strings
     public static string SearchTooltipBrowseFolder = "검색할 폴더 선택";
     public static string SearchTooltipRefresh = "다시 인덱싱";
     public static string SearchTooltipHistory = "최근 검색어";
-    public static string SearchTooltipSort = "결과 정렬 전환 (이름/날짜, 오름/내림)";
     public static string SearchHistoryDeleteTooltip = "이 검색어 삭제";
     public static string SearchBrowseFolderDialogTitle = "검색할 폴더를 선택하세요";
     public static string SearchScopeNone = "검색할 폴더를 선택하세요 →";
@@ -214,6 +225,9 @@ public static class Strings
         MenuNewFolder = "New Folder";
         MenuRefresh = "Refresh";
         MenuAutoCollapse = "Accordion Mode";
+        MenuCollapseAllExpanded = "Collapse All Expanded Folders";
+        CollapseAllConfirmTitle = "Collapse All Expanded Folders";
+        CollapseAllConfirmBody = "Collapse every folder that is currently expanded?";
         MenuOpen = "Open";
         MenuOpenWith = "Open With";
         MenuCopy = "Copy";
@@ -246,7 +260,13 @@ public static class Strings
         MenuSortAscending = "Ascending";
         MenuSortDescending = "Descending";
         MenuFollowDefaultSort = "Follow Default Sort";
-        SortOverrideIconTooltip = "Click to cycle sort (clear it from the Sort menu)";
+        SortTooltipFormat = "Sort: {0} (click to cycle)";
+        SortModeFollowGlobal = "Follow default";
+        SortModeFolderGroup = "Group by folder";
+        SortModeNameAsc = "Name ascending";
+        SortModeNameDesc = "Name descending";
+        SortModeDateAsc = "Date ascending";
+        SortModeDateDesc = "Date descending";
         MenuMaxItemsPerFolder = "Items per Folder";
         MenuTabSpacing = "Indent Width";
         MenuRowSpacing = "Row Spacing";
@@ -270,7 +290,6 @@ public static class Strings
         SearchTooltipBrowseFolder = "Choose folder to search";
         SearchTooltipRefresh = "Reindex";
         SearchTooltipHistory = "Recent searches";
-        SearchTooltipSort = "Cycle result sort (name/date, asc/desc)";
         SearchHistoryDeleteTooltip = "Remove this search";
         SearchBrowseFolderDialogTitle = "Choose a folder to search";
         SearchScopeNone = "Choose a folder to search →";
