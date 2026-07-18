@@ -1,3 +1,17 @@
+<!-- Crispness settings on the Window below, inherited by everything in it.
+
+     UseLayoutRounding: without it, layout lands on fractional device pixels, so
+     a 1px divider gets spread across two pixels as two grey halves. Subtle at
+     100% scaling, obvious at the 125-150% that 4K laptop and 27"+ users
+     typically run.
+
+     TextOptions.TextFormattingMode is deliberately NOT set, i.e. left at WPF's
+     default "Ideal", which positions glyphs at fractional pixels so text stays
+     geometrically correct under scaling. The alternative, "Display", snaps them
+     to the pixel grid the way native Windows apps do - measurably crisper at
+     the 9-20pt sizes used here, but it thickens the strokes, and that tradeoff
+     was judged by eye on a 4K screen at 150% rather than assumed. Re-add it
+     here if that judgement ever changes; nothing else depends on it. -->
 <Window x:Class="SidebarExplorer.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -12,6 +26,8 @@
         x:Name="RootWindow"
         Title="Edgetree"
         Icon="pack://application:,,,/Resources/app.ico"
+        TextOptions.TextRenderingMode="ClearType"
+        UseLayoutRounding="True"
         WindowStyle="None"
         AllowsTransparency="False"
         ResizeMode="NoResize"

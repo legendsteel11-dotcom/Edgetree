@@ -511,6 +511,63 @@ public partial class MainWindow : Window
         }
     }
 
+    // A scaling change - Settings > Display, or dragging onto a monitor at a
+    // different scale - leaves a docked window sized for the scale it left.
+    // Height is stored in logical units, so one computed under 150% keeps that
+    // number at 100%, where it now covers two thirds of the screen. Undocking
+    // and re-docking fixed it only because Dock() recomputes from scratch.
+    //
+    // The WorkArea handler below doesn't cover this: that notification can
+    // arrive before this window's own DPI has finished changing, so positioning
+    // from there would recompute using the scale being left behind. Deferred to
+    // Background priority for the same reason - by then VisualTreeHelper.GetDpi
+    // (see GetCurrentMonitorWorkArea) reports the new scale.
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+
+        // Same rule as the WorkArea handler: a floating window is where the
+        // user put it, and must not be snapped back to an edge.
+        if (!_isDocked)
+        {
+            return;
+        }
+
+        // Deferred because WPF applies the window rect Windows suggests along
+        // with WM_DPICHANGED after this returns, which would overwrite anything
+        // set inline; newDpi is captured rather than re-read later, since the
+        // window can still report the scale it is leaving.
+        //
+        // HONEST STATUS (2026-07-19): this does NOT fix changing the scale in
+        // Windows' display settings while the app runs. A docked window keeps
+        // the height computed under the old scale until something nudges it -
+        // clicking it, moving it, or resizing. Tried inline, then Background
+        // priority, then this timer; none of them changed the behaviour, which
+        // suggests the event may not be raised at all for that case rather than
+        // it being an ordering problem. Left in place because it is harmless
+        // and should still cover a window dragged between monitors of different
+        // scale (a path where WM_DPICHANGED definitely arrives), but do not
+        // assume the settings-change case works. Deliberately not chased
+        // further: a fresh start always positions correctly, so the symptom
+        // only survives until the next launch, and the user judged it not worth
+        // more time. Instrument whether OnDpiChanged fires at all before
+        // attempting a third fix.
+        var newScale = newDpi;
+        var settle = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(150)
+        };
+        settle.Tick += (_, _) =>
+        {
+            settle.Stop();
+            if (_isDocked)
+            {
+                PositionToWorkArea(newScale);
+            }
+        };
+        settle.Start();
+    }
+
     private void SystemParameters_StaticPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         // Only re-snap to the work area while docked - a floating window must not
@@ -521,9 +578,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PositionToWorkArea()
+    // dpiScale is passed only from the DPI-change path, where the window's own
+    // reported scale can still be the old one - see OnDpiChanged.
+    private void PositionToWorkArea(DpiScale? dpiScale = null)
     {
-        var workArea = GetCurrentMonitorWorkArea();
+        var workArea = GetCurrentMonitorWorkArea(dpiScale);
         Left = _settings.DockOnRight ? workArea.Right - Width : workArea.Left;
         Top = workArea.Top;
         Height = workArea.Height;
@@ -543,7 +602,7 @@ public partial class MainWindow : Window
     // only ever asked about the monitor the window is already sitting on
     // (Dock() calls this before moving the window anywhere), so there's no
     // cross-monitor DPI mismatch to resolve.
-    private Rect GetCurrentMonitorWorkArea()
+    private Rect GetCurrentMonitorWorkArea(DpiScale? dpiScale = null)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         var screen = hwnd != IntPtr.Zero
@@ -554,7 +613,9 @@ public partial class MainWindow : Window
             return SystemParameters.WorkArea;
         }
 
-        var dpi = VisualTreeHelper.GetDpi(this);
+        // Caller-supplied during a DPI change, where asking the window itself
+        // can still return the scale being left behind.
+        var dpi = dpiScale ?? VisualTreeHelper.GetDpi(this);
         var working = screen.WorkingArea;
         return new Rect(
             working.Left / dpi.DpiScaleX,
@@ -1242,11 +1303,59 @@ public partial class MainWindow : Window
     // MainWindow.xaml), so a fitted panel still matches the favorites list's
     // actual rendered row height after Ctrl+/- zoom instead of drifting away
     // from it as the font grows or shrinks.
-    private double FavoriteRowHeight => 24 * (ExplorerTree.FontSize / DefaultTreeFontSize);
+    // A favorites row's rendered height, built from the same two inputs the row
+    // itself is: its scaled content, plus RowVerticalPadding top and bottom.
+    //
+    // This used to be a flat `24 * fontScale`, which quietly assumed the only
+    // thing that could change a row's height was the font. The "행 간격" option
+    // (-4..+8, added later) also feeds RowPadding, so every row was really up
+    // to 16px taller or shorter than this claimed - an error multiplied by the
+    // favorite count, which is what made the gap above the panel's bottom
+    // divider wander as that option was stepped. The two numbers have to come
+    // from one place; that place is RowVerticalPadding.
+    //
+    // 18 is the content itself (icon or text line), chosen so that at the
+    // default font and zero row spacing this still yields exactly the 24 it
+    // always did - i.e. the previously-correct font-only case is preserved
+    // bit-for-bit, and only the row-spacing term is new.
+    private const double FavoriteRowContentHeight = 18;
 
-    // FavoritesList's own top+bottom Padding (see the XAML - top trimmed from
-    // 8 to 6 to match the tree's top gap, per direct pixel measurement).
-    private const double FavoritesListChrome = 10;
+    // Measured off a real row wherever possible, rather than predicted. Any
+    // prediction restates what the row template and ApplyLayoutMetrics between
+    // them actually produce, and drifts from it the moment either changes -
+    // and because the result is multiplied by the favorite count, a couple of
+    // pixels of drift per row is a visible gap above the panel's bottom
+    // divider. That gap has now been "fixed" twice by tuning constants (see
+    // FavoritesFitBottomPadding, cut 8 -> 0 for the same complaint) and came
+    // back both times, which is the signal to stop guessing the number and ask
+    // the row itself. The formula below survives only as a fallback for the
+    // instant before any row exists to measure - startup, or 0 -> 1 favorites.
+    private double FavoriteRowHeight
+    {
+        get
+        {
+            if (FavoritesList.ItemContainerGenerator.ContainerFromIndex(0)
+                is ListBoxItem { ActualHeight: > 0 } firstRow)
+            {
+                return firstRow.ActualHeight;
+            }
+            return FavoriteRowContentHeight * TreeFontScale + 2 * RowVerticalPadding;
+        }
+    }
+
+    // Read off the control instead of restating the XAML's value here, for the
+    // same reason as above: two copies of one number drift.
+    //
+    // BorderThickness counts as well as Padding: the panel's bottom divider IS
+    // the list's own 1px bottom border, and leaving it out cost exactly one
+    // pixel - which does not show up as a one-pixel error. The list scrolls by
+    // whole items, so a last row clipped by a single pixel makes WPF scroll a
+    // full row to reveal it the moment that row is clicked, i.e. the list
+    // visibly jumps by one line. The old row-height over-estimate happened to
+    // absorb this; measuring rows exactly is what exposed it.
+    private double FavoritesListChrome
+        => FavoritesList.Padding.Top + FavoritesList.Padding.Bottom
+           + FavoritesList.BorderThickness.Top + FavoritesList.BorderThickness.Bottom;
 
     // Row1 and Row3 (see the XAML comment on Grid.RowDefinitions) are neutral
     // top/bottom slots - whichever one currently holds the favorites panel is
@@ -1297,7 +1406,25 @@ public partial class MainWindow : Window
     // (e.g. right after going from 0 to 1) but a manually-enlarged panel is
     // still respected once there are enough favorites to fill it.
     private double ComputeFavoritesContentHeight()
-        => _settings.Favorites.Count * FavoriteRowHeight + FavoritesListChrome + FavoritesFitBottomPadding;
+    {
+        // Both callers run right after ApplyLayoutMetrics has swapped the row
+        // padding resource, at which point the existing containers still report
+        // their previous height - so force the pending pass through before
+        // measuring, or every metric change would size the panel to the metric
+        // before it.
+        FavoritesList.UpdateLayout();
+
+        double height = _settings.Favorites.Count * FavoriteRowHeight
+            + FavoritesListChrome + FavoritesFitBottomPadding;
+
+        // Rounded up because being a fraction of a pixel short is not a
+        // fractional problem here - see FavoritesListChrome: item-based
+        // scrolling turns any shortfall at all into a whole-row jump. Row
+        // heights are fractional at most zoom levels (16 * 20/12 and friends),
+        // so this is a real risk rather than a theoretical one. Costs at most
+        // one pixel of extra gap.
+        return Math.Ceiling(height);
+    }
 
     private void UpdateFavoritesPanelVisibility()
     {
@@ -2061,6 +2188,12 @@ public partial class MainWindow : Window
         {
             _settings.RowSpacing = value;
             ApplyLayoutMetrics();
+            // Row spacing changes a favorites row's height just as the font
+            // zoom does, so the panel needs the same re-fit SetTreeFontSize
+            // performs - without it the panel kept whatever height it was sized
+            // to for the old rows, leaving the gap above its bottom divider to
+            // drift with every step.
+            FitFavoritesPanel();
         }
 
         if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
@@ -2778,10 +2911,31 @@ public partial class MainWindow : Window
     // (shift the name itself so its left edge lands there instead,
     // FileNameMargin). "Both off" is the one case that instead collapses the
     // arrow gutter itself to 0 below, so nothing here needs to shift into it.
+    // How far the current font is zoomed from the default, which nearly every
+    // metric below is a multiple of.
+    private double TreeFontScale => ExplorerTree.FontSize / DefaultTreeFontSize;
+
+    // The vertical padding on every tree AND favorites row: the font-scaled
+    // base plus the user's flat "행 간격" offset, clamped at 0 so a small font
+    // with the most negative offset can't go negative. Defined here rather than
+    // inline in ApplyLayoutMetrics because FavoriteRowHeight has to predict the
+    // very same number - see its own comment for what went wrong when the two
+    // were worked out separately.
+    private double RowVerticalPadding
+        => Math.Max(0, TreeFontScale * 3.0 + _settings.RowSpacing);
+
     private void ApplyLayoutMetrics()
     {
-        double scale = ExplorerTree.FontSize / DefaultTreeFontSize;
-        Resources["IconSize"] = 16.0 * scale;
+        double scale = TreeFontScale;
+
+        // Rounded to whole pixels rather than left fractional. The source PNGs
+        // are 32x32 being scaled down, which is clean at the default font
+        // (32 -> 16, an exact half) but lands on something like 17.33 at 13pt -
+        // a destination size no source pixel maps onto evenly, so the whole
+        // icon goes soft. Whole numbers also keep the row's other metrics on
+        // the pixel grid that UseLayoutRounding is trying to hold (see
+        // MainWindow.xaml's header comment).
+        Resources["IconSize"] = Math.Round(16.0 * scale);
 
         // Grows past its base size once the font is zoomed above default, but
         // never shrinks below it while zoomed smaller - the sort-override
@@ -2791,8 +2945,8 @@ public partial class MainWindow : Window
         // it harder to hit right when a low-resolution/small-window user is
         // most likely to have reached for a smaller font in the first place.
         double growOnlyScale = Math.Max(1.0, scale);
-        Resources["SortOverrideIconWidth"] = 9.0 * growOnlyScale;
-        Resources["SortOverrideIconHeight"] = 13.0 * growOnlyScale;
+        Resources["SortOverrideIconWidth"] = Math.Round(9.0 * growOnlyScale);
+        Resources["SortOverrideIconHeight"] = Math.Round(13.0 * growOnlyScale);
 
         // Row vertical padding: the font-size-scaled base (was
         // Converters/FontSizeToRowPaddingConverter's whole job, now folded in
@@ -2801,8 +2955,7 @@ public partial class MainWindow : Window
         // combined with the most negative offset can't go negative. Shared by
         // both ExplorerTreeViewItemStyle and FavoriteListBoxItemStyle (see
         // their own comments) so the tree and favorites rows always match.
-        double baseVerticalPadding = scale * 3.0;
-        double verticalPadding = Math.Max(0, baseVerticalPadding + _settings.RowSpacing);
+        double verticalPadding = RowVerticalPadding;
         Resources["RowPadding"] = new Thickness(4, verticalPadding, 4, verticalPadding);
 
         // Search result file rows use the same vertical rhythm as the tree (so

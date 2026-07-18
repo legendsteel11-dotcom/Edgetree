@@ -8,4 +8,27 @@
     </application>
   </compatibility>
 
+  <!-- This is what actually makes the app per-monitor DPI aware, and it must
+       stay here. The csproj's <ApplicationHighDpiMode> looks like it does the
+       same job but does nothing for this app: it only takes effect through the
+       WinForms-generated entry point (ApplicationConfiguration.Initialize),
+       which a WPF application never calls. Verified 2026-07-19 by querying
+       GetProcessDpiAwareness on the running process - it reported SYSTEM, and
+       PER-MONITOR only after this block was added.
+
+       Being merely system-aware means Windows renders the window at whatever
+       scale was in effect when the process started and bitmap-stretches it
+       afterwards, so text looks like a scaled-up image next to a native app -
+       exactly the symptom that led here, comparing against VS Code at 200%.
+
+       Building this alongside UseWindowsForms warns WFAC010 ("remove the high
+       DPI settings from app.manifest"); that advice is wrong for a WPF-entry
+       app, so the warning is suppressed in the csproj rather than obeyed. -->
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+    </windowsSettings>
+  </application>
+
 </assembly>
