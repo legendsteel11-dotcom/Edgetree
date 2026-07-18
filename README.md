@@ -125,6 +125,9 @@ Either way, it's one `.exe` — no installer, just run it.
 - **About** window: version, author, build date, license summary (including
   a plain-language no-warranty note)
 - Rounded corners when floating (undocked) on Windows 11, to match native windows
+- **Display scaling aware**: renders at the display's actual scale (125%, 150%,
+  200%…) rather than being stretched to fit it, so text and icons stay sharp on
+  high-resolution laptops and 27"+ 4K monitors
 - **Font size**: adjustable 9–20pt from the options menu (12pt by default), or
   with `Ctrl` `+`/`-`; `Ctrl+0` resets. Icon sizes and row spacing scale along
   with it, in the favorites panel too
