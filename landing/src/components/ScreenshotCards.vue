@@ -2,12 +2,12 @@
 import { t } from '../i18n'
 
 const images = [
-  'docked-left-2.png',
-  'browsing.png',
-  'context-menu.png',
-  'options-menu.png',
-  'color-settings.png',
-  'favorite.png',
+  'et-01.png',
+  'et-02.png',
+  'et-03.png',
+  'et-04.png',
+  'et-05.png',
+  'et-06.png',
 ]
 </script>
 

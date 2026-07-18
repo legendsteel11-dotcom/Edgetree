@@ -60,8 +60,8 @@ const dict = {
           desc: '폴더명, 파일명, 배경, 선택 영역 등 색상을 원하는 대로 바꿀 수 있고, 다크/라이트 모드를 각각 따로 지정할 수 있습니다.',
         },
         {
-          title: '폴더 즐겨찾기',
-          desc: '자주 사용하는 폴더를 탐색기의 상/하에 고정하고 클릭 한번으로 바로 펼쳐줍니다.',
+          title: '파일 검색',
+          desc: 'Ctrl+F로 검색창을 열어 지정한 폴더 안의 파일을 이름으로 빠르게 찾고, 결과를 클릭하면 탐색기의 해당 위치로 바로 이동합니다.',
         },
       ],
     },
@@ -165,8 +165,8 @@ const dict = {
           desc: 'Customizable colors for folder names, file names, backgrounds, selection, and more — with separate dark and light palettes.',
         },
         {
-          title: 'Items per folder',
-          desc: 'Adjust how many items each folder shows at once, from 1 to 50.',
+          title: 'File search',
+          desc: 'Ctrl+F opens a search box to find files by name inside a chosen folder; click a result to jump straight to it in the tree.',
         },
       ],
     },
