@@ -23,14 +23,7 @@ Either way, it's one `.exe` — no installer, just run it.
 
 ## Screenshots
 
-| | |
-|---|---|
-| ![Docked to the left edge](screenshot/docked-left.png) | ![Docked to the right edge](screenshot/docked-right.png) |
-| Docked to the left edge | Docked to the right edge |
-| ![Browsing a wider window](screenshot/browsing.png) | ![Right-click context menu](screenshot/context-menu.png) |
-| Browsing, undocked/wider | Right-click context menu |
-| ![Options menu](screenshot/options-menu.png) | ![Color settings](screenshot/color-settings.png) |
-| Options ("...") menu | Color settings |
+![Edgetree docked to the left edge of the screen](screenshot/EdgetreeDemo.gif)
 
 ## Features
 

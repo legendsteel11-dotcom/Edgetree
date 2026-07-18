@@ -17,14 +17,7 @@
 
 ## 스크린샷
 
-| | |
-|---|---|
-| ![좌측 도킹](screenshot/docked-left.png) | ![우측 도킹](screenshot/docked-right.png) |
-| 좌측 가장자리 도킹 | 우측 가장자리 도킹 |
-| ![넓은 창에서 탐색](screenshot/browsing.png) | ![우클릭 컨텍스트 메뉴](screenshot/context-menu.png) |
-| 창모드(넓게)에서 탐색 | 우클릭 컨텍스트 메뉴 |
-| ![옵션 메뉴](screenshot/options-menu.png) | ![색상 설정](screenshot/color-settings.png) |
-| 옵션("...") 메뉴 | 색상 설정 |
+![화면 왼쪽 가장자리에 도킹된 Edgetree](screenshot/EdgetreeDemo.gif)
 
 ## 주요 기능
 

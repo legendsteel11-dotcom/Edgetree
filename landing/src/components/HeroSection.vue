@@ -22,7 +22,7 @@ onMounted(ensureReleaseAssetsLoaded)
         </div>
       </div>
       <div class="shot">
-        <img src="/screenshots/fullscreen-context.jpg" alt="Edgetree docked to the left edge of a full screen" />
+        <img src="/screenshots/EdgetreeDemo.gif" alt="Edgetree docked to the left edge of a full screen" />
       </div>
     </div>
   </section>
@@ -83,7 +83,11 @@ h1 {
 }
 
 .shot img {
-  width: 70%;
+  /* Grows up to the demo GIF's native 960px width - past that it would
+     upscale and blur, so max-width caps it there. */
+  width: 100%;
+  max-width: 960px;
+  display: block;
   margin: 0 auto;
   border-radius: 10px;
   /* border: 1px solid var(--border); */
