@@ -110,7 +110,7 @@ const dict = {
         'VirusTotal 등에서 일부 백신이 휴리스틱(패턴 기반) 오탐을 표시할 수 있습니다. 서명되지 않은 소규모 개인 개발 프로그램에서 흔히 나타나는 현상이며, 소스 코드가 GitHub에 전부 공개되어 있어 언제든 직접 확인하실 수 있습니다.',
     },
     footer: {
-      contact: '문의',
+      contact: '요청·버그 신고',
       copyright: `© ${new Date().getFullYear()} Edgetree. MIT License.`,
     },
   },
@@ -215,7 +215,7 @@ const dict = {
         'A few antivirus engines on VirusTotal and similar sites may flag it with a generic heuristic detection - common for small, unsigned indie apps. The full source is public on GitHub, so you’re welcome to check it yourself.',
     },
     footer: {
-      contact: 'Contact',
+      contact: 'Requests & bug reports',
       copyright: `© ${new Date().getFullYear()} Edgetree. MIT License.`,
     },
   },

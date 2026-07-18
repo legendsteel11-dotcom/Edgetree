@@ -178,6 +178,10 @@ moment it's moved on its own.
 Either way, the resulting `.exe` is in
 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
 
+## Requests & bug reports
+
+Email pjh85336@gmail.com.
+
 ## License
 
 MIT — see [LICENSE.md](LICENSE.md). Bundled icons are from the Material Icon

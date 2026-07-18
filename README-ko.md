@@ -160,6 +160,10 @@ dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -p:Publi
 어느 쪽이든 결과물은 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`
 경로에 생성됩니다.
 
+## 요청·버그 신고
+
+pjh85336@gmail.com 으로 보내주세요.
+
 ## 라이선스
 
 MIT — [LICENSE.md](LICENSE.md) 참고. 번들된 아이콘은 Material Icon Theme
