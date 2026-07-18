@@ -30,10 +30,10 @@ const dict = {
     howto: {
       title: '사용방법',
       steps: [
-        { title: '도킹 / 자동접기/펼치기', desc: '제목표시줄 아이콘 클릭 한 번으로 화면 가장자리에 얇게 숨고, 마우스를 가장자리로 가져가면 다시 펼쳐집니다.' },
-        { title: '자동접기/펼치기 고정 해제', desc: '펼쳐진 상태에서 핀을 클릭하면 자동접기/펼치기가 꺼지고 항상 펼쳐진 상태로 고정됩니다.' },
-        { title: '도킹 / 창모드', desc: '제목바를 드래그하면 자유롭게 움직이는 창모드로 전환되고, 핀을 클릭하면 다시 화면 가장자리에 도킹됩니다.' },
-        { title: '전체 펼침/접기', desc: '제목바의 ▲ 아이콘으로 펼쳐진 폴더 트리 전체를 한 번에 접었다 복원할 수 있습니다.' },
+        { title: '도킹 / 자동접기 / 창모드 전환', desc: '제목표시줄 아이콘 클릭 한 번으로 화면 가장자리에 얇게 숨고, 마우스를 가장자리로 가져가면 다시 펼쳐집니다. 제목표시줄을 드래그하여 창모드로 전환할 수 있습니다.' },
+        { title: '간단한 파일 검색', desc: '제목표시줄의 검색 아이콘 혹은 Ctrl + F / Ctrl + E 로 검색창과 탐색기 창을 전환하고 간단한 파일 검색을 할 수 있습니다.' },
+        { title: '컨텍스트 메뉴 및 파일 액세스', desc: '탐색기에서 폴더나 파일을 우클릭하여 기본적인 기능 등을 편리하게 사용할 수 있습니다. 파일을 창 외부로 복사하거나, VS Code의 탐색기에 바로 등록할 수 있습니다.' },
+        { title: '전체 펼침/접기, 자동 아코디언', desc: '제목바의 ▲ 아이콘으로 펼쳐진 폴더 트리 전체를 한 번에 접었다 복원할 수 있습니다. 또 필요한 폴더만 펼치고 나머지는 자동으로 접히게 할 수 있습니다.' },
       ],
     },
     screenshots: {
@@ -73,7 +73,7 @@ const dict = {
         { title: '자동 숨김', desc: '아이콘 클릭 한 번으로 화면 가장자리에 숨고, 마우스를 올리면 펼쳐집니다. 핀으로 고정도 가능합니다.' },
         { title: '기본 옵션', desc: '윈도우 시작 시 자동 실행, 항상 위에 표시, 트레이로 최소화 등을 옵션으로 조절합니다.' },
         { title: '파일 관리', desc: '다른 앱으로 파일을 바로 드래그하고, 복사/붙여넣기/이름변경/속성 등을 지원하며 외부 변경사항도 실시간 반영됩니다.' },
-        { title: '폴더 검색', desc: 'Ctrl+F로 검색창을 열어 선택한 폴더 안의 파일명을 즉시 찾습니다. 부분일치·와일드카드, 이름/날짜 정렬과 폴더별 묶어보기를 지원하고, 결과를 클릭하면 탐색기의 해당 위치로 이동하거나 다른 앱으로 바로 끌어다 쓸 수 있습니다.' },
+        { title: '파일/폴더 검색', desc: '가벼운 인덱싱으로 원하는 파일과 폴더의 위치로 바로 이동할 수 있습니다.' },
         { title: '즐겨찾기', desc: '자주 쓰는 폴더를 등록해 클릭 한 번으로 이동, 영역 위치도 상/하로 바꿀 수 있습니다.' },
         { title: '폴더/파일 아이콘 토글', desc: '폴더/파일 아이콘을 숨겨서 더 심플하게 볼 수 있습니다.' },
         { title: '탭 간격 및 행 간격 조정', desc: '들여쓰기 폭과 행 간격을 각각 취향대로 좁히거나 넓힐 수 있습니다.' },
@@ -135,10 +135,10 @@ const dict = {
     howto: {
       title: 'How to Use',
       steps: [
-        { title: 'Dock / Auto-Hide', desc: 'One click on the titlebar icon tucks it away to a thin sliver at the screen edge; move your mouse there to bring it back.' },
-        { title: 'Unpin Auto-Hide', desc: 'While expanded, click the pin to turn off auto-hide and keep it open for good.' },
-        { title: 'Dock / Floating Window', desc: 'Drag the titlebar to undock into a free-floating window; click the pin again to dock it back.' },
-        { title: 'Collapse / Restore All', desc: 'The ▲ icon on the titlebar collapses or restores every expanded folder in the tree at once.' },
+        { title: 'Dock / Auto-Hide / Window Mode', desc: 'One click on the titlebar icon tucks it away to a thin sliver at the screen edge; move your mouse there to bring it back. Drag the titlebar to switch into a floating window.' },
+        { title: 'Quick File Search', desc: "The titlebar's search icon (or Ctrl + F / Ctrl + E) toggles between the search box and the explorer for a quick file lookup." },
+        { title: 'Context Menu & File Access', desc: 'Right-click a folder or file in the explorer for the essentials at hand — copy files out to another window, or send them straight to the VS Code explorer.' },
+        { title: 'Collapse/Restore All & Auto Accordion', desc: 'The ▲ icon on the titlebar collapses or restores the whole expanded tree at once; you can also keep only the folder you open expanded while the rest auto-collapse.' },
       ],
     },
     screenshots: {
@@ -178,7 +178,7 @@ const dict = {
         { title: 'Auto-Hide', desc: 'One click tucks it away to a thin sliver at the screen edge; hover to reveal, pin to keep it open.' },
         { title: 'Core Options', desc: "Launch at Windows startup, stay always-on-top, minimize to tray - all toggleable from the options menu." },
         { title: 'File Management', desc: 'Drag files straight into other apps, plus copy/paste/rename/properties, with live updates when files change externally.' },
-        { title: 'Folder Search', desc: 'Ctrl+F opens a search box to find files by name within a chosen folder. Substring and wildcard matching, name/date sorting, and grouping by folder; click a result to jump to it in the tree, or drag it straight into another app.' },
+        { title: 'File Search', desc: 'Lightweight indexing to jump straight to the file location you are after.' },
         { title: 'Favorites', desc: 'Pin frequently used folders and jump to them in one click; switch the panel to the top or bottom.' },
         { title: 'Folder/File Icon Toggle', desc: 'Hide folder and file icons for a cleaner look.' },
         { title: 'Indent & Row Spacing', desc: "Adjust the tree's indent width and row spacing independently, to taste." },
