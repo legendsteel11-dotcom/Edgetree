@@ -101,6 +101,15 @@ public static class FileSystemService
         return roots;
     }
 
+    // Hidden/System items are skipped so the tree matches Windows Explorer's
+    // default (and the file search, which already skips them). RecurseSub-
+    // directories stays false - LoadChildren only ever loads one level.
+    private static readonly EnumerationOptions VisibleEntryOptions = new()
+    {
+        AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
+        IgnoreInaccessible = true
+    };
+
     public static List<FileSystemItem> LoadChildren(string path, FileSystemItem parent)
     {
         var result = new List<FileSystemItem>();
@@ -110,7 +119,7 @@ public static class FileSystemService
 
         try
         {
-            var directories = SortPaths(Directory.EnumerateDirectories(path), isDirectory: true, field, descending);
+            var directories = SortPaths(Directory.EnumerateDirectories(path, "*", VisibleEntryOptions), isDirectory: true, field, descending);
 
             foreach (var dir in directories)
             {
@@ -126,7 +135,7 @@ public static class FileSystemService
 
         try
         {
-            var files = SortPaths(Directory.EnumerateFiles(path), isDirectory: false, field, descending);
+            var files = SortPaths(Directory.EnumerateFiles(path, "*", VisibleEntryOptions), isDirectory: false, field, descending);
 
             foreach (var file in files)
             {

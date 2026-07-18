@@ -3468,19 +3468,24 @@ public partial class MainWindow : Window
                 var watcher = new FileSystemWatcher(root.FullPath)
                 {
                     IncludeSubdirectories = true,
-                    // Deliberately no NotifyFilters.LastWrite/no Changed
-                    // subscription below - this tree only ever shows a
-                    // folder's list of names, and a file being edited in
-                    // place (same name) doesn't change what that list looks
-                    // like. Watching LastWrite too would mean every
-                    // autosave/log write anywhere on the whole drive resets
-                    // some folder's debounce for a change nothing here
-                    // actually displays differently.
-                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName
+                    // FileName/DirectoryName catch add/remove/rename. Attributes
+                    // is added so toggling an item's Hidden/System attribute
+                    // (which now filters it out of the tree, see
+                    // FileSystemService.VisibleEntryOptions) reflects live via
+                    // the Changed handler below. LastWrite is still deliberately
+                    // excluded - the tree only shows names, so an in-place edit
+                    // (same name) never changes the listing, and watching it
+                    // would let every autosave/log write on the whole drive
+                    // churn some folder's refresh for nothing. Attribute events
+                    // are far rarer (an already-set archive bit doesn't re-fire
+                    // on each write), and the refresh is expanded-folder-only +
+                    // debounced regardless.
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Attributes
                 };
                 watcher.Created += OnDriveWatcherEvent;
                 watcher.Deleted += OnDriveWatcherEvent;
                 watcher.Renamed += OnDriveWatcherEvent;
+                watcher.Changed += OnDriveWatcherEvent;
                 watcher.EnableRaisingEvents = true;
                 _driveWatchers.Add(watcher);
             }
