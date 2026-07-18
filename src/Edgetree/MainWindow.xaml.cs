@@ -789,6 +789,9 @@ public partial class MainWindow : Window
     // (StartAutoHideOutsideClickWatch) doesn't care about the cursor leaving
     // at all.
     private void MainWindow_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        => ArmAutoHideRehideTimer();
+
+    private void ArmAutoHideRehideTimer()
     {
         if (!_isDocked || !_settings.IsAutoHidden || !_isAutoHideRevealed || !_settings.AutoHideCloseOnMouseLeave)
         {
@@ -812,6 +815,14 @@ public partial class MainWindow : Window
         // (MainWindow_MouseEnter, which stops this timer) may have already
         // changed things by the time this fires.
         if (!_settings.IsAutoHidden || !_isAutoHideRevealed)
+        {
+            return;
+        }
+
+        // Moving onto the options menu counts as leaving the window, because
+        // the menu is its own window - so this would close the sidebar out from
+        // under the menu the user just opened. See IsMenuOrDialogOpen.
+        if (IsMenuOrDialogOpen)
         {
             return;
         }
@@ -866,6 +877,73 @@ public partial class MainWindow : Window
     // click-outside mode).
     private System.Windows.Threading.DispatcherTimer? _autoHideOutsideClickTimer;
 
+    // How many of the app's own menus are open right now. Both auto-hide paths
+    // decide by the sidebar's rectangle - the cursor leaving it, or a click
+    // landing outside it - and a menu is a separate window that satisfies
+    // either the instant it appears. Opening the options menu while auto-hidden
+    // therefore slammed the sidebar shut, so the only way to reach a setting
+    // was to pin first, change it, and unpin again - i.e. auto-hide and the
+    // settings could not really be used together.
+    //
+    // Held as the set of menus actually open rather than a running count: a
+    // count that ever missed a Closed would suppress auto-hide permanently,
+    // and "the sidebar stopped hiding and I can't see why" is a far worse
+    // failure than the one this fixes.
+    private readonly HashSet<ContextMenu> _openMenus = new();
+
+    private bool IsMenuOrDialogOpen
+    {
+        get
+        {
+            // Self-healing: drop anything that has closed without its event
+            // reaching us, so a single missed notification can't wedge this on
+            // forever. At most a handful of entries.
+            _openMenus.RemoveWhere(menu => !menu.IsOpen);
+
+            // Windows.Count > 1 covers the Color Settings and About windows -
+            // separate windows too, so working inside one reads exactly like
+            // walking away from the sidebar.
+            return _openMenus.Count > 0 || Application.Current.Windows.Count > 1;
+        }
+    }
+
+    private void AnyMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is ContextMenu menu)
+        {
+            _openMenus.Add(menu);
+        }
+    }
+
+    private void AnyMenu_Closed(object sender, RoutedEventArgs e)
+    {
+        if (sender is ContextMenu menu)
+        {
+            _openMenus.Remove(menu);
+        }
+
+        // Opening a menu moves the cursor out of the sidebar, so MouseLeave has
+        // already fired and been ignored (the menu was up). Closing the menu
+        // raises no new MouseLeave - the cursor never re-entered - so without
+        // this the sidebar would sit open until the cursor came back and left
+        // again. Re-arm here if the cursor is in fact outside; the timer's own
+        // tick re-checks everything else, and ArmAutoHideRehideTimer ignores
+        // the call outright unless mouse-leave mode is the active one.
+        if (!IsMenuOrDialogOpen && !IsCursorInsideWindow())
+        {
+            ArmAutoHideRehideTimer();
+        }
+    }
+
+    private bool IsCursorInsideWindow()
+    {
+        var cursor = System.Windows.Forms.Cursor.Position;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double x = cursor.X / dpi.DpiScaleX;
+        double y = cursor.Y / dpi.DpiScaleY;
+        return x >= Left && x <= Left + Width && y >= Top && y <= Top + Height;
+    }
+
     private void StartAutoHideOutsideClickWatch()
     {
         _autoHideOutsideClickTimer ??= new System.Windows.Threading.DispatcherTimer
@@ -891,6 +969,16 @@ public partial class MainWindow : Window
         if (!_isDocked || !_settings.IsAutoHidden || !_isAutoHideRevealed || _settings.AutoHideCloseOnMouseLeave)
         {
             StopAutoHideOutsideClickWatch();
+            return;
+        }
+
+        // Clicking a menu item, or anywhere in the Color Settings window, is a
+        // click outside the sidebar's own rectangle - which is exactly what
+        // this watch is looking for. Stand down while either is up, or picking
+        // an option would dismiss the sidebar mid-action. See
+        // IsMenuOrDialogOpen.
+        if (IsMenuOrDialogOpen)
+        {
             return;
         }
 
@@ -2012,13 +2100,18 @@ public partial class MainWindow : Window
 
     private void OptionsMenu_Opened(object sender, RoutedEventArgs e)
     {
+        // This menu has its own Opened work below, so it can't just point at
+        // AnyMenu_Opened in the XAML the way the plain menus do - count it here
+        // instead. Its Closed is wired to AnyMenu_Closed as usual.
+        AnyMenu_Opened(sender, e);
+
         // Same reasoning as ExplorerItemContextMenu_Opened: MenuItems declared
         // in a resource dictionary don't get auto-generated code-behind fields.
         // The two discards after the toggle group skip the separator and the
         // "색상 변경" item, neither of which has state to sync here.
         if (sender is ContextMenu
             {
-                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, MenuItem autoHideSliverWidthRow, _, _, MenuItem sortMenu, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem languageMenu, ..]
+                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, _, _, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem autoHideSliverWidthRow, MenuItem sortMenu, MenuItem languageMenu, ..]
             })
         {
             // Nothing expanded means nothing to collapse - grey it out rather
@@ -2833,12 +2926,22 @@ public partial class MainWindow : Window
         if (sender is MenuItem menuItem)
         {
             _settings.AutoHideCloseOnMouseLeave = menuItem.IsChecked;
-            // Switching away from click-outside mode mid-reveal should stop
-            // watching for one immediately rather than leaving it armed under
-            // the now-inapplicable setting.
+
+            // Both directions have to be handled while the sidebar is already
+            // revealed. Switching away from click-outside mode should stop the
+            // watch rather than leave it armed under a setting that no longer
+            // applies - and switching TO it has to start one, which nothing did
+            // before: the watch is otherwise only ever armed by
+            // MainWindow_MouseEnter, so turning this option off while revealed
+            // left no watcher at all and clicking outside did nothing until the
+            // sidebar had been hidden and re-revealed once.
             if (menuItem.IsChecked)
             {
                 StopAutoHideOutsideClickWatch();
+            }
+            else if (_isDocked && _settings.IsAutoHidden && _isAutoHideRevealed)
+            {
+                StartAutoHideOutsideClickWatch();
             }
         }
     }
@@ -3709,6 +3812,8 @@ public partial class MainWindow : Window
 
     private void ExplorerItemContextMenu_Opened(object sender, RoutedEventArgs e)
     {
+        AnyMenu_Opened(sender, e);
+
         // MenuItems declared inside a resource dictionary don't get an
         // auto-generated code-behind field the way named elements in the main
         // visual tree do, so these have to be found by position on the
@@ -5440,6 +5545,8 @@ public partial class MainWindow : Window
 
     private void SearchResultContextMenu_Opened(object sender, RoutedEventArgs e)
     {
+        AnyMenu_Opened(sender, e);
+
         // Menu items in a resource-dictionary ContextMenu have no code-behind
         // field, so the "Code로 열기" item is found by position (index 2, after
         // Open and Open With) - same approach as ExplorerItemContextMenu_Opened.

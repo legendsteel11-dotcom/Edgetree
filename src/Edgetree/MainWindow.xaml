@@ -80,6 +80,16 @@
         <TranslateTransform x:Key="ShiftUp1px"
                 Y="-1"/>
 
+        <!-- The header glyphs are not all optically centred by the same amount:
+             their drawn shapes sit differently inside their boxes, so a single
+             shared nudge leaves some looking high and others low. Judged on a
+             magnified capture against guide lines rather than by eye at size.
+             The X reads a pixel low with the shared nudge and takes this one
+             instead; the pin and the "..." read a pixel high and take none at
+             all (they are simply left untransformed). -->
+        <TranslateTransform x:Key="ShiftUp2px"
+                Y="-2"/>
+
         <SolidColorBrush x:Key="SidebarBackground"
                 Color="#FF1A1A1A"/>
         <SolidColorBrush x:Key="FavoritesBackground"
@@ -227,7 +237,7 @@
                             <ContentPresenter x:Name="Content"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
-                                    Opacity="0.75"/>
+                                    Opacity="0.85"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"
@@ -249,9 +259,13 @@
                                 <Setter TargetName="Bd"
                                         Property="Background"
                                         Value="Transparent"/>
+                                <!-- Dim enough to read as unavailable, but not so
+                                     dim it looks like a rendering fault - 0.3
+                                     left the glyph barely visible against the
+                                     header. -->
                                 <Setter TargetName="Content"
                                         Property="Opacity"
-                                        Value="0.3"/>
+                                        Value="0.45"/>
                                 <Setter Property="Cursor"
                                         Value="Arrow"/>
                             </Trigger>
@@ -541,8 +555,14 @@
         <!-- Assigned to ExplorerTree itself (not via ItemContainerStyle, unlike
              ExplorerItemContextMenu below), so it's what shows up when
              right-clicking empty tree space rather than an actual row. -->
+        <!-- Every menu in this file reports its open/closed state so auto-hide
+             can stand down while one is up - a menu renders as its own window
+             outside the sidebar's bounds, which both hide paths would otherwise
+             read as "the user left". See MainWindow.xaml.cs's _openMenuCount. -->
         <ContextMenu x:Key="ExplorerEmptySpaceContextMenu"
-                Style="{StaticResource DarkContextMenuStyle}">
+                Style="{StaticResource DarkContextMenuStyle}"
+                Opened="AnyMenu_Opened"
+                Closed="AnyMenu_Closed">
             <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
                     Click="NewFolder_Click"/>
         </ContextMenu>
@@ -550,6 +570,7 @@
         <ContextMenu x:Key="ExplorerItemContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
                 Opened="ExplorerItemContextMenu_Opened"
+                Closed="AnyMenu_Closed"
                 PreviewKeyDown="ExplorerItemContextMenu_PreviewKeyDown">
             <MenuItem Header="{x:Static services:Strings.MenuAddFavorite}"
                     Click="AddFavorite_Click"/>
@@ -631,7 +652,8 @@
              file-only search result. -->
         <ContextMenu x:Key="SearchResultContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
-                Opened="SearchResultContextMenu_Opened">
+                Opened="SearchResultContextMenu_Opened"
+                Closed="AnyMenu_Closed">
             <MenuItem Header="{x:Static services:Strings.MenuOpen}"
                     Click="SearchOpen_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpenWith}"
@@ -658,7 +680,8 @@
 
         <ContextMenu x:Key="OptionsMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
-                Opened="OptionsMenu_Opened">
+                Opened="OptionsMenu_Opened"
+                Closed="AnyMenu_Closed">
             <MenuItem Header="{x:Static services:Strings.MenuAutoCollapse}"
                     IsCheckable="True"
                     Click="AutoCollapseMenuItem_Click"/>
@@ -700,60 +723,13 @@
             <MenuItem Header="{x:Static services:Strings.MenuAutoHideCloseOnLeave}"
                     IsCheckable="True"
                     Click="AutoHideCloseOnLeaveMenuItem_Click"/>
-            <!-- StaysOpenOnClick so stepping the value doesn't close the whole
-                 options menu out from under the user. -->
-            <MenuItem StaysOpenOnClick="True"
-                    Focusable="False">
-                <MenuItem.Header>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                Text="{x:Static services:Strings.MenuAutoHideSliverWidth}"
-                                Foreground="{DynamicResource ForegroundText}"
-                                VerticalAlignment="Center"
-                                Margin="0,0,8,0"/>
-                        <StackPanel Grid.Column="1"
-                                Orientation="Horizontal">
-                            <Button Content="−"
-                                    Style="{StaticResource MenuStepperButtonStyle}"
-                                    Click="AutoHideSliverWidthDecrement_Click"/>
-                            <TextBlock Text="3"
-                                    Foreground="{DynamicResource ForegroundText}"
-                                    Width="26"
-                                    TextAlignment="Center"
-                                    VerticalAlignment="Center"/>
-                            <Button Content="+"
-                                    Style="{StaticResource MenuStepperButtonStyle}"
-                                    Click="AutoHideSliverWidthIncrement_Click"/>
-                        </StackPanel>
-                    </Grid>
-                </MenuItem.Header>
-            </MenuItem>
             <Separator/>
+            <!-- Fenced off by separators on both sides: it opens a window,
+                 unlike everything around it, so it belongs to neither the
+                 toggles above nor the steppers below. -->
             <MenuItem Header="{x:Static services:Strings.MenuColorSettings}"
                     Click="ColorSettingsMenuItem_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuDefaultSort}">
-                <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
-                        IsCheckable="True"
-                        Tag="name"
-                        Click="SortFieldMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuSortByDate}"
-                        IsCheckable="True"
-                        Tag="date"
-                        Click="SortFieldMenuItem_Click"/>
-                <Separator/>
-                <MenuItem Header="{x:Static services:Strings.MenuSortAscending}"
-                        IsCheckable="True"
-                        Tag="asc"
-                        Click="SortDirectionMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuSortDescending}"
-                        IsCheckable="True"
-                        Tag="desc"
-                        Click="SortDirectionMenuItem_Click"/>
-            </MenuItem>
+            <Separator/>
             <!-- Font size leads the stepper group deliberately: it was
                  keyboard-only (Ctrl +/-) until a user with presbyopia asked for
                  "a way to change the font size" while row/indent spacing were
@@ -885,6 +861,64 @@
                         </StackPanel>
                     </Grid>
                 </MenuItem.Header>
+            </MenuItem>
+            <!-- Sits with the other steppers rather than up among the
+                 checkboxes, where it was the one row of its kind and read as
+                 stranded. It is an auto-hide setting, so grouping by topic
+                 would put it beside "마우스 이탈 시 닫기" - but a menu is read by
+                 shape first, and a lone stepper among checkmarks looks like a
+                 mistake. -->
+            <MenuItem StaysOpenOnClick="True"
+                    Focusable="False">
+                <MenuItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                Text="{x:Static services:Strings.MenuAutoHideSliverWidth}"
+                                Foreground="{DynamicResource ForegroundText}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"/>
+                        <StackPanel Grid.Column="1"
+                                Orientation="Horizontal">
+                            <Button Content="−"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="AutoHideSliverWidthDecrement_Click"/>
+                            <TextBlock Text="3"
+                                    Foreground="{DynamicResource ForegroundText}"
+                                    Width="26"
+                                    TextAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                            <Button Content="+"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="AutoHideSliverWidthIncrement_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </MenuItem.Header>
+            </MenuItem>
+            <!-- Kept next to Language: both open a submenu, so they read as a
+                 pair at the end of the settings block rather than one submenu
+                 stranded above a run of steppers. -->
+            <MenuItem Header="{x:Static services:Strings.MenuDefaultSort}">
+                <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
+                        IsCheckable="True"
+                        Tag="name"
+                        Click="SortFieldMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortByDate}"
+                        IsCheckable="True"
+                        Tag="date"
+                        Click="SortFieldMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortAscending}"
+                        IsCheckable="True"
+                        Tag="asc"
+                        Click="SortDirectionMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortDescending}"
+                        IsCheckable="True"
+                        Tag="desc"
+                        Click="SortDirectionMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="{x:Static services:Strings.MenuLanguage}">
                 <!-- Non-interactive note, not a language choice - IsEnabled
@@ -1615,7 +1649,9 @@
         </HierarchicalDataTemplate>
 
         <ContextMenu x:Key="FavoriteItemContextMenu"
-                Style="{StaticResource DarkContextMenuStyle}">
+                Style="{StaticResource DarkContextMenuStyle}"
+                Opened="AnyMenu_Opened"
+                Closed="AnyMenu_Closed">
             <MenuItem Header="{x:Static services:Strings.MenuRemoveFavorite}"
                     Click="RemoveFavorite_Click"/>
         </ContextMenu>
@@ -1964,20 +2000,34 @@
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="PinButton_Click"
                         Margin="{DynamicResource HeaderButtonMargin}"
-                        RenderTransform="{StaticResource ShiftUp1px}"
                         Visibility="Collapsed"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <!-- Monochrome vector pushpin, to match the other header
-                         glyphs (magnifier/arrow/dots/X): it picks up the same
-                         ForegroundText brush so it follows the theme without a
-                         second image, and stays crisp at every header size step
-                         - the old PNG blurred once the buttons shrank. -->
-                    <Path Data="M5.5,2.5 L10.5,2.5 M7,2.5 L7,8 L5.5,10.5 L10.5,10.5 L9,8 L9,2.5 M8,10.5 L8,14"
-                            Stroke="{DynamicResource ForegroundText}"
-                            StrokeThickness="1.3"
-                            StrokeStartLineCap="Round"
-                            StrokeEndLineCap="Round"
-                            StrokeLineJoin="Round"/>
+                    <!-- Google Material Symbols "keep", picked by the author and
+                         kept in its original 960-unit grid (the source is
+                         Resources/Icons/keepPin.svg) rather than re-plotted onto
+                         the 16-unit box the hand-built glyphs beside it use.
+                         Stretch does the fitting, so this stays byte-identical
+                         to what the design tool produced - negative Y origin and
+                         all - and only Width/Height decide how big it lands.
+
+                         Filled rather than stroked, so it takes the same
+                         ForegroundText brush as the other glyphs and will follow
+                         a future theme. The leading "F1" selects the nonzero
+                         fill rule: SVG's default, but not WPF's (EvenOdd), and
+                         without it the pin's inner cut-out fills in solid.
+
+                         Height is what sets the size: the artwork is about twice
+                         as tall as it is wide, so Stretch="Uniform" inside a
+                         square box would fit the height and leave the glyph
+                         barely half as wide as the round magnifier next to it -
+                         which read as far too small. Sized taller than that
+                         magnifier's ~10 units on purpose, since a narrow
+                         upright shape looks smaller than a circular one of the
+                         same height. -->
+                    <Path Data="F1 M632.13-488.37l96 96v83.24H521.5v227.04L480-40.59l-41.5-41.5v-227.04H231.87v-83.24l96-96v-257.78h-48v-83h400.26v83h-48v257.78Zm-283.2 96.24h262.14l-61.94-61.94v-292.08H410.87v292.08l-61.94 61.94Z"
+                            Fill="{DynamicResource ForegroundText}"
+                            Stretch="Uniform"
+                            Height="13"/>
                 </Button>
                 <Button x:Name="CollapseAllButton"
                         Grid.Column="4"
@@ -1996,7 +2046,6 @@
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="OptionsButton_Click"
                         Margin="{DynamicResource HeaderButtonMargin}"
-                        RenderTransform="{StaticResource ShiftUp1px}"
                         ToolTip="{x:Static services:Strings.ToolTipOptions}"
                         ContextMenu="{StaticResource OptionsMenu}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
@@ -2045,7 +2094,7 @@
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="CloseButton_Click"
                         Margin="{DynamicResource HeaderCloseButtonMargin}"
-                        RenderTransform="{StaticResource ShiftUp1px}"
+                        RenderTransform="{StaticResource ShiftUp2px}"
                         ToolTip="{x:Static services:Strings.ToolTipClose}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <Path Data="M4,4 L12,12 M12,4 L4,12"
