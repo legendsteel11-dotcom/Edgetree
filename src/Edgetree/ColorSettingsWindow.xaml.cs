@@ -70,7 +70,10 @@ public partial class ColorSettingsWindow : Window
         HeaderSwatch.Background = ParseBrush(CurrentHeaderBackgroundColorHex);
         PanelDividerSwatch.Background = ParseBrush(CurrentPanelDividerColorHex);
 
-        ThemeToggleButton.Content = _settings.IsLightMode ? Strings.ColorThemeLightMode : Strings.ColorThemeDarkMode;
+        // Labels the mode the button will switch TO (the action), not the one
+        // currently active - "☀️ 라이트 모드" while in dark mode reads as "click
+        // to go light", which is clearer than restating the current state.
+        ThemeToggleButton.Content = _settings.IsLightMode ? Strings.ColorThemeDarkMode : Strings.ColorThemeLightMode;
         UpdateResetButtonEnabled();
     }
 

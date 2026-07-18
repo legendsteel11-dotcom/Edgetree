@@ -20,6 +20,9 @@ out/
 **/packages/*
 !**/packages/build/
 
+# Node (landing page build deps)
+node_modules/
+
 # OS files
 Thumbs.db
 .DS_Store

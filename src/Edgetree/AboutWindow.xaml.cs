@@ -65,4 +65,13 @@ public partial class AboutWindow : Window
             UseShellExecute = true
         });
     }
+
+    private void WebsiteLink_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "https://edgetree.vercel.app",
+            UseShellExecute = true
+        });
+    }
 }

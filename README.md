@@ -88,6 +88,13 @@ Either way, it's one `.exe` — no installer, just run it.
   it never covers the item
 - **Drag files out** of the sidebar into Explorer or any other app (standard
   Windows file drag, so copy/move/drop-to-open all work as expected)
+- **Folder search** (`Ctrl+F`, or the title-bar search icon toggles between
+  the tree and a search view): pick a folder, and it indexes that folder in
+  memory to find files by name — substring or `*`/`?` wildcard matching, with
+  results grouped by folder and sortable by name/date. Click a result to jump
+  to it in the tree (its folder pinned to the top) or drag it straight into
+  another app; recent searches are remembered (`↑`/`↓` to recall, each
+  removable). `Ctrl+E` returns to the tree
 - **Sort**: by name or date, ascending or descending — from the "..." options
   menu, or a folder's own right-click menu, which also re-sorts that folder
   immediately instead of waiting for the next expand

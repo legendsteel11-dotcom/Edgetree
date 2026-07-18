@@ -160,9 +160,9 @@
                 </Button>
             </Grid>
 
-            <!-- Content text (dark/light label) set in code-behind, since it
-                 always reflects whichever mode is CURRENTLY active - see
-                 ThemeToggle_Click. -->
+            <!-- Content text (dark/light label) set in code-behind - it names
+                 the mode this button will switch TO, not the current one (see
+                 RefreshSwatches). -->
             <Button x:Name="ThemeToggleButton"
                     Grid.Row="1"
                     Style="{StaticResource DialogButtonStyle}"

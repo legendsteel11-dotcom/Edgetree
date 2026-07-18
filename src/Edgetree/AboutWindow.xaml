@@ -187,7 +187,17 @@
                         FontSize="12"
                         Cursor="Hand"
                         TextDecorations="Underline"
+                        Margin="0,0,0,10"
                         MouseLeftButtonDown="GithubLink_MouseLeftButtonDown"/>
+
+                <TextBlock Text="{x:Static services:Strings.AboutWebsiteLabel}"
+                        Style="{StaticResource AboutRowLabelStyle}"/>
+                <TextBlock Text="edgetree.vercel.app"
+                        Foreground="{DynamicResource AccentForeground}"
+                        FontSize="12"
+                        Cursor="Hand"
+                        TextDecorations="Underline"
+                        MouseLeftButtonDown="WebsiteLink_MouseLeftButtonDown"/>
 
                 <Button Content="{x:Static services:Strings.ButtonClose}"
                         Style="{StaticResource DialogButtonStyle}"

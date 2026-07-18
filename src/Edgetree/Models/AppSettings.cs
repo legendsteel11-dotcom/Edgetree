@@ -210,4 +210,22 @@ public class AppSettings
     // (FindItemForPath returns null for it), not an error.
     public List<string> ExpandedFolderPaths { get; set; } = new();
     public string? LastSelectedPath { get; set; }
+
+    // File-search feature (see Services/FileSearchService). The last folder
+    // chosen via "폴더 찾기" is remembered so reopening search restores the same
+    // scope. Null until the user picks one for the first time. A path that no
+    // longer exists is simply re-prompted, same tolerance as the other
+    // remembered-path settings above.
+    public string? LastSearchFolder { get; set; }
+
+    // Recent search queries, most-recent-first, shown in the search box's
+    // history dropdown. Capped in code (see MainWindow.CommitSearchHistory) so
+    // it can't grow without bound.
+    public List<string> SearchHistory { get; set; } = new();
+
+    // Results-only sort/grouping for the search view, independent of the
+    // explorer tree's own sort. 0=folder group (default), 1=name asc, 2=name
+    // desc, 3=date asc, 4=date desc - see MainWindow's SearchSortMode enum and
+    // SearchSortButton_Click. Remembered across sessions.
+    public int SearchSortMode { get; set; } = 0;
 }

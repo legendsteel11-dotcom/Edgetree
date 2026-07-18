@@ -571,11 +571,46 @@
                     Click="CopyPath_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpenTerminal}"
                     Click="OpenTerminal_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuOpenWithCode}"
+                    Click="OpenWithCode_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuRevealInExplorer}"
                     Click="RevealInExplorer_Click"/>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuProperties}"
                     Click="ShowProperties_Click"/>
+        </ContextMenu>
+
+        <!-- Search result rows' own menu. Every action operates on the
+             right-clicked result's path (SearchEntry.FullPath) via the same
+             ShellFileService/FileOperationService the tree menu uses - no
+             FileSystemItem needed. The tree-only items (즐겨찾기/새 폴더/붙여넣기/
+             정렬/이름 바꾸기) are intentionally absent: they don't apply to a
+             file-only search result. -->
+        <ContextMenu x:Key="SearchResultContextMenu"
+                Style="{StaticResource DarkContextMenuStyle}"
+                Opened="SearchResultContextMenu_Opened">
+            <MenuItem Header="{x:Static services:Strings.MenuOpen}"
+                    Click="SearchOpen_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuOpenWith}"
+                    Click="SearchOpenWith_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuOpenWithCode}"
+                    Click="SearchOpenWithCode_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuCopy}"
+                    Click="SearchCopy_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuCopyPath}"
+                    Click="SearchCopyPath_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuOpenTerminal}"
+                    Click="SearchOpenTerminal_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuRevealInExplorer}"
+                    Click="SearchReveal_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuDelete}"
+                    Click="SearchDelete_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuProperties}"
+                    Click="SearchProperties_Click"/>
         </ContextMenu>
 
         <ContextMenu x:Key="OptionsMenu"
@@ -1618,6 +1653,102 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Search result rows (the two-line "folder path over filename" entries
+             in the Ctrl+F search view). Own hover/selection highlight and the
+             bottom margin that spaces one result from the next, since the
+             default ListBoxItem chrome would clash with the rest of the app's
+             hand-themed look. -->
+        <Style x:Key="SearchResultItemStyle"
+                TargetType="ListBoxItem">
+            <Setter Property="Padding"
+                    Value="{DynamicResource SearchRowPadding}"/>
+            <Setter Property="Margin"
+                    Value="0,0,0,3"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Stretch"/>
+            <Setter Property="ContextMenu"
+                    Value="{StaticResource SearchResultContextMenu}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd"
+                                Background="Transparent"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowHoverBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <!-- Folder header rows are labels, not targets: no hand cursor,
+                     no hover/selection highlight (IsHitTestVisible=False also
+                     lets a click land through to nothing rather than selecting
+                     a header), skipped by keyboard nav (Focusable=False), and
+                     tucked close to the files beneath them. -->
+                <DataTrigger Binding="{Binding IsHeader}"
+                        Value="True">
+                    <Setter Property="Cursor"
+                            Value="Arrow"/>
+                    <Setter Property="Focusable"
+                            Value="False"/>
+                    <Setter Property="IsHitTestVisible"
+                            Value="False"/>
+                    <Setter Property="Margin"
+                            Value="0,3,0,0"/>
+                    <Setter Property="Padding"
+                            Value="8,2"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Recent-search dropdown rows (history Popup under the search box). -->
+        <Style x:Key="SearchHistoryItemStyle"
+                TargetType="ListBoxItem">
+            <Setter Property="Padding"
+                    Value="8,4"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Stretch"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd"
+                                Background="Transparent"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource HoverBackground}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- Single cell, not a content-column + dedicated resize-grip-column split:
@@ -1684,6 +1815,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <!-- The app icon IS the auto-hide toggle now (see
                      AppIcon_MouseLeftButtonDown) - the separate chevron
@@ -1712,8 +1844,29 @@
                         FontWeight="Bold"
                         Opacity="0.75"
                            TextTrimming="CharacterEllipsis"/>
-                <Button x:Name="PinButton"
+                <!-- Search toggle. Swaps the whole content area below the header
+                     between the explorer tree and the file-search view (see
+                     ToggleSearchView / SetSearchViewActive in code-behind); the
+                     glyph itself flips between a magnifier and a left chevron
+                     ("back to explorer") the same way CollapseAllButton swaps
+                     its arrow Data. -->
+                <Button x:Name="SearchButton"
                         Grid.Column="2"
+                        Style="{StaticResource ToggleButtonStyle}"
+                        Click="SearchButton_Click"
+                        Margin="2"
+                        RenderTransform="{StaticResource ShiftUp1px}"
+                        ToolTip="{x:Static services:Strings.ToolTipSearch}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Path x:Name="SearchButtonIcon"
+                            Data="M4,7 A3.5,3.5 0 1 0 11,7 A3.5,3.5 0 1 0 4,7 M10,10 L13.5,13.5"
+                            Stroke="{DynamicResource ForegroundText}"
+                            StrokeThickness="1.5"
+                            StrokeStartLineCap="Round"
+                            StrokeEndLineCap="Round"/>
+                </Button>
+                <Button x:Name="PinButton"
+                        Grid.Column="3"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="PinButton_Click"
                         Margin="2"
@@ -1726,7 +1879,7 @@
                             RenderOptions.BitmapScalingMode="HighQuality"/>
                 </Button>
                 <Button x:Name="CollapseAllButton"
-                        Grid.Column="3"
+                        Grid.Column="4"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="CollapseAllButton_Click"
                         Margin="2"
@@ -1738,7 +1891,7 @@
                             Fill="{DynamicResource ForegroundText}"/>
                 </Button>
                 <Button x:Name="OptionsButton"
-                        Grid.Column="4"
+                        Grid.Column="5"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="OptionsButton_Click"
                         Margin="2"
@@ -1764,7 +1917,7 @@
                     </StackPanel>
                 </Button>
                 <Button x:Name="MinimizeButton"
-                        Grid.Column="5"
+                        Grid.Column="6"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="MinimizeButton_Click"
                         Margin="2"
@@ -1787,7 +1940,7 @@
                      its own hit-box instead of crowding the window's true
                      right edge. -->
                 <Button x:Name="CloseButton"
-                        Grid.Column="6"
+                        Grid.Column="7"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="CloseButton_Click"
                         Margin="2,2,6,2"
@@ -1912,6 +2065,359 @@
                         VerticalAlignment="Center"
                         Margin="8,0,0,4"/>
             </Border>
+
+            <!-- File-search view. Overlays the whole content area below the
+                 header (rows 1-4: favorites, splitter, tree, version footer) -
+                 opaque background, so toggling it on replaces "the screen except
+                 the title bar" exactly as the spec asks, while the tree
+                 underneath keeps its state for an instant toggle back. Declared
+                 last so it paints on top of everything it covers; Collapsed
+                 until the search button / Ctrl+F activates it (see
+                 SetSearchViewActive). -->
+            <Grid x:Name="SearchView"
+                    Grid.Row="1"
+                    Grid.RowSpan="4"
+                    Background="{DynamicResource SidebarBackground}"
+                    Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Controls group: scope row + input row, on the same slightly-
+                     darker background the favorites panel uses, with the same
+                     bottom divider. -->
+                <StackPanel Grid.Row="0"
+                        Background="{DynamicResource FavoritesBackground}">
+                    <Grid Margin="6,6,6,3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="SearchScopeText"
+                                Grid.Column="0"
+                                Text="{x:Static services:Strings.SearchScopeNone}"
+                                Foreground="{DynamicResource ForegroundText}"
+                                Opacity="0.75"
+                                FontSize="11"
+                                VerticalAlignment="Center"
+                                TextTrimming="CharacterEllipsis"
+                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                        <Button x:Name="SearchBrowseButton"
+                                Grid.Column="1"
+                                Style="{StaticResource ToggleButtonStyle}"
+                                Width="26"
+                                Height="26"
+                                Margin="2,0"
+                                Click="SearchBrowseButton_Click"
+                                ToolTip="{x:Static services:Strings.SearchTooltipBrowseFolder}">
+                            <Path Data="M1.5,4 L6,4 L7.5,5.5 L14.5,5.5 L14.5,12.5 L1.5,12.5 Z"
+                                    Fill="{DynamicResource ForegroundText}"/>
+                        </Button>
+                        <!-- Results-only sort (name/date, asc/desc). Reuses the
+                             same rotating icons as the per-folder sort override
+                             (N↑→N↓→D↑→D↓ on click); its image Source is set from
+                             code (SearchSortIcon) so it tracks the light/dark
+                             theme the same way. -->
+                        <Button x:Name="SearchSortButton"
+                                Grid.Column="2"
+                                Style="{StaticResource ToggleButtonStyle}"
+                                Width="26"
+                                Height="26"
+                                Margin="2,0"
+                                Click="SearchSortButton_Click"
+                                ToolTip="{x:Static services:Strings.SearchTooltipSort}">
+                            <Image x:Name="SearchSortIcon"
+                                    Width="10"
+                                    Height="14"
+                                    Stretch="Uniform"
+                                    RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Button>
+                        <Button x:Name="SearchRefreshButton"
+                                Grid.Column="3"
+                                Style="{StaticResource ToggleButtonStyle}"
+                                Width="26"
+                                Height="26"
+                                Margin="2,0"
+                                Click="SearchRefreshButton_Click"
+                                ToolTip="{x:Static services:Strings.SearchTooltipRefresh}">
+                            <Grid Width="15"
+                                    Height="15">
+                                <Path Data="M12.6,7.5 A5,5 0 1 1 10.8,3.7"
+                                        Stroke="{DynamicResource ForegroundText}"
+                                        StrokeThickness="1.4"
+                                        StrokeStartLineCap="Round"
+                                        StrokeEndLineCap="Round"/>
+                                <Path Data="M9.6,1 L11.4,4.3 L7.9,4.4 Z"
+                                        Fill="{DynamicResource ForegroundText}"/>
+                            </Grid>
+                        </Button>
+                    </Grid>
+
+                    <!-- Input row: search box + history caret. The placeholder is
+                         a TextBlock behind the box, hidden once there's text
+                         (see SearchBox_TextChanged). -->
+                    <Grid Margin="6,0,6,6"
+                            Height="26">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <!-- Outline only (transparent fill), per request - the
+                             box reads as a border, not a filled field. -->
+                        <Border Grid.Column="0"
+                                Grid.ColumnSpan="2"
+                                Background="Transparent"
+                                BorderBrush="{DynamicResource ControlBorder}"
+                                BorderThickness="1"
+                                CornerRadius="3"/>
+                        <Grid Grid.Column="0">
+                            <TextBlock x:Name="SearchPlaceholder"
+                                    Text="{x:Static services:Strings.SearchBoxPlaceholder}"
+                                    Foreground="{DynamicResource SecondaryForeground}"
+                                    Opacity="0.55"
+                                    FontSize="12"
+                                    IsHitTestVisible="False"
+                                    VerticalAlignment="Center"
+                                    Margin="7,0,0,0"/>
+                            <TextBox x:Name="SearchBox"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Foreground="{DynamicResource DialogForeground}"
+                                    CaretBrush="{DynamicResource ForegroundText}"
+                                    FontSize="12"
+                                    Padding="6,0"
+                                    VerticalContentAlignment="Center"
+                                    TextChanged="SearchBox_TextChanged"
+                                    PreviewKeyDown="SearchBox_PreviewKeyDown"/>
+                        </Grid>
+                        <!-- Kept a few px shorter than the 26px box and centered
+                             so its hover highlight sits inside the outline
+                             instead of covering the top/bottom border line. -->
+                        <Button x:Name="SearchHistoryButton"
+                                Grid.Column="1"
+                                Style="{StaticResource ToggleButtonStyle}"
+                                Width="22"
+                                Height="20"
+                                VerticalAlignment="Center"
+                                Margin="0,0,3,0"
+                                Click="SearchHistoryButton_Click"
+                                ToolTip="{x:Static services:Strings.SearchTooltipHistory}">
+                            <Path Data="M3,5 L7,9 L11,5"
+                                    Stroke="{DynamicResource ForegroundText}"
+                                    StrokeThickness="1.4"
+                                    StrokeStartLineCap="Round"
+                                    StrokeEndLineCap="Round"/>
+                        </Button>
+
+                        <!-- History dropdown. StaysOpen=False closes it on an
+                             outside click; selection is handled in code. -->
+                        <Popup x:Name="SearchHistoryPopup"
+                                PlacementTarget="{Binding ElementName=SearchBox}"
+                                Placement="Bottom"
+                                StaysOpen="False"
+                                AllowsTransparency="True"
+                                PopupAnimation="Fade">
+                            <Border Background="{DynamicResource PanelBackground}"
+                                    BorderBrush="{DynamicResource PanelBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="3"
+                                    MinWidth="180"
+                                    Effect="{DynamicResource MenuDropShadow}"
+                                    Margin="0,2,8,8">
+                                <ListBox x:Name="SearchHistoryList"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        MaxHeight="220"
+                                        Padding="2"
+                                        ItemContainerStyle="{StaticResource SearchHistoryItemStyle}"
+                                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                        PreviewMouseLeftButtonUp="SearchHistoryList_PreviewMouseLeftButtonUp">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0"
+                                                        Text="{Binding}"
+                                                        Foreground="{DynamicResource DialogForeground}"
+                                                        FontSize="12"
+                                                        VerticalAlignment="Center"
+                                                        TextTrimming="CharacterEllipsis"/>
+                                                <!-- Per-entry delete. Handled on its own Click;
+                                                     the list's PreviewMouseLeftButtonUp skips
+                                                     clicks that land on a Button so this doesn't
+                                                     also fill the search box. -->
+                                                <Button Grid.Column="1"
+                                                        Width="18"
+                                                        Height="18"
+                                                        Margin="6,0,0,0"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Cursor="Hand"
+                                                        ToolTip="{x:Static services:Strings.SearchHistoryDeleteTooltip}"
+                                                        Click="SearchHistoryDelete_Click">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border x:Name="Bd"
+                                                                    Background="Transparent"
+                                                                    CornerRadius="3">
+                                                                <Path Data="M3,3 L9,9 M9,3 L3,9"
+                                                                        Stroke="{DynamicResource SecondaryForeground}"
+                                                                        StrokeThickness="1.3"
+                                                                        StrokeStartLineCap="Round"
+                                                                        StrokeEndLineCap="Round"
+                                                                        HorizontalAlignment="Center"
+                                                                        VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver"
+                                                                        Value="True">
+                                                                    <Setter TargetName="Bd"
+                                                                            Property="Background"
+                                                                            Value="{DynamicResource HoverBackground}"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                        </Popup>
+                    </Grid>
+
+                    <Border Height="1"
+                            Background="{DynamicResource PanelDividerBrush}"/>
+                </StackPanel>
+
+                <!-- Status line: scanning progress / result count / hints, over
+                     a thin pulsing bar shown only while a scan runs (see
+                     SetSearchScanning) - an honest "working" indicator, not a
+                     fake percentage. -->
+                <StackPanel Grid.Row="1">
+                    <TextBlock x:Name="SearchStatusText"
+                            Text="{x:Static services:Strings.SearchStatusEmpty}"
+                            Foreground="{DynamicResource ShowMoreForeground}"
+                            Opacity="0.8"
+                            FontSize="11"
+                            Margin="10,6,10,4"/>
+                    <Border x:Name="SearchScanIndicator"
+                            Height="2"
+                            Margin="10,0,10,4"
+                            Background="{DynamicResource AccentForeground}"
+                            Visibility="Collapsed"/>
+                </StackPanel>
+
+                <!-- Results: two lines per entry - dim italic folder path over
+                     the filename. Single click activates (see
+                     SearchResultsList_PreviewMouseLeftButtonUp). -->
+                <ListBox x:Name="SearchResultsList"
+                        Grid.Row="2"
+                        Style="{StaticResource FavoritesListBoxStyle}"
+                        Background="{DynamicResource SidebarBackground}"
+                        BorderThickness="0"
+                        Padding="6,2,4,6"
+                        ItemContainerStyle="{StaticResource SearchResultItemStyle}"
+                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                        ScrollViewer.VerticalScrollBarVisibility="Auto"
+                        VirtualizingPanel.IsVirtualizing="True"
+                        VirtualizingPanel.VirtualizationMode="Recycling"
+                        PreviewMouseLeftButtonDown="SearchResultsList_PreviewMouseLeftButtonDown"
+                        PreviewMouseMove="SearchResultsList_PreviewMouseMove"
+                        PreviewMouseLeftButtonUp="SearchResultsList_PreviewMouseLeftButtonUp"
+                        PreviewMouseRightButtonDown="SearchResultsList_PreviewMouseRightButtonDown"
+                        KeyDown="SearchResultsList_KeyDown">
+                    <ListBox.ItemTemplate>
+                        <!-- One row is either a folder header or a file (see
+                             Models/SearchRow). IsHeader swaps which line shows:
+                             the folder path once, or an indented filename under
+                             it. -->
+                        <DataTemplate>
+                            <Grid>
+                                <!-- Folder header: folder icon (gated by the
+                                     same ShowFolderIcons toggle as the tree) +
+                                     path. -->
+                                <StackPanel x:Name="HeaderPanel"
+                                        Orientation="Horizontal"
+                                        Visibility="Collapsed">
+                                    <Image Source="{Binding IconUri}"
+                                            Width="{DynamicResource IconSize}"
+                                            Height="{DynamicResource IconSize}"
+                                            Margin="0,0,6,0"
+                                            VerticalAlignment="Center"
+                                            Visibility="{DynamicResource FolderIconVisibility}"
+                                            RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    <TextBlock Text="{Binding DirectoryPath}"
+                                            Foreground="{DynamicResource FolderNameForeground}"
+                                            FontStyle="Italic"
+                                            FontSize="{DynamicResource SearchHeaderFontSize}"
+                                            VerticalAlignment="Center"
+                                            TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                                <!-- File row: per-extension file icon (gated by
+                                     ShowFileIcons) + name, indented under the
+                                     folder header. -->
+                                <StackPanel x:Name="FilePanel"
+                                        Orientation="Horizontal"
+                                        Margin="14,0,0,0">
+                                    <Image Source="{Binding IconUri}"
+                                            Width="{DynamicResource IconSize}"
+                                            Height="{DynamicResource IconSize}"
+                                            Margin="0,0,6,0"
+                                            VerticalAlignment="Center"
+                                            Visibility="{DynamicResource FileIconVisibility}"
+                                            RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    <!-- Inlines built by SearchHighlightBehavior
+                                         (matched run in the highlight color)
+                                         instead of a plain Text binding. -->
+                                    <TextBlock local:SearchHighlightBehavior.Row="{Binding}"
+                                            Foreground="{DynamicResource FileNameForeground}"
+                                            FontSize="{DynamicResource SearchFileFontSize}"
+                                            VerticalAlignment="Center"
+                                            TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                                <!-- "… 더 보기 (N개)" - clickable, raises the page
+                                     limit (SearchResultsList_PreviewMouseLeftButtonUp). -->
+                                <TextBlock x:Name="ShowMoreText"
+                                        Text="{Binding ShowMoreLabel}"
+                                        Foreground="{DynamicResource ShowMoreForeground}"
+                                        FontStyle="Italic"
+                                        FontSize="{DynamicResource SearchHeaderFontSize}"
+                                        VerticalAlignment="Center"
+                                        Visibility="Collapsed"/>
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsHeader}"
+                                        Value="True">
+                                    <Setter TargetName="HeaderPanel"
+                                            Property="Visibility"
+                                            Value="Visible"/>
+                                    <Setter TargetName="FilePanel"
+                                            Property="Visibility"
+                                            Value="Collapsed"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsShowMore}"
+                                        Value="True">
+                                    <Setter TargetName="FilePanel"
+                                            Property="Visibility"
+                                            Value="Collapsed"/>
+                                    <Setter TargetName="ShowMoreText"
+                                            Property="Visibility"
+                                            Value="Visible"/>
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
         </Grid>
 
         <!-- Resize grip: overlaid on the content's right edge (see the note on

@@ -15,30 +15,38 @@ public static class IconResolver
     private static readonly Lazy<IconMap> Map = new(LoadMap);
 
     public static string Resolve(FileSystemItem item)
-    {
-        string? png = item.IsDirectory ? ResolveFolder(item) : ResolveFile(item);
-        return IconBasePath + png;
-    }
+        => IconBasePath + (item.IsDirectory
+            ? ResolveFolderPng(item.Name, item.IsExpanded)
+            : ResolveFilePng(item.Name));
 
-    private static string ResolveFolder(FileSystemItem item)
+    // Name-based entry points for callers that don't have a FileSystemItem
+    // (the file-search results carry a SearchEntry). Folder headers use the
+    // collapsed folder icon.
+    public static string ResolveFileIcon(string fileName)
+        => IconBasePath + ResolveFilePng(fileName);
+
+    public static string ResolveFolderIcon(string folderName)
+        => IconBasePath + ResolveFolderPng(folderName, isExpanded: false);
+
+    private static string ResolveFolderPng(string name, bool isExpanded)
     {
         var map = Map.Value;
-        string nameLower = item.Name.ToLowerInvariant();
-        var table = item.IsExpanded ? map.FolderNamesExpanded : map.FolderNames;
+        string nameLower = name.ToLowerInvariant();
+        var table = isExpanded ? map.FolderNamesExpanded : map.FolderNames;
 
         if (table.TryGetValue(nameLower, out var png))
         {
             return png;
         }
 
-        var fallback = item.IsExpanded ? map.DefaultFolderExpanded : map.DefaultFolder;
-        return fallback ?? (item.IsExpanded ? FallbackFolderOpenIcon : FallbackFolderIcon);
+        var fallback = isExpanded ? map.DefaultFolderExpanded : map.DefaultFolder;
+        return fallback ?? (isExpanded ? FallbackFolderOpenIcon : FallbackFolderIcon);
     }
 
-    private static string ResolveFile(FileSystemItem item)
+    private static string ResolveFilePng(string name)
     {
         var map = Map.Value;
-        string nameLower = item.Name.ToLowerInvariant();
+        string nameLower = name.ToLowerInvariant();
 
         if (map.FileNames.TryGetValue(nameLower, out var byName))
         {

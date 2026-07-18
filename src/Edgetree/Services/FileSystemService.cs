@@ -56,6 +56,11 @@ public static class FileSystemService
         public int Compare(string? x, string? y) => StrCmpLogicalW(x ?? string.Empty, y ?? string.Empty);
     }
 
+    // The same Explorer-style natural name comparison LoadChildren uses,
+    // exposed so the file-search results can sort names identically (see
+    // MainWindow's results-only sort).
+    public static IComparer<string?> NaturalNameComparer => NaturalStringComparer.Instance;
+
     public static string NormalizeSortOverridePath(string path) => path.TrimEnd('\\');
 
     // Resolves which of the pre-made sort-override icon images (see

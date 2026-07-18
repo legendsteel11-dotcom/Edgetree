@@ -264,6 +264,8 @@ public partial class MainWindow : Window
         // already handled above by SetExpandedContentVisibility.
         FavoritesList.ItemsSource = _settings.Favorites;
 
+        InitializeSearch();
+
         Topmost = _settings.AlwaysOnTop || _settings.IsAutoHidden;
         if (Application.Current is App app)
         {
@@ -368,6 +370,12 @@ public partial class MainWindow : Window
         SetBrushColor("TreeGuideLineActiveBrush", light ? _settings.LightGuideLineActiveColorHex : _settings.GuideLineActiveColorHex);
         SetBrushColor("PanelDividerBrush", light ? _settings.LightPanelDividerColorHex : _settings.PanelDividerColorHex);
         SetBrushColor("HeaderBackground", light ? _settings.LightHeaderBackgroundColorHex : _settings.HeaderBackgroundColorHex);
+
+        // The results sort button's icon has its own light/dark variants (same
+        // as the folder override icon) - re-resolve it now that IsLightMode
+        // above reflects the current theme. ApplyColorSettings only ever runs
+        // from Loaded onward (after InitializeComponent), so the element exists.
+        UpdateSearchSortIcon();
     }
 
     private void SetBrushColor(string resourceKey, string hex)
@@ -427,6 +435,14 @@ public partial class MainWindow : Window
                 SetTreeFontSize(DefaultTreeFontSize);
                 e.Handled = true;
                 break;
+            case Key.F:
+                SetSearchViewActive(true);
+                e.Handled = true;
+                break;
+            case Key.E:
+                SetSearchViewActive(false);
+                e.Handled = true;
+                break;
         }
     }
 
@@ -461,6 +477,10 @@ public partial class MainWindow : Window
         {
             SaveCurrentWidth();
         }
+
+        // Stop a search scan's background walk promptly rather than letting it
+        // keep doing disk I/O during shutdown.
+        _searchScanCts?.Cancel();
 
         foreach (var watcher in _driveWatchers)
         {
@@ -818,6 +838,7 @@ public partial class MainWindow : Window
         // else here rather than needing a second code path.
         UpdateRootPathTextVisibility(visibility);
         ExplorerTree.Visibility = visibility;
+        SearchButton.Visibility = visibility;
         CollapseAllButton.Visibility = visibility;
         OptionsButton.Visibility = visibility;
         MinimizeButton.Visibility = visibility;
@@ -825,6 +846,13 @@ public partial class MainWindow : Window
         FavoritesList.Visibility = visibility;
         FavoritesSplitter.Visibility = visibility;
         VersionFooterBorder.Visibility = visibility;
+
+        // The search overlay only shows when it's both expanded AND search is
+        // the active view - collapsing to the auto-hide sliver hides it like
+        // everything else, and expanding back restores whichever view was up.
+        SearchView.Visibility = visibility == Visibility.Visible && _isSearchViewActive
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
         // RowDefinition heights don't auto-shrink just because their content is
         // hidden, so without this the favorites row/splitter (and the version
@@ -1361,8 +1389,12 @@ public partial class MainWindow : Window
     // but not for RefreshFolderPreservingState's own quiet reselect after a
     // resort/background change, where the user's current scroll position
     // should stay put; defaults to true so every existing caller keeps its
-    // current behavior unless it opts out.
-    private void NavigateToPath(string targetPath, bool pinToTop = true)
+    // current behavior unless it opts out. pinParentToTop pins the target's
+    // PARENT folder to the top instead of the target itself, while still
+    // selecting the target - used by search-result navigation so a found file
+    // lands in the context of its folder (folder at top, file selected below)
+    // rather than glued to the very top with its folder scrolled off.
+    private void NavigateToPath(string targetPath, bool pinToTop = true, bool pinParentToTop = false)
     {
         // Bumped here (not just when a navigation finishes and selects
         // something) so a second favorite clicked while RevealChainStep is
@@ -1418,7 +1450,7 @@ public partial class MainWindow : Window
             current = next;
         }
 
-        RevealChain(chain, myToken, pinToTop);
+        RevealChain(chain, myToken, pinToTop, pinParentToTop);
     }
 
     // Walks the loaded tree returning every fully-revealed ("더 보기" expanded)
@@ -1449,12 +1481,12 @@ public partial class MainWindow : Window
     // items, so each level has to be brought into view and laid out before
     // its own children's containers can be looked up. Starts the (possibly
     // asynchronous - see RevealChainStep) walk down the chain from the root.
-    private void RevealChain(List<FileSystemItem> chain, int token, bool pinToTop = true)
+    private void RevealChain(List<FileSystemItem> chain, int token, bool pinToTop = true, bool pinParentToTop = false)
     {
         // Overflow re-capping already ran up-front in NavigateToPath, so the
         // walk starts over a light tree; this only expands the path down to
         // the target and doesn't touch any other folder's expanded state.
-        RevealChainStep(chain, 0, ExplorerTree, token, pinToTop: pinToTop);
+        RevealChainStep(chain, 0, ExplorerTree, token, pinToTop: pinToTop, pinParentToTop: pinParentToTop);
     }
 
     // A container not being found isn't necessarily "it'll never exist" - a
@@ -1466,7 +1498,7 @@ public partial class MainWindow : Window
     // second click once whatever was in flight had finished on its own in the
     // meantime. Yielding via the dispatcher and trying again gives that
     // pending work an actual chance to complete first instead.
-    private void RevealChainStep(List<FileSystemItem> chain, int index, ItemsControl container, int token, int attempt = 0, bool pinToTop = true)
+    private void RevealChainStep(List<FileSystemItem> chain, int index, ItemsControl container, int token, int attempt = 0, bool pinToTop = true, bool pinParentToTop = false)
     {
         // A newer favorite click superseded this walk while it was waiting on a
         // container - stop rather than risking two walks interleaving their
@@ -1488,24 +1520,33 @@ public partial class MainWindow : Window
         var item = chain[index];
         if (container.ItemContainerGenerator.ContainerFromItem(item) is not TreeViewItem treeViewItem)
         {
-            // A cheap safety net for a genuine one-frame layout lag, and
-            // nothing more. It is NOT what makes a container appear: a
-            // container outside the virtualizing panel's viewport+cache is
-            // never going to materialize just because we looked again, no
-            // matter how many times. Several rounds of raising this ceiling
-            // (10 -> 40) chasing exactly that failure achieved nothing, which
-            // in hindsight was the clue that the miss was structural. The
-            // actual cause was drive roots falling outside the ROOT panel's
-            // cache - fixed by CacheLength on ExplorerTree in the XAML, not
-            // here.
-            if (attempt >= 5)
+            // A container outside the virtualizing panel's viewport+cache won't
+            // materialize just by looking again - which is exactly the case for
+            // a search result deep in a big folder (past the "더 보기" cap), the
+            // one place this reveal is now driven to a FILE rather than a
+            // shallow favorite folder. Actively scroll that index into view via
+            // its host panel so the container realizes, instead of retrying
+            // blindly until the ceiling and giving up (which left the previous
+            // selection in place - the "wrong file opens" bug). Harmless for the
+            // levels that were already realizing on their own: it only runs when
+            // the container is genuinely missing.
+            if (FindItemsHostPanel(container) is VirtualizingPanel hostPanel)
+            {
+                int itemIndex = container.Items.IndexOf(item);
+                if (itemIndex >= 0)
+                {
+                    hostPanel.BringIndexIntoViewPublic(itemIndex);
+                }
+            }
+
+            if (attempt >= 8)
             {
                 // Given it a real chance - genuinely gone (renamed/deleted), not just slow.
                 EndFavoriteNavigation(token);
                 return;
             }
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
-                new Action(() => RevealChainStep(chain, index, container, token, attempt + 1, pinToTop)));
+                new Action(() => RevealChainStep(chain, index, container, token, attempt + 1, pinToTop, pinParentToTop)));
             return;
         }
 
@@ -1520,23 +1561,35 @@ public partial class MainWindow : Window
 
         if (index == chain.Count - 1)
         {
-            FinishReveal(treeViewItem, token, pinToTop);
+            // pinParentToTop anchors the scroll on the parent folder (this
+            // step's `container`, the folder whose child we just revealed)
+            // while still selecting the target - so a searched file lands
+            // inside its folder's context. `container` is always a realized
+            // TreeViewItem for any target nested under a drive root; the
+            // fallback keeps the target as anchor otherwise.
+            var anchor = pinParentToTop && container is TreeViewItem parentItem ? parentItem : treeViewItem;
+            FinishReveal(treeViewItem, anchor, token, pinToTop);
         }
         else
         {
-            RevealChainStep(chain, index + 1, treeViewItem, token, pinToTop: pinToTop);
+            RevealChainStep(chain, index + 1, treeViewItem, token, pinToTop: pinToTop, pinParentToTop: pinParentToTop);
         }
     }
 
-    private void FinishReveal(TreeViewItem treeViewItem, int token, bool pinToTop = true)
+    // `selected` is the row that gets selected/focused; `anchor` is the row
+    // pinned to the top of the viewport when pinToTop is set. They're the same
+    // for a normal favorite navigation, but differ for a search-result jump
+    // (select the file, pin its parent folder) - see NavigateToPath's
+    // pinParentToTop.
+    private void FinishReveal(TreeViewItem selected, TreeViewItem anchor, int token, bool pinToTop = true)
     {
         // Still guarded while this fires: setting IsSelected raises
         // SelectedItemChanged synchronously, and the guard keeps that from
         // re-syncing (and possibly clearing) the favorites list. Cleared right
         // after, so subsequent user-driven selections sync normally again.
-        treeViewItem.IsSelected = true;
-        treeViewItem.BringIntoView();
-        treeViewItem.Focus();
+        selected.IsSelected = true;
+        selected.BringIntoView();
+        selected.Focus();
         EndFavoriteNavigation(token);
 
         if (!pinToTop)
@@ -1570,7 +1623,7 @@ public partial class MainWindow : Window
             }
             if (FindTreeScrollViewer() is { } scrollViewer)
             {
-                treeViewItem.BringIntoView(new Rect(0, 0, treeViewItem.ActualWidth, scrollViewer.ActualHeight));
+                anchor.BringIntoView(new Rect(0, 0, anchor.ActualWidth, scrollViewer.ActualHeight));
             }
         }));
     }
@@ -1579,6 +1632,33 @@ public partial class MainWindow : Window
     {
         ExplorerTree.ApplyTemplate();
         return ExplorerTree.Template.FindName("PART_TreeScrollViewer", ExplorerTree) as ScrollViewer;
+    }
+
+    // The panel that hosts an ItemsControl's own item containers (IsItemsHost).
+    // Used to force a specific child index to realize (BringIndexIntoViewPublic)
+    // when its container is virtualized away. Descent stops at nested
+    // TreeViewItems so this returns THIS control's items panel, not a
+    // grandchild folder's.
+    private static VirtualizingPanel? FindItemsHostPanel(DependencyObject root)
+    {
+        int count = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is System.Windows.Controls.Panel { IsItemsHost: true } panel)
+            {
+                return panel as VirtualizingPanel;
+            }
+            if (child is TreeViewItem)
+            {
+                continue;
+            }
+            if (FindItemsHostPanel(child) is { } found)
+            {
+                return found;
+            }
+        }
+        return null;
     }
 
     // Clears the "navigating from a favorite" guard when THIS walk is the one
@@ -2208,7 +2288,7 @@ public partial class MainWindow : Window
     {
         var dialog = new SaveFileDialog
         {
-            FileName = "SidebarExplorer-settings.json",
+            FileName = "Edgetree-settings.json",
             Filter = "JSON (*.json)|*.json",
             DefaultExt = ".json"
         };
@@ -2560,6 +2640,11 @@ public partial class MainWindow : Window
         double verticalPadding = Math.Max(0, baseVerticalPadding + _settings.RowSpacing);
         Resources["RowPadding"] = new Thickness(4, verticalPadding, 4, verticalPadding);
 
+        // Search result file rows use the same vertical rhythm as the tree (so
+        // the "행 간격" option and font zoom move them in step), just with the
+        // wider horizontal padding the results list already had.
+        Resources["SearchRowPadding"] = new Thickness(8, verticalPadding, 8, verticalPadding);
+
         double tabSpacing = Math.Clamp(_settings.TabSpacing, 4, 24);
         Resources["TabSpacingWidth"] = new GridLength(tabSpacing);
         // Split around the guide line's own fixed 1px BorderThickness (see
@@ -2602,6 +2687,14 @@ public partial class MainWindow : Window
         // no longer even show an icon to justify it.
         bool bothOff = !_settings.ShowFolderIcons && !_settings.ShowFileIcons;
         Resources["FileArrowGutterWidth"] = new GridLength(bothOff ? 0 : tabSpacing);
+
+        // Search result rows track the same zoom (Ctrl +/-) as the tree, so the
+        // filename matches the tree's current font and the folder-path header
+        // stays one step smaller (floored so it can't disappear at the smallest
+        // zoom). Bound as DynamicResource in the results DataTemplate.
+        double searchFileFont = ExplorerTree.FontSize;
+        Resources["SearchFileFontSize"] = searchFileFont;
+        Resources["SearchHeaderFontSize"] = Math.Max(searchFileFont - 1, 8.0);
     }
 
     private void ColorSettingsMenuItem_Click(object sender, RoutedEventArgs e)
@@ -2643,7 +2736,12 @@ public partial class MainWindow : Window
     }
 
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string RunValueName = "SidebarExplorer";
+    private const string RunValueName = "Edgetree";
+
+    // Pre-rebrand value name (app was named SidebarExplorer) - cleaned up
+    // below so an install that already had startup enabled doesn't end up
+    // with a dangling, wrongly-named entry sitting alongside the new one.
+    private const string OldRunValueName = "SidebarExplorer";
 
     // Registers/unregisters the currently-running exe under the per-user Run
     // key. Points at whatever path this process was actually launched from,
@@ -2673,6 +2771,8 @@ public partial class MainWindow : Window
         {
             return;
         }
+
+        key.DeleteValue(OldRunValueName, throwOnMissingValue: false);
 
         if (enabled)
         {
@@ -3295,7 +3395,7 @@ public partial class MainWindow : Window
         // auto-generated code-behind field the way named elements in the main
         // visual tree do, so these have to be found by position on the
         // ContextMenu itself instead.
-        if (sender is ContextMenu { Items: [MenuItem addFavoriteItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem sortMenu, _, _, MenuItem openWithItem, ..] })
+        if (sender is ContextMenu { Items: [MenuItem addFavoriteItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, _, _, _, _, _, MenuItem openWithCodeItem, ..] })
         {
             bool isFolder = ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true };
             addFavoriteItem.IsEnabled = isFolder;
@@ -3331,6 +3431,13 @@ public partial class MainWindow : Window
             // file-association picker.
             openWithItem.IsEnabled =
                 ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: false };
+
+            // Files and folders both make sense here - Code.exe opens either
+            // one directly - so this only gates on whether Code is actually
+            // installed (see ShellFileService.IsCodeRegistered), not on
+            // isFolder.
+            openWithCodeItem.IsEnabled =
+                ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false } && ShellFileService.IsCodeRegistered();
         }
     }
 
@@ -3844,6 +3951,14 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OpenWithCode_Click(object sender, RoutedEventArgs e)
+    {
+        if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false } item)
+        {
+            ShellFileService.OpenWithCode(item.FullPath);
+        }
+    }
+
     private void ShowProperties_Click(object sender, RoutedEventArgs e)
     {
         if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false } item)
@@ -4072,5 +4187,914 @@ public partial class MainWindow : Window
         _settings.LastSelectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
 
         _settingsService.Save(_settings);
+    }
+
+    // ===================================================================
+    // File search (Ctrl+F view). Phase 1: one folder scope, an in-memory,
+    // session-only index (no disk cache, no staleness) - see
+    // Services/FileSearchService and the design note in TODO.md.
+    // ===================================================================
+
+    // Folder group (default) or a global name/date sort, cycled by the sort
+    // button. FolderGroup clusters same-folder files under one header; the
+    // name/date modes sort globally and mostly break groups apart (with
+    // still-adjacent same-folder runs re-collapsing) - see RunSearchFilter.
+    private enum SearchSortMode { FolderGroup = 0, NameAsc = 1, NameDesc = 2, DateAsc = 3, DateDesc = 4 }
+
+    // Materialized rows (folder headers interleaved with capped file rows).
+    // Rebuilt and reassigned to SearchResultsList.ItemsSource wholesale on each
+    // filter - one Reset beats an ObservableCollection's Clear + N Adds (a
+    // notification per row) when a query can match up to the display cap.
+    private List<SearchRow> _searchRows = new();
+
+    // The full scanned scope, held on the UI thread. The background scan
+    // appends to it in batches via IProgress; every keystroke filters it into
+    // _searchRows. Filtering RAM is what the user experiences as "the index".
+    private readonly List<FileSearchService.SearchEntry> _searchEntries = new();
+
+    private System.Windows.Threading.DispatcherTimer? _searchDebounceTimer;
+    private CancellationTokenSource? _searchScanCts;
+    private bool _isSearchViewActive;
+    private bool _searchScanning;
+    private string? _searchScopeFolder;
+
+    // Drag-out candidate (a result file being pressed, before the move passes
+    // the drag threshold) - same press/threshold/drag pattern the tree uses, so
+    // a plain click still navigates and only a real drag copies the file out.
+    private System.Windows.Point? _searchDragStart;
+    private FileSearchService.SearchEntry? _searchDragCandidate;
+
+    // Results-only sort/grouping (independent of the tree's sort), cycled by
+    // the button in the scope row.
+    private SearchSortMode _searchSortMode = SearchSortMode.FolderGroup;
+
+    // Re-filtering the whole growing list on every streamed batch would be
+    // O(n^2) across a big scan; this throttles the mid-scan re-filter. A final,
+    // unthrottled filter always runs once the scan completes.
+    private int _lastSearchFilterTick;
+
+    // How many file rows the results currently show. Starts at one page and
+    // grows by a page each time "더 보기" is clicked; reset to one page whenever
+    // the query or scope changes.
+    private int _searchDisplayLimit = SearchResultDisplayCap;
+
+    // Terminal-style history recall in the search box (Up = older, Down = newer
+    // then back to the draft). -1 means "not navigating - showing the draft";
+    // otherwise an index into _settings.SearchHistory (0 = most recent). The
+    // draft is what was typed before the first Up, restored on the way back
+    // down. _suppressHistoryReset guards the programmatic SetText from the
+    // manual-edit reset in SearchBox_TextChanged.
+    private int _searchHistoryNavIndex = -1;
+    private string _searchHistoryDraft = string.Empty;
+    private bool _suppressHistoryReset;
+
+    private const int SearchResultDisplayCap = 1000;
+    private const int SearchHistoryMax = 15;
+
+    // Swapped onto SearchButtonIcon.Data (same idea as CollapseAllArrow): a
+    // magnifier while the explorer shows, a left chevron ("back") while search
+    // is up.
+    private static readonly Geometry SearchGlyphMagnifier =
+        Geometry.Parse("M4,7 A3.5,3.5 0 1 0 11,7 A3.5,3.5 0 1 0 4,7 M10,10 L13.5,13.5");
+    private static readonly Geometry SearchGlyphBack =
+        Geometry.Parse("M10,3 L5,8 L10,13");
+
+    private System.Windows.Media.Animation.Storyboard? _searchScanPulse;
+
+    private void InitializeSearch()
+    {
+        SearchResultsList.ItemsSource = _searchRows;
+
+        _searchDebounceTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(200)
+        };
+        _searchDebounceTimer.Tick += (_, _) =>
+        {
+            _searchDebounceTimer!.Stop();
+            RunSearchFilter();
+        };
+
+        // Honest "scanning is active" indicator - a pulsing thin bar. A real
+        // percentage gauge would be misleading: Directory.EnumerateFiles can
+        // block for seconds on a large/slow subtree, so the file count doesn't
+        // advance steadily (it stalls then jumps), and there's no total known
+        // up front. Only shown while a scan runs (see SetSearchScanning).
+        var pulse = new System.Windows.Media.Animation.DoubleAnimation
+        {
+            From = 1.0,
+            To = 0.3,
+            Duration = TimeSpan.FromMilliseconds(650),
+            AutoReverse = true,
+            RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
+        };
+        System.Windows.Media.Animation.Storyboard.SetTarget(pulse, SearchScanIndicator);
+        System.Windows.Media.Animation.Storyboard.SetTargetProperty(pulse, new PropertyPath(OpacityProperty));
+        _searchScanPulse = new System.Windows.Media.Animation.Storyboard();
+        _searchScanPulse.Children.Add(pulse);
+
+        _searchScopeFolder = _settings.LastSearchFolder;
+        _searchSortMode = (SearchSortMode)Math.Clamp(_settings.SearchSortMode, 0, 4);
+        UpdateSearchScopeText();
+        UpdateSearchSortIcon();
+    }
+
+    // Whether a search scope (a picked folder) is currently set at all.
+    private bool HasSearchScope => _searchScopeFolder is { Length: > 0 };
+
+    // Toggles the scanning flag and the pulsing activity indicator together.
+    private void SetSearchScanning(bool scanning)
+    {
+        _searchScanning = scanning;
+        if (scanning)
+        {
+            SearchScanIndicator.Visibility = Visibility.Visible;
+            _searchScanPulse?.Begin();
+        }
+        else
+        {
+            _searchScanPulse?.Stop();
+            SearchScanIndicator.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    // (Re)scans the current scope folder. Used by the refresh button and the
+    // lazy first scan when the view opens.
+    private void RescanCurrentScope()
+    {
+        if (_searchScopeFolder is { Length: > 0 } folder)
+        {
+            StartScopeScan(new[] { folder });
+        }
+    }
+
+    // Replaces the bound rows in one shot (see _searchRows) - reassigning
+    // ItemsSource to a fresh list is a single collection reset rather than a
+    // per-row notification storm.
+    private void SetSearchRows(List<SearchRow> rows)
+    {
+        _searchRows = rows;
+        SearchResultsList.ItemsSource = rows;
+    }
+
+    // Folder-group state uses the user-provided default icon; the four sort
+    // states reuse the same rotating field/direction icons as the per-folder
+    // sort override (which also swap their light variant on theme change - see
+    // the ApplyColorSettings call). aliginIconDefault has no "_L" light variant
+    // yet, so it's used as-is for both themes.
+    private void UpdateSearchSortIcon()
+    {
+        string uri = _searchSortMode == SearchSortMode.FolderGroup
+            ? "pack://application:,,,/Resources/Icons/aliginIconDefault.png"
+            : FileSystemService.FormatSortOverrideIconUri(
+                _searchSortMode is SearchSortMode.DateAsc or SearchSortMode.DateDesc ? FileSortField.Date : FileSortField.Name,
+                _searchSortMode is SearchSortMode.NameDesc or SearchSortMode.DateDesc);
+        SearchSortIcon.Source = new BitmapImage(new Uri(uri));
+    }
+
+    // Cycles 폴더그룹 -> 이름↑ -> 이름↓ -> 날짜↑ -> 날짜↓ -> 폴더그룹. Folder-group
+    // is the default (clusters same-folder results); the name/date states sort
+    // globally. Remembered separately from the tree's own sort.
+    private void SearchSortButton_Click(object sender, RoutedEventArgs e)
+    {
+        _searchSortMode = (SearchSortMode)(((int)_searchSortMode + 1) % 5);
+        _settings.SearchSortMode = (int)_searchSortMode;
+        _settingsService.Save(_settings);
+        UpdateSearchSortIcon();
+        RunSearchFilter();
+    }
+
+    private void SearchButton_Click(object sender, RoutedEventArgs e)
+        => SetSearchViewActive(!_isSearchViewActive);
+
+    // Single entry point for switching between the explorer and search views -
+    // keeps the button glyph/tooltip, the overlay's visibility, and focus all
+    // in sync regardless of what triggered it (button, Ctrl+F/E, or Esc).
+    private void SetSearchViewActive(bool active)
+    {
+        if (active == _isSearchViewActive)
+        {
+            // Already in the requested view - a repeat Ctrl+F still nudges
+            // focus back to the box if it drifted (e.g. into the results).
+            if (active)
+            {
+                FocusSearchBox();
+            }
+            return;
+        }
+
+        _isSearchViewActive = active;
+        SearchView.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+        SearchButtonIcon.Data = active ? SearchGlyphBack : SearchGlyphMagnifier;
+        SearchButton.ToolTip = active ? Strings.ToolTipExitSearch : Strings.ToolTipSearch;
+
+        if (active)
+        {
+            // Fresh history recall each time the view opens.
+            _searchHistoryNavIndex = -1;
+
+            // Lazy first scan: a remembered scope isn't walked at startup, only
+            // when search is actually opened, and only once per session unless
+            // the user hits refresh (or changes scope).
+            if (HasSearchScope && _searchEntries.Count == 0 && !_searchScanning)
+            {
+                RescanCurrentScope();
+            }
+            else
+            {
+                UpdateSearchStatus();
+            }
+            FocusSearchBox();
+        }
+        else
+        {
+            SearchHistoryPopup.IsOpen = false;
+            ExplorerTree.Focus();
+        }
+    }
+
+    private void FocusSearchBox()
+    {
+        // Deferred: when this runs from the same input event that revealed the
+        // view, the box isn't focusable yet in this layout pass.
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            SearchBox.Focus();
+            SearchBox.SelectAll();
+        }), System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    private void SearchBrowseButton_Click(object sender, RoutedEventArgs e)
+    {
+        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = Strings.SearchBrowseFolderDialogTitle,
+            UseDescriptionForTitle = true
+        };
+        if (_searchScopeFolder is { Length: > 0 } && Directory.Exists(_searchScopeFolder))
+        {
+            dialog.SelectedPath = _searchScopeFolder;
+        }
+
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        {
+            _searchScopeFolder = dialog.SelectedPath;
+            _settings.LastSearchFolder = _searchScopeFolder;
+            _settingsService.Save(_settings);
+            UpdateSearchScopeText();
+            StartScopeScan(new[] { _searchScopeFolder });
+        }
+    }
+
+    private void SearchRefreshButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (HasSearchScope)
+        {
+            RescanCurrentScope();
+        }
+    }
+
+    // Cancels any in-flight scan, clears the in-memory index + results, and
+    // walks the folder afresh on a background thread, streaming batches back to
+    // the UI thread where the current query is (re-)applied as they arrive.
+    private async void StartScopeScan(IReadOnlyList<string> roots)
+    {
+        // Supersede any in-flight scan, but don't dispose its CTS here - the
+        // background walk may still be observing that token. Each scan disposes
+        // its own CTS in the finally below, once its await has unwound.
+        _searchScanCts?.Cancel();
+
+        _searchEntries.Clear();
+        _searchDisplayLimit = SearchResultDisplayCap;
+        SetSearchRows(new List<SearchRow>());
+
+        var existingRoots = roots.Where(Directory.Exists).ToList();
+        if (existingRoots.Count == 0)
+        {
+            SetSearchScanning(false);
+            _searchScanCts = null;
+            SearchStatusText.Text = Strings.SearchStatusScopeMissing;
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _searchScanCts = cts;
+        // Checked (not the source) in the closures/continuation below - a token
+        // stays safe to query even after its source is disposed, so this never
+        // races the finally.
+        var token = cts.Token;
+
+        SetSearchScanning(true);
+        _lastSearchFilterTick = 0;
+        SearchStatusText.Text = string.Format(Strings.SearchStatusScanning, 0);
+
+        // Each scan's Progress closure captures its own token, so a stale batch
+        // queued before a newer scan cancelled this one no-ops instead of
+        // corrupting the newer scan's list.
+        var progress = new Progress<IReadOnlyList<FileSearchService.SearchEntry>>(batch =>
+        {
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _searchEntries.AddRange(batch);
+            SearchStatusText.Text = string.Format(Strings.SearchStatusScanning, _searchEntries.Count);
+
+            int now = Environment.TickCount;
+            if (now - _lastSearchFilterTick > 150 && SearchBox.Text.Trim().Length > 0)
+            {
+                _lastSearchFilterTick = now;
+                RunSearchFilter(updateStatusWhileScanning: false);
+                // RunSearchFilter would otherwise leave a result count up; put
+                // the scanning progress line back so it stays visible.
+                SearchStatusText.Text = string.Format(Strings.SearchStatusScanning, _searchEntries.Count);
+            }
+        });
+
+        try
+        {
+            await FileSearchService.ScanAsync(existingRoots, progress, token);
+
+            if (!token.IsCancellationRequested)
+            {
+                SetSearchScanning(false);
+                RunSearchFilter();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer scan / scope change - leave state alone.
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            if (!token.IsCancellationRequested)
+            {
+                SetSearchScanning(false);
+                SearchStatusText.Text = Strings.SearchStatusScopeMissing;
+            }
+        }
+        finally
+        {
+            // Only clear the field if a newer scan hasn't already replaced it.
+            if (ReferenceEquals(_searchScanCts, cts))
+            {
+                _searchScanCts = null;
+            }
+            cts.Dispose();
+        }
+    }
+
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        SearchPlaceholder.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        // A new/changed query always starts back at the first page of results.
+        _searchDisplayLimit = SearchResultDisplayCap;
+
+        // A manual edit ends history recall - the next Up should start over
+        // from the most recent entry, not continue from wherever recall left
+        // off. Programmatic recall sets _suppressHistoryReset so it's exempt.
+        if (!_suppressHistoryReset)
+        {
+            _searchHistoryNavIndex = -1;
+        }
+
+        _searchDebounceTimer?.Stop();
+        _searchDebounceTimer?.Start();
+    }
+
+    private void SearchBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Enter:
+                _searchDebounceTimer?.Stop();
+                CommitSearchHistory(SearchBox.Text);
+                _searchHistoryNavIndex = -1;
+                RunSearchFilter();
+                e.Handled = true;
+                break;
+            case Key.Escape:
+                if (SearchHistoryPopup.IsOpen)
+                {
+                    SearchHistoryPopup.IsOpen = false;
+                }
+                else
+                {
+                    SetSearchViewActive(false);
+                }
+                e.Handled = true;
+                break;
+            case Key.Up:
+                // Recall an older search into the box.
+                NavigateSearchHistory(older: true);
+                e.Handled = true;
+                break;
+            case Key.Down:
+                // While recalling history, Down walks back toward the draft;
+                // only from the draft state does it dive into the results list
+                // (landing on the first file row, past the folder header).
+                if (_searchHistoryNavIndex >= 0)
+                {
+                    NavigateSearchHistory(older: false);
+                    e.Handled = true;
+                    break;
+                }
+                int firstFile = -1;
+                for (int i = 0; i < _searchRows.Count; i++)
+                {
+                    if (!_searchRows[i].IsHeader)
+                    {
+                        firstFile = i;
+                        break;
+                    }
+                }
+                if (firstFile >= 0)
+                {
+                    SearchResultsList.SelectedIndex = firstFile;
+                    if (SearchResultsList.ItemContainerGenerator.ContainerFromIndex(firstFile) is ListBoxItem item)
+                    {
+                        item.Focus();
+                    }
+                    e.Handled = true;
+                }
+                break;
+        }
+    }
+
+    // Walks _settings.SearchHistory (most-recent-first). older=true moves back
+    // in time (Up); older=false moves forward (Down), and stepping past the
+    // most recent restores the draft the user was typing before recall began.
+    private void NavigateSearchHistory(bool older)
+    {
+        var history = _settings.SearchHistory;
+        if (history.Count == 0)
+        {
+            return;
+        }
+
+        if (older)
+        {
+            if (_searchHistoryNavIndex == -1)
+            {
+                _searchHistoryDraft = SearchBox.Text;
+                _searchHistoryNavIndex = 0;
+            }
+            else if (_searchHistoryNavIndex < history.Count - 1)
+            {
+                _searchHistoryNavIndex++;
+            }
+            else
+            {
+                return; // already at the oldest entry
+            }
+        }
+        else
+        {
+            if (_searchHistoryNavIndex <= 0)
+            {
+                _searchHistoryNavIndex = -1;
+                SetSearchTextFromHistory(_searchHistoryDraft);
+                return;
+            }
+            _searchHistoryNavIndex--;
+        }
+
+        SetSearchTextFromHistory(history[_searchHistoryNavIndex]);
+    }
+
+    // Sets the box text without the TextChanged handler treating it as a manual
+    // edit (which would reset history recall); the recalled query still triggers
+    // a live filter via the normal debounce.
+    private void SetSearchTextFromHistory(string text)
+    {
+        _suppressHistoryReset = true;
+        SearchBox.Text = text;
+        SearchBox.CaretIndex = text.Length;
+        _suppressHistoryReset = false;
+    }
+
+    // Applies the current query to the in-memory index, capping how many rows
+    // materialize so a query matching thousands of files still renders
+    // instantly (the status line notes when the display was capped).
+    private void RunSearchFilter(bool updateStatusWhileScanning = true)
+    {
+        string query = SearchBox.Text;
+        if (query.Trim().Length == 0)
+        {
+            SetSearchRows(new List<SearchRow>());
+            if (!_searchScanning || updateStatusWhileScanning)
+            {
+                UpdateSearchStatus();
+            }
+            return;
+        }
+
+        // Refuse a match-everything query (e.g. "*", "*.*") - it just sorts and
+        // counts the entire index for no useful result. Requiring at least one
+        // letter or digit keeps "*.txt" / "report" working while blocking the
+        // pure-wildcard case.
+        if (!query.Any(char.IsLetterOrDigit))
+        {
+            SetSearchRows(new List<SearchRow>());
+            if (!_searchScanning || updateStatusWhileScanning)
+            {
+                SearchStatusText.Text = Strings.SearchStatusTooBroad;
+            }
+            return;
+        }
+
+        var matcher = FileSearchService.BuildMatcher(query);
+        var matches = new List<FileSearchService.SearchEntry>();
+        foreach (var entry in _searchEntries)
+        {
+            if (matcher(entry.FileName))
+            {
+                matches.Add(entry);
+            }
+        }
+
+        // For a plain substring query, the matched run is highlighted in the
+        // filename (see SearchHighlightBehavior). A wildcard query has no single
+        // literal substring to point at, so it's left unhighlighted.
+        string trimmedQuery = query.Trim();
+        bool highlightable = trimmedQuery.Length > 0
+            && !trimmedQuery.Contains('*') && !trimmedQuery.Contains('?');
+
+        // Order per the current mode. FolderGroup clusters by folder then name
+        // (so a folder's matches are contiguous -> one header each); the
+        // name/date modes sort globally (mostly breaking groups apart, with any
+        // still-adjacent same-folder run re-collapsing under one header below).
+        IEnumerable<FileSearchService.SearchEntry> ordered = _searchSortMode switch
+        {
+            SearchSortMode.NameAsc => matches.OrderBy(x => (string?)x.FileName, FileSystemService.NaturalNameComparer),
+            SearchSortMode.NameDesc => matches.OrderByDescending(x => (string?)x.FileName, FileSystemService.NaturalNameComparer),
+            SearchSortMode.DateAsc => matches.OrderBy(x => x.LastWriteTime),
+            SearchSortMode.DateDesc => matches.OrderByDescending(x => x.LastWriteTime),
+            _ => matches
+                .OrderBy(x => (string?)x.DirectoryPath, FileSystemService.NaturalNameComparer)
+                .ThenBy(x => (string?)x.FileName, FileSystemService.NaturalNameComparer),
+        };
+
+        // Collapse consecutive runs of the same folder into one header + its
+        // files; the cap counts FILE rows only, so headers never eat into it.
+        var rows = new List<SearchRow>();
+        int total = matches.Count;
+        int shownFiles = 0;
+        string? currentFolder = null;
+        foreach (var entry in ordered)
+        {
+            if (shownFiles >= _searchDisplayLimit)
+            {
+                break;
+            }
+            if (!string.Equals(entry.DirectoryPath, currentFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                currentFolder = entry.DirectoryPath;
+                rows.Add(SearchRow.Header(entry.DirectoryPath));
+            }
+
+            int matchStart = highlightable
+                ? entry.FileName.IndexOf(trimmedQuery, StringComparison.OrdinalIgnoreCase)
+                : -1;
+            rows.Add(SearchRow.File(entry, matchStart, matchStart >= 0 ? trimmedQuery.Length : 0));
+            shownFiles++;
+        }
+
+        // A clickable "더 보기" row when more matched than the current page shows
+        // (SearchResultsList_PreviewMouseLeftButtonUp raises _searchDisplayLimit).
+        if (total > shownFiles)
+        {
+            rows.Add(SearchRow.ShowMore(string.Format(Strings.ShowMoreFormat, total - shownFiles)));
+        }
+
+        SetSearchRows(rows);
+
+        if (_searchScanning && !updateStatusWhileScanning)
+        {
+            return;
+        }
+
+        if (total == 0)
+        {
+            SearchStatusText.Text = Strings.SearchStatusNoResults;
+        }
+        else if (total > shownFiles)
+        {
+            SearchStatusText.Text = string.Format(Strings.SearchStatusResultsCapped, shownFiles, total);
+        }
+        else
+        {
+            SearchStatusText.Text = string.Format(Strings.SearchStatusResults, total);
+        }
+    }
+
+    private void UpdateSearchStatus()
+    {
+        if (_searchScanning)
+        {
+            SearchStatusText.Text = string.Format(Strings.SearchStatusScanning, _searchEntries.Count);
+        }
+        else if (!HasSearchScope)
+        {
+            SearchStatusText.Text = Strings.SearchScopeNone;
+        }
+        else
+        {
+            SearchStatusText.Text = Strings.SearchStatusEmpty;
+        }
+    }
+
+    private void UpdateSearchScopeText()
+    {
+        SearchScopeText.Text = _searchScopeFolder is { Length: > 0 }
+            ? _searchScopeFolder
+            : Strings.SearchScopeNone;
+    }
+
+    private void SearchHistoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (SearchHistoryPopup.IsOpen)
+        {
+            SearchHistoryPopup.IsOpen = false;
+            return;
+        }
+        if (_settings.SearchHistory.Count == 0)
+        {
+            return;
+        }
+        SearchHistoryList.ItemsSource = _settings.SearchHistory.ToList();
+        SearchHistoryPopup.IsOpen = true;
+    }
+
+    private void SearchHistoryList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        // A click on the per-entry delete button is its own action - don't also
+        // treat it as "pick this history entry" and fill the box.
+        if ((e.OriginalSource as DependencyObject)?.FindAncestor<Button>() is not null)
+        {
+            return;
+        }
+
+        if (ItemsControl.ContainerFromElement(SearchHistoryList, (DependencyObject)e.OriginalSource) is ListBoxItem { Content: string query })
+        {
+            SearchHistoryPopup.IsOpen = false;
+            SearchBox.Text = query;
+            SearchBox.CaretIndex = query.Length;
+            _searchDebounceTimer?.Stop();
+            RunSearchFilter();
+            FocusSearchBox();
+        }
+    }
+
+    private void SearchHistoryDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: string query })
+        {
+            return;
+        }
+
+        _settings.SearchHistory.RemoveAll(h => string.Equals(h, query, StringComparison.OrdinalIgnoreCase));
+        _settingsService.Save(_settings);
+
+        if (_settings.SearchHistory.Count == 0)
+        {
+            SearchHistoryPopup.IsOpen = false;
+            return;
+        }
+
+        // Rebind the (now shorter) list so the dropdown updates in place.
+        SearchHistoryList.ItemsSource = _settings.SearchHistory.ToList();
+    }
+
+    // Records a file result as a drag-out candidate on press (file rows only -
+    // not headers or the "더 보기" row). The actual drag starts in
+    // SearchResultsList_PreviewMouseMove once the pointer passes the threshold.
+    private void SearchResultsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _searchDragStart = null;
+        _searchDragCandidate = null;
+        if (ItemsControl.ContainerFromElement(SearchResultsList, (DependencyObject)e.OriginalSource) is ListBoxItem { Content: SearchRow { Entry: { } entry } })
+        {
+            _searchDragStart = e.GetPosition(SearchResultsList);
+            _searchDragCandidate = entry;
+        }
+    }
+
+    private void SearchResultsList_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_searchDragCandidate is not { } entry || _searchDragStart is not { } start ||
+            e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(SearchResultsList);
+        bool pastThreshold =
+            Math.Abs(current.X - start.X) >= SystemParameters.MinimumHorizontalDragDistance ||
+            Math.Abs(current.Y - start.Y) >= SystemParameters.MinimumVerticalDragDistance;
+        if (!pastThreshold)
+        {
+            return;
+        }
+
+        _searchDragStart = null;
+        _searchDragCandidate = null;
+
+        // FileDrop + Copy-only, exactly like the tree's own drag-out (see
+        // TreeViewItem_PreviewMouseMove): any app that accepts an Explorer file
+        // drop accepts this, and Copy (never Move) means dragging a result into
+        // Explorer/another app can never remove the original file.
+        var data = new DataObject(DataFormats.FileDrop, new[] { entry.FullPath });
+        DragDrop.DoDragDrop(SearchResultsList, data, DragDropEffects.Copy);
+    }
+
+    private void SearchResultsList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (ItemsControl.ContainerFromElement(SearchResultsList, (DependencyObject)e.OriginalSource) is not ListBoxItem { Content: SearchRow row })
+        {
+            return;
+        }
+
+        if (row.IsShowMore)
+        {
+            _searchDisplayLimit += SearchResultDisplayCap;
+            RunSearchFilter();
+        }
+        else if (row.Entry is { } entry)
+        {
+            ActivateSearchResult(entry);
+        }
+    }
+
+    private void SearchResultsList_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && SearchResultsList.SelectedItem is SearchRow { Entry: { } entry })
+        {
+            ActivateSearchResult(entry);
+            e.Handled = true;
+        }
+    }
+
+    // Return to the explorer view and reveal the picked file there, reusing the
+    // exact same reveal-and-select machinery favorites navigation uses (which
+    // already handles files past a folder's "더 보기" cap). pinParentToTop lands
+    // the file inside its folder's context (folder at the top, file selected
+    // below) rather than gluing the file itself to the very top.
+    private void ActivateSearchResult(FileSearchService.SearchEntry entry)
+    {
+        // Opening a result is a strong "this query was useful" signal, so
+        // remember it - live typing alone never commits history (that would
+        // spam it with every prefix), only an explicit Enter or this do.
+        CommitSearchHistory(SearchBox.Text);
+
+        SetSearchViewActive(false);
+        NavigateToPath(entry.FullPath, pinParentToTop: true);
+    }
+
+    private void CommitSearchHistory(string query)
+    {
+        query = query.Trim();
+        if (query.Length == 0)
+        {
+            return;
+        }
+
+        // Move-to-front, de-duplicated case-insensitively, capped.
+        _settings.SearchHistory.RemoveAll(h => string.Equals(h, query, StringComparison.OrdinalIgnoreCase));
+        _settings.SearchHistory.Insert(0, query);
+        while (_settings.SearchHistory.Count > SearchHistoryMax)
+        {
+            _settings.SearchHistory.RemoveAt(_settings.SearchHistory.Count - 1);
+        }
+        _settingsService.Save(_settings);
+    }
+
+    // ---- Search result context menu ----------------------------------
+    // Every action targets the right-clicked result's path directly, so no
+    // FileSystemItem/tree node is involved.
+
+    private FileSearchService.SearchEntry? SelectedSearchResult
+        => (SearchResultsList.SelectedItem as SearchRow)?.Entry;
+
+    // Right-click selects the row under the cursor (WPF doesn't do this for
+    // right-click on its own) so the menu's handlers act on the intended item.
+    private void SearchResultsList_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (ItemsControl.ContainerFromElement(SearchResultsList, (DependencyObject)e.OriginalSource) is ListBoxItem item)
+        {
+            item.IsSelected = true;
+        }
+    }
+
+    private void SearchResultContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        // Menu items in a resource-dictionary ContextMenu have no code-behind
+        // field, so the "Code로 열기" item is found by position (index 2, after
+        // Open and Open With) - same approach as ExplorerItemContextMenu_Opened.
+        if (sender is ContextMenu { Items: [_, _, MenuItem openWithCodeItem, ..] })
+        {
+            openWithCodeItem.IsEnabled = ShellFileService.IsCodeRegistered();
+        }
+    }
+
+    private void SearchOpen_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedSearchResult is { } entry)
+        {
+            ShellFileService.OpenWithDefaultApp(entry.FullPath);
+        }
+    }
+
+    private void SearchOpenWith_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedSearchResult is { } entry)
+        {
+            ShellFileService.OpenWithPicker(entry.FullPath);
+        }
+    }
+
+    private void SearchOpenWithCode_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedSearchResult is { } entry)
+        {
+            ShellFileService.OpenWithCode(entry.FullPath);
+        }
+    }
+
+    private void SearchCopy_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedSearchResult is { } entry)
+        {
+            FileOperationService.CopyToClipboard(entry.FullPath);
+        }
+    }
+
+    private void SearchCopyPath_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedSearchResult is { } entry)
+        {
+            FileOperationService.CopyPathToClipboard(entry.FullPath);
+        }
+    }
+
+    private void SearchOpenTerminal_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedSearchResult is { } entry && entry.DirectoryPath.Length > 0)
+        {
+            ShellFileService.OpenTerminal(entry.DirectoryPath);
+        }
+    }
+
+    private void SearchReveal_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedSearchResult is { } entry)
+        {
+            ShellFileService.RevealInExplorer(entry.FullPath);
+        }
+    }
+
+    private void SearchProperties_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedSearchResult is { } entry)
+        {
+            ShellFileService.ShowProperties(entry.FullPath);
+        }
+    }
+
+    private void SearchDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedSearchResult is not { } entry)
+        {
+            return;
+        }
+
+        var result = MessageBox.Show(
+            this,
+            string.Format(Strings.DeleteConfirmBody, entry.FileName),
+            Strings.DeleteConfirmTitle,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        if (!FileOperationService.TryDeleteToRecycleBin(entry.FullPath, out var error))
+        {
+            if (error is not null)
+            {
+                MessageBox.Show(this, error, Strings.DeleteFailedTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            return;
+        }
+
+        // Drop it from the in-memory index and re-run the filter so the shown
+        // results and the count both reflect the deletion. The tree, if the
+        // parent folder is expanded there, refreshes itself via its own
+        // FileSystemWatcher.
+        _searchEntries.RemoveAll(x => string.Equals(x.FullPath, entry.FullPath, StringComparison.OrdinalIgnoreCase));
+        RunSearchFilter();
     }
 }

@@ -20,6 +20,7 @@ public static class Strings
     public static string MenuDelete = "삭제";
     public static string MenuCopyPath = "경로 복사";
     public static string MenuOpenTerminal = "터미널에서 열기";
+    public static string MenuOpenWithCode = "Code로 열기";
     public static string MenuRevealInExplorer = "탐색기에서 위치 열기";
     public static string MenuProperties = "속성";
     public static string MenuRemoveFavorite = "즐겨찾기에서 제거";
@@ -99,6 +100,29 @@ public static class Strings
     // FileSystemItem.DisplayCap items. {0} is the hidden count.
     public static string ShowMoreFormat = "… 더 보기 ({0}개)";
 
+    // File search (Ctrl+F view - see MainWindow's search-view methods and
+    // Services/FileSearchService)
+    public static string ToolTipSearch = "검색 (Ctrl+F)";
+    public static string ToolTipExitSearch = "탐색기로 (Ctrl+E)";
+    public static string SearchTooltipBrowseFolder = "검색할 폴더 선택";
+    public static string SearchTooltipRefresh = "다시 인덱싱";
+    public static string SearchTooltipHistory = "최근 검색어";
+    public static string SearchTooltipSort = "결과 정렬 전환 (이름/날짜, 오름/내림)";
+    public static string SearchHistoryDeleteTooltip = "이 검색어 삭제";
+    public static string SearchBrowseFolderDialogTitle = "검색할 폴더를 선택하세요";
+    public static string SearchScopeNone = "검색할 폴더를 선택하세요 →";
+    public static string SearchBoxPlaceholder = "검색";
+    // {0} = files scanned so far.
+    public static string SearchStatusScanning = "인덱싱 중… ({0})";
+    // {0} = result count.
+    public static string SearchStatusResults = "{0}개 결과";
+    // {0} = shown, {1} = total (results were capped for display).
+    public static string SearchStatusResultsCapped = "{0} / {1}개 결과 표시";
+    public static string SearchStatusNoResults = "결과 없음";
+    public static string SearchStatusTooBroad = "검색어가 너무 광범위합니다 (글자나 숫자를 포함하세요)";
+    public static string SearchStatusEmpty = "검색어를 입력하세요 (부분일치, *? 와일드카드, ↑↓:검색기록)";
+    public static string SearchStatusScopeMissing = "폴더를 찾을 수 없습니다. 새로고침하거나 다른 폴더를 선택하세요.";
+
     // Color settings window
     public static string ColorSettingsTitle = "색상 설정";
     public static string ColorLabelBackground = "탐색기 배경";
@@ -134,6 +158,7 @@ public static class Strings
     public static string AboutDateLabel = "날짜";
     public static string AboutLicenseLabel = "라이센스 요약";
     public static string AboutGithubLabel = "GitHub";
+    public static string AboutWebsiteLabel = "웹사이트";
     public static string AboutAuthorValue = "pjh85336@gmail.com";
     public static string AboutLicenseSummary =
         "MIT 라이선스. 번들된 아이콘은 Material Icon Theme 프로젝트(MIT)에서 가져왔습니다. " +
@@ -141,6 +166,8 @@ public static class Strings
 
     // Tray
     public static string TrayOpen = "열기";
+    public static string TrayHide = "트레이로";
+    public static string TrayAbout = "정보";
     public static string TrayExit = "종료";
 
     // MessageBox titles/bodies
@@ -195,6 +222,7 @@ public static class Strings
         MenuDelete = "Delete";
         MenuCopyPath = "Copy Path";
         MenuOpenTerminal = "Open in Terminal";
+        MenuOpenWithCode = "Open with Code";
         MenuRevealInExplorer = "Reveal in Explorer";
         MenuProperties = "Properties";
         MenuRemoveFavorite = "Remove from Favorites";
@@ -237,6 +265,24 @@ public static class Strings
         RootPathLabel = "This PC";
         ShowMoreFormat = "… Show {0} more";
 
+        ToolTipSearch = "Search (Ctrl+F)";
+        ToolTipExitSearch = "Back to Explorer (Ctrl+E)";
+        SearchTooltipBrowseFolder = "Choose folder to search";
+        SearchTooltipRefresh = "Reindex";
+        SearchTooltipHistory = "Recent searches";
+        SearchTooltipSort = "Cycle result sort (name/date, asc/desc)";
+        SearchHistoryDeleteTooltip = "Remove this search";
+        SearchBrowseFolderDialogTitle = "Choose a folder to search";
+        SearchScopeNone = "Choose a folder to search →";
+        SearchBoxPlaceholder = "Search";
+        SearchStatusScanning = "Indexing… ({0})";
+        SearchStatusResults = "{0} results";
+        SearchStatusResultsCapped = "Showing {0} of {1} results";
+        SearchStatusNoResults = "No results";
+        SearchStatusTooBroad = "Search is too broad (include a letter or digit)";
+        SearchStatusEmpty = "Type to search (substring, * ? wildcards, ↑↓: history)";
+        SearchStatusScopeMissing = "Folder not found. Refresh or choose another folder.";
+
         ColorSettingsTitle = "Color Settings";
         ColorLabelBackground = "Explorer Background";
         ColorLabelFolderNameFont = "Folder Name";
@@ -267,11 +313,14 @@ public static class Strings
         AboutAuthorLabel = "Author";
         AboutDateLabel = "Date";
         AboutLicenseLabel = "License Summary";
+        AboutWebsiteLabel = "Website";
         AboutLicenseSummary =
             "MIT License. Bundled icons are from the Material Icon Theme project (MIT). " +
             "Provided as-is, without warranty; use is at your own discretion.";
 
         TrayOpen = "Open";
+        TrayHide = "Send to Tray";
+        TrayAbout = "About";
         TrayExit = "Exit";
 
         PasteFailedTitle = "Paste Failed";

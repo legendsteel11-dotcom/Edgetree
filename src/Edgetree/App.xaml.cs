@@ -13,6 +13,7 @@ namespace SidebarExplorer.App;
 public partial class App : Application
 {
     private NotifyIcon? _trayIcon;
+    private ToolStripMenuItem? _trayToggleItem;
 
     // Held for the app's whole lifetime (a field, not a local) so it isn't
     // released early by the GC - see OnStartup/OnExit.
@@ -70,9 +71,18 @@ public partial class App : Application
         _trayIcon.MouseClick += TrayIcon_MouseClick;
 
         var contextMenu = new ContextMenuStrip();
-        contextMenu.Items.Add(Strings.TrayOpen, null, (_, _) => RestoreMainWindow());
+        _trayToggleItem = new ToolStripMenuItem(Strings.TrayOpen, null, (_, _) => ToggleMainWindowTray());
+        contextMenu.Items.Add(_trayToggleItem);
+        contextMenu.Items.Add(new ToolStripSeparator());
+        contextMenu.Items.Add(Strings.TrayAbout, null, (_, _) => ShowAboutCentered());
         contextMenu.Items.Add(new ToolStripSeparator());
         contextMenu.Items.Add(Strings.TrayExit, null, (_, _) => Shutdown());
+
+        // The window can be shown/hidden by other means (title bar "_"
+        // button, restoring from taskbar) between menu openings, so the
+        // toggle item's label is refreshed right before it's actually shown
+        // rather than once at construction time.
+        contextMenu.Opening += (_, _) => UpdateTrayToggleItem();
         _trayIcon.ContextMenuStrip = contextMenu;
     }
 
@@ -82,6 +92,53 @@ public partial class App : Application
         {
             RestoreMainWindow();
         }
+    }
+
+    private void UpdateTrayToggleItem()
+    {
+        if (_trayToggleItem is null)
+        {
+            return;
+        }
+
+        bool isWindowVisible = MainWindow is { IsVisible: true };
+        _trayToggleItem.Text = isWindowVisible ? Strings.TrayHide : Strings.TrayOpen;
+    }
+
+    // Same open/hide split the title bar's own "_" button and tray click use
+    // (see MainWindow.MinimizeButton_Click / RestoreMainWindow) - just picks
+    // which of the two applies based on current visibility, per the TODO
+    // request that this read "트레이로/닫기" instead of always "열기/닫기".
+    private void ToggleMainWindowTray()
+    {
+        if (MainWindow is not { } window)
+        {
+            return;
+        }
+
+        if (window.IsVisible)
+        {
+            window.Hide();
+            IsTrayIconVisible = true;
+        }
+        else
+        {
+            RestoreMainWindow();
+        }
+    }
+
+    // Opened from the tray, where the window this would normally be
+    // positioned relative to (the options button) may itself be hidden - so
+    // this centers on the screen instead, per the TODO request, rather than
+    // reusing MainWindow.PositionNearOptionsButton.
+    private void ShowAboutCentered()
+    {
+        var window = new AboutWindow
+        {
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            Owner = MainWindow
+        };
+        window.ShowDialog();
     }
 
     public void RestoreMainWindow()
