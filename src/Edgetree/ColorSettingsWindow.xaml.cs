@@ -247,49 +247,49 @@ public partial class ColorSettingsWindow : Window
         _onChanged();
     }
 
-    private void BackgroundSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void BackgroundSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(BackgroundSwatch, () => CurrentBackgroundColorHex, hex => CurrentBackgroundColorHex = hex);
 
-    private void FolderNameFontSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void FolderNameFontSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(FolderNameFontSwatch, () => CurrentFolderNameColorHex, hex => CurrentFolderNameColorHex = hex);
 
-    private void FolderNameHighlightFontSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void FolderNameHighlightFontSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(FolderNameHighlightFontSwatch, () => CurrentFolderNameHighlightColorHex, hex => CurrentFolderNameHighlightColorHex = hex);
 
-    private void FileNameFontSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void FileNameFontSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(FileNameFontSwatch, () => CurrentFileNameColorHex, hex => CurrentFileNameColorHex = hex);
 
-    private void FileNameHighlightFontSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void FileNameHighlightFontSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(FileNameHighlightFontSwatch, () => CurrentFileNameHighlightColorHex, hex => CurrentFileNameHighlightColorHex = hex);
 
-    private void SelectionSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void SelectionSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(SelectionSwatch, () => CurrentSelectionColorHex, hex => CurrentSelectionColorHex = hex);
 
-    private void HistorySwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void HistorySwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(HistorySwatch, () => CurrentHistoryBackgroundColorHex, hex => CurrentHistoryBackgroundColorHex = hex);
 
-    private void HoverBackgroundSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void HoverBackgroundSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(HoverBackgroundSwatch, () => CurrentHoverBackgroundColorHex, hex => CurrentHoverBackgroundColorHex = hex);
 
-    private void FolderNameHoverFontSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void FolderNameHoverFontSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(FolderNameHoverFontSwatch, () => CurrentFolderNameHoverColorHex, hex => CurrentFolderNameHoverColorHex = hex);
 
-    private void FileNameHoverFontSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void FileNameHoverFontSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(FileNameHoverFontSwatch, () => CurrentFileNameHoverColorHex, hex => CurrentFileNameHoverColorHex = hex);
 
-    private void ShowMoreFontSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void ShowMoreFontSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(ShowMoreFontSwatch, () => CurrentShowMoreColorHex, hex => CurrentShowMoreColorHex = hex);
 
-    private void GuideLineSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void GuideLineSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(GuideLineSwatch, () => CurrentGuideLineColorHex, hex => CurrentGuideLineColorHex = hex);
 
-    private void GuideLineActiveSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void GuideLineActiveSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(GuideLineActiveSwatch, () => CurrentGuideLineActiveColorHex, hex => CurrentGuideLineActiveColorHex = hex);
 
-    private void HeaderSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void HeaderSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(HeaderSwatch, () => CurrentHeaderBackgroundColorHex, hex => CurrentHeaderBackgroundColorHex = hex);
 
-    private void PanelDividerSwatch_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void PanelDividerSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(PanelDividerSwatch, () => CurrentPanelDividerColorHex, hex => CurrentPanelDividerColorHex = hex);
 
     // Shared across every PickColor call (and, being static, across every time
@@ -303,6 +303,20 @@ public partial class ColorSettingsWindow : Window
     // Windows' own color picker (System.Windows.Forms.ColorDialog, already
     // available - the project already references WinForms elsewhere for the
     // tray icon and Recycle Bin support) rather than building a custom one.
+    //
+    // Every swatch calls this from MouseLeftButtonUP, never Down, and that
+    // matters more than it looks. This opens a NATIVE modal dialog, which runs
+    // its own message loop: opening it from the down event means the dialog
+    // appears while the button is still physically held, and the release that
+    // follows is consumed by that loop instead of reaching WPF. WPF is then
+    // left believing the left button is still down, and every drag gesture in
+    // the app begins with exactly one test - `e.LeftButton == Pressed`. With
+    // that stuck true, merely moving the cursor over the tree afterwards starts
+    // a drag nobody asked for, which takes the mouse capture and has no button
+    // release coming to end it - the app keeps receiving all mouse input while
+    // every other window stops responding. Reported after a long session in
+    // which colors had just been changed. Waiting for the release keeps the
+    // gesture WPF sees complete before the native loop takes over.
     private void PickColor(Border swatch, Func<string> getHex, Action<string> setHex)
     {
         var current = (Color)ColorConverter.ConvertFromString(getHex());

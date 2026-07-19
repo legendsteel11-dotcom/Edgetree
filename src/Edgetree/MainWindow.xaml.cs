@@ -303,6 +303,8 @@ public partial class MainWindow : Window
         // up (drive roots visible, just not yet re-expanded) before that
         // work runs, rather than reading as a startup freeze/flicker.
         Dispatcher.BeginInvoke(RestoreTreeState, System.Windows.Threading.DispatcherPriority.Background);
+
+        StartStuckCaptureWatchdog();
     }
 
     private void RestoreTreeState()
@@ -903,7 +905,27 @@ public partial class MainWindow : Window
             // Windows.Count > 1 covers the Color Settings and About windows -
             // separate windows too, so working inside one reads exactly like
             // walking away from the sidebar.
-            return _openMenus.Count > 0 || Application.Current.Windows.Count > 1;
+            //
+            // The search history dropdown is a Popup rather than a ContextMenu,
+            // so it reports through none of the above - but it takes mouse
+            // capture exactly as a menu does, which is how it closes on an
+            // outside click. The capture watchdog would otherwise pull that out
+            // from under it (see StartStuckCaptureWatchdog).
+            return IsCapturingUiOpen || Application.Current.Windows.Count > 1;
+        }
+    }
+
+    // The subset that actually holds the mouse: menus and the history popup
+    // take capture (with no button down) for as long as they are open, which is
+    // how they close on an outside click. Split out from the property above
+    // because the capture watchdog must key off exactly this and not off
+    // whether some dialog window happens to be open - see its own comment.
+    private bool IsCapturingUiOpen
+    {
+        get
+        {
+            _openMenus.RemoveWhere(menu => !menu.IsOpen);
+            return _openMenus.Count > 0 || SearchHistoryPopup.IsOpen;
         }
     }
 
@@ -942,6 +964,110 @@ public partial class MainWindow : Window
         double x = cursor.X / dpi.DpiScaleX;
         double y = cursor.Y / dpi.DpiScaleY;
         return x >= Left && x <= Left + Width && y >= Top && y <= Top + Height;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr GetCapture();
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    private System.Windows.Threading.DispatcherTimer? _stuckCaptureWatchdog;
+
+    // A mouse capture that outlives whatever took it makes Windows route ALL
+    // mouse input to this app: the sidebar still highlights rows under the
+    // cursor while every other window stops responding to clicks, the pointer
+    // appears to jump, and a press released over another app can land as a
+    // stray click or context menu there. Reported after ~8 hours of use with
+    // many drags out to another application, and confirmed by the giveaway
+    // detail that Edgetree alone still tracked the mouse; it also matches an
+    // earlier "nothing is clickable after waking from sleep" report.
+    //
+    // Capture is taken in several places (the OLE drag loop, the header grab)
+    // and can be stranded by paths outside this code entirely - a drag source
+    // destroyed mid-drag, a suspend/resume in the middle of a gesture. Rather
+    // than trying to enumerate every way it can leak, this asserts the
+    // invariant directly once a second: with no mouse button held and no menu
+    // open, nothing in this app has any business holding capture.
+    //
+    // Both the WPF-level and Win32-level captures are checked. The OLE drag
+    // loop takes the latter without WPF necessarily knowing, so Mouse.Captured
+    // alone would miss exactly the case this was written for.
+    private void StartStuckCaptureWatchdog()
+    {
+        _stuckCaptureWatchdog = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        _stuckCaptureWatchdog.Tick += (_, _) =>
+        {
+            if (System.Windows.Forms.Control.MouseButtons != System.Windows.Forms.MouseButtons.None)
+            {
+                return;
+            }
+
+            // Deliberately NOT IsMenuOrDialogOpen: that also reports true while
+            // a dialog window is open, and a dialog does not hold the mouse -
+            // so using it here would switch this watchdog off for as long as
+            // Color Settings or About were up, and switch it off permanently if
+            // that window count ever failed to return to one. A safety net must
+            // not share a failure mode with the thing it is protecting against.
+            // Only the UI that genuinely captures with no button held is
+            // excluded: menus and the history popup.
+            if (IsCapturingUiOpen)
+            {
+                return;
+            }
+
+            var wpfCapture = Mouse.Captured;
+            var win32Capture = GetCapture();
+            if (wpfCapture is null && win32Capture == IntPtr.Zero)
+            {
+                return;
+            }
+
+            if (wpfCapture is not null)
+            {
+                Mouse.Capture(null);
+            }
+
+            if (win32Capture != IntPtr.Zero)
+            {
+                ReleaseCapture();
+            }
+
+            LogStuckCapture(wpfCapture, win32Capture);
+        };
+        _stuckCaptureWatchdog.Start();
+    }
+
+    // Debug builds only - this exists to answer one question ("does capture
+    // actually get stranded, or is the theory wrong?") and there is no reason
+    // to ship a log file for it. If the file stays empty while the symptom
+    // recurs, the diagnosis is wrong and the cause is elsewhere.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogStuckCapture(IInputElement? wpfCapture, IntPtr win32Capture)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+
+            string held = wpfCapture is not null && win32Capture != IntPtr.Zero
+                ? $"WPF({wpfCapture.GetType().Name}) + Win32(0x{win32Capture:X})"
+                : wpfCapture is not null
+                    ? $"WPF({wpfCapture.GetType().Name})"
+                    : $"Win32(0x{win32Capture:X})";
+
+            File.AppendAllText(
+                Path.Combine(dir, "capture-watchdog.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  released stuck capture: {held}{Environment.NewLine}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Diagnostics must never be the reason something breaks.
+        }
     }
 
     private void StartAutoHideOutsideClickWatch()
@@ -3675,7 +3801,33 @@ public partial class MainWindow : Window
         // same-drive drop, which read as an inconsistent surprise next to
         // every external-drop-in always being a safe copy.
         var data = new DataObject(DataFormats.FileDrop, new[] { item.FullPath });
-        DragDrop.DoDragDrop((DependencyObject)sender, data, DragDropEffects.Copy);
+
+        // Source is the TreeView, NOT the TreeViewItem this started on. The
+        // item is a virtualized, recycled container, and a background refresh
+        // (see QueueExternalRefresh) rebuilds a folder's children wholesale -
+        // either of which can destroy the very element that DoDragDrop's modal
+        // loop is holding as its drag source, part-way through a drag that
+        // lasts as long as it takes to reach another application. When the loop
+        // then ends, the mouse capture it took has nothing valid to hand back
+        // to, and a capture that outlives the drag makes this app keep
+        // receiving mouse input while the cursor is over other windows - which
+        // looks exactly like the pointer jumping and clicking on its own. The
+        // search-results drag already passed its stable ListBox for this
+        // reason; the tree was the one place still passing the item.
+        //
+        // The finally is belt-and-braces for the same failure: whatever the
+        // drag leaves behind, capture is not allowed to outlive this method.
+        try
+        {
+            DragDrop.DoDragDrop(ExplorerTree, data, DragDropEffects.Copy);
+        }
+        finally
+        {
+            if (Mouse.Captured is not null)
+            {
+                Mouse.Capture(null);
+            }
+        }
     }
 
     // DragEnter/DragOver/Drop all bubble, and every TreeViewItem has its own
@@ -5446,7 +5598,21 @@ public partial class MainWindow : Window
         // drop accepts this, and Copy (never Move) means dragging a result into
         // Explorer/another app can never remove the original file.
         var data = new DataObject(DataFormats.FileDrop, new[] { entry.FullPath });
-        DragDrop.DoDragDrop(SearchResultsList, data, DragDropEffects.Copy);
+
+        // Already sourced from the stable list rather than a row container; the
+        // finally matches the tree's for the same reason - see the note there
+        // on a mouse capture outliving the drag.
+        try
+        {
+            DragDrop.DoDragDrop(SearchResultsList, data, DragDropEffects.Copy);
+        }
+        finally
+        {
+            if (Mouse.Captured is not null)
+            {
+                Mouse.Capture(null);
+            }
+        }
     }
 
     private void SearchResultsList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)

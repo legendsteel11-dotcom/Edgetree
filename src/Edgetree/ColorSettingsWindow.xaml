@@ -203,7 +203,7 @@
                         Grid.Row="0"
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
-                        MouseLeftButtonDown="FolderNameFontSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="FolderNameFontSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="1"
                         Grid.Column="0"
@@ -215,7 +215,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="FolderNameHighlightFontSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="FolderNameHighlightFontSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="2"
                         Grid.Column="0"
@@ -227,7 +227,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="FolderNameHoverFontSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="FolderNameHoverFontSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="3"
                         Grid.Column="0"
@@ -239,7 +239,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="FileNameFontSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="FileNameFontSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="4"
                         Grid.Column="0"
@@ -251,7 +251,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="FileNameHighlightFontSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="FileNameHighlightFontSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="5"
                         Grid.Column="0"
@@ -263,7 +263,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="FileNameHoverFontSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="FileNameHoverFontSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="6"
                         Grid.Column="0"
@@ -275,7 +275,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="ShowMoreFontSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="ShowMoreFontSwatch_MouseLeftButtonUp"/>
 
                 <!-- Faint divider between the folder/file name colors above
                      and the general app colors below. -->
@@ -294,7 +294,7 @@
                         Grid.Row="8"
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
-                        MouseLeftButtonDown="HeaderSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="HeaderSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="9"
                         Grid.Column="0"
@@ -306,7 +306,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="HistorySwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="HistorySwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="10"
                         Grid.Column="0"
@@ -318,7 +318,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="BackgroundSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="BackgroundSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="11"
                         Grid.Column="0"
@@ -330,7 +330,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="SelectionSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="SelectionSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="12"
                         Grid.Column="0"
@@ -342,7 +342,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="HoverBackgroundSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="HoverBackgroundSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="13"
                         Grid.Column="0"
@@ -354,7 +354,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="GuideLineSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="GuideLineSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="14"
                         Grid.Column="0"
@@ -366,7 +366,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="GuideLineActiveSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="GuideLineActiveSwatch_MouseLeftButtonUp"/>
 
                 <TextBlock Grid.Row="15"
                         Grid.Column="0"
@@ -378,7 +378,7 @@
                         Grid.Column="1"
                         Style="{StaticResource ColorSwatchStyle}"
                         Margin="0,10,0,0"
-                        MouseLeftButtonDown="PanelDividerSwatch_MouseLeftButtonDown"/>
+                        MouseLeftButtonUp="PanelDividerSwatch_MouseLeftButtonUp"/>
 
                 <StackPanel Grid.Row="16"
                         Grid.Column="0"
