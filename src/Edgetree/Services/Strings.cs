@@ -97,6 +97,7 @@ public static class Strings
     public static string MenuMaxItemsPerFolder = "한 번에 표시할 개수";
     public static string MenuTabSpacing = "탭 간격";
     public static string MenuRowSpacing = "행 간격";
+    public static string MenuScrollBarThickness = "스크롤바 두께";
     public static string MenuExportSettings = "설정 내보내기...";
     public static string MenuImportSettings = "설정 가져오기...";
     public static string MenuResetSettings = "전체 설정 초기화...";
@@ -304,6 +305,7 @@ public static class Strings
         MenuMaxItemsPerFolder = "Items per Folder";
         MenuTabSpacing = "Indent Width";
         MenuRowSpacing = "Row Spacing";
+        MenuScrollBarThickness = "Scrollbar Width";
         MenuExportSettings = "Export Settings...";
         MenuImportSettings = "Import Settings...";
         MenuResetSettings = "Reset All Settings...";

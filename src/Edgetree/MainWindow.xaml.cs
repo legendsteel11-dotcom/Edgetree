@@ -2237,7 +2237,7 @@ public partial class MainWindow : Window
         // "색상 변경" item, neither of which has state to sync here.
         if (sender is ContextMenu
             {
-                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, _, _, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem autoHideSliverWidthRow, MenuItem sortMenu, MenuItem languageMenu, ..]
+                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, _, _, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem autoHideSliverWidthRow, MenuItem scrollBarThicknessRow, MenuItem sortMenu, MenuItem languageMenu, ..]
             })
         {
             // Nothing expanded means nothing to collapse - grey it out rather
@@ -2255,15 +2255,6 @@ public partial class MainWindow : Window
             dockOnRight.IsChecked = _settings.DockOnRight;
             autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
 
-            // Header is now a Grid (label in a "*" column, this stepper's own
-            // StackPanel right-aligned in an "Auto" one - see MainWindow.xaml)
-            // rather than one flat StackPanel, so the value TextBlock is one
-            // level deeper than it used to be.
-            if (autoHideSliverWidthRow.Header is Grid { Children: [_, StackPanel { Children: [_, TextBlock sliverWidthValueText, _] }] })
-            {
-                sliverWidthValueText.Text = _settings.AutoHideSliverWidth.ToString();
-            }
-
             if (sortMenu.Items is [MenuItem byName, MenuItem byDate, _, MenuItem ascending, MenuItem descending])
             {
                 byName.IsChecked = !_settings.SortByDate;
@@ -2272,27 +2263,17 @@ public partial class MainWindow : Window
                 descending.IsChecked = _settings.SortDescending;
             }
 
-            // Read off the live tree, not _settings - the two agree, but the
-            // tree is what SetTreeFontSize actually drives.
-            if (fontSizeRow.Header is Grid { Children: [_, StackPanel { Children: [_, TextBlock fontSizeValueText, _] }] })
-            {
-                fontSizeValueText.Text = ((int)ExplorerTree.FontSize).ToString();
-            }
-
-            if (maxItemsRow.Header is Grid { Children: [_, StackPanel { Children: [_, TextBlock maxItemsValueText, _] }] })
-            {
-                maxItemsValueText.Text = _settings.MaxItemsPerFolder.ToString();
-            }
-
-            if (tabSpacingRow.Header is Grid { Children: [_, StackPanel { Children: [_, TextBlock tabSpacingValueText, _] }] })
-            {
-                tabSpacingValueText.Text = _settings.TabSpacing.ToString();
-            }
-
-            if (rowSpacingRow.Header is Grid { Children: [_, StackPanel { Children: [_, TextBlock rowSpacingValueText, _] }] })
-            {
-                rowSpacingValueText.Text = _settings.RowSpacing.ToString();
-            }
+            // Each stepper's value and its two buttons' enabled state, so a row
+            // already sitting at a limit shows that the moment the menu opens
+            // rather than only after a click that does nothing. Font size reads
+            // off the live tree, not _settings - the two agree, but the tree is
+            // what SetTreeFontSize actually drives.
+            UpdateStepperRow(fontSizeRow, ExplorerTree.FontSize, TreeFontSizeSteps[0], TreeFontSizeSteps[^1]);
+            UpdateStepperRow(maxItemsRow, _settings.MaxItemsPerFolder, 1, 50);
+            UpdateStepperRow(tabSpacingRow, _settings.TabSpacing, 4, 24);
+            UpdateStepperRow(rowSpacingRow, _settings.RowSpacing, -4, 8);
+            UpdateStepperRow(autoHideSliverWidthRow, _settings.AutoHideSliverWidth, 3, 8);
+            UpdateStepperRow(scrollBarThicknessRow, _settings.ScrollBarThickness, 6, 20);
 
             // languageMenu's first child is the non-interactive restart note
             // (see the XAML) - skipped here via the leading discard.
@@ -2331,15 +2312,7 @@ public partial class MainWindow : Window
             RefreshAllLoadedFolders();
         }
 
-        // sender is whichever stepper Button was clicked; its logical parent
-        // is the inner (-, value, +) StackPanel nested in the row's Header
-        // Grid (label in one column, this StackPanel right-aligned in the
-        // other - see MainWindow.xaml) - the value TextBlock sits at the same
-        // position regardless of which button fired.
-        if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
-        {
-            valueText.Text = value.ToString();
-        }
+        UpdateStepperRow(sender, value, 1, 50);
     }
 
     private void TabSpacingDecrement_Click(object sender, RoutedEventArgs e)
@@ -2363,10 +2336,7 @@ public partial class MainWindow : Window
             ApplyLayoutMetrics();
         }
 
-        if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
-        {
-            valueText.Text = value.ToString();
-        }
+        UpdateStepperRow(sender, value, 4, 24);
     }
 
     private void FontSizeDecrement_Click(object sender, RoutedEventArgs e)
@@ -2384,10 +2354,7 @@ public partial class MainWindow : Window
     {
         StepTreeFontSize(direction);
 
-        if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
-        {
-            valueText.Text = ((int)ExplorerTree.FontSize).ToString();
-        }
+        UpdateStepperRow(sender, ExplorerTree.FontSize, TreeFontSizeSteps[0], TreeFontSizeSteps[^1]);
     }
 
     private void RowSpacingDecrement_Click(object sender, RoutedEventArgs e)
@@ -2415,10 +2382,7 @@ public partial class MainWindow : Window
             FitFavoritesPanel();
         }
 
-        if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
-        {
-            valueText.Text = value.ToString();
-        }
+        UpdateStepperRow(sender, value, -4, 8);
     }
 
     // Options ("...") menu's "기본 정렬" - a deliberate global change, so every
@@ -3072,6 +3036,51 @@ public partial class MainWindow : Window
         }
     }
 
+    // Every stepper row in the options menu has the same shape - a label, then
+    // [− value +] - so writing the value and greying out whichever button has
+    // nothing left to do is one place, reached two ways: from the button that
+    // was just clicked (sender is that Button), and from the row itself when
+    // the menu opens (sender is the MenuItem). Without the greying out, a
+    // stepper sitting at its limit still looks pressable and silently does
+    // nothing, which reads as the app ignoring the click rather than the value
+    // having an end.
+    private static void UpdateStepperRow(object sender, double value, double min, double max)
+    {
+        StackPanel? stepper = sender switch
+        {
+            Button { Parent: StackPanel panel } => panel,
+            MenuItem { Header: Grid { Children: [_, StackPanel panel] } } => panel,
+            _ => null
+        };
+
+        if (stepper is not { Children: [Button minus, TextBlock valueText, Button plus] })
+        {
+            return;
+        }
+
+        valueText.Text = ((int)value).ToString();
+        minus.IsEnabled = value > min;
+        plus.IsEnabled = value < max;
+    }
+
+    private void ScrollBarThicknessDecrement_Click(object sender, RoutedEventArgs e)
+        => StepScrollBarThickness(sender, -1);
+
+    private void ScrollBarThicknessIncrement_Click(object sender, RoutedEventArgs e)
+        => StepScrollBarThickness(sender, +1);
+
+    private void StepScrollBarThickness(object sender, int delta)
+    {
+        int value = Math.Clamp(_settings.ScrollBarThickness + delta, 6, 20);
+        if (value != _settings.ScrollBarThickness)
+        {
+            _settings.ScrollBarThickness = value;
+            ApplyLayoutMetrics();
+        }
+
+        UpdateStepperRow(sender, value, 6, 20);
+    }
+
     private void AutoHideSliverWidthDecrement_Click(object sender, RoutedEventArgs e)
         => StepAutoHideSliverWidth(sender, -1);
 
@@ -3096,10 +3105,7 @@ public partial class MainWindow : Window
             _settings.AutoHideSliverWidth = value;
         }
 
-        if (sender is Button { Parent: StackPanel { Children: [_, TextBlock valueText, _] } })
-        {
-            valueText.Text = value.ToString();
-        }
+        UpdateStepperRow(sender, value, 3, 8);
     }
 
     // Same live-swap approach as ApplyColorSettings: replacing the resource
@@ -3186,6 +3192,14 @@ public partial class MainWindow : Window
         // their own comments) so the tree and favorites rows always match.
         double verticalPadding = RowVerticalPadding;
         Resources["RowPadding"] = new Thickness(4, verticalPadding, 4, verticalPadding);
+
+        // Not scaled by the font like the metrics around it: this is a pointer
+        // target, so it wants to stay the size the user picked regardless of
+        // how large the text is. The lane beside the content is the bar plus
+        // its 1px divider (see MinimalScrollViewerTemplate).
+        double scrollBarThickness = Math.Clamp(_settings.ScrollBarThickness, 6, 20);
+        Resources["ScrollBarThickness"] = scrollBarThickness;
+        Resources["ScrollGutterWidth"] = new GridLength(scrollBarThickness + 1);
 
         // Search result file rows use the same vertical rhythm as the tree (so
         // the "행 간격" option and font zoom move them in step), just with the
@@ -5670,8 +5684,26 @@ public partial class MainWindow : Window
         // spam it with every prefix), only an explicit Enter or this do.
         CommitSearchHistory(SearchBox.Text);
 
-        SetSearchViewActive(false);
-        NavigateToPath(entry.FullPath, pinParentToTop: true);
+        // Deferred, and this is not cosmetic. The mouse path into here is
+        // SearchResultsList_PreviewMouseLeftButtonUp - a PREVIEW handler, so it
+        // runs before the ListBox handles that same release itself. A ListBox
+        // takes the mouse capture on button-down (that is how it tracks
+        // dragging across items), and gives it back when it processes the up.
+        // Collapsing the search view inline here tears the list out of the
+        // visual tree in between: the capture is taken, and the code that would
+        // return it never gets a live element to return it from.
+        //
+        // A capture stranded that way makes Windows keep routing every mouse
+        // message to this app - the sidebar still tracks the cursor while other
+        // windows stop responding to clicks. Confirmed in the wild: the
+        // watchdog's log recorded exactly this, "WPF(ListBox)", 23 minutes into
+        // a session. Letting the event finish first means the ListBox releases
+        // its own capture normally, before anything is hidden.
+        Dispatcher.BeginInvoke(() =>
+        {
+            SetSearchViewActive(false);
+            NavigateToPath(entry.FullPath, pinParentToTop: true);
+        }, System.Windows.Threading.DispatcherPriority.Input);
     }
 
     private void CommitSearchHistory(string query)

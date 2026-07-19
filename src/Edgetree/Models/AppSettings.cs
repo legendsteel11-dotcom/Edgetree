@@ -176,6 +176,17 @@ public class AppSettings
     // default, 0 meaning no change from that default.
     public int RowSpacing { get; set; } = 0;
 
+    // Thickness of the overlay scrollbar, and with it the width of the lane
+    // reserved for it beside the content (that lane is this plus the 1px
+    // divider - see MainWindow.xaml's MinimalScrollViewerTemplate). Exposed as
+    // an option because taste on this genuinely splits: the same bar reads as
+    // "tidy" to one person and "impossible to grab" to another, and it costs
+    // horizontal space in a sidebar that is already narrow. User-adjustable
+    // 6~20, defaulting to 12: the 8 it first shipped at was chosen to be
+    // unobtrusive, but the bar is a pointer target before it is decoration and
+    // 8 was awkward to grab. 6 is there for whoever still wants it hairline.
+    public int ScrollBarThickness { get; set; } = 12;
+
     // Folder icons only - file icons (already distinct per extension) are
     // unaffected either way. A VS Code-minimal-theme-style option: off hides
     // just the folder glyph, leaving the expand arrow and name.

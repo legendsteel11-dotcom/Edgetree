@@ -172,6 +172,10 @@
              icons off) where RowIcon is Collapsed and so can't carry the
              alignment shift itself. -->
         <system:Double x:Key="IconSize">16</system:Double>
+        <!-- Both replaced from ApplyLayoutMetrics; these are the values they
+             hold until it first runs, and match AppSettings' own defaults. -->
+        <system:Double x:Key="ScrollBarThickness">12</system:Double>
+        <GridLength x:Key="ScrollGutterWidth">13</GridLength>
         <Thickness x:Key="FolderRowIconMargin">0,0,6,0</Thickness>
         <Thickness x:Key="FileRowIconMargin">0,0,6,0</Thickness>
         <Thickness x:Key="FileNameMargin">0,0,0,0</Thickness>
@@ -523,6 +527,21 @@
                                 <Setter TargetName="Bd"
                                         Property="Background"
                                         Value="{DynamicResource ControlHoverBackground}"/>
+                            </Trigger>
+                            <!-- After the hover trigger so it wins for a
+                                 disabled button. A stepper at its limit greys
+                                 out that direction instead of staying lit and
+                                 doing nothing when pressed. -->
+                            <Trigger Property="IsEnabled"
+                                    Value="False">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="Transparent"/>
+                                <Setter TargetName="Bd"
+                                        Property="Opacity"
+                                        Value="0.35"/>
+                                <Setter Property="Cursor"
+                                        Value="Arrow"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -894,6 +913,36 @@
                             <Button Content="+"
                                     Style="{StaticResource MenuStepperButtonStyle}"
                                     Click="AutoHideSliverWidthIncrement_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </MenuItem.Header>
+            </MenuItem>
+            <MenuItem StaysOpenOnClick="True"
+                    Focusable="False">
+                <MenuItem.Header>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                Text="{x:Static services:Strings.MenuScrollBarThickness}"
+                                Foreground="{DynamicResource ForegroundText}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,8,0"/>
+                        <StackPanel Grid.Column="1"
+                                Orientation="Horizontal">
+                            <Button Content="−"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="ScrollBarThicknessDecrement_Click"/>
+                            <TextBlock Text="12"
+                                    Foreground="{DynamicResource ForegroundText}"
+                                    Width="26"
+                                    TextAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                            <Button Content="+"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="ScrollBarThicknessIncrement_Click"/>
                         </StackPanel>
                     </Grid>
                 </MenuItem.Header>
@@ -1310,33 +1359,25 @@
                 <Trigger Property="Orientation"
                         Value="Vertical">
                     <Setter Property="Width"
-                            Value="5"/>
+                            Value="{DynamicResource ScrollBarThickness}"/>
                 </Trigger>
                 <Trigger Property="Orientation"
                         Value="Horizontal">
                     <Setter Property="Height"
-                            Value="5"/>
+                            Value="{DynamicResource ScrollBarThickness}"/>
                 </Trigger>
-                <EventTrigger RoutedEvent="Mouse.MouseEnter">
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                    To="1"
-                                    Duration="0:0:0.1"/>
-                        </Storyboard>
-                    </BeginStoryboard>
-                </EventTrigger>
-                <EventTrigger RoutedEvent="Mouse.MouseLeave">
-                    <BeginStoryboard>
-                        <Storyboard>
-                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                    To="0"
-                                    Duration="0:0:0.6"
-                                    BeginTime="0:0:0.2"/>
-                        </Storyboard>
-                    </BeginStoryboard>
-                </EventTrigger>
             </Style.Triggers>
+            <!-- Revealing this used to be driven from the bar's own
+                 MouseEnter/MouseLeave, which meant it only appeared once the
+                 cursor was already inside a 5px invisible strip - you had to
+                 find a thing you couldn't see in order to make it visible. It
+                 is now driven by the ScrollViewer's hover instead (see
+                 MinimalScrollViewerTemplate's triggers), so the thumb shows as
+                 soon as the pointer is anywhere over the list and can simply be
+                 aimed at. Widened from 5 to 8 for the same reason: the search
+                 results were the worst case, where a click meant for the
+                 scrollbar landed on a result row instead and navigated away to
+                 that file - a miss with a consequence, not just an annoyance. -->
         </Style>
 
         <!-- ScrollViewer's own default template creates PART_VerticalScrollBar /
@@ -1356,16 +1397,45 @@
                  top of the full-bleed content instead give the true VS Code-style
                  overlay the styling elsewhere already intended. -->
             <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <!-- Zero until there is actually something to scroll, then
+                         widened by the trigger below. The original template
+                         overlaid the bar on the content precisely because an
+                         always-reserved column left a permanent sliver of empty
+                         space down the edge; keying the width off
+                         ComputedVerticalScrollBarVisibility keeps that fixed
+                         while still giving the bar a lane of its own whenever
+                         it appears, so long file names no longer run underneath
+                         it. -->
+                    <ColumnDefinition x:Name="ScrollGutterColumn"
+                            Width="0"/>
+                </Grid.ColumnDefinitions>
+
                 <!-- The default ScrollViewer template wraps this in a Border with
                      Padding="{TemplateBinding Padding}" - our replacement dropped
                      that wrapper for the minimal scrollbar layout, which silently
                      made every ScrollViewer.Padding (TreeView's and FavoritesList's
                      both) a no-op. Margin here restores it. -->
                 <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                         Grid.Column="0"
                                          Content="{TemplateBinding Content}"
                                          CanContentScroll="{TemplateBinding CanContentScroll}"
                                          Margin="{TemplateBinding Padding}"/>
+
+                <!-- Marks where the content stops and the bar's lane begins.
+                     Shown with the lane, not with the bar's hover fade - it is
+                     the boundary that explains why the text ends there, so it
+                     has to be there whether or not the pointer is. -->
+                <Border x:Name="ScrollGutterLine"
+                        Grid.Column="1"
+                        Width="1"
+                        HorizontalAlignment="Left"
+                        Background="{DynamicResource PanelDividerBrush}"
+                        Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
+
                 <ScrollBar x:Name="PART_VerticalScrollBar"
+                           Grid.Column="1"
                            Style="{StaticResource MinimalScrollBarStyle}"
                            Orientation="Vertical"
                            HorizontalAlignment="Right"
@@ -1374,6 +1444,8 @@
                            ViewportSize="{TemplateBinding ViewportHeight}"
                            Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
                 <ScrollBar x:Name="PART_HorizontalScrollBar"
+                           Grid.Column="0"
+                           Grid.ColumnSpan="2"
                            Style="{StaticResource MinimalScrollBarStyle}"
                            Orientation="Horizontal"
                            VerticalAlignment="Bottom"
@@ -1382,6 +1454,55 @@
                            ViewportSize="{TemplateBinding ViewportWidth}"
                            Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"/>
             </Grid>
+            <ControlTemplate.Triggers>
+                <!-- The user-set bar thickness plus the 1px divider - both
+                     recomputed together in ApplyLayoutMetrics. -->
+                <Trigger Property="ComputedVerticalScrollBarVisibility"
+                        Value="Visible">
+                    <Setter TargetName="ScrollGutterColumn"
+                            Property="Width"
+                            Value="{DynamicResource ScrollGutterWidth}"/>
+                </Trigger>
+                <!-- Hovering anywhere in the scrollable area reveals both bars,
+                     rather than each bar waiting for the pointer to land on its
+                     own hidden strip - see MinimalScrollBarStyle's note. The
+                     fade-out is slower and delayed so the bar doesn't vanish
+                     the instant the pointer drifts off the list on its way to
+                     the thumb. -->
+                <Trigger Property="IsMouseOver"
+                        Value="True">
+                    <Trigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetName="PART_VerticalScrollBar"
+                                        Storyboard.TargetProperty="Opacity"
+                                        To="1"
+                                        Duration="0:0:0.1"/>
+                                <DoubleAnimation Storyboard.TargetName="PART_HorizontalScrollBar"
+                                        Storyboard.TargetProperty="Opacity"
+                                        To="1"
+                                        Duration="0:0:0.1"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.EnterActions>
+                    <Trigger.ExitActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetName="PART_VerticalScrollBar"
+                                        Storyboard.TargetProperty="Opacity"
+                                        To="0"
+                                        Duration="0:0:0.6"
+                                        BeginTime="0:0:0.3"/>
+                                <DoubleAnimation Storyboard.TargetName="PART_HorizontalScrollBar"
+                                        Storyboard.TargetProperty="Opacity"
+                                        To="0"
+                                        Duration="0:0:0.6"
+                                        BeginTime="0:0:0.3"/>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.ExitActions>
+                </Trigger>
+            </ControlTemplate.Triggers>
         </ControlTemplate>
 
         <Style x:Key="ExplorerTreeViewStyle"
@@ -2448,8 +2569,6 @@
                         </Popup>
                     </Grid>
 
-                    <Border Height="1"
-                            Background="{DynamicResource PanelDividerBrush}"/>
                 </StackPanel>
 
                 <!-- Status line: scanning progress / result count / hints.
@@ -2467,6 +2586,15 @@
                             FontSize="11"
                             TextTrimming="CharacterEllipsis"
                             Margin="10,6,10,4"/>
+                    <!-- Below the status line, not above it. The results list's
+                         own scrollbar lane draws a vertical divider down its
+                         left edge (see MinimalScrollViewerTemplate), and that
+                         line starts where the list starts - so a horizontal
+                         divider sitting above the status text left the two
+                         lines offset by the height of that text instead of
+                         meeting in a corner. -->
+                    <Border Height="1"
+                            Background="{DynamicResource PanelDividerBrush}"/>
                     <!-- The pulsing progress bar that used to live here was
                          removed deliberately. A running indicator is the
                          universal idiom for "wait, don't touch anything" - and
