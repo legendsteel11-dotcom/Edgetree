@@ -576,7 +576,16 @@ public partial class MainWindow : Window
         // get yanked back to the left edge just because the taskbar moved/resized.
         if (e.PropertyName == nameof(SystemParameters.WorkArea) && _isDocked)
         {
-            Dispatcher.Invoke(PositionToWorkArea);
+            // Wrapped in a lambda rather than passed as a method group, which
+            // crashed the app outright ("Parameter count mismatch") the moment a
+            // second monitor was switched on. PositionToWorkArea gained an
+            // optional parameter when the DPI-change path was added; passing it
+            // as a method group binds Dispatcher.Invoke(Delegate, object[]),
+            // which invokes reflectively - and reflection does not fill in
+            // optional parameters the way the compiler does at a normal call
+            // site. Nothing warns about this: it compiles, and only fails when
+            // the display layout actually changes.
+            Dispatcher.Invoke(() => PositionToWorkArea());
         }
     }
 
