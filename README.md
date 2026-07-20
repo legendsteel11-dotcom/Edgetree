@@ -134,6 +134,9 @@ Either way, it's one `.exe` — no installer, just run it.
 - **Indent spacing**: the per-depth indent width (expand arrow, guide line,
   and icon/name alignment all included) is adjustable 4–24px from the
   options menu (16px by default)
+- **Scrollbar width**: adjustable 6–20px from the options menu (12px by
+  default). It appears when the pointer is over a list, and sits in its own
+  lane so it never overlaps the content
 - Selected file's parent folder gets a brighter indent-guide line, VS
   Code-style
 - Unassociated file types fall back to the same "How do you want to open this
