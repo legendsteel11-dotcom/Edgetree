@@ -476,6 +476,19 @@
                                         Property="Visibility"
                                         Value="Hidden"/>
                             </Trigger>
+                            <!-- Opt-in for NON-checkable items sitting among
+                                 checkable siblings (options menu's "모든 펼친
+                                 폴더 접기"): reserves the same check-column
+                                 width they get, so the labels share one left
+                                 edge at every font size - replacing a
+                                 hardcoded-padding patch that broke when menu
+                                 padding became font-scaled. -->
+                            <Trigger Property="Tag"
+                                    Value="reserve-check-column">
+                                <Setter TargetName="CheckMark"
+                                        Property="Visibility"
+                                        Value="Hidden"/>
+                            </Trigger>
                             <Trigger Property="IsChecked"
                                     Value="True">
                                 <Setter TargetName="CheckMark"
@@ -795,12 +808,16 @@
                  is a toggle that remembers what was expanded and can restore
                  it). Disabled while nothing is expanded - see
                  OptionsMenu_Opened. -->
-            <!-- Not checkable, so the template's check column collapses to zero
-                 width and its label would sit 18px left of the checkable items
-                 around it - the extra left padding (14 + the 10px mark + its
-                 8px margin) lines it back up with them. -->
+            <!-- Not checkable, so the template's check column would collapse to
+                 zero width and its label would sit 18px left of the checkable
+                 items around it. This used to be patched with a hardcoded
+                 Padding="32,4,14,4" - which drifted out of alignment the day
+                 the menu paddings became font-scaled - so the check column is
+                 now reserved structurally instead (see the Tag trigger in the
+                 MenuItem template), the same reservation its checkable
+                 siblings get, at every font size. -->
             <MenuItem Header="{x:Static services:Strings.MenuCollapseAllExpanded}"
-                    Padding="32,4,14,4"
+                    Tag="reserve-check-column"
                     Click="CollapseAllExpandedMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuAlwaysOnTop}"
                     IsCheckable="True"
