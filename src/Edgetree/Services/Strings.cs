@@ -120,6 +120,7 @@ public static class Strings
     public static string ToolTipCollapseAll = "모두 접기";
     public static string ToolTipRestoreExpanded = "펼침 상태 복원";
     public static string ToolTipOptions = "옵션";
+    public static string ToolTipUpdateAvailable = "새 버전 {0} 다운로드 가능";
     public static string ToolTipMinimize = "트레이로 최소화";
     public static string ToolTipClose = "종료";
     public static string RootPathLabel = "내 PC";
@@ -329,6 +330,7 @@ public static class Strings
         ToolTipCollapseAll = "Collapse All";
         ToolTipRestoreExpanded = "Restore Expanded";
         ToolTipOptions = "Options";
+        ToolTipUpdateAvailable = "Version {0} available for download";
         ToolTipMinimize = "Minimize to Tray";
         ToolTipClose = "Exit";
         RootPathLabel = "This PC";

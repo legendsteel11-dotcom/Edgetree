@@ -2290,22 +2290,36 @@
                         ToolTip="{x:Static services:Strings.ToolTipOptions}"
                         ContextMenu="{StaticResource OptionsMenu}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <StackPanel Orientation="Horizontal"
-                            VerticalAlignment="Center"
-                            HorizontalAlignment="Center">
-                        <Ellipse Width="3"
-                                Height="3"
-                                Fill="{DynamicResource ForegroundText}"
-                                Margin="1,0"/>
-                        <Ellipse Width="3"
-                                Height="3"
-                                Fill="{DynamicResource ForegroundText}"
-                                Margin="1,0"/>
-                        <Ellipse Width="3"
-                                Height="3"
-                                Fill="{DynamicResource ForegroundText}"
-                                Margin="1,0"/>
-                    </StackPanel>
+                    <Grid>
+                        <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center">
+                            <Ellipse Width="3"
+                                    Height="3"
+                                    Fill="{DynamicResource ForegroundText}"
+                                    Margin="1,0"/>
+                            <Ellipse Width="3"
+                                    Height="3"
+                                    Fill="{DynamicResource ForegroundText}"
+                                    Margin="1,0"/>
+                            <Ellipse Width="3"
+                                    Height="3"
+                                    Fill="{DynamicResource ForegroundText}"
+                                    Margin="1,0"/>
+                        </StackPanel>
+                        <!-- Update-available indicator: lit by
+                             CheckForUpdateOnceAsync when GitHub's latest
+                             release is newer than this build. Display only -
+                             clicking stays the normal options menu. -->
+                        <Ellipse x:Name="UpdateAvailableDot"
+                                Width="5"
+                                Height="5"
+                                Fill="{DynamicResource AccentForeground}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Margin="0,-2,-3,0"
+                                Visibility="Collapsed"/>
+                    </Grid>
                 </Button>
                 <Button x:Name="MinimizeButton"
                         Grid.Column="6"

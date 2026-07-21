@@ -323,6 +323,57 @@ public partial class MainWindow : Window
         // These events arrive on a system thread, hence the marshal.
         Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChanged;
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+
+        _ = CheckForUpdateOnceAsync();
+    }
+
+    // Display-only update check, ONCE per process start: asks GitHub for the
+    // latest release tag and, if it's newer than this build, lights the small
+    // dot on the options button and notes the version in its tooltip. No
+    // download, no prompt, no retry, no periodic re-check - and any failure
+    // (offline, rate-limited, API shape change) silently means "no dot this
+    // run", never an error surface. One unauthenticated API call per launch
+    // is far inside GitHub's 60/hour-per-IP limit.
+    private async Task CheckForUpdateOnceAsync()
+    {
+        try
+        {
+            using var http = new System.Net.Http.HttpClient();
+            http.Timeout = TimeSpan.FromSeconds(10);
+            // GitHub's API rejects requests without a User-Agent outright.
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("Edgetree");
+
+            string json = await http.GetStringAsync(
+                "https://api.github.com/repos/legendsteel11-dotcom/Edgetree/releases/latest");
+
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("tag_name", out var tagElement) is false ||
+                tagElement.GetString() is not { } tag ||
+                !Version.TryParse(tag.TrimStart('v', 'V'), out var latest))
+            {
+                return;
+            }
+
+            var current = Assembly.GetExecutingAssembly().GetName().Version;
+            if (current is null || latest <= new Version(current.Major, current.Minor, current.Build))
+            {
+                return;
+            }
+
+            // Still on the UI thread here - no ConfigureAwait(false) above,
+            // deliberately, so these touch the controls safely.
+            UpdateAvailableDot.Visibility = Visibility.Visible;
+            OptionsButton.ToolTip =
+                $"{Strings.ToolTipOptions} — {string.Format(Strings.ToolTipUpdateAvailable, "v" + latest)}";
+        }
+        catch (Exception e) when (e is System.Net.Http.HttpRequestException
+            or TaskCanceledException
+            or System.Text.Json.JsonException
+            or InvalidOperationException
+            or FormatException)
+        {
+            // 표시만 - a check that can't complete simply doesn't show a dot.
+        }
     }
 
     private void OnPowerModeChanged(object sender, Microsoft.Win32.PowerModeChangedEventArgs e)
