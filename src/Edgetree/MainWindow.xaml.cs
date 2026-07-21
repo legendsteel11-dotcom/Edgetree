@@ -3432,6 +3432,46 @@ public partial class MainWindow : Window
         double searchFileFont = ExplorerTree.FontSize;
         Resources["SearchFileFontSize"] = searchFileFont;
         Resources["SearchHeaderFontSize"] = Math.Max(searchFileFont - 1, 8.0);
+
+        // Menus (context menus + the options menu) render in their own popup
+        // windows outside the tree's visual tree, so nothing above reaches
+        // them - these are what tie every menu to the same Ctrl +/- zoom, via
+        // DarkContextMenuStyle and the implicit MenuItem style. APP-level
+        // resources, not window-level: a ContextMenu resolves app resources
+        // reliably (the chrome brushes it already uses prove the path), which
+        // a window resource lookup from inside a popup does not guarantee.
+        //
+        // The item padding's vertical base is 6, deliberately roomier than the
+        // fixed 14,4 it replaces - that tight value existed for low-res
+        // screens, which can now simply use a smaller font (the padding
+        // follows it down) instead of everyone getting the cramped default.
+        // Vertical menu padding shrinks FASTER than the font below its pivot
+        // (squared scale), and linearly above it. Linear both ways was tried
+        // first and read right at large sizes but too airy at small ones -
+        // proportionally equal spacing doesn't LOOK equal on small text, and
+        // someone zooming the font down is trying to fit more on screen, so
+        // the breathing room should give way ahead of the text.
+        //
+        // The pivot is 14, not the tree default of 12 (user call, 2026-07-21,
+        // after trying 12): full breathing room from 14pt up, the tightening
+        // curve below. The vertical base of 8 is chosen so the approved
+        // values are reproduced exactly at 9pt (3px) and 12pt (6px), while
+        // 14pt and up gain the "살짝 더" room that was asked for.
+        double menuVerticalScale = ExplorerTree.FontSize / 14.0;
+        if (menuVerticalScale < 1.0)
+        {
+            menuVerticalScale *= menuVerticalScale;
+        }
+
+        var appResources = Application.Current.Resources;
+        appResources["MenuFontSize"] = ExplorerTree.FontSize;
+        appResources["MenuGestureFontSize"] = Math.Max(8.0, Math.Round(11.0 * scale));
+        appResources["MenuItemPadding"] = new Thickness(
+            Math.Round(15.0 * scale), Math.Round(8.0 * menuVerticalScale),
+            Math.Round(15.0 * scale), Math.Round(8.0 * menuVerticalScale));
+        appResources["MenuPadding"] = new Thickness(
+            Math.Round(5.0 * scale), Math.Round(8.0 * menuVerticalScale),
+            Math.Round(5.0 * scale), Math.Round(8.0 * menuVerticalScale));
     }
 
     private void ColorSettingsMenuItem_Click(object sender, RoutedEventArgs e)

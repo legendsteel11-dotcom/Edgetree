@@ -313,8 +313,15 @@
                     Value="{DynamicResource PanelBorder}"/>
             <Setter Property="BorderThickness"
                     Value="1"/>
+            <!-- FontSize/Padding follow the tree's Ctrl +/- zoom - app-level
+                 resources filled by ApplyLayoutMetrics (menus render in their
+                 own popups, so they'd never inherit the tree's font on their
+                 own). FontSize set here propagates down to every MenuItem and
+                 custom header content by normal property inheritance. -->
+            <Setter Property="FontSize"
+                    Value="{DynamicResource MenuFontSize}"/>
             <Setter Property="Padding"
-                    Value="4,6"/>
+                    Value="{DynamicResource MenuPadding}"/>
             <!-- Compensates for the Border's own Margin below (see its
                  comment) - without this, reserving that bleed room for the
                  shadow would also visibly shift the menu 10px down-right from
@@ -357,11 +364,14 @@
              style. An implicit style only matches MenuItems, leaving
              Separators to their own separate implicit style below. -->
         <Style TargetType="MenuItem">
-            <!-- Vertical padding trimmed from the original 7 - fine on a
-                 high-DPI screen, but the options menu's item count made it run
-                 noticeably tall on HD-class (1366x768) displays. -->
+            <!-- Follows the tree's font zoom (see ApplyLayoutMetrics), with a
+                 roomier vertical base than the fixed 14,4 it replaces. That
+                 tight value existed for HD-class (1366x768) displays; now that
+                 padding scales with the font, a small screen is handled by
+                 picking a smaller font rather than everyone getting the
+                 cramped spacing. -->
             <Setter Property="Padding"
-                    Value="14,4"/>
+                    Value="{DynamicResource MenuItemPadding}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="MenuItem">
@@ -404,7 +414,7 @@
                                             Grid.Column="2"
                                             Text="{TemplateBinding InputGestureText}"
                                             Foreground="{DynamicResource SecondaryForeground}"
-                                            FontSize="11"
+                                            FontSize="{DynamicResource MenuGestureFontSize}"
                                             Margin="24,0,0,0"
                                             VerticalAlignment="Center"/>
                                     <!-- Submenu items (a MenuItem with child MenuItems, like the
@@ -439,7 +449,7 @@
                                         BorderBrush="{DynamicResource PanelBorder}"
                                         BorderThickness="1"
                                         CornerRadius="8"
-                                        Padding="4,6"
+                                        Padding="{DynamicResource MenuPadding}"
                                         Margin="10"
                                         Effect="{DynamicResource MenuDropShadow}"
                                         SnapsToDevicePixels="True">
