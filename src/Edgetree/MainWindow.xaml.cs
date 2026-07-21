@@ -4044,10 +4044,19 @@ public partial class MainWindow : Window
         {
             return;
         }
-        // An anchor that has since collapsed away or been rebuilt by a refresh
-        // just isn't in the visible list anymore - degrade to a single-row
-        // range rather than guessing.
+        // An anchor that has since collapsed away or been rebuilt by a
+        // refresh isn't in the visible list anymore. Before degrading to a
+        // single-row range, fall back to the NATIVE selection - that's the
+        // row the user visibly ranges from. Without this, a stale anchor made
+        // Shift+click quietly select just the clicked row, which read as
+        // "shift+click stopped working, selection just moves" (reported after
+        // browsing thumbnails via right-click, which at the time didn't
+        // update the anchor at all - see TreeViewItem_PreviewMouseRightButtonDown).
         int anchorIndex = visible.IndexOf(anchor);
+        if (anchorIndex < 0 && ExplorerTree.SelectedItem is FileSystemItem nativeSelected)
+        {
+            anchorIndex = visible.IndexOf(nativeSelected);
+        }
         if (anchorIndex < 0)
         {
             anchorIndex = targetIndex;
@@ -4456,6 +4465,13 @@ public partial class MainWindow : Window
 
             treeViewItem.IsSelected = true;
             treeViewItem.Focus();
+
+            // The anchor a later Shift+click ranges from follows right-clicks
+            // too, matching Explorer. Browsing several images via right-click
+            // (thumbnail peeks) and then Shift+clicking used to range from a
+            // long-stale anchor instead of the row just right-clicked - which
+            // collapsed the range to a single row (see SelectRange).
+            _multiSelectAnchor = (FileSystemItem)treeViewItem.DataContext;
 
             // Default (mouse-point) placement opens the menu right on top of the
             // clicked row, hiding the very item it applies to. Anchoring it to
