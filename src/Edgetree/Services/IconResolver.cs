@@ -14,19 +14,15 @@ public static class IconResolver
 
     private static readonly Lazy<IconMap> Map = new(LoadMap);
 
-    public static string Resolve(FileSystemItem item)
-        => IconBasePath + (item.IsDirectory
-            ? ResolveFolderPng(item.Name, item.IsExpanded)
-            : ResolveFilePng(item.Name));
-
-    // Name-based entry points for callers that don't have a FileSystemItem
-    // (the file-search results carry a SearchEntry). Folder headers use the
-    // collapsed folder icon.
+    // Name-based lookups into the bundled PNG set. Only ShellIconService calls
+    // these now - it's the mode switch ("아이콘 방식") deciding whether a row
+    // gets one of these or a live Windows shell icon, and it also owns the
+    // ImageSource caching for both.
     public static string ResolveFileIcon(string fileName)
         => IconBasePath + ResolveFilePng(fileName);
 
-    public static string ResolveFolderIcon(string folderName)
-        => IconBasePath + ResolveFolderPng(folderName, isExpanded: false);
+    public static string ResolveFolderIcon(string folderName, bool isExpanded = false)
+        => IconBasePath + ResolveFolderPng(folderName, isExpanded);
 
     private static string ResolveFolderPng(string name, bool isExpanded)
     {

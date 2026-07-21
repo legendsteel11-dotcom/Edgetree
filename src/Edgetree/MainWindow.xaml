@@ -1002,6 +1002,20 @@
                         Tag="en"
                         Click="LanguageMenuItem_Click"/>
             </MenuItem>
+            <!-- Applies live (no restart) - see IconStyleMenuItem_Click.
+                 Positioned with the other submenu items; OptionsMenu_Opened
+                 matches this menu's items by POSITION, so keep its pattern in
+                 sync when touching anything here. -->
+            <MenuItem Header="{x:Static services:Strings.MenuIconStyle}">
+                <MenuItem Header="{x:Static services:Strings.MenuIconStyleDefault}"
+                        IsCheckable="True"
+                        Tag="default"
+                        Click="IconStyleMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuIconStyleShell}"
+                        IsCheckable="True"
+                        Tag="shell"
+                        Click="IconStyleMenuItem_Click"/>
+            </MenuItem>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuExportSettings}"
                     Click="ExportSettingsMenuItem_Click"/>
@@ -1581,7 +1595,7 @@
                 </Grid.ColumnDefinitions>
                 <Image x:Name="RowIcon"
                         Grid.Column="0"
-                        Source="{Binding IconUri}"
+                        Source="{Binding Icon}"
                         Width="{DynamicResource IconSize}"
                         Height="{DynamicResource IconSize}"
                         Margin="{DynamicResource FolderRowIconMargin}"
@@ -1883,8 +1897,14 @@
                                      FolderIconVisibility unconditionally - no
                                      IsDirectory check needed the way the tree
                                      row's icon has one. -->
+                                <!-- Source is a code-set DynamicResource (not the
+                                     folder.png pack URI it used to hardcode) so
+                                     the "아이콘 방식" switch swaps the favorites'
+                                     folder icon along with the tree's - set at
+                                     startup and on every mode change in
+                                     MainWindow.ApplyIconStyle. -->
                                 <Image Grid.Column="1"
-                                        Source="pack://application:,,,/Resources/Icons/folder.png"
+                                        Source="{DynamicResource FavoriteFolderIconSource}"
                                         Width="{DynamicResource IconSize}"
                                         Height="{DynamicResource IconSize}"
                                         Margin="{DynamicResource FolderRowIconMargin}"
@@ -2695,7 +2715,7 @@
                                 <StackPanel x:Name="HeaderPanel"
                                         Orientation="Horizontal"
                                         Visibility="Collapsed">
-                                    <Image Source="{Binding IconUri}"
+                                    <Image Source="{Binding Icon}"
                                             Width="{DynamicResource IconSize}"
                                             Height="{DynamicResource IconSize}"
                                             Margin="0,0,6,0"
@@ -2715,7 +2735,7 @@
                                 <StackPanel x:Name="FilePanel"
                                         Orientation="Horizontal"
                                         Margin="14,0,0,0">
-                                    <Image Source="{Binding IconUri}"
+                                    <Image Source="{Binding Icon}"
                                             Width="{DynamicResource IconSize}"
                                             Height="{DynamicResource IconSize}"
                                             Margin="0,0,6,0"

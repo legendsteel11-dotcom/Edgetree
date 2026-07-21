@@ -233,6 +233,11 @@ public partial class MainWindow : Window
         FileSystemService.SortDescending = _settings.SortDescending;
         FileSystemItem.DisplayCap = Math.Clamp(_settings.MaxItemsPerFolder, 1, 50);
 
+        // Must be set before the tree/favorites below ever read an icon, same
+        // as the sort/display statics above.
+        ShellIconService.UseShellIcons = _settings.UseShellIcons;
+        Resources["FavoriteFolderIconSource"] = ShellIconService.GetFavoritesFolderIcon();
+
         FileSystemService.SortOverrides.Clear();
         foreach (var entry in _settings.FolderSortOverrides)
         {
@@ -2351,7 +2356,7 @@ public partial class MainWindow : Window
         // "색상 변경" item, neither of which has state to sync here.
         if (sender is ContextMenu
             {
-                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, _, _, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem autoHideSliverWidthRow, MenuItem scrollBarThicknessRow, MenuItem sortMenu, MenuItem languageMenu, ..]
+                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, _, _, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem autoHideSliverWidthRow, MenuItem scrollBarThicknessRow, MenuItem sortMenu, MenuItem languageMenu, MenuItem iconStyleMenu, ..]
             })
         {
             // Nothing expanded means nothing to collapse - grey it out rather
@@ -2395,6 +2400,12 @@ public partial class MainWindow : Window
             {
                 koItem.IsChecked = _settings.Language != "en";
                 enItem.IsChecked = _settings.Language == "en";
+            }
+
+            if (iconStyleMenu.Items is [MenuItem defaultIcons, MenuItem shellIcons])
+            {
+                defaultIcons.IsChecked = !_settings.UseShellIcons;
+                shellIcons.IsChecked = _settings.UseShellIcons;
             }
         }
     }
@@ -2876,6 +2887,52 @@ public partial class MainWindow : Window
         {
             System.Diagnostics.Process.Start(Environment.ProcessPath!);
             Application.Current.Shutdown();
+        }
+    }
+
+    private void IconStyleMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        bool useShellIcons = sender is MenuItem { Tag: "shell" };
+        if (_settings.UseShellIcons == useShellIcons)
+        {
+            return;
+        }
+
+        // Flushes to disk on close with the rest of the settings, same as the
+        // other toggles - no explicit save here.
+        _settings.UseShellIcons = useShellIcons;
+        ShellIconService.UseShellIcons = useShellIcons;
+        ApplyIconStyle();
+    }
+
+    // Applies the current icon mode to everything already on screen, without a
+    // reload: every realized tree item re-raises Icon, the favorites' shared
+    // folder-icon resource is swapped, and the search results (whose rows
+    // resolve their icon at creation) are rebuilt from the live index.
+    private void ApplyIconStyle()
+    {
+        Resources["FavoriteFolderIconSource"] = ShellIconService.GetFavoritesFolderIcon();
+
+        foreach (var root in _roots)
+        {
+            RefreshIconsRecursively(root);
+        }
+
+        if (_searchEntries.Count > 0)
+        {
+            RunSearchFilter();
+        }
+    }
+
+    private static void RefreshIconsRecursively(FileSystemItem item)
+    {
+        item.RefreshIcon();
+        foreach (var child in item.Children)
+        {
+            if (!child.IsPlaceholder && !child.IsShowMore)
+            {
+                RefreshIconsRecursively(child);
+            }
         }
     }
 

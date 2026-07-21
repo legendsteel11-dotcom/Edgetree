@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Media;
 using SidebarExplorer.App.Services;
 
 namespace SidebarExplorer.App.Models;
@@ -20,7 +21,19 @@ public class FileSystemItem : INotifyPropertyChanged
     public bool IsDirectory { get; }
     public bool IsPlaceholder { get; }
     public FileSystemItem? Parent { get; }
-    public string IconUri => IsShowMore ? string.Empty : IconResolver.Resolve(this);
+    // Mode-aware (PNG set vs. Windows shell icons - see ShellIconService).
+    // RefreshIcon is handed in as the change callback: a per-file shell icon
+    // (.exe 등) arriving from the background swaps in by re-raising this
+    // property, VS the instant generic icon this getter returned meanwhile.
+    public ImageSource? Icon => IsShowMore || IsPlaceholder
+        ? null
+        : IsDirectory
+            ? ShellIconService.GetFolderIcon(Name, IsExpanded)
+            : ShellIconService.GetFileIcon(Name, FullPath, RefreshIcon);
+
+    // Also called by MainWindow.ApplyIconStyle when the icon mode toggles, so
+    // every realized row re-reads Icon under the new mode without a reload.
+    public void RefreshIcon() => OnPropertyChanged(nameof(Icon));
 
     // Only the first DisplayCap children are ever placed in Children at once;
     // the rest wait in _overflow behind a single "더 보기" row. Keeping the
@@ -62,7 +75,7 @@ public class FileSystemItem : INotifyPropertyChanged
         {
             if (SetField(ref _isExpanded, value) && IsDirectory)
             {
-                OnPropertyChanged(nameof(IconUri));
+                OnPropertyChanged(nameof(Icon));
             }
         }
     }

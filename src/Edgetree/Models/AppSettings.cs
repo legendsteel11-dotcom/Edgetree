@@ -41,6 +41,11 @@ public class AppSettings
     // (see App.xaml.cs) from before this toggle existed.
     public bool AlwaysShowTrayIcon { get; set; } = true;
 
+    // "아이콘 방식" - false is the bundled PNG set the app has always shipped
+    // (so existing users see no change on update), true shows the same icons
+    // Windows Explorer does (see ShellIconService).
+    public bool UseShellIcons { get; set; } = false;
+
     // Color settings ("색상 설정"). Defaults match the original hardcoded
     // brushes in MainWindow.xaml, so existing users see no change until they
     // customize - ColorSettingsWindow's "기본값" button restores these exact
