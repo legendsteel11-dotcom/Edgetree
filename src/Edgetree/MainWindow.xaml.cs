@@ -3608,6 +3608,27 @@ public partial class MainWindow : Window
         }
     }
 
+    // When the user last pressed a mouse button or key inside the tree -
+    // TreeViewItem.Expanded fires for MORE than deliberate expansions:
+    // virtualization raises it whenever it re-creates a container for a folder
+    // whose model says IsExpanded=true (scrolling back to it, a window resize,
+    // a display change re-realizing the viewport). Auto-collapse running on one
+    // of those phantom "expansions" collapses everything off that folder's own
+    // chain - including the DEEPER half of the currently-open chain when the
+    // regenerated container is an ancestor - with no user action at all.
+    // Suspected cause of the "found every folder closed" report (2026-07-22
+    // ~04:48, coinciding with display-change events in redraw.log). So
+    // auto-collapse only follows an expansion that lands within this window of
+    // a real tree gesture; anything else keeps children loading but leaves the
+    // rest of the tree alone (and logs, in debug builds - see
+    // LogAutoCollapseSuppressed - so the theory is checkable next time).
+    private long _lastTreeUserInputTicks = long.MinValue / 2;
+
+    private const long TreeGestureWindowMs = 1000;
+
+    private bool IsWithinTreeGestureWindow
+        => Environment.TickCount64 - _lastTreeUserInputTicks <= TreeGestureWindowMs;
+
     private void TreeViewItem_Expanded(object sender, RoutedEventArgs e)
     {
         // Expanded bubbles, and the EventSetter that wires this handler is on
@@ -3629,7 +3650,39 @@ public partial class MainWindow : Window
         }
 
         item.EnsureChildrenLoaded();
-        ApplyAutoCollapse(item);
+        if (IsWithinTreeGestureWindow)
+        {
+            ApplyAutoCollapse(item);
+        }
+        else
+        {
+            // Favorites navigation lands here too (RevealChain expands
+            // programmatically) - harmless, it applies its own collapse once
+            // at the end of the walk. Same for startup state restore, which
+            // was never meant to auto-collapse the paths it restores.
+            LogAutoCollapseSuppressed(item.FullPath);
+        }
+    }
+
+    // Debug builds only - exists to confirm or kill the phantom-Expanded
+    // theory above: if folders collapse on their own again, this file says
+    // whether container regeneration fired Expanded around that moment (and
+    // for which folders) without any tree input preceding it.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogAutoCollapseSuppressed(string path)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "autocollapse.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  Expanded without recent tree input (auto-collapse suppressed): {path}{Environment.NewLine}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     // Accordion mode: collapse every other open folder, keeping only this one
@@ -3752,6 +3805,12 @@ public partial class MainWindow : Window
     // that default behavior from ever running.
     private void ExplorerTree_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        // Keyboard expansion (Right arrow, +) is handled by the native
+        // TreeView after this tunnel - stamp the gesture here so the
+        // auto-collapse guard treats it like a click (see
+        // _lastTreeUserInputTicks).
+        _lastTreeUserInputTicks = Environment.TickCount64;
+
         switch (e.Key)
         {
             case Key.PageDown:
@@ -4132,6 +4191,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Marks a real gesture for the auto-collapse guard (see
+        // _lastTreeUserInputTicks) - deliberately before the innermost-item
+        // filter and the expander check: any press that can lead to an
+        // expansion (row click, expander arrow) passes through here first.
+        _lastTreeUserInputTicks = Environment.TickCount64;
+
         // Preview (tunneling) events pass through every ANCESTOR TreeViewItem on
         // the way down to the one actually clicked. Only act on the pass where
         // `sender` is that innermost/target item, identified by walking up from
@@ -4463,45 +4528,144 @@ public partial class MainWindow : Window
                 return;
             }
 
-            treeViewItem.IsSelected = true;
-            treeViewItem.Focus();
+            PrepareTreeRowContextMenu(treeViewItem);
+        }
+    }
 
-            // The anchor a later Shift+click ranges from follows right-clicks
-            // too, matching Explorer. Browsing several images via right-click
-            // (thumbnail peeks) and then Shift+clicking used to range from a
-            // long-stale anchor instead of the row just right-clicked - which
-            // collapsed the range to a single row (see SelectRange).
-            _multiSelectAnchor = (FileSystemItem)treeViewItem.DataContext;
+    // Everything a tree row's context menu needs set up BEFORE it opens -
+    // selection, Shift-range anchor, placement, thumbnail slot. Split out of
+    // the right-button-down handler above so the menu-covered-row pass-through
+    // (ExplorerItemContextMenu_PreviewMouseRightButtonDown) can run the exact
+    // same sequence for the row it uncovers and then open the menu itself.
+    private void PrepareTreeRowContextMenu(TreeViewItem treeViewItem)
+    {
+        treeViewItem.IsSelected = true;
+        treeViewItem.Focus();
 
-            // Default (mouse-point) placement opens the menu right on top of the
-            // clicked row, hiding the very item it applies to. Anchoring it to
-            // just the row's own header border - not the TreeViewItem itself,
-            // whose bounds also cover any expanded children below it - and
-            // opening below keeps the row visible regardless of the current
-            // zoom level (row height already reflects the live font size/padding
-            // at click time, so nothing here is a hardcoded pixel offset).
-            if (treeViewItem.ContextMenu is { } menu)
+        // The anchor a later Shift+click ranges from follows right-clicks
+        // too, matching Explorer. Browsing several images via right-click
+        // (thumbnail peeks) and then Shift+clicking used to range from a
+        // long-stale anchor instead of the row just right-clicked - which
+        // collapsed the range to a single row (see SelectRange).
+        _multiSelectAnchor = (FileSystemItem)treeViewItem.DataContext;
+
+        // Default (mouse-point) placement opens the menu right on top of the
+        // clicked row, hiding the very item it applies to. Anchoring it to
+        // just the row's own header border - not the TreeViewItem itself,
+        // whose bounds also cover any expanded children below it - and
+        // opening below keeps the row visible regardless of the current
+        // zoom level (row height already reflects the live font size/padding
+        // at click time, so nothing here is a hardcoded pixel offset).
+        if (treeViewItem.ContextMenu is { } menu)
+        {
+            treeViewItem.ApplyTemplate();
+            menu.PlacementTarget = treeViewItem.Template.FindName("RowBorder", treeViewItem) as UIElement ?? treeViewItem;
+            menu.Placement = PlacementMode.Bottom;
+
+            // The thumbnail row must be configured BEFORE the menu opens:
+            // doing it in ExplorerItemContextMenu_Opened - which fires
+            // after the popup has already sized and positioned itself -
+            // made the freshly-shown menu visibly jump as it re-laid out
+            // around the appearing slot.
+            if (menu.Items is [MenuItem thumbnailItem, Separator thumbnailSeparator, ..])
             {
-                treeViewItem.ApplyTemplate();
-                menu.PlacementTarget = treeViewItem.Template.FindName("RowBorder", treeViewItem) as UIElement ?? treeViewItem;
-                menu.Placement = PlacementMode.Bottom;
-
-                // The thumbnail row must be configured BEFORE the menu opens:
-                // doing it in ExplorerItemContextMenu_Opened - which fires
-                // after the popup has already sized and positioned itself -
-                // made the freshly-shown menu visibly jump as it re-laid out
-                // around the appearing slot.
-                if (menu.Items is [MenuItem thumbnailItem, Separator thumbnailSeparator, ..])
-                {
-                    string? thumbnailPath =
-                        _multiSelection.Count <= 1 &&
-                        treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsShowMore: false, IsDirectory: false } file
-                            ? file.FullPath
-                            : null;
-                    UpdateThumbnailRow(thumbnailItem, thumbnailSeparator, thumbnailPath);
-                }
+                string? thumbnailPath =
+                    _multiSelection.Count <= 1 &&
+                    treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsShowMore: false, IsDirectory: false } file
+                        ? file.FullPath
+                        : null;
+                UpdateThumbnailRow(thumbnailItem, thumbnailSeparator, thumbnailPath);
             }
         }
+    }
+
+    // WPF's MenuItem also fires on a RIGHT-button release while it sits inside
+    // a ContextMenu (Win32 context menus work that way, and WPF kept the
+    // behavior). Combined with the thumbnail row being a click target and the
+    // menu opening right below the clicked row, "right-click image, right-click
+    // the next image" often landed the second click's release on the open menu
+    // - which invoked whatever item was under the cursor, most visibly "just
+    // opening" the file via the thumbnail. Wired to every ContextMenu in the
+    // XAML: a right-click release inside a menu never invokes anything.
+    private void ContextMenu_PreviewMouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        => e.Handled = true;
+
+    // The companion press half of the same gesture: a right-click PRESS on an
+    // open tree menu means "I want the menu for the row under my cursor" (the
+    // menu is covering the rows below the one it belongs to - exactly where
+    // the next image sits while peeking through a folder of pictures). Close
+    // this menu, find the tree row at that spot, and reopen the menu there -
+    // the same one-right-click flow as when no menu was open. A press over a
+    // part of the menu with no tree row beneath it just closes the menu.
+    private void ExplorerItemContextMenu_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not ContextMenu menu)
+        {
+            return;
+        }
+        menu.IsOpen = false;
+
+        var position = Mouse.GetPosition(ExplorerTree);
+        if (position.X < 0 || position.Y < 0 ||
+            position.X >= ExplorerTree.ActualWidth || position.Y >= ExplorerTree.ActualHeight)
+        {
+            return;
+        }
+        if (ExplorerTree.InputHitTest(position) is not DependencyObject hit ||
+            hit.FindAncestor<TreeViewItem>() is not
+                { DataContext: FileSystemItem { IsPlaceholder: false, IsShowMore: false } } row)
+        {
+            return;
+        }
+
+        // Deferred one dispatcher hop: the old menu's close (capture release,
+        // popup teardown) is still in flight during this handler, and
+        // reopening the same shared ContextMenu instance synchronously from
+        // inside its own event would race that teardown.
+        Dispatcher.BeginInvoke(() =>
+        {
+            PrepareTreeRowContextMenu(row);
+            if (row.ContextMenu is { } rowMenu)
+            {
+                rowMenu.IsOpen = true;
+            }
+        });
+    }
+
+    // Same pass-through for the search results list's menu.
+    private void SearchResultContextMenu_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not ContextMenu menu)
+        {
+            return;
+        }
+        menu.IsOpen = false;
+
+        var position = Mouse.GetPosition(SearchResultsList);
+        if (position.X < 0 || position.Y < 0 ||
+            position.X >= SearchResultsList.ActualWidth || position.Y >= SearchResultsList.ActualHeight)
+        {
+            return;
+        }
+        if (SearchResultsList.InputHitTest(position) is not DependencyObject hit ||
+            ItemsControl.ContainerFromElement(SearchResultsList, hit) is not ListBoxItem row)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            PrepareSearchRowContextMenu(row);
+            if (row.ContextMenu is { } rowMenu)
+            {
+                // Programmatic opens don't get ContextMenuService's automatic
+                // PlacementTarget; without one the menu has no anchor visual.
+                rowMenu.PlacementTarget = row;
+                rowMenu.IsOpen = true;
+            }
+        });
     }
 
     private void ExplorerTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -4824,12 +4988,23 @@ public partial class MainWindow : Window
                     // are far rarer (an already-set archive bit doesn't re-fire
                     // on each write), and the refresh is expanded-folder-only +
                     // debounced regardless.
-                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Attributes
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Attributes,
+
+                    // A whole-drive recursive watcher rides on one kernel change
+                    // buffer, and the default is only 8KB - a burst of activity
+                    // anywhere on the drive (a build, a browser cache flush)
+                    // overflows it and every queued event is silently thrown
+                    // away, which surfaced as "created a file in an expanded
+                    // folder and it just never appeared". 64KB is the documented
+                    // ceiling; the Error handler below covers the bursts that
+                    // still blow past it.
+                    InternalBufferSize = 64 * 1024
                 };
                 watcher.Created += OnDriveWatcherEvent;
                 watcher.Deleted += OnDriveWatcherEvent;
                 watcher.Renamed += OnDriveWatcherEvent;
                 watcher.Changed += OnDriveWatcherEvent;
+                watcher.Error += OnDriveWatcherError;
                 watcher.EnableRaisingEvents = true;
                 _driveWatchers.Add(watcher);
             }
@@ -4855,6 +5030,48 @@ public partial class MainWindow : Window
         }
 
         Dispatcher.BeginInvoke(() => QueueExternalRefresh(folderPath));
+    }
+
+    // The watcher's change buffer overflowed (or the handle failed): an
+    // unknown number of events for this drive were dropped on the floor, so
+    // per-folder patching is off the table - resync everything the user
+    // actually has open under that drive from disk instead. The watcher
+    // itself keeps running after an overflow; nothing needs restarting.
+    private void OnDriveWatcherError(object sender, ErrorEventArgs e)
+    {
+        if ((sender as FileSystemWatcher)?.Path is not { } rootPath)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            LogWatcherError(rootPath, e.GetException());
+            if (FindLoadedItemForPath(rootPath) is { ChildrenLoaded: true } rootItem)
+            {
+                RefreshFolderPreservingState(rootItem);
+            }
+        });
+    }
+
+    // Debug builds only - says how often drive-wide bursts actually overflow
+    // the enlarged buffer, i.e. whether lost events remain a live suspect for
+    // "a new file didn't show up" reports or the resync above has it covered.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogWatcherError(string rootPath, Exception exception)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "watcher.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  watcher error on {rootPath}: {exception.GetType().Name} {exception.Message} - resyncing expanded folders{Environment.NewLine}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     // Debounced per-folder-path - see _pendingExternalRefreshes' own comment.
@@ -4970,6 +5187,18 @@ public partial class MainWindow : Window
             ShowAllChildrenIfPossible(path);
         }
 
+        // The same blank-rows symptom ForceTreeRedraw exists for (rows gone
+        // until any scroll/resize/click pokes the layout) also showed up next
+        // to a folder receiving constant external changes - an all-night code
+        // churn kept this refresh's clear-and-refill running, and the
+        // virtualizing panel was left with unrealized containers mid-viewport
+        // (2026-07-22 ~01:00 report; redraw.log showed NO resume/display
+        // change near it, which is what pointed here). Same remedy, new
+        // trigger: force a layout pass once the refill settles. Coalesced so
+        // a burst of per-folder refreshes in one dispatcher batch pays for a
+        // single pass.
+        QueueExternalRefreshRedraw();
+
         // Deliberately NOT attempting to reselect the previous selection here,
         // even when it lived inside this subtree - an earlier version reused
         // NavigateToPath's favorites-style reveal walk for that (a real
@@ -4992,6 +5221,25 @@ public partial class MainWindow : Window
         // the user had open collapses out from under them.
     }
 
+    // See the call in RefreshFolderPreservingState. Background priority so the
+    // pass runs after the current batch of collection changes has fully
+    // landed, mirroring how the resume/display-change callers schedule theirs.
+    private bool _externalRefreshRedrawQueued;
+
+    private void QueueExternalRefreshRedraw()
+    {
+        if (_externalRefreshRedrawQueued)
+        {
+            return;
+        }
+        _externalRefreshRedrawQueued = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            _externalRefreshRedrawQueued = false;
+            ForceTreeRedraw("external-refresh");
+        }, System.Windows.Threading.DispatcherPriority.Background);
+    }
+
     private void OpenItem_Click(object sender, RoutedEventArgs e)
     {
         if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false } item)
@@ -5001,6 +5249,10 @@ public partial class MainWindow : Window
 
         if (item.IsDirectory)
         {
+            // A menu click is a deliberate gesture too, but it happens outside
+            // the tree - stamp it so the expansion below still auto-collapses
+            // the way it always has (see _lastTreeUserInputTicks).
+            _lastTreeUserInputTicks = Environment.TickCount64;
             item.IsExpanded = true;
         }
         else
@@ -6556,17 +6808,25 @@ public partial class MainWindow : Window
     {
         if (ItemsControl.ContainerFromElement(SearchResultsList, (DependencyObject)e.OriginalSource) is ListBoxItem item)
         {
-            item.IsSelected = true;
+            PrepareSearchRowContextMenu(item);
+        }
+    }
 
-            // Same pre-open timing rule as the tree's thumbnail (see
-            // TreeViewItem_PreviewMouseRightButtonDown): the slot must be in
-            // the menu's very first measure or the open menu visibly grows.
-            // Header/"더 보기" rows carry no Entry, so they pass null = no slot.
-            if (item.ContextMenu is { Items: [MenuItem thumbnailItem, Separator thumbnailSeparator, ..] })
-            {
-                UpdateThumbnailRow(thumbnailItem, thumbnailSeparator,
-                    (item.DataContext as SearchRow)?.Entry?.FullPath);
-            }
+    // Split out for the same reason as PrepareTreeRowContextMenu: the
+    // menu-covered-row pass-through reopens the menu itself and needs the
+    // identical pre-open setup.
+    private void PrepareSearchRowContextMenu(ListBoxItem item)
+    {
+        item.IsSelected = true;
+
+        // Same pre-open timing rule as the tree's thumbnail (see
+        // TreeViewItem_PreviewMouseRightButtonDown): the slot must be in
+        // the menu's very first measure or the open menu visibly grows.
+        // Header/"더 보기" rows carry no Entry, so they pass null = no slot.
+        if (item.ContextMenu is { Items: [MenuItem thumbnailItem, Separator thumbnailSeparator, ..] })
+        {
+            UpdateThumbnailRow(thumbnailItem, thumbnailSeparator,
+                (item.DataContext as SearchRow)?.Entry?.FullPath);
         }
     }
 

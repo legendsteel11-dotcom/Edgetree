@@ -613,10 +613,18 @@
              can stand down while one is up - a menu renders as its own window
              outside the sidebar's bounds, which both hide paths would otherwise
              read as "the user left". See MainWindow.xaml.cs's _openMenuCount. -->
+        <!-- PreviewMouseRightButtonUp on every ContextMenu below: WPF invokes a
+             menu item on right-button-release too while it sits inside a
+             ContextMenu (Win32 heritage), which is how repeatedly right-clicking
+             through image rows kept "just opening" a file - the second click
+             landed on the freshly-opened menu (often its thumbnail row, a click
+             target) instead of the row it covered. See
+             ContextMenu_PreviewMouseRightButtonUp. -->
         <ContextMenu x:Key="ExplorerEmptySpaceContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
                 Opened="AnyMenu_Opened"
-                Closed="AnyMenu_Closed">
+                Closed="AnyMenu_Closed"
+                PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
             <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
                     Click="NewFolder_Click"/>
         </ContextMenu>
@@ -625,7 +633,9 @@
                 Style="{StaticResource DarkContextMenuStyle}"
                 Opened="ExplorerItemContextMenu_Opened"
                 Closed="AnyMenu_Closed"
-                PreviewKeyDown="ExplorerItemContextMenu_PreviewKeyDown">
+                PreviewKeyDown="ExplorerItemContextMenu_PreviewKeyDown"
+                PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp"
+                PreviewMouseRightButtonDown="ExplorerItemContextMenu_PreviewMouseRightButtonDown">
             <!-- Image thumbnail (single image file only): the slot is reserved
                  at its fixed size the moment the menu opens - we already know
                  from the extension whether this row gets one - so the async
@@ -788,7 +798,9 @@
         <ContextMenu x:Key="SearchResultContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
                 Opened="SearchResultContextMenu_Opened"
-                Closed="AnyMenu_Closed">
+                Closed="AnyMenu_Closed"
+                PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp"
+                PreviewMouseRightButtonDown="SearchResultContextMenu_PreviewMouseRightButtonDown">
             <!-- Same image-thumbnail slot as the tree menu's (same reserved-
                  before-open rules; configured by
                  SearchResultsList_PreviewMouseRightButtonDown, positional
@@ -851,7 +863,8 @@
         <ContextMenu x:Key="OptionsMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
                 Opened="OptionsMenu_Opened"
-                Closed="AnyMenu_Closed">
+                Closed="AnyMenu_Closed"
+                PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
             <MenuItem Header="{x:Static services:Strings.MenuAutoCollapse}"
                     IsCheckable="True"
                     Click="AutoCollapseMenuItem_Click"/>
@@ -1970,7 +1983,8 @@
         <ContextMenu x:Key="FavoriteItemContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
                 Opened="AnyMenu_Opened"
-                Closed="AnyMenu_Closed">
+                Closed="AnyMenu_Closed"
+                PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
             <MenuItem Header="{x:Static services:Strings.MenuRemoveFavorite}"
                     Click="RemoveFavorite_Click"/>
         </ContextMenu>

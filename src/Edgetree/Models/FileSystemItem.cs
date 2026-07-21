@@ -238,8 +238,14 @@ public class FileSystemItem : INotifyPropertyChanged
         }
         _childrenLoaded = true;
 
-        PopulateCapped(FileSystemService.LoadChildren(FullPath, this));
+        // Stamped BEFORE the read, not after: a file created while LoadChildren
+        // is enumerating can be missed by the enumeration yet have its watcher
+        // event carry an earlier tick than an after-the-read stamp - which made
+        // QueueExternalRefresh's "already re-read it afterwards" check skip the
+        // refresh and the file never appear. Stamping first errs the other way:
+        // worst case one redundant refresh of a folder that did catch the file.
         LastLoadedTicks = Environment.TickCount64;
+        PopulateCapped(FileSystemService.LoadChildren(FullPath, this));
     }
 
     // Fills Children with at most DisplayCap items; anything beyond that is
