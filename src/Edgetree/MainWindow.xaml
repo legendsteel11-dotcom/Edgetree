@@ -642,11 +642,16 @@
                              it), with the sized value kept only as a floor so a
                              very narrow menu can't crush the preview. The image
                              letterboxes centered inside (Uniform). -->
+                        <!-- Transparent, not the ControlBackground plate it
+                             first shipped with: the plate showed as a lighter
+                             rounded box around letterboxed images, and the
+                             user preferred the picture floating directly on
+                             the menu. Transparent (not null) keeps the whole
+                             slot clickable. -->
                         <Border MinWidth="{DynamicResource MenuThumbnailWidth}"
                                 MaxWidth="{DynamicResource MenuThumbnailMaxWidth}"
                                 Height="{DynamicResource MenuThumbnailHeight}"
-                                Background="{DynamicResource ControlBackground}"
-                                CornerRadius="4"
+                                Background="Transparent"
                                 Padding="3">
                             <!-- The Image's Width/Height are BOUND to the host
                                  grid rather than left natural: an Image reports
@@ -796,8 +801,7 @@
                         <Border MinWidth="{DynamicResource MenuThumbnailWidth}"
                                 MaxWidth="{DynamicResource MenuThumbnailMaxWidth}"
                                 Height="{DynamicResource MenuThumbnailHeight}"
-                                Background="{DynamicResource ControlBackground}"
-                                CornerRadius="4"
+                                Background="Transparent"
                                 Padding="3">
                             <Grid>
                                 <Image Stretch="Uniform"
