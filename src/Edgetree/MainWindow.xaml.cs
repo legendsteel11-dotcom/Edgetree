@@ -305,6 +305,70 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(RestoreTreeState, System.Windows.Threading.DispatcherPriority.Background);
 
         StartStuckCaptureWatchdog();
+
+        // Resuming from sleep and changing the display layout both make Windows
+        // rebuild the surfaces WPF renders onto. The reported symptom is rows
+        // vanishing from the middle of the tree after the app has been up a
+        // long time, reappearing the moment anything is clicked or moved - i.e.
+        // the data is intact and only the drawing is missing, and the thing
+        // that restores it is a layout pass. The user resumes from sleep
+        // constantly and does NOT see this while scrolling, which points here
+        // rather than at container recycling.
+        //
+        // These events arrive on a system thread, hence the marshal.
+        Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChanged;
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+    }
+
+    private void OnPowerModeChanged(object sender, Microsoft.Win32.PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == Microsoft.Win32.PowerModes.Resume)
+        {
+            Dispatcher.BeginInvoke(() => ForceTreeRedraw("resume"),
+                System.Windows.Threading.DispatcherPriority.Background);
+        }
+    }
+
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+        => Dispatcher.BeginInvoke(() => ForceTreeRedraw("display-change"),
+            System.Windows.Threading.DispatcherPriority.Background);
+
+    // Re-runs measure/arrange on the tree and its panels. Cheap - it costs one
+    // layout pass over what is on screen, and only after events that happen
+    // seconds apart at most.
+    private void ForceTreeRedraw(string reason)
+    {
+        ExplorerTree.InvalidateMeasure();
+        ExplorerTree.InvalidateArrange();
+        ExplorerTree.InvalidateVisual();
+        ExplorerTree.UpdateLayout();
+
+        FavoritesList.InvalidateMeasure();
+        FavoritesList.InvalidateArrange();
+        FavoritesList.UpdateLayout();
+
+        LogRedraw(reason);
+    }
+
+    // Debug only, same purpose as the capture watchdog's log: if rows still go
+    // missing, this says whether a resume or display change had just happened -
+    // which either confirms the theory above or rules it out and points the
+    // next attempt somewhere else.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogRedraw(string reason)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "redraw.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  forced redraw after {reason}{Environment.NewLine}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     private void RestoreTreeState()
@@ -506,6 +570,11 @@ public partial class MainWindow : Window
         // Stop a search scan's background walk promptly rather than letting it
         // keep doing disk I/O during shutdown.
         _searchScanCts?.Cancel();
+
+        // SystemEvents holds these statically, so an unhooked handler keeps
+        // this window alive for the life of the process.
+        Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
 
         foreach (var watcher in _driveWatchers)
         {

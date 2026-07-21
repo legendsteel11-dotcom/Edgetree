@@ -2278,7 +2278,17 @@
                  they were never the problem (the log proves it), and letting
                  a "reveal everything" cache reach a folder someone expanded
                  via "더 보기" would realize hundreds of rows for no reason. -->
-            <!-- Also note: do NOT "fix" this by setting IsVirtualizing=False
+            <!-- VirtualizationMode is Standard, not Recycling. Recycling reuses
+                 row containers as they scroll out of view, and a reused
+                 container whose visual fails to refresh renders as a blank gap
+                 - one candidate for the reported "rows disappear from the
+                 middle of the tree until I click something". The saving it
+                 offers is small here regardless, since CacheLength already
+                 keeps a thousand containers alive. This is a SEPARATE setting
+                 from CacheLength below; that one fixes favorites navigation and
+                 must stay as it is.
+
+                 Also note: do NOT "fix" this by setting IsVirtualizing=False
                  here. That was tried; it silently un-virtualizes the ENTIRE
                  tree (the property inherits) and breaks scrolling app-wide. -->
             <TreeView x:Name="ExplorerTree"
@@ -2291,7 +2301,7 @@
                     ContextMenu="{StaticResource ExplorerEmptySpaceContextMenu}"
                       ItemContainerStyle="{StaticResource ExplorerTreeViewItemStyle}"
                       VirtualizingPanel.IsVirtualizing="True"
-                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      VirtualizingPanel.VirtualizationMode="Standard"
                       VirtualizingPanel.ScrollUnit="Pixel"
                       VirtualizingPanel.CacheLengthUnit="Item"
                       VirtualizingPanel.CacheLength="1000,1000"
