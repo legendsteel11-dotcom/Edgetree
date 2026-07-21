@@ -200,7 +200,9 @@ public partial class App : Application
             SetChromeBrush("HighlightForeground", "#FFF0F2F6");
             SetChromeBrush("HoverBackground", "#FF2A2D2E");
             SetChromeBrush("SecondaryForeground", "#FF9A9A9A");
-            SetChromeBrush("PanelBackground", "#FF282828");
+            // RGB 40/42/44 (user-picked 2026-07-21, was a flat #282828): a
+            // hint of blue-grey so menus separate from the tree behind them.
+            SetChromeBrush("PanelBackground", "#FF282A2C");
             SetChromeBrush("PanelBorder", "#FF454545");
             SetChromeBrush("SeparatorBrush", "#26FFFFFF");
             SetChromeBrush("ControlBackground", "#FF3C3C3C");
