@@ -491,6 +491,18 @@
                                         Property="Visibility"
                                         Value="Visible"/>
                             </Trigger>
+                            <!-- An empty GestureText still rendered as a
+                                 0-wide TextBlock WITH its 24px left margin,
+                                 silently docking that much off the content
+                                 column of every gesture-less item - which is
+                                 what pushed the (stretching) thumbnail slot
+                                 visibly left of the menu's center. -->
+                            <Trigger Property="InputGestureText"
+                                    Value="">
+                                <Setter TargetName="GestureText"
+                                        Property="Visibility"
+                                        Value="Collapsed"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -601,6 +613,36 @@
                 Opened="ExplorerItemContextMenu_Opened"
                 Closed="AnyMenu_Closed"
                 PreviewKeyDown="ExplorerItemContextMenu_PreviewKeyDown">
+            <!-- Image thumbnail (single image file only): the slot is reserved
+                 at its fixed size the moment the menu opens - we already know
+                 from the extension whether this row gets one - so the async
+                 arrival of the actual picture never reflows the open menu.
+                 Clicking it opens the file, same as double-click on the row.
+                 Shown/loaded by UpdateThumbnailRow via the POSITIONAL pattern
+                 in ExplorerItemContextMenu_Opened - keep that in sync. -->
+            <MenuItem Visibility="Collapsed"
+                    Click="ThumbnailMenuItem_Click">
+                <MenuItem.Header>
+                    <!-- No fixed Width: the slot stretches to the menu's own
+                         content width (whatever the widest text item makes
+                         it), with the sized value kept only as a floor so a
+                         very narrow menu can't crush the preview. The image
+                         letterboxes centered inside (Uniform). -->
+                    <Border MinWidth="{DynamicResource MenuThumbnailWidth}"
+                            Height="{DynamicResource MenuThumbnailHeight}"
+                            Background="{DynamicResource ControlBackground}"
+                            CornerRadius="4"
+                            Padding="3">
+                        <!-- DownOnly: a source smaller than the slot (an .ico,
+                             a tiny image) shows at its natural size, sharp and
+                             centered, instead of being blown up blurry. -->
+                        <Image Stretch="Uniform"
+                                StretchDirection="DownOnly"
+                                RenderOptions.BitmapScalingMode="HighQuality"/>
+                    </Border>
+                </MenuItem.Header>
+            </MenuItem>
+            <Separator Visibility="Collapsed"/>
             <!-- Multi-selection header row ("N개 항목 선택됨"): shown, with its
                  separator, only while a Ctrl/Shift-click multi-selection is
                  active - text and visibility both set on every open by

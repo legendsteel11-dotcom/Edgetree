@@ -3466,6 +3466,10 @@ public partial class MainWindow : Window
         var appResources = Application.Current.Resources;
         appResources["MenuFontSize"] = ExplorerTree.FontSize;
         appResources["MenuGestureFontSize"] = Math.Max(8.0, Math.Round(11.0 * scale));
+        // The context menu's image-thumbnail slot (see UpdateThumbnailRow):
+        // 4:3, sized to roughly fill the menu's own width at any font zoom.
+        appResources["MenuThumbnailWidth"] = Math.Round(160.0 * scale);
+        appResources["MenuThumbnailHeight"] = Math.Round(120.0 * scale);
         appResources["MenuItemPadding"] = new Thickness(
             Math.Round(15.0 * scale), Math.Round(8.0 * menuVerticalScale),
             Math.Round(15.0 * scale), Math.Round(8.0 * menuVerticalScale));
@@ -4415,6 +4419,16 @@ public partial class MainWindow : Window
                 treeViewItem.ApplyTemplate();
                 menu.PlacementTarget = treeViewItem.Template.FindName("RowBorder", treeViewItem) as UIElement ?? treeViewItem;
                 menu.Placement = PlacementMode.Bottom;
+
+                // The thumbnail row must be configured BEFORE the menu opens:
+                // doing it in ExplorerItemContextMenu_Opened - which fires
+                // after the popup has already sized and positioned itself -
+                // made the freshly-shown menu visibly jump as it re-laid out
+                // around the appearing slot.
+                if (menu.Items is [MenuItem thumbnailItem, Separator thumbnailSeparator, ..])
+                {
+                    UpdateThumbnailRow(thumbnailItem, thumbnailSeparator, _multiSelection.Count > 1);
+                }
             }
         }
     }
@@ -4496,8 +4510,24 @@ public partial class MainWindow : Window
         // auto-generated code-behind field the way named elements in the main
         // visual tree do, so these have to be found by position on the
         // ContextMenu itself instead.
-        if (sender is ContextMenu { Items: [MenuItem multiInfoItem, Separator multiInfoSeparator, MenuItem addFavoriteItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem searchInFolderItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, MenuItem renameItem, _, _, MenuItem copyPathItem, _, MenuItem openWithCodeItem, ..] })
+        if (sender is ContextMenu { Items: [MenuItem thumbnailItem, Separator thumbnailSeparator, MenuItem multiInfoItem, Separator multiInfoSeparator, MenuItem addFavoriteItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem searchInFolderItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, MenuItem renameItem, _, _, MenuItem copyPathItem, _, MenuItem openWithCodeItem, ..] })
         {
+            // The thumbnail row is NOT configured here - see
+            // TreeViewItem_PreviewMouseRightButtonDown, which runs before the
+            // menu opens (this event fires after the popup has already sized
+            // itself, and revealing the slot at that point visibly bumped the
+            // open menu). This only guards paths that bypass that handler
+            // (e.g. the keyboard menu key): a row left over from an earlier
+            // open that doesn't match the current selection is hidden rather
+            // than showing the wrong file's picture.
+            if (thumbnailItem.Visibility == Visibility.Visible &&
+                _pendingThumbnailPath != (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath)
+            {
+                thumbnailItem.Visibility = Visibility.Collapsed;
+                thumbnailSeparator.Visibility = Visibility.Collapsed;
+                _pendingThumbnailPath = null;
+            }
+
             // The "N개 항목 선택됨" header only appears while a multi-selection
             // is active, so the menu stays exactly as it always was for the
             // everyday single-row case.
@@ -4564,6 +4594,87 @@ public partial class MainWindow : Window
                 ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false } && ShellFileService.IsCodeRegistered();
         }
     }
+
+    // The image formats worth even asking the shell for a thumbnail of -
+    // gating by extension keeps a right-click on an exe/txt from paying a
+    // pointless extraction attempt. Whether a thumbnail actually EXISTS is
+    // still the shell's call (SIIGBF_THUMBNAILONLY fails cleanly on a
+    // corrupted file or a format missing its codec).
+    private static readonly HashSet<string> ThumbnailExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg", ".jpeg", ".jfif", ".png", ".gif", ".bmp", ".webp",
+        ".ico", ".tif", ".tiff", ".heic", ".heif", ".avif"
+    };
+
+    // The path the currently open menu requested a thumbnail for - compared on
+    // the async arrival so a slow fetch can't paint its image into a menu that
+    // has since been reopened on a different file.
+    private string? _pendingThumbnailPath;
+
+    // Shows/hides the context menu's thumbnail slot for the current selection
+    // and kicks off the async fetch. The slot appears at its full fixed size
+    // immediately (we know from the extension alone whether this row gets
+    // one), so the image arriving later never resizes the open menu; only a
+    // FAILED fetch collapses the row after the fact, which is rare enough
+    // (corrupted file, missing codec) that the one-off shrink is fine.
+    private void UpdateThumbnailRow(MenuItem thumbnailItem, Separator thumbnailSeparator, bool isMultiSelection)
+    {
+        _pendingThumbnailPath = null;
+        if (thumbnailItem.Header is not Border { Child: System.Windows.Controls.Image image })
+        {
+            return;
+        }
+        image.Source = null;
+
+        bool show = !isMultiSelection &&
+            ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false, IsDirectory: false } file &&
+            ThumbnailExtensions.Contains(Path.GetExtension(file.Name)) &&
+            File.Exists(file.FullPath);
+
+        thumbnailItem.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        thumbnailSeparator.Visibility = thumbnailItem.Visibility;
+        if (!show)
+        {
+            return;
+        }
+
+        string path = ((FileSystemItem)ExplorerTree.SelectedItem).FullPath;
+        _pendingThumbnailPath = path;
+
+        // Requested in physical pixels so the shell hands over enough
+        // resolution to stay sharp on scaled displays. The slot stretches to
+        // the menu's content width, which isn't known until the menu lays out
+        // - the 1.5x headroom over the slot's floor width covers the widths
+        // menus actually reach, and SIIGBF_BIGGERSIZEOK makes over-asking
+        // cheap anyway.
+        double slotWidth = Application.Current.Resources["MenuThumbnailWidth"] as double? ?? 160.0;
+        int pixelSize = (int)Math.Ceiling(slotWidth * 1.5 * VisualTreeHelper.GetDpi(this).DpiScaleX);
+
+        ShellThumbnailService.GetThumbnail(path, pixelSize, thumbnail =>
+        {
+            if (_pendingThumbnailPath != path)
+            {
+                return;
+            }
+
+            if (thumbnail is null)
+            {
+                // No thumbnail to be had - drop the empty slot rather than
+                // leaving a blank box at the top of the menu.
+                thumbnailItem.Visibility = Visibility.Collapsed;
+                thumbnailSeparator.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            image.Source = thumbnail;
+        });
+    }
+
+    // The thumbnail is a click target too: opening the file is the natural
+    // "show me properly" follow-up to a glance, and it's why a bigger
+    // preview flyout wasn't needed.
+    private void ThumbnailMenuItem_Click(object sender, RoutedEventArgs e)
+        => OpenItem_Click(sender, e);
 
     // Re-reads the selected folder's own children from disk - the direct,
     // scoped way to see a changed sort order (or new/removed files) without
