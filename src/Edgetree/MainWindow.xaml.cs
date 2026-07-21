@@ -1784,8 +1784,15 @@ public partial class MainWindow : Window
     // unused space), this is a deliberate "fit now" action so it can grow the
     // panel too, e.g. to reveal favorites previously left below a manually
     // shrunk splitter.
+    // Left button only - same latent trap as ExplorerTree_MouseDoubleClick
+    // (see its comment): WPF raises this for right-button double-clicks too.
     private void FavoritesSplitter_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        => FitFavoritesPanel();
+    {
+        if (e.ChangedButton == MouseButton.Left)
+        {
+            FitFavoritesPanel();
+        }
+    }
 
     // Sizes the panel to exactly fit every current favorite (growing it if
     // needed, unlike UpdateFavoritesPanelVisibility's shrink-only cap) and
@@ -3888,6 +3895,17 @@ public partial class MainWindow : Window
 
     private void ExplorerTree_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
+        // WPF raises MouseDoubleClick for the RIGHT button too, and this
+        // handler never checked which - so two right-clicks landing on the
+        // same row within double-click time (easy to hit while repeatedly
+        // right-clicking to open/close the context menu) opened the file.
+        // Latent since this handler was written; surfaced by thumbnail
+        // testing's rapid right-clicks.
+        if (e.ChangedButton != MouseButton.Left)
+        {
+            return;
+        }
+
         if ((e.OriginalSource as DependencyObject)?.FindAncestor<TreeViewItem>() is not { } treeViewItem)
         {
             return;
@@ -5311,7 +5329,9 @@ public partial class MainWindow : Window
     // fitting again.
     private void ResizeThumb_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (!CanResizeWidth)
+        // Left button only - same latent trap as ExplorerTree_MouseDoubleClick
+        // (see its comment): WPF raises this for right-button double-clicks too.
+        if (e.ChangedButton != MouseButton.Left || !CanResizeWidth)
         {
             return;
         }
