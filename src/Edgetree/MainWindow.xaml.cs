@@ -4678,11 +4678,15 @@ public partial class MainWindow : Window
     private void UpdateThumbnailRow(MenuItem thumbnailItem, Separator thumbnailSeparator, string? filePath)
     {
         _pendingThumbnailPath = null;
-        if (thumbnailItem.Header is not Border { Child: Grid { Children: [System.Windows.Controls.Image image] } })
+        if (thumbnailItem.Header is not StackPanel
+            {
+                Children: [Border { Child: Grid { Children: [System.Windows.Controls.Image image] } }, TextBlock infoText]
+            })
         {
             return;
         }
         image.Source = null;
+        infoText.Text = string.Empty;
 
         bool show = filePath is not null &&
             ThumbnailExtensions.Contains(Path.GetExtension(filePath)) &&
@@ -4698,6 +4702,25 @@ public partial class MainWindow : Window
         string path = filePath!;
         _pendingThumbnailPath = path;
 
+        // Format + file size under the preview, shown immediately; the pixel
+        // dimensions (which need the file's header, read on the background
+        // hop) slot in between when the thumbnail arrives. Read the cheap
+        // parts synchronously: File.Exists above already touched this path's
+        // metadata, so the FileInfo comes from the same warm cache.
+        string format = Path.GetExtension(path).TrimStart('.').ToUpperInvariant();
+        string sizeText = string.Empty;
+        try
+        {
+            sizeText = FormatFileSize(new FileInfo(path).Length);
+            infoText.Text = format + "  ·  " + sizeText;
+        }
+        catch (Exception e2) when (e2 is IOException or UnauthorizedAccessException)
+        {
+            // Metadata gone mid-read (file deleted between the check and
+            // here) - the preview fetch below will fail and collapse the
+            // row on its own; no info line is fine meanwhile.
+        }
+
         // Requested in physical pixels so the shell hands over enough
         // resolution to stay sharp on scaled displays. The slot stretches to
         // the menu's content width, which isn't known until the menu lays out
@@ -4707,7 +4730,7 @@ public partial class MainWindow : Window
         double slotWidth = Application.Current.Resources["MenuThumbnailWidth"] as double? ?? 160.0;
         int pixelSize = (int)Math.Ceiling(slotWidth * 1.5 * VisualTreeHelper.GetDpi(this).DpiScaleX);
 
-        ShellThumbnailService.GetThumbnail(path, pixelSize, thumbnail =>
+        ShellThumbnailService.GetThumbnail(path, pixelSize, (thumbnail, pixelWidth, pixelHeight) =>
         {
             if (_pendingThumbnailPath != path)
             {
@@ -4724,6 +4747,10 @@ public partial class MainWindow : Window
             }
 
             image.Source = thumbnail;
+            if (pixelWidth > 0 && pixelHeight > 0)
+            {
+                infoText.Text = $"{format}  ·  {pixelWidth}×{pixelHeight}  ·  {sizeText}";
+            }
         });
     }
 
@@ -4732,6 +4759,15 @@ public partial class MainWindow : Window
     // preview flyout wasn't needed.
     private void ThumbnailMenuItem_Click(object sender, RoutedEventArgs e)
         => OpenItem_Click(sender, e);
+
+    // "1.2 MB" style, one decimal from KB up - for the thumbnail's info line.
+    private static string FormatFileSize(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:0.#} KB",
+        < 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024):0.#} MB",
+        _ => $"{bytes / (1024.0 * 1024 * 1024):0.#} GB"
+    };
 
     // Re-reads the selected folder's own children from disk - the direct,
     // scoped way to see a changed sort order (or new/removed files) without

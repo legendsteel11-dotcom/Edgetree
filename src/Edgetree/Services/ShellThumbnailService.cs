@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -23,15 +24,34 @@ namespace SidebarExplorer.App.Services;
 // ImageSource ever leaves this class.
 public static class ShellThumbnailService
 {
-    // onCompleted is invoked on the UI thread, with null when the file has no
-    // thumbnail to give (unsupported/corrupted/unreadable) - the caller
-    // collapses its slot rather than showing an empty box forever.
-    public static void GetThumbnail(string path, int pixelSize, Action<ImageSource?> onCompleted)
+    // onCompleted is invoked on the UI thread, with a null image when the
+    // file has no thumbnail to give (unsupported/corrupted/unreadable) - the
+    // caller collapses its slot rather than showing an empty box forever.
+    // pixelWidth/Height are the ORIGINAL image's dimensions (the thumbnail is
+    // scaled, so they can't be read off it), 0 when they couldn't be read -
+    // decoded header-only, on the same background hop as the thumbnail.
+    public static void GetThumbnail(string path, int pixelSize, Action<ImageSource?, int, int> onCompleted)
     {
         Task.Run(() =>
         {
             var thumbnail = Extract(path, pixelSize);
-            Application.Current?.Dispatcher.BeginInvoke(() => onCompleted(thumbnail));
+
+            int pixelWidth = 0, pixelHeight = 0;
+            try
+            {
+                using var stream = File.OpenRead(path);
+                var frame = BitmapDecoder.Create(stream,
+                    BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0];
+                pixelWidth = frame.PixelWidth;
+                pixelHeight = frame.PixelHeight;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException or FileFormatException or ArgumentException)
+            {
+                // No WIC codec / unreadable header - the info line just omits
+                // the dimensions.
+            }
+
+            Application.Current?.Dispatcher.BeginInvoke(() => onCompleted(thumbnail, pixelWidth, pixelHeight));
         });
     }
 

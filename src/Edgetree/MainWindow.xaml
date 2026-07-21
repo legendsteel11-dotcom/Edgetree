@@ -636,39 +636,50 @@
             <MenuItem Visibility="Collapsed"
                     Click="ThumbnailMenuItem_Click">
                 <MenuItem.Header>
-                    <!-- No fixed Width: the slot stretches to the menu's own
-                         content width (whatever the widest text item makes
-                         it), with the sized value kept only as a floor so a
-                         very narrow menu can't crush the preview. The image
-                         letterboxes centered inside (Uniform). -->
-                    <Border MinWidth="{DynamicResource MenuThumbnailWidth}"
-                            MaxWidth="{DynamicResource MenuThumbnailMaxWidth}"
-                            Height="{DynamicResource MenuThumbnailHeight}"
-                            Background="{DynamicResource ControlBackground}"
-                            CornerRadius="4"
-                            Padding="3">
-                        <!-- The Image's Width/Height are BOUND to the host
-                             grid rather than left natural: an Image reports
-                             its picture's full natural size during measure,
-                             and since the picture arrives asynchronously
-                             AFTER the menu has laid out, a wide image was
-                             re-measuring - and visibly widening - the whole
-                             open menu the moment it loaded. Bound to the
-                             slot, the image can never influence the menu's
-                             size in either direction; the slot just follows
-                             the width the other items give the menu.
-                             DownOnly still applies within that box: a source
-                             smaller than the slot (an .ico, a tiny image)
-                             shows at its natural size, sharp and centered,
-                             instead of being blown up blurry. -->
-                        <Grid>
-                            <Image Stretch="Uniform"
-                                    StretchDirection="DownOnly"
-                                    Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Grid}}"
-                                    Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}}"
-                                    RenderOptions.BitmapScalingMode="HighQuality"/>
-                        </Grid>
-                    </Border>
+                    <StackPanel>
+                        <!-- No fixed Width: the slot stretches to the menu's own
+                             content width (whatever the widest text item makes
+                             it), with the sized value kept only as a floor so a
+                             very narrow menu can't crush the preview. The image
+                             letterboxes centered inside (Uniform). -->
+                        <Border MinWidth="{DynamicResource MenuThumbnailWidth}"
+                                MaxWidth="{DynamicResource MenuThumbnailMaxWidth}"
+                                Height="{DynamicResource MenuThumbnailHeight}"
+                                Background="{DynamicResource ControlBackground}"
+                                CornerRadius="4"
+                                Padding="3">
+                            <!-- The Image's Width/Height are BOUND to the host
+                                 grid rather than left natural: an Image reports
+                                 its picture's full natural size during measure,
+                                 and since the picture arrives asynchronously
+                                 AFTER the menu has laid out, a wide image was
+                                 re-measuring - and visibly widening - the whole
+                                 open menu the moment it loaded. Bound to the
+                                 slot, the image can never influence the menu's
+                                 size in either direction; the slot just follows
+                                 the width the other items give the menu.
+                                 DownOnly still applies within that box: a source
+                                 smaller than the slot (an .ico, a tiny image)
+                                 shows at its natural size, sharp and centered,
+                                 instead of being blown up blurry. -->
+                            <Grid>
+                                <Image Stretch="Uniform"
+                                        StretchDirection="DownOnly"
+                                        Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Grid}}"
+                                        Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}}"
+                                        RenderOptions.BitmapScalingMode="HighQuality"/>
+                            </Grid>
+                        </Border>
+                        <!-- Format · pixel size · file size, set by
+                             UpdateThumbnailRow. Foreground explicit: property
+                             inheritance from the template's Bd border doesn't
+                             reliably reach an explicit TextBlock in Header
+                             content (it rendered near-black), so the menu
+                             text brush is named outright. -->
+                        <TextBlock Foreground="{DynamicResource MenuForeground}"
+                                HorizontalAlignment="Center"
+                                Margin="0,3,0,0"/>
+                    </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
             <Separator Visibility="Collapsed"/>
@@ -781,20 +792,25 @@
             <MenuItem Visibility="Collapsed"
                     Click="SearchOpen_Click">
                 <MenuItem.Header>
-                    <Border MinWidth="{DynamicResource MenuThumbnailWidth}"
-                            MaxWidth="{DynamicResource MenuThumbnailMaxWidth}"
-                            Height="{DynamicResource MenuThumbnailHeight}"
-                            Background="{DynamicResource ControlBackground}"
-                            CornerRadius="4"
-                            Padding="3">
-                        <Grid>
-                            <Image Stretch="Uniform"
-                                    StretchDirection="DownOnly"
-                                    Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Grid}}"
-                                    Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}}"
-                                    RenderOptions.BitmapScalingMode="HighQuality"/>
-                        </Grid>
-                    </Border>
+                    <StackPanel>
+                        <Border MinWidth="{DynamicResource MenuThumbnailWidth}"
+                                MaxWidth="{DynamicResource MenuThumbnailMaxWidth}"
+                                Height="{DynamicResource MenuThumbnailHeight}"
+                                Background="{DynamicResource ControlBackground}"
+                                CornerRadius="4"
+                                Padding="3">
+                            <Grid>
+                                <Image Stretch="Uniform"
+                                        StretchDirection="DownOnly"
+                                        Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Grid}}"
+                                        Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}}"
+                                        RenderOptions.BitmapScalingMode="HighQuality"/>
+                            </Grid>
+                        </Border>
+                        <TextBlock Foreground="{DynamicResource MenuForeground}"
+                                HorizontalAlignment="Center"
+                                Margin="0,3,0,0"/>
+                    </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
             <Separator Visibility="Collapsed"/>
