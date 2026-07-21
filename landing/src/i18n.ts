@@ -32,7 +32,7 @@ const dict = {
       steps: [
         { title: '도킹 / 자동접기 / 창모드 전환', desc: '제목표시줄 아이콘 클릭 한 번으로 화면 가장자리에 얇게 숨고, 마우스를 가장자리로 가져가면 다시 펼쳐집니다. 제목표시줄을 드래그하여 창모드로 전환할 수 있습니다.' },
         { title: '간단한 파일 검색', desc: '제목표시줄의 검색 아이콘 혹은 Ctrl + F / Ctrl + E 로 검색창과 탐색기 창을 전환하고 간단한 파일 검색을 할 수 있습니다.' },
-        { title: '컨텍스트 메뉴 및 파일 액세스', desc: '탐색기에서 폴더나 파일을 우클릭하여 기본적인 기능 등을 편리하게 사용할 수 있습니다. 파일을 창 외부로 복사하거나, VS Code의 탐색기에 바로 등록할 수 있습니다.' },
+        { title: '컨텍스트 메뉴 및 파일 액세스', desc: '탐색기에서 폴더나 파일을 우클릭하여 기본적인 기능 등을 편리하게 사용할 수 있습니다. 이미지 파일은 열지 않고도 메뉴 상단의 미리보기로 바로 확인됩니다. 파일을 창 외부로 복사하거나, VS Code의 탐색기에 바로 등록할 수 있습니다.' },
         { title: '전체 펼침/접기, 자동 아코디언', desc: '제목바의 ▲ 아이콘으로 펼쳐진 폴더 트리 전체를 한 번에 접었다 복원할 수 있습니다. 또 필요한 폴더만 펼치고 나머지는 자동으로 접히게 할 수 있습니다.' },
       ],
     },
@@ -49,7 +49,7 @@ const dict = {
         },
         {
           title: '우클릭 메뉴',
-          desc: '새 폴더, 복사/붙여넣기, 이름 바꾸기, 삭제, 터미널 열기 등을 한 곳에서.',
+          desc: '새 폴더, 복사/붙여넣기, 이름 바꾸기, 삭제, 터미널 열기 등을 한 곳에서. 이미지 파일은 메뉴 상단에 미리보기가 표시됩니다.',
         },
         {
           title: '옵션 메뉴',
@@ -138,7 +138,7 @@ const dict = {
       steps: [
         { title: 'Dock / Auto-Hide / Window Mode', desc: 'One click on the titlebar icon tucks it away to a thin sliver at the screen edge; move your mouse there to bring it back. Drag the titlebar to switch into a floating window.' },
         { title: 'Quick File Search', desc: "The titlebar's search icon (or Ctrl + F / Ctrl + E) toggles between the search box and the explorer for a quick file lookup." },
-        { title: 'Context Menu & File Access', desc: 'Right-click a folder or file in the explorer for the essentials at hand — copy files out to another window, or send them straight to the VS Code explorer.' },
+        { title: 'Context Menu & File Access', desc: 'Right-click a folder or file in the explorer for the essentials at hand — image files show a preview right at the top of the menu, no need to open them. Copy files out to another window, or send them straight to the VS Code explorer.' },
         { title: 'Collapse/Restore All & Auto Accordion', desc: 'The ▲ icon on the titlebar collapses or restores the whole expanded tree at once; you can also keep only the folder you open expanded while the rest auto-collapse.' },
       ],
     },
@@ -155,7 +155,7 @@ const dict = {
         },
         {
           title: 'Right-click menu',
-          desc: 'New folder, copy/paste, rename, delete, open terminal, and more — all in one place.',
+          desc: 'New folder, copy/paste, rename, delete, open terminal, and more — all in one place. Image files show a preview at the top of the menu.',
         },
         {
           title: 'Options menu',
