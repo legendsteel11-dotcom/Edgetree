@@ -19,6 +19,7 @@ public static class Strings
     public static string MenuRename = "이름 바꾸기";
     public static string MenuDelete = "삭제";
     public static string MenuCopyPath = "경로 복사";
+    public static string MenuMultiSelectionInfo = "{0}개 항목 선택됨";
     public static string MenuOpenTerminal = "터미널에서 열기";
     public static string MenuOpenWithCode = "Code로 열기";
     public static string MenuRevealInExplorer = "탐색기에서 위치 열기";
@@ -220,6 +221,7 @@ public static class Strings
     public static string RenameFailedTitle = "이름 바꾸기 실패";
     public static string DeleteConfirmTitle = "삭제 확인";
     public static string DeleteConfirmBody = "'{0}'을(를) 휴지통으로 보낼까요?";
+    public static string DeleteConfirmBodyMultiple = "선택한 {0}개 항목을 휴지통으로 보낼까요?";
     public static string DeleteFailedTitle = "삭제 실패";
     public static string StartWithWindowsFailedTitle = "윈도우 시작 시 실행";
     public static string StartWithWindowsFailedBody = "시작 프로그램 등록에 실패했습니다. 관리자 정책으로 제한되어 있을 수 있습니다.";
@@ -268,6 +270,7 @@ public static class Strings
         MenuRename = "Rename";
         MenuDelete = "Delete";
         MenuCopyPath = "Copy Path";
+        MenuMultiSelectionInfo = "{0} items selected";
         MenuOpenTerminal = "Open in Terminal";
         MenuOpenWithCode = "Open with Code";
         MenuRevealInExplorer = "Reveal in Explorer";
@@ -391,6 +394,7 @@ public static class Strings
         RenameFailedTitle = "Rename Failed";
         DeleteConfirmTitle = "Confirm Delete";
         DeleteConfirmBody = "Send '{0}' to the Recycle Bin?";
+        DeleteConfirmBodyMultiple = "Send {0} selected items to the Recycle Bin?";
         DeleteFailedTitle = "Delete Failed";
         StartWithWindowsFailedTitle = "Start with Windows";
         StartWithWindowsFailedBody = "Failed to register as a startup program. It may be restricted by administrator policy.";

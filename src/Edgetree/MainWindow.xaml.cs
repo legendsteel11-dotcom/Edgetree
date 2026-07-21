@@ -2676,6 +2676,11 @@ public partial class MainWindow : Window
     // a true whole-app refresh.
     private void RefreshAllLoadedFolders()
     {
+        // The rebuild below replaces every item instance, so whatever the
+        // multi-selection held would keep only dead instances - flags lost,
+        // list stale. Drop it up front.
+        ClearMultiSelection();
+
         // Snapshot every currently-expanded, already-loaded folder's full
         // path, and the current selection, before refreshing discards the
         // actual instances that know about either - a folder's
@@ -3572,6 +3577,10 @@ public partial class MainWindow : Window
                 CopyPath_Click(sender, e);
                 e.Handled = true;
                 break;
+            case Key.Escape when _multiSelection.Count > 0:
+                ClearMultiSelection();
+                e.Handled = true;
+                break;
             case Key.V when Keyboard.Modifiers == ModifierKeys.Control:
                 PasteItem_Click(sender, e);
                 e.Handled = true;
@@ -3793,6 +3802,169 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    // ----- Ctrl/Shift-click multi-selection ---------------------------------
+    //
+    // WPF's TreeView is single-select only, so the extra rows live here: the
+    // items in this list carry IsMultiSelected (painted like the native
+    // selection by the row style) while WPF's own selection stays on whichever
+    // row was interacted with last. Invariant kept throughout: whenever this
+    // list is non-empty, the natively-selected row is one of its members -
+    // ExplorerTree_SelectedItemChanged enforces it by collapsing the set the
+    // moment selection lands outside it (keyboard navigation, right-click on
+    // an unrelated row, a favorites walk).
+    //
+    // Copy(Ctrl+C)/Delete/drag-out act on the whole set via
+    // GetEffectiveSelection; everything else (rename, open, paste, path copy)
+    // deliberately stays single-target on the native selection.
+    private readonly List<FileSystemItem> _multiSelection = new();
+
+    // Where the next Shift+click range starts from: the last plainly- or
+    // Ctrl-clicked row, VS Code-style. Left alone by Shift+click itself so
+    // successive Shift+clicks re-range from the same start.
+    private FileSystemItem? _multiSelectAnchor;
+
+    // A plain press on a row that's already part of the set must NOT collapse
+    // the set right away - that press may be the start of dragging the whole
+    // set out. The collapse is deferred to mouse-UP, and cancelled if a drag
+    // actually starts in between (see TreeViewItem_PreviewMouseMove).
+    private FileSystemItem? _deferredMultiClearItem;
+
+    private void ClearMultiSelection()
+    {
+        foreach (var item in _multiSelection)
+        {
+            item.IsMultiSelected = false;
+        }
+        _multiSelection.Clear();
+        _deferredMultiClearItem = null;
+    }
+
+    private void AddToMultiSelection(FileSystemItem item)
+    {
+        if (!item.IsMultiSelected)
+        {
+            item.IsMultiSelected = true;
+            _multiSelection.Add(item);
+        }
+    }
+
+    private void RemoveFromMultiSelection(FileSystemItem item)
+    {
+        if (item.IsMultiSelected)
+        {
+            item.IsMultiSelected = false;
+            _multiSelection.Remove(item);
+        }
+    }
+
+    // Every row currently on screen or scrolled out of view but realized in
+    // the item tree, in top-to-bottom display order - the order Shift+click
+    // ranges over. Recurses only into expanded folders, so a collapsed
+    // folder's contents can never be swept into a range invisibly.
+    private List<FileSystemItem> BuildVisibleItemsInDisplayOrder()
+    {
+        var result = new List<FileSystemItem>();
+        void Walk(FileSystemItem item)
+        {
+            result.Add(item);
+            if (item.IsDirectory && item.IsExpanded)
+            {
+                foreach (var child in item.Children)
+                {
+                    if (!child.IsPlaceholder && !child.IsShowMore)
+                    {
+                        Walk(child);
+                    }
+                }
+            }
+        }
+        foreach (var root in _roots)
+        {
+            Walk(root);
+        }
+        return result;
+    }
+
+    private void SelectRange(FileSystemItem anchor, FileSystemItem target)
+    {
+        var visible = BuildVisibleItemsInDisplayOrder();
+        int targetIndex = visible.IndexOf(target);
+        if (targetIndex < 0)
+        {
+            return;
+        }
+        // An anchor that has since collapsed away or been rebuilt by a refresh
+        // just isn't in the visible list anymore - degrade to a single-row
+        // range rather than guessing.
+        int anchorIndex = visible.IndexOf(anchor);
+        if (anchorIndex < 0)
+        {
+            anchorIndex = targetIndex;
+        }
+
+        ClearMultiSelection();
+        int low = Math.Min(anchorIndex, targetIndex);
+        int high = Math.Max(anchorIndex, targetIndex);
+        for (int i = low; i <= high; i++)
+        {
+            AddToMultiSelection(visible[i]);
+        }
+    }
+
+    // The rows an operation should apply to: the multi-selection when one is
+    // active, else the native single selection. Paths that stopped existing
+    // (deleted/renamed behind a stale set entry) are dropped rather than
+    // handed to an operation that would only fail on them.
+    private List<FileSystemItem> GetEffectiveSelection()
+    {
+        if (_multiSelection.Count > 0)
+        {
+            return _multiSelection
+                .Where(i => File.Exists(i.FullPath) || Directory.Exists(i.FullPath))
+                .ToList();
+        }
+        return ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false } single
+            ? new List<FileSystemItem> { single }
+            : new List<FileSystemItem>();
+    }
+
+    private void TreeViewItem_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        // Innermost-item filtering FIRST, before touching the deferred state:
+        // this preview event tunnels through every ancestor TreeViewItem ahead
+        // of the row actually released on, and consuming the deferred item on
+        // one of those ancestor passes threw it away before the real target's
+        // pass could act - which is why the click-to-collapse only worked on
+        // top-level rows (a drive root has no ancestor to eat the state).
+        // Same tunneling trap as the right-click handler's.
+        if (sender is not TreeViewItem treeViewItem ||
+            !ReferenceEquals((e.OriginalSource as DependencyObject)?.FindAncestor<TreeViewItem>(), treeViewItem))
+        {
+            return;
+        }
+
+        if (_deferredMultiClearItem is not { } deferred)
+        {
+            return;
+        }
+        _deferredMultiClearItem = null;
+
+        // The release must land on the very row the press deferred for -
+        // anything else (released over some other row after a cancelled
+        // gesture) leaves the set alone.
+        if (!ReferenceEquals(treeViewItem.DataContext, deferred))
+        {
+            return;
+        }
+
+        // A full click (press + release, no drag in between) on a set member:
+        // collapse the multi-selection down to just that row, like Explorer.
+        ClearMultiSelection();
+        _multiSelectAnchor = deferred;
+        treeViewItem.IsSelected = true;
+        treeViewItem.Focus();
+    }
+
     private void TreeViewItem_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not TreeViewItem treeViewItem)
@@ -3862,6 +4034,90 @@ public partial class MainWindow : Window
             (e.OriginalSource as DependencyObject)?.FindAncestor<ToggleButton>() is { } expander
             && ReferenceEquals(expander.FindAncestor<TreeViewItem>(), treeViewItem);
 
+        // Multi-selection gestures. All three modifier branches mark the event
+        // handled and return, so none of the single-selection behavior below
+        // (folder expand toggle, slow-double-click rename, native selection)
+        // runs for them - a Ctrl+click on a folder selects it WITHOUT toggling
+        // it open, per the agreed design.
+        if (!clickedOnExpander &&
+            treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsShowMore: false, IsEditing: false } target)
+        {
+            var modifiers = Keyboard.Modifiers;
+            if (modifiers.HasFlag(ModifierKeys.Control) && !modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                // The row that was already natively selected joins the set
+                // first, so "click A, then Ctrl+click B" yields {A, B} like
+                // Explorer - not just {B}.
+                if (_multiSelection.Count == 0 &&
+                    ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false } current &&
+                    !ReferenceEquals(current, target))
+                {
+                    AddToMultiSelection(current);
+                }
+
+                if (target.IsMultiSelected)
+                {
+                    RemoveFromMultiSelection(target);
+                    if (treeViewItem.IsSelected)
+                    {
+                        // Un-highlight for real: this row was both natively
+                        // selected and in the set; dropping only the flag would
+                        // leave the native highlight painting it selected.
+                        treeViewItem.IsSelected = false;
+                    }
+                }
+                else
+                {
+                    AddToMultiSelection(target);
+                    // TreeViewItem.OnGotFocus selects the row it lands on, so
+                    // this moves the native selection here too (the guard in
+                    // ExplorerTree_SelectedItemChanged keeps the set because
+                    // the row is a member) - and puts keyboard focus in the
+                    // tree so Ctrl+C/Delete land in ExplorerTree_KeyDown.
+                    treeViewItem.Focus();
+                }
+
+                _multiSelectAnchor = target;
+                _itemDragStart = null;
+                _itemDragCandidate = null;
+                e.Handled = true;
+                return;
+            }
+
+            if (modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                var anchor = _multiSelectAnchor
+                    ?? ExplorerTree.SelectedItem as FileSystemItem
+                    ?? target;
+                SelectRange(anchor, target);
+                treeViewItem.Focus();
+
+                _itemDragStart = null;
+                _itemDragCandidate = null;
+                e.Handled = true;
+                return;
+            }
+
+            if (target.IsMultiSelected && _multiSelection.Count > 1)
+            {
+                // Plain press on a set member: might be the start of dragging
+                // the whole set out, so the collapse waits for mouse-up (see
+                // TreeViewItem_PreviewMouseLeftButtonUp). Folders are drag
+                // candidates here too - unlike the single-item drag below,
+                // there's no expand-toggle on this press to conflict with.
+                _deferredMultiClearItem = target;
+                _itemDragStart = e.GetPosition(ExplorerTree);
+                _itemDragCandidate = target;
+                e.Handled = true;
+                return;
+            }
+
+            // Plain click outside the set: back to single-selection, and this
+            // row is the anchor a later Shift+click ranges from.
+            ClearMultiSelection();
+            _multiSelectAnchor = target;
+        }
+
         if (!clickedOnExpander &&
             treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsDirectory: true, IsEditing: false } item)
         {
@@ -3916,6 +4172,11 @@ public partial class MainWindow : Window
         _itemDragStart = null;
         _itemDragCandidate = null;
 
+        // The press that started this drag will never be a plain click now, so
+        // the deferred set-collapse it may have queued must not run on the
+        // (much later) mouse-up.
+        _deferredMultiClearItem = null;
+
         // Dragging the file out, not renaming it in place.
         CancelPendingRename();
 
@@ -3928,7 +4189,21 @@ public partial class MainWindow : Window
         // Explorer silently default to moving (removing the original) for a
         // same-drive drop, which read as an inconsistent surprise next to
         // every external-drop-in always being a safe copy.
-        var data = new DataObject(DataFormats.FileDrop, new[] { item.FullPath });
+        // A drag that starts on a multi-selection member carries the whole set
+        // (files and folders alike); otherwise the single pressed file, as
+        // before.
+        string[] dragPaths = item.IsMultiSelected && _multiSelection.Count > 1
+            ? _multiSelection
+                .Where(i => File.Exists(i.FullPath) || Directory.Exists(i.FullPath))
+                .Select(i => i.FullPath)
+                .ToArray()
+            : new[] { item.FullPath };
+        if (dragPaths.Length == 0)
+        {
+            return;
+        }
+
+        var data = new DataObject(DataFormats.FileDrop, dragPaths);
 
         // Source is the TreeView, NOT the TreeViewItem this started on. The
         // item is a virtualized, recycled container, and a background refresh
@@ -4014,6 +4289,20 @@ public partial class MainWindow : Window
     {
         if (sender is TreeViewItem { DataContext: FileSystemItem { IsPlaceholder: false, IsShowMore: false } } treeViewItem)
         {
+            // Same innermost-item filtering as the left-button handler: this
+            // preview event tunnels through every ANCESTOR TreeViewItem before
+            // reaching the row actually clicked, and running the select below
+            // on each ancestor pass briefly selected each one in turn. The
+            // final selection still landed right, which is why this went
+            // unnoticed - until the multi-selection guard in
+            // ExplorerTree_SelectedItemChanged saw those momentary ancestor
+            // selections as "selection left the set" and collapsed the set on
+            // every right-click inside it.
+            if (!ReferenceEquals((e.OriginalSource as DependencyObject)?.FindAncestor<TreeViewItem>(), treeViewItem))
+            {
+                return;
+            }
+
             treeViewItem.IsSelected = true;
             treeViewItem.Focus();
 
@@ -4035,6 +4324,18 @@ public partial class MainWindow : Window
 
     private void ExplorerTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
+        // The moment the native selection lands on a row OUTSIDE the
+        // multi-selection - keyboard navigation, right-click on an unrelated
+        // row, a favorites walk - the set no longer matches what reads as
+        // "current" on screen, so it collapses. Selection changes our own
+        // gestures cause keep the set: they either select a row that IS a
+        // member (Ctrl/Shift-click's Focus) or clear the selection entirely
+        // (Ctrl-click toggle-off), neither of which matches this condition.
+        if (_multiSelection.Count > 0 && e.NewValue is FileSystemItem { IsMultiSelected: false })
+        {
+            ClearMultiSelection();
+        }
+
         // The navigation token is deliberately NOT bumped here. A favorites
         // walk expands folders as it goes, and with auto-collapse on that
         // collapses the previously-open drive - which makes WPF move the tree
@@ -4098,8 +4399,28 @@ public partial class MainWindow : Window
         // auto-generated code-behind field the way named elements in the main
         // visual tree do, so these have to be found by position on the
         // ContextMenu itself instead.
-        if (sender is ContextMenu { Items: [MenuItem addFavoriteItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem searchInFolderItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, _, _, _, _, _, MenuItem openWithCodeItem, ..] })
+        if (sender is ContextMenu { Items: [MenuItem multiInfoItem, Separator multiInfoSeparator, MenuItem addFavoriteItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem searchInFolderItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, MenuItem renameItem, _, _, MenuItem copyPathItem, _, MenuItem openWithCodeItem, ..] })
         {
+            // The "N개 항목 선택됨" header only appears while a multi-selection
+            // is active, so the menu stays exactly as it always was for the
+            // everyday single-row case.
+            bool isMultiSelection = _multiSelection.Count > 1;
+            multiInfoItem.Visibility = isMultiSelection ? Visibility.Visible : Visibility.Collapsed;
+            multiInfoSeparator.Visibility = multiInfoItem.Visibility;
+            if (isMultiSelection && multiInfoItem.Header is TextBlock multiInfoText)
+            {
+                multiInfoText.Text = string.Format(Strings.MenuMultiSelectionInfo, _multiSelection.Count);
+            }
+
+            // Single-target-by-design actions grey out on a multi-selection
+            // rather than silently acting on just one of the rows: 경로 복사
+            // (multi-path copy was deliberately left out of the multi
+            // operations) and 이름 바꾸기 (renaming several rows at once isn't a
+            // thing this menu offers). RenameItem_Click carries the same guard
+            // for the F2 path, which doesn't come through this menu.
+            copyPathItem.IsEnabled = !isMultiSelection;
+            renameItem.IsEnabled = !isMultiSelection;
+
             bool isFolder = ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true };
             addFavoriteItem.IsEnabled = isFolder;
 
@@ -4381,9 +4702,10 @@ public partial class MainWindow : Window
 
     private void CopyItem_Click(object sender, RoutedEventArgs e)
     {
-        if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false } item)
+        var items = GetEffectiveSelection();
+        if (items.Count > 0)
         {
-            FileOperationService.CopyToClipboard(item.FullPath);
+            FileOperationService.CopyToClipboard(items.Select(i => i.FullPath));
         }
     }
 
@@ -4468,6 +4790,14 @@ public partial class MainWindow : Window
     // DataTrigger) instead of opening a separate popup dialog.
     private void RenameItem_Click(object sender, RoutedEventArgs e)
     {
+        // Renaming is single-target only; with a multi-selection active this
+        // is greyed out on the menu (see ExplorerItemContextMenu_Opened), and
+        // this guard covers the F2 path that skips the menu.
+        if (_multiSelection.Count > 1)
+        {
+            return;
+        }
+
         if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false } item)
         {
             return;
@@ -4608,14 +4938,18 @@ public partial class MainWindow : Window
 
     private void DeleteItem_Click(object sender, RoutedEventArgs e)
     {
-        if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false } item)
+        var items = GetEffectiveSelection();
+        if (items.Count == 0)
         {
             return;
         }
 
+        string confirmBody = items.Count == 1
+            ? string.Format(Strings.DeleteConfirmBody, items[0].Name)
+            : string.Format(Strings.DeleteConfirmBodyMultiple, items.Count);
         var result = MessageBox.Show(
             this,
-            string.Format(Strings.DeleteConfirmBody, item.Name),
+            confirmBody,
             Strings.DeleteConfirmTitle,
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
@@ -4624,17 +4958,45 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!FileOperationService.TryDeleteToRecycleBin(item.FullPath, out var error))
+        // Every failure is collected and shown once at the end rather than
+        // popping a box per item mid-loop. A selection can also contain both a
+        // folder and something inside it - deleting the folder first makes the
+        // child's delete a silent no-op (TryDeleteToRecycleBin succeeds on an
+        // already-gone path), which is the right outcome.
+        var failures = new List<string>();
+        var parentsToRefresh = new HashSet<FileSystemItem>();
+        foreach (var item in items)
         {
-            if (error is not null)
+            if (!FileOperationService.TryDeleteToRecycleBin(item.FullPath, out var error))
             {
-                MessageBox.Show(this, error, Strings.DeleteFailedTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
+                if (error is not null)
+                {
+                    failures.Add(error);
+                }
+                continue;
             }
-            return;
+
+            if (item.Parent is { } parent)
+            {
+                parentsToRefresh.Add(parent);
+            }
+            RemoveFavoritesUnder(item.FullPath);
         }
 
-        item.Parent?.RefreshChildren();
-        RemoveFavoritesUnder(item.FullPath);
+        // Refresh each affected folder once, however many of its children
+        // were deleted. The set members are about to be discarded by these
+        // rebuilds anyway, so the multi-selection ends here too.
+        ClearMultiSelection();
+        foreach (var parent in parentsToRefresh)
+        {
+            parent.RefreshChildren();
+        }
+
+        if (failures.Count > 0)
+        {
+            MessageBox.Show(this, string.Join(Environment.NewLine, failures.Distinct()),
+                Strings.DeleteFailedTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     // Deleting a folder that's itself favorited - or that contains a

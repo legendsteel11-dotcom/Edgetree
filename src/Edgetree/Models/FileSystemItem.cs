@@ -9,6 +9,7 @@ public class FileSystemItem : INotifyPropertyChanged
 {
     private bool _isExpanded;
     private bool _isSelected;
+    private bool _isMultiSelected;
     private bool _isAncestorOfSelection;
     private bool _childrenLoaded;
     private bool _isEditing;
@@ -70,6 +71,17 @@ public class FileSystemItem : INotifyPropertyChanged
     {
         get => _isSelected;
         set => SetField(ref _isSelected, value);
+    }
+
+    // Part of the Ctrl/Shift-click multi-selection (MainWindow._multiSelection).
+    // Kept separate from IsSelected because WPF's TreeView only ever has ONE
+    // native selection; the additional rows carry this flag instead, and the
+    // row style paints both states with the same brushes. Maintained externally
+    // by MainWindow, same pattern as IsAncestorOfSelection below.
+    public bool IsMultiSelected
+    {
+        get => _isMultiSelected;
+        set => SetField(ref _isMultiSelected, value);
     }
 
     // True for every ancestor folder of the currently selected item, so its

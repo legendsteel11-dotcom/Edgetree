@@ -12,10 +12,19 @@ public static class FileOperationService
     }
 
     public static void CopyToClipboard(string path)
+        => CopyToClipboard(new[] { path });
+
+    public static void CopyToClipboard(IEnumerable<string> paths)
     {
         var files = new System.Collections.Specialized.StringCollection();
-        files.Add(path);
-        Clipboard.SetFileDropList(files);
+        foreach (string path in paths)
+        {
+            files.Add(path);
+        }
+        if (files.Count > 0)
+        {
+            Clipboard.SetFileDropList(files);
+        }
     }
 
     // Returns false only when the clipboard has nothing pasteable, so the

@@ -591,6 +591,25 @@
                 Opened="ExplorerItemContextMenu_Opened"
                 Closed="AnyMenu_Closed"
                 PreviewKeyDown="ExplorerItemContextMenu_PreviewKeyDown">
+            <!-- Multi-selection header row ("N개 항목 선택됨"): shown, with its
+                 separator, only while a Ctrl/Shift-click multi-selection is
+                 active - text and visibility both set on every open by
+                 ExplorerItemContextMenu_Opened, which finds items by POSITION
+                 (see its comment), so adding/removing/reordering anything here
+                 means updating that handler's list pattern too.
+                 The header is a TextBlock with its own Foreground rather than
+                 a plain string: the menu style's IsEnabled=False trigger greys
+                 items via an INHERITED TextBlock.Foreground, and a local value
+                 on the TextBlock outranks that - so this row stays accented
+                 while still being unclickable. -->
+            <MenuItem IsEnabled="False"
+                    Visibility="Collapsed">
+                <MenuItem.Header>
+                    <TextBlock FontWeight="SemiBold"
+                            Foreground="{DynamicResource AccentForeground}"/>
+                </MenuItem.Header>
+            </MenuItem>
+            <Separator Visibility="Collapsed"/>
             <MenuItem Header="{x:Static services:Strings.MenuAddFavorite}"
                     Click="AddFavorite_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
@@ -1110,6 +1129,8 @@
                     Handler="TreeViewItem_PreviewMouseLeftButtonDown"/>
             <EventSetter Event="PreviewMouseMove"
                     Handler="TreeViewItem_PreviewMouseMove"/>
+            <EventSetter Event="PreviewMouseLeftButtonUp"
+                    Handler="TreeViewItem_PreviewMouseLeftButtonUp"/>
             <EventSetter Event="DragEnter"
                     Handler="TreeViewItem_DragOver"/>
             <EventSetter Event="DragOver"
@@ -1220,6 +1241,19 @@
                                 <Setter Property="Foreground"
                                         Value="{DynamicResource FolderNameHoverForeground}"/>
                             </Trigger>
+                            <!-- Ctrl/Shift-click multi-selection rows: painted with the exact
+                                 same brushes as the native selection below, so the one row WPF
+                                 itself selected and the extra flagged rows are indistinguishable.
+                                 Declared BEFORE the IsSelected triggers so native selection's
+                                 setters win when both apply to the same row. -->
+                            <DataTrigger Binding="{Binding IsMultiSelected}"
+                                    Value="True">
+                                <Setter TargetName="RowBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource FolderNameHighlightForeground}"/>
+                            </DataTrigger>
                             <!-- Selected background no longer varies with
                                  Selector.IsSelectionActive: that state flips to False any time
                                  keyboard focus leaves the tree's focus scope - including while
@@ -1748,6 +1782,20 @@
                     <Setter TargetName="NameText"
                             Property="Foreground"
                             Value="{DynamicResource FileNameHoverForeground}"/>
+                </MultiDataTrigger>
+                <!-- Multi-selected file rows get the same highlighted text color as
+                     the natively-selected one (folder rows inherit it from the
+                     TreeViewItem style's own IsMultiSelected trigger instead). -->
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsDirectory}"
+                                Value="False"/>
+                        <Condition Binding="{Binding IsMultiSelected}"
+                                Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="NameText"
+                            Property="Foreground"
+                            Value="{DynamicResource FileNameHighlightForeground}"/>
                 </MultiDataTrigger>
                 <MultiDataTrigger>
                     <MultiDataTrigger.Conditions>
