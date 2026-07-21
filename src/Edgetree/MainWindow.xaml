@@ -33,7 +33,7 @@
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         Topmost="False"
-        Background="#FF252526"
+        Background="{DynamicResource SidebarBackground}"
         Left="0"
         Top="0"
         Height="600"
