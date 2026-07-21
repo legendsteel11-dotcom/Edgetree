@@ -443,7 +443,7 @@
                                     VerticalOffset="-10"
                                     AllowsTransparency="True"
                                     Focusable="False"
-                                    PopupAnimation="Fade"
+                                    PopupAnimation="None"
                                     IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
                                 <Border Background="{DynamicResource PanelBackground}"
                                         BorderBrush="{DynamicResource PanelBorder}"

@@ -1017,6 +1017,21 @@ public partial class MainWindow : Window
         if (sender is ContextMenu menu)
         {
             _openMenus.Add(menu);
+
+            // Kill the popup fade WPF applies to context menus when the OS
+            // menu-animation setting is on: menus opened/closed in quick
+            // succession restart the fade over each other, which reads as a
+            // fluorescent-lamp flicker. The internal popup only exists after
+            // the menu's first open (which is why this lives here and not
+            // somewhere earlier), so each menu instance gets one last fade on
+            // its very first open of the session and none after - the rapid
+            // reopen case, where the flicker actually lived, is the fixed one.
+            // The submenu popups' own animation is off in the XAML template.
+            if (menu.Parent is System.Windows.Controls.Primitives.Popup popup &&
+                popup.PopupAnimation != System.Windows.Controls.Primitives.PopupAnimation.None)
+            {
+                popup.PopupAnimation = System.Windows.Controls.Primitives.PopupAnimation.None;
+            }
         }
     }
 
