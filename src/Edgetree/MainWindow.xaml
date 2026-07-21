@@ -2397,16 +2397,34 @@
                     Grid.Row="1"
                     Style="{StaticResource FavoritesListBoxStyle}"
                     Background="{DynamicResource FavoritesBackground}"
-                    BorderThickness="0,0,0,1"
-                    BorderBrush="{DynamicResource PanelDividerBrush}"
+                    BorderThickness="0"
                     Padding="4,6,4,4"
                     FontSize="{Binding FontSize, ElementName=ExplorerTree}"
                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                     ItemContainerStyle="{StaticResource FavoriteListBoxItemStyle}"/>
 
+            <!-- The splitter row's VISIBLE part is exactly this 1px divider -
+                 which is why the tree's scrollbar (and first row) start flush
+                 beneath the line. The line used to be FavoritesList's own
+                 bottom border with the transparent grab zone taking 4px of
+                 real space after it, leaving a visible gap between the line
+                 and everything below. Position-mode flipping of that border
+                 is gone too: the line IS the boundary now, same on either
+                 side. -->
+            <Border Grid.Row="2"
+                    Height="1"
+                    Background="{DynamicResource PanelDividerBrush}"/>
+            <!-- Functionality unchanged (drag-resize, double-click fit); only
+                 WHERE the grab zone lives did: negative margins float it over
+                 the last few pixels of the panels on either side of the line
+                 instead of occupying its own space (net desired height: 1px,
+                 so the Auto row stays exactly the line). ZIndex wins the
+                 overlapped strip's hit-testing from the rows beneath. -->
             <GridSplitter x:Name="FavoritesSplitter"
                     Grid.Row="2"
-                    Height="4"
+                    Height="9"
+                    Margin="0,-4,0,-4"
+                    Panel.ZIndex="1"
                     HorizontalAlignment="Stretch"
                     VerticalAlignment="Center"
                     Background="Transparent"

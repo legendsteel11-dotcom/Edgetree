@@ -1748,15 +1748,9 @@ public partial class MainWindow : Window
         // the rest.
         TreeRowDef.Height = new GridLength(1, GridUnitType.Star);
 
-        // The one hairline border FavoritesList draws (see its
-        // BorderThickness in the XAML) faces whichever edge is adjacent to
-        // the splitter/tree - bottom edge when favorites is on top, top edge
-        // when it's on bottom - so it still reads as separating the two
-        // panels instead of framing the wrong side.
-        FavoritesList.BorderThickness = _settings.FavoritesAtBottom
-            ? new Thickness(0, 1, 0, 0)
-            : new Thickness(0, 0, 0, 1);
-
+        // No border flipping anymore: the divider line lives in the splitter
+        // row itself (see the XAML), which IS the boundary between the two
+        // panels in either position mode.
         UpdateFavoritesPanelVisibility();
     }
 
