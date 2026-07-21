@@ -1052,6 +1052,12 @@ public partial class MainWindow : Window
 
     private System.Windows.Threading.DispatcherTimer? _stuckCaptureWatchdog;
 
+    // The capture seen on the previous tick, and how many ticks in a row it has
+    // been the same one - see the watchdog for why a single sighting isn't
+    // enough to act on.
+    private IntPtr _lastSeenCapture;
+    private int _sameCaptureTicks;
+
     // A mouse capture that outlives whatever took it makes Windows route ALL
     // mouse input to this app: the sidebar still highlights rows under the
     // cursor while every other window stops responding to clicks, the pointer
@@ -1081,6 +1087,7 @@ public partial class MainWindow : Window
         {
             if (System.Windows.Forms.Control.MouseButtons != System.Windows.Forms.MouseButtons.None)
             {
+                _sameCaptureTicks = 0;
                 return;
             }
 
@@ -1094,6 +1101,7 @@ public partial class MainWindow : Window
             // excluded: menus and the history popup.
             if (IsCapturingUiOpen)
             {
+                _sameCaptureTicks = 0;
                 return;
             }
 
@@ -1101,8 +1109,36 @@ public partial class MainWindow : Window
             var win32Capture = GetCapture();
             if (wpfCapture is null && win32Capture == IntPtr.Zero)
             {
+                _sameCaptureTicks = 0;
                 return;
             }
+
+            // Act only on the SAME capture seen three ticks running. A genuinely
+            // stranded capture stays put and is collected three seconds later,
+            // which the user never notices; a capture that is merely mid-gesture
+            // does not survive the wait.
+            //
+            // This was added after the log showed 26 releases in three minutes,
+            // each naming a DIFFERENT handle - the signature of live gestures
+            // being interrupted rather than one leak recurring, most likely a
+            // scrollbar thumb drag where the button state momentarily read as
+            // released. The two real leaks recorded before that (both
+            // "WPF(ListBox)") pass this test unchanged, since a stuck capture
+            // by definition keeps reporting the same handle.
+            if (win32Capture != _lastSeenCapture)
+            {
+                _lastSeenCapture = win32Capture;
+                _sameCaptureTicks = 1;
+                return;
+            }
+
+            if (++_sameCaptureTicks < 3)
+            {
+                return;
+            }
+
+            _sameCaptureTicks = 0;
+            _lastSeenCapture = IntPtr.Zero;
 
             if (wpfCapture is not null)
             {
