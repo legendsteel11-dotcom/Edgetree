@@ -57,6 +57,12 @@ Either way, it's one `.exe` — no installer, just run it.
   on another PC (favorites included; paths that don't exist there are dropped)
 - Single click a folder row to expand/collapse (VS Code-style, not just the
   arrow); double-click a file to open it with its default application
+- **Multi-select**: `Ctrl+click` toggles files/folders one by one,
+  `Shift+click` selects a range in on-screen order — then copy them all at
+  once (`Ctrl+C`), delete them (`Delete`, one confirmation), or drag the whole
+  selection out of the app. The right-click menu shows "N items selected" at
+  the top and greys out single-target actions (rename, copy path); `Esc` or a
+  plain click clears the selection
 - **Auto Collapse** (in the "..." options menu): accordion mode — expanding a
   folder collapses every other open one, keeping just the path to it visible
 - **Favorites panel**: pin folders below the header; a single click
@@ -98,17 +104,21 @@ Either way, it's one `.exe` — no installer, just run it.
 - **Sort**: by name or date, ascending or descending — from the "..." options
   menu, or a folder's own right-click menu, which also re-sorts that folder
   immediately instead of waiting for the next expand
-- **Material Icon Theme** file/folder icons (see
-  [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)); drive names shown in bold
+- **Two icon styles**: Material Icon Theme file/folder icons by default (see
+  [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)), or switch to **the same
+  icons Windows Explorer shows** via "Icon Style" in the options menu — applies
+  instantly (tree, search results, and favorites alike), .exe/shortcut files
+  get their own real icons, and extraction runs in the background so network
+  drives never slow scrolling down; drive names shown in bold
 - Header: pin, **collapse-all** (toggles: remembers which folders were
   expanded, collapses everything, then restores exactly that state on a
   second click), an **options ("...") menu** (Auto Collapse, always on top,
   start with Windows, always show the tray icon, show folder icons, show
   file icons, favorites at bottom, dock to the right edge, close instantly on
-  mouse leave, auto-hide thickness, color settings, default sort, items per
-  folder, indent spacing, language, export/import settings, reset all
-  settings — with a confirmation prompt, about — all remembered), minimize to
-  tray, and close
+  mouse leave, auto-hide thickness, color settings, default sort, icon style,
+  items per folder, indent spacing, language, export/import settings, reset
+  all settings — with a confirmation prompt, about — all remembered), minimize
+  to tray, and close
 - **Minimize to the system tray**: click the tray icon (or its "Open" menu
   item) to restore the window; right-click for Open/Exit
 - **Color settings**: 15 customizable colors — folder name, file name (each
