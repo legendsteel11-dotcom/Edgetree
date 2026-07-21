@@ -773,25 +773,56 @@
                 Style="{StaticResource DarkContextMenuStyle}"
                 Opened="SearchResultContextMenu_Opened"
                 Closed="AnyMenu_Closed">
+            <!-- Same image-thumbnail slot as the tree menu's (same reserved-
+                 before-open rules; configured by
+                 SearchResultsList_PreviewMouseRightButtonDown, positional
+                 pattern in SearchResultContextMenu_Opened - keep in sync).
+                 Clicking opens the file, like the row itself. -->
+            <MenuItem Visibility="Collapsed"
+                    Click="SearchOpen_Click">
+                <MenuItem.Header>
+                    <Border MinWidth="{DynamicResource MenuThumbnailWidth}"
+                            MaxWidth="{DynamicResource MenuThumbnailMaxWidth}"
+                            Height="{DynamicResource MenuThumbnailHeight}"
+                            Background="{DynamicResource ControlBackground}"
+                            CornerRadius="4"
+                            Padding="3">
+                        <Grid>
+                            <Image Stretch="Uniform"
+                                    StretchDirection="DownOnly"
+                                    Width="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Grid}}"
+                                    Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Grid}}"
+                                    RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Grid>
+                    </Border>
+                </MenuItem.Header>
+            </MenuItem>
+            <Separator Visibility="Collapsed"/>
+            <!-- Groups mirror the tree menu's taxonomy (open / edit /
+                 path-and-tools / properties) so the same action always lives
+                 in the same group in both menus - the items the search view
+                 doesn't have are simply absent, but nothing is REGROUPED. -->
             <MenuItem Header="{x:Static services:Strings.MenuOpen}"
                     Click="SearchOpen_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpenWith}"
                     Click="SearchOpenWith_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuOpenWithCode}"
-                    Click="SearchOpenWithCode_Click"/>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuCopy}"
+                    InputGestureText="Ctrl+C"
                     Click="SearchCopy_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuCopyPath}"
-                    Click="SearchCopyPath_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuDelete}"
+                    InputGestureText="Del"
+                    Click="SearchDelete_Click"/>
             <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuCopyPath}"
+                    InputGestureText="Ctrl+Shift+C"
+                    Click="SearchCopyPath_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpenTerminal}"
                     Click="SearchOpenTerminal_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuOpenWithCode}"
+                    Click="SearchOpenWithCode_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuRevealInExplorer}"
                     Click="SearchReveal_Click"/>
-            <Separator/>
-            <MenuItem Header="{x:Static services:Strings.MenuDelete}"
-                    Click="SearchDelete_Click"/>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuProperties}"
                     Click="SearchProperties_Click"/>

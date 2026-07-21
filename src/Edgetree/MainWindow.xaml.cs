@@ -4477,7 +4477,12 @@ public partial class MainWindow : Window
                 // around the appearing slot.
                 if (menu.Items is [MenuItem thumbnailItem, Separator thumbnailSeparator, ..])
                 {
-                    UpdateThumbnailRow(thumbnailItem, thumbnailSeparator, _multiSelection.Count > 1);
+                    string? thumbnailPath =
+                        _multiSelection.Count <= 1 &&
+                        treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsShowMore: false, IsDirectory: false } file
+                            ? file.FullPath
+                            : null;
+                    UpdateThumbnailRow(thumbnailItem, thumbnailSeparator, thumbnailPath);
                 }
             }
         }
@@ -4661,13 +4666,16 @@ public partial class MainWindow : Window
     // has since been reopened on a different file.
     private string? _pendingThumbnailPath;
 
-    // Shows/hides the context menu's thumbnail slot for the current selection
-    // and kicks off the async fetch. The slot appears at its full fixed size
-    // immediately (we know from the extension alone whether this row gets
-    // one), so the image arriving later never resizes the open menu; only a
-    // FAILED fetch collapses the row after the fact, which is rare enough
-    // (corrupted file, missing codec) that the one-off shrink is fine.
-    private void UpdateThumbnailRow(MenuItem thumbnailItem, Separator thumbnailSeparator, bool isMultiSelection)
+    // Shows/hides a context menu's thumbnail slot for the given file and
+    // kicks off the async fetch - shared by the tree menu and the search
+    // results menu, whose callers decide WHAT is eligible (single non-multi
+    // file row / search file row) and pass its path, or null to hide. The
+    // slot appears at its full fixed size immediately (the extension alone
+    // decides whether a row gets one), so the image arriving later never
+    // resizes the open menu; only a FAILED fetch collapses the row after the
+    // fact, which is rare enough (corrupted file, missing codec) that the
+    // one-off shrink is fine.
+    private void UpdateThumbnailRow(MenuItem thumbnailItem, Separator thumbnailSeparator, string? filePath)
     {
         _pendingThumbnailPath = null;
         if (thumbnailItem.Header is not Border { Child: Grid { Children: [System.Windows.Controls.Image image] } })
@@ -4676,10 +4684,9 @@ public partial class MainWindow : Window
         }
         image.Source = null;
 
-        bool show = !isMultiSelection &&
-            ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false, IsDirectory: false } file &&
-            ThumbnailExtensions.Contains(Path.GetExtension(file.Name)) &&
-            File.Exists(file.FullPath);
+        bool show = filePath is not null &&
+            ThumbnailExtensions.Contains(Path.GetExtension(filePath)) &&
+            File.Exists(filePath);
 
         thumbnailItem.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         thumbnailSeparator.Visibility = thumbnailItem.Visibility;
@@ -4688,7 +4695,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        string path = ((FileSystemItem)ExplorerTree.SelectedItem).FullPath;
+        string path = filePath!;
         _pendingThumbnailPath = path;
 
         // Requested in physical pixels so the shell hands over enough
@@ -6383,12 +6390,36 @@ public partial class MainWindow : Window
         }
     }
 
+    // Enter deliberately activates (jump to the file in the tree), NOT "열기"
+    // - which is why the menu's 열기 shows no gesture while 복사/삭제/경로
+    // 복사 do: those now mirror the tree's shortcuts exactly, added together
+    // with their menu labels (the label is what teaches the key, so a label
+    // must never name a key that doesn't work here).
     private void SearchResultsList_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && SearchResultsList.SelectedItem is SearchRow { Entry: { } entry })
+        if (SearchResultsList.SelectedItem is not SearchRow { Entry: not null })
         {
-            ActivateSearchResult(entry);
-            e.Handled = true;
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case Key.Enter:
+                ActivateSearchResult(((SearchRow)SearchResultsList.SelectedItem).Entry!);
+                e.Handled = true;
+                break;
+            case Key.Delete:
+                SearchDelete_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.C when Keyboard.Modifiers == ModifierKeys.Control:
+                SearchCopy_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.C when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
+                SearchCopyPath_Click(sender, e);
+                e.Handled = true;
+                break;
         }
     }
 
@@ -6474,6 +6505,16 @@ public partial class MainWindow : Window
         if (ItemsControl.ContainerFromElement(SearchResultsList, (DependencyObject)e.OriginalSource) is ListBoxItem item)
         {
             item.IsSelected = true;
+
+            // Same pre-open timing rule as the tree's thumbnail (see
+            // TreeViewItem_PreviewMouseRightButtonDown): the slot must be in
+            // the menu's very first measure or the open menu visibly grows.
+            // Header/"더 보기" rows carry no Entry, so they pass null = no slot.
+            if (item.ContextMenu is { Items: [MenuItem thumbnailItem, Separator thumbnailSeparator, ..] })
+            {
+                UpdateThumbnailRow(thumbnailItem, thumbnailSeparator,
+                    (item.DataContext as SearchRow)?.Entry?.FullPath);
+            }
         }
     }
 
@@ -6482,11 +6523,24 @@ public partial class MainWindow : Window
         AnyMenu_Opened(sender, e);
 
         // Menu items in a resource-dictionary ContextMenu have no code-behind
-        // field, so the "Code로 열기" item is found by position (index 2, after
-        // Open and Open With) - same approach as ExplorerItemContextMenu_Opened.
-        if (sender is ContextMenu { Items: [_, _, MenuItem openWithCodeItem, ..] })
+        // field, so items are found by position - same approach as
+        // ExplorerItemContextMenu_Opened. "Code로 열기" sits at index 10 now
+        // that the groups mirror the tree menu's (open / edit / path-and-tools
+        // / properties).
+        if (sender is ContextMenu { Items: [MenuItem thumbnailItem, Separator thumbnailSeparator, _, _, _, _, _, _, _, _, MenuItem openWithCodeItem, ..] })
         {
             openWithCodeItem.IsEnabled = ShellFileService.IsCodeRegistered();
+
+            // Guard for opens that bypassed the right-click handler (keyboard
+            // menu key): hide a slot left over from an earlier open rather
+            // than show the wrong file's picture - same rule as the tree's.
+            if (thumbnailItem.Visibility == Visibility.Visible &&
+                _pendingThumbnailPath != SelectedSearchResult?.FullPath)
+            {
+                thumbnailItem.Visibility = Visibility.Collapsed;
+                thumbnailSeparator.Visibility = Visibility.Collapsed;
+                _pendingThumbnailPath = null;
+            }
         }
     }
 
