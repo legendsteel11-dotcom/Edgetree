@@ -167,6 +167,14 @@ public partial class App : Application
         if (isLightMode)
         {
             SetChromeBrush("ForegroundText", "#FF3B3B3B");
+            // Menu text runs ~10% DARKER than ForegroundText in light mode
+            // (and ~10% brighter in dark mode below) - user call 2026-07-21:
+            // menu labels wanted a touch more presence than the shared chrome
+            // color in both themes, which "more" means toward-black on white
+            // and toward-white on dark. Split from ForegroundText so headers/
+            // footers sharing that brush stay as they were.
+            SetChromeBrush("MenuForeground", "#FF353535");
+            SetChromeBrush("MenuDisabledForeground", "#FF5F5F5F");
             SetChromeBrush("HighlightForeground", "#FF000000");
             SetChromeBrush("HoverBackground", "#FFE8E8E8");
             SetChromeBrush("SecondaryForeground", "#FF6E6E6E");
@@ -185,6 +193,10 @@ public partial class App : Application
         else
         {
             SetChromeBrush("ForegroundText", "#FFA8AAAE");
+            // ForegroundText #A8AAAE and the old hardcoded disabled #6A6A6A,
+            // each with RGB scaled by ~1.1 - see the light-mode comment.
+            SetChromeBrush("MenuForeground", "#FFB9BBBF");
+            SetChromeBrush("MenuDisabledForeground", "#FF757575");
             SetChromeBrush("HighlightForeground", "#FFF0F2F6");
             SetChromeBrush("HoverBackground", "#FF2A2D2E");
             SetChromeBrush("SecondaryForeground", "#FF9A9A9A");

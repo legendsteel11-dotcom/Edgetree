@@ -380,7 +380,7 @@
                                     Background="Transparent"
                                     CornerRadius="4"
                                     Padding="{TemplateBinding Padding}"
-                                    TextBlock.Foreground="{DynamicResource ForegroundText}">
+                                    TextBlock.Foreground="{DynamicResource MenuForeground}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
@@ -397,7 +397,7 @@
                                     <Path x:Name="CheckMark"
                                             Grid.Column="0"
                                             Data="M1,4.5 L4,7.5 L9,1.5"
-                                            Stroke="{DynamicResource ForegroundText}"
+                                            Stroke="{DynamicResource MenuForeground}"
                                             StrokeThickness="1.4"
                                             StrokeLineJoin="Round"
                                             StrokeStartLineCap="Round"
@@ -423,7 +423,7 @@
                                     <Path x:Name="SubmenuArrow"
                                             Grid.Column="2"
                                             Data="M0,0 L4,4 L0,8"
-                                            Stroke="{DynamicResource ForegroundText}"
+                                            Stroke="{DynamicResource MenuForeground}"
                                             StrokeThickness="1.4"
                                             StrokeLineJoin="Round"
                                             StrokeStartLineCap="Round"
@@ -468,7 +468,7 @@
                                     Value="False">
                                 <Setter TargetName="Bd"
                                         Property="TextBlock.Foreground"
-                                        Value="#FF6A6A6A"/>
+                                        Value="{DynamicResource MenuDisabledForeground}"/>
                             </Trigger>
                             <Trigger Property="IsCheckable"
                                     Value="True">
@@ -794,7 +794,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                 Text="{x:Static services:Strings.MenuFontSize}"
-                                Foreground="{DynamicResource ForegroundText}"
+                                Foreground="{DynamicResource MenuForeground}"
                                 VerticalAlignment="Center"
                                 Margin="0,0,8,0"/>
                         <StackPanel Grid.Column="1"
@@ -803,7 +803,7 @@
                                     Style="{StaticResource MenuStepperButtonStyle}"
                                     Click="FontSizeDecrement_Click"/>
                             <TextBlock Text="12"
-                                    Foreground="{DynamicResource ForegroundText}"
+                                    Foreground="{DynamicResource MenuForeground}"
                                     Width="26"
                                     TextAlignment="Center"
                                     VerticalAlignment="Center"/>
@@ -826,7 +826,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                 Text="{x:Static services:Strings.MenuMaxItemsPerFolder}"
-                                Foreground="{DynamicResource ForegroundText}"
+                                Foreground="{DynamicResource MenuForeground}"
                                 VerticalAlignment="Center"
                                 Margin="0,0,8,0"/>
                         <StackPanel Grid.Column="1"
@@ -835,7 +835,7 @@
                                     Style="{StaticResource MenuStepperButtonStyle}"
                                     Click="MaxItemsPerFolderDecrement_Click"/>
                             <TextBlock Text="25"
-                                    Foreground="{DynamicResource ForegroundText}"
+                                    Foreground="{DynamicResource MenuForeground}"
                                     Width="26"
                                     TextAlignment="Center"
                                     VerticalAlignment="Center"/>
@@ -858,7 +858,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                 Text="{x:Static services:Strings.MenuTabSpacing}"
-                                Foreground="{DynamicResource ForegroundText}"
+                                Foreground="{DynamicResource MenuForeground}"
                                 VerticalAlignment="Center"
                                 Margin="0,0,8,0"/>
                         <StackPanel Grid.Column="1"
@@ -867,7 +867,7 @@
                                     Style="{StaticResource MenuStepperButtonStyle}"
                                     Click="TabSpacingDecrement_Click"/>
                             <TextBlock Text="16"
-                                    Foreground="{DynamicResource ForegroundText}"
+                                    Foreground="{DynamicResource MenuForeground}"
                                     Width="26"
                                     TextAlignment="Center"
                                     VerticalAlignment="Center"/>
@@ -890,7 +890,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                 Text="{x:Static services:Strings.MenuRowSpacing}"
-                                Foreground="{DynamicResource ForegroundText}"
+                                Foreground="{DynamicResource MenuForeground}"
                                 VerticalAlignment="Center"
                                 Margin="0,0,8,0"/>
                         <StackPanel Grid.Column="1"
@@ -899,7 +899,7 @@
                                     Style="{StaticResource MenuStepperButtonStyle}"
                                     Click="RowSpacingDecrement_Click"/>
                             <TextBlock Text="0"
-                                    Foreground="{DynamicResource ForegroundText}"
+                                    Foreground="{DynamicResource MenuForeground}"
                                     Width="26"
                                     TextAlignment="Center"
                                     VerticalAlignment="Center"/>
@@ -926,7 +926,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                 Text="{x:Static services:Strings.MenuAutoHideSliverWidth}"
-                                Foreground="{DynamicResource ForegroundText}"
+                                Foreground="{DynamicResource MenuForeground}"
                                 VerticalAlignment="Center"
                                 Margin="0,0,8,0"/>
                         <StackPanel Grid.Column="1"
@@ -935,7 +935,7 @@
                                     Style="{StaticResource MenuStepperButtonStyle}"
                                     Click="AutoHideSliverWidthDecrement_Click"/>
                             <TextBlock Text="3"
-                                    Foreground="{DynamicResource ForegroundText}"
+                                    Foreground="{DynamicResource MenuForeground}"
                                     Width="26"
                                     TextAlignment="Center"
                                     VerticalAlignment="Center"/>
@@ -956,7 +956,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0"
                                 Text="{x:Static services:Strings.MenuScrollBarThickness}"
-                                Foreground="{DynamicResource ForegroundText}"
+                                Foreground="{DynamicResource MenuForeground}"
                                 VerticalAlignment="Center"
                                 Margin="0,0,8,0"/>
                         <StackPanel Grid.Column="1"
@@ -965,7 +965,7 @@
                                     Style="{StaticResource MenuStepperButtonStyle}"
                                     Click="ScrollBarThicknessDecrement_Click"/>
                             <TextBlock Text="12"
-                                    Foreground="{DynamicResource ForegroundText}"
+                                    Foreground="{DynamicResource MenuForeground}"
                                     Width="26"
                                     TextAlignment="Center"
                                     VerticalAlignment="Center"/>
