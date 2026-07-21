@@ -3509,7 +3509,11 @@ public partial class MainWindow : Window
         appResources["MenuGestureFontSize"] = Math.Max(8.0, Math.Round(11.0 * scale));
         // The context menu's image-thumbnail slot (see UpdateThumbnailRow):
         // 4:3, sized to roughly fill the menu's own width at any font zoom.
+        // The MAX matters as much as the min: the slot's Image reports the
+        // picture's natural width during measure, so without a ceiling a wide
+        // screenshot dragged the whole MENU out to its own width.
         appResources["MenuThumbnailWidth"] = Math.Round(160.0 * scale);
+        appResources["MenuThumbnailMaxWidth"] = Math.Round(240.0 * scale);
         appResources["MenuThumbnailHeight"] = Math.Round(120.0 * scale);
         appResources["MenuItemPadding"] = new Thickness(
             Math.Round(15.0 * scale), Math.Round(8.0 * menuVerticalScale),
@@ -4672,7 +4676,7 @@ public partial class MainWindow : Window
     private void UpdateThumbnailRow(MenuItem thumbnailItem, Separator thumbnailSeparator, bool isMultiSelection)
     {
         _pendingThumbnailPath = null;
-        if (thumbnailItem.Header is not Border { Child: System.Windows.Controls.Image image })
+        if (thumbnailItem.Header is not Border { Child: Grid { Children: [System.Windows.Controls.Image image] } })
         {
             return;
         }
