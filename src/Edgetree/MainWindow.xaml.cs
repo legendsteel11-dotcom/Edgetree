@@ -733,63 +733,36 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    // Animates Width toward targetWidth - and, docked to the right edge,
-    // Left in lockstep (identical duration/easing, so they visibly move as
-    // one) so the right edge stays anchored to the screen edge instead of
-    // the whole window drifting as it grows/shrinks (see PositionToWorkArea/
-    // ResizeThumb_DragDelta, which anchor that same edge their own way).
-    // Shared by the auto-hide enter/reveal/re-hide transitions.
+    // Sets Width to targetWidth in one step - and, docked to the right edge,
+    // Left with it so the right edge stays anchored to the screen edge (see
+    // PositionToWorkArea/ResizeThumb_DragDelta, which anchor that same edge
+    // their own way). Shared by the auto-hide enter/reveal/re-hide
+    // transitions.
     //
-    // Every tick of a top-level Window's own Width/Left animation actually
-    // resizes/moves the real native HWND (a genuine Win32 call) and drags a
-    // full layout/repaint of everything inside along with it - capping the
-    // frame rate here was tried first (a cheap, low-risk change) but only
-    // made the stutter worse: fewer, evenly-spaced-but-still-expensive
-    // frames just made each individual step more visible instead of fixing
-    // the actual per-frame cost. The real fix is what content is exposed
-    // during that per-frame cost - see callers: whichever ones keep the
-    // full tree/favorites content hidden (Collapsed) for the whole
-    // animation and only reveal it once Width has already reached its
-    // target are cheap and smooth; the one that used to reveal content
-    // before animating (MainWindow_MouseEnter) was doing a full TreeView
-    // layout pass on every single resize tick on top of the native resize
-    // itself, which is what actually produced the lag.
+    // This USED to be a 200ms eased Width/Left animation. Removed entirely
+    // (2026-07-21, user call) after it kept producing irregular visible
+    // ghosting/afterimages: every animation tick resizes/moves the real
+    // native HWND, and whether DWM composes each of those frames cleanly is
+    // outside the app's control - frame-rate capping was tried in an earlier
+    // round and only made the steps MORE visible, and hiding the content
+    // during the slide (still in place at the callers) reduced but never
+    // eliminated the artifacts. One resize can't smear.
+    //
+    // A transform-based slide (window snaps, content glides via
+    // TranslateTransform - ghost-free by construction) was ALSO built and
+    // tried the same day, and the user still preferred instant. Both
+    // alternatives are settled questions: don't re-propose an animation here.
     private void AnimateWidth(double targetWidth, Action? onCompleted = null)
     {
         double targetLeft = Left + (Width - targetWidth);
         bool anchorRightEdge = _isDocked && _settings.DockOnRight;
 
-        var widthAnimation = new DoubleAnimation
-        {
-            To = targetWidth,
-            Duration = TimeSpan.FromMilliseconds(ToggleAnimationMs),
-            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
-        };
-        widthAnimation.Completed += (_, _) =>
-        {
-            // Release the animation clocks' hold so later direct assignments
-            // (e.g. from the resize thumb) take effect again.
-            BeginAnimation(WidthProperty, null);
-            Width = targetWidth;
-            if (anchorRightEdge)
-            {
-                BeginAnimation(LeftProperty, null);
-                Left = targetLeft;
-            }
-            onCompleted?.Invoke();
-        };
-        BeginAnimation(WidthProperty, widthAnimation);
-
+        Width = targetWidth;
         if (anchorRightEdge)
         {
-            var leftAnimation = new DoubleAnimation
-            {
-                To = targetLeft,
-                Duration = TimeSpan.FromMilliseconds(ToggleAnimationMs),
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseInOut }
-            };
-            BeginAnimation(LeftProperty, leftAnimation);
+            Left = targetLeft;
         }
+        onCompleted?.Invoke();
     }
 
     // Clamped defensively at the point of use (like MaxItemsPerFolder/
@@ -848,13 +821,8 @@ public partial class MainWindow : Window
 
         _autoHideRehideTimer?.Stop();
         _isAutoHideRevealed = true;
-        // Deferred until the width animation finishes - matching
-        // EnterAutoHide's own shrink path - so the grow animation only ever
-        // has to redraw the sliver's own bare background/header, not a full
-        // tree/favorites layout pass on every single resize tick. This used
-        // to show content before animating, which was the actual source of
-        // the reveal-side stutter (see AnimateWidth's own comment) - not the
-        // animation itself.
+        // Width first, content after: the one full tree/favorites layout pass
+        // this costs happens at the final width, not at the sliver's.
         AnimateWidth(ClampExpandedWidth(_settings.ExpandedWidth), onCompleted: () =>
         {
             SetExpandedContentVisibility(Visibility.Visible);
