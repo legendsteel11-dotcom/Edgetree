@@ -4430,7 +4430,12 @@ public partial class MainWindow : Window
         // the second-click condition. ClickCount == 1 skips the second press of
         // a fast double-click; the timer covers the rest (see
         // SchedulePendingRename).
+        // The activation grace keeps the click that brings the WINDOW back to
+        // the foreground from doubling as a rename gesture - it lands on
+        // whatever is under the cursor, often the very row that was left
+        // selected (see _lastActivatedTicks).
         if (!clickedOnExpander && e.ClickCount == 1 && treeViewItem.IsSelected &&
+            Environment.TickCount64 - _lastActivatedTicks > ActivationClickGraceMs &&
             treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsShowMore: false, IsDirectory: false, IsEditing: false } file)
         {
             SchedulePendingRename(file);
@@ -5497,10 +5502,52 @@ public partial class MainWindow : Window
         BeginInlineRename(item);
     }
 
-    private static void BeginInlineRename(FileSystemItem item)
+    // The row currently in inline edit - tracked so leaving the WINDOW can
+    // revert it: LostFocus only fires when focus moves within the app, never
+    // on whole-window deactivation, so without this an edit box survived an
+    // Alt-Tab and was still sitting there (or reappearing on hover) when the
+    // user came back (2026-07-23 03:51 report).
+    private FileSystemItem? _inlineRenameItem;
+
+    // When this window last became active. The click that ACTIVATES the
+    // window must not double as a rename gesture: it lands on whatever row
+    // happens to be under the cursor - often the still-selected row the user
+    // left off on - and "already-selected row clicked" is exactly the
+    // slow-double-click rename trigger.
+    private long _lastActivatedTicks = long.MinValue / 2;
+
+    private const long ActivationClickGraceMs = 300;
+
+    protected override void OnActivated(EventArgs e)
+    {
+        base.OnActivated(e);
+        _lastActivatedTicks = Environment.TickCount64;
+    }
+
+    // Leaving the app resolves rename state Total Commander-style: a pending
+    // slow-double-click timer is disarmed (its edit would otherwise pop up in
+    // a BACKGROUND window ~0.6s after the user already switched away - the
+    // "came back and found the file in edit mode" report), and an edit box
+    // already open reverts without renaming. Committing on app-switch was
+    // deliberately rejected: applying a half-typed name the user never
+    // confirmed is worse than asking them to start over.
+    protected override void OnDeactivated(EventArgs e)
+    {
+        base.OnDeactivated(e);
+
+        CancelPendingRename();
+        if (_inlineRenameItem is { IsEditing: true } editing)
+        {
+            editing.IsEditing = false;
+        }
+        _inlineRenameItem = null;
+    }
+
+    private void BeginInlineRename(FileSystemItem item)
     {
         item.EditingName = item.Name;
         item.IsEditing = true;
+        _inlineRenameItem = item;
     }
 
     private void SchedulePendingRename(FileSystemItem item)
@@ -5541,10 +5588,13 @@ public partial class MainWindow : Window
 
         // Bail out if anything since the click makes renaming the wrong move:
         // the selection moved on (a click elsewhere this handler never saw), an
-        // edit already started some other way, or the button is still held - a
-        // drag, or a press that hasn't become a click yet.
+        // edit already started some other way, the button is still held - a
+        // drag, or a press that hasn't become a click yet - or the window is
+        // no longer active (the user clicked and switched apps within the
+        // timer's ~0.6s; OnDeactivated also disarms this timer, so this is
+        // the belt to that braces for a deactivation racing the tick).
         if (!ReferenceEquals(ExplorerTree.SelectedItem, item) || item.IsEditing ||
-            Mouse.LeftButton == MouseButtonState.Pressed)
+            Mouse.LeftButton == MouseButtonState.Pressed || !IsActive)
         {
             return;
         }
@@ -5590,6 +5640,7 @@ public partial class MainWindow : Window
         {
             e.Handled = true;
             item.IsEditing = false;
+            _inlineRenameItem = null;
         }
     }
 
@@ -5611,6 +5662,7 @@ public partial class MainWindow : Window
             return;
         }
         item.IsEditing = false;
+        _inlineRenameItem = null;
 
         string newName = item.EditingName;
         if (string.IsNullOrWhiteSpace(newName) || newName == item.Name)
