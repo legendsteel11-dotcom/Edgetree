@@ -90,6 +90,24 @@
         <TranslateTransform x:Key="ShiftUp2px"
                 Y="-2"/>
 
+        <!-- One visual step up for every header GLYPH (pin, magnifier,
+             collapse arrow, "...", minimize bar, close X) - applied to the
+             glyph element inside each button, never the button itself, so the
+             hit-box, margins and header layout stay byte-identical (a
+             RenderTransform happens after layout, same reasoning as the
+             nudges above). ~15% ≈ +2px on these 10-13px shapes. On the
+             options button it scales only the three-dot StackPanel, not the
+             update-available dot overlaid in the same Grid.
+
+             Unlike the nudges above, this one IS mutated at runtime:
+             ApplyHeaderMetrics steps it back to 1.0 when the window narrows
+             to 224 or less. That only works while the instance stays
+             unfrozen - keep it out of any Style setter (sealed styles freeze
+             their freezables). -->
+        <ScaleTransform x:Key="HeaderGlyphGrow"
+                ScaleX="1.15"
+                ScaleY="1.15"/>
+
         <SolidColorBrush x:Key="SidebarBackground"
                 Color="#FF1A1A1A"/>
         <SolidColorBrush x:Key="FavoritesBackground"
@@ -685,15 +703,23 @@
                                         RenderOptions.BitmapScalingMode="HighQuality"/>
                             </Grid>
                         </Border>
-                        <!-- Format · pixel size · file size, set by
-                             UpdateThumbnailRow. Foreground explicit: property
+                        <!-- Format · pixel size · file size on the first line,
+                             modified date on the second, set by
+                             UpdateThumbnailRow. One font step below the menu's
+                             own size (MenuThumbnailInfoFontSize) - metadata,
+                             not a menu item. Foreground explicit: property
                              inheritance from the template's Bd border doesn't
                              reliably reach an explicit TextBlock in Header
                              content (it rendered near-black), so the menu
                              text brush is named outright. -->
                         <TextBlock Foreground="{DynamicResource MenuForeground}"
+                                FontSize="{DynamicResource MenuThumbnailInfoFontSize}"
                                 HorizontalAlignment="Center"
                                 Margin="0,3,0,0"/>
+                        <TextBlock Foreground="{DynamicResource MenuForeground}"
+                                FontSize="{DynamicResource MenuThumbnailInfoFontSize}"
+                                HorizontalAlignment="Center"
+                                Margin="0,1,0,0"/>
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
@@ -824,8 +850,13 @@
                             </Grid>
                         </Border>
                         <TextBlock Foreground="{DynamicResource MenuForeground}"
+                                FontSize="{DynamicResource MenuThumbnailInfoFontSize}"
                                 HorizontalAlignment="Center"
                                 Margin="0,3,0,0"/>
+                        <TextBlock Foreground="{DynamicResource MenuForeground}"
+                                FontSize="{DynamicResource MenuThumbnailInfoFontSize}"
+                                HorizontalAlignment="Center"
+                                Margin="0,1,0,0"/>
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
@@ -2319,8 +2350,10 @@
                      glyph itself flips between a magnifier and a left chevron
                      ("back to explorer") the same way CollapseAllButton swaps
                      its arrow Data. -->
+                <!-- Column 3, not 2: the pin sits first (user call, 2026-07-22)
+                     - the two swapped columns, everything else untouched. -->
                 <Button x:Name="SearchButton"
-                        Grid.Column="2"
+                        Grid.Column="3"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="SearchButton_Click"
                         Margin="{DynamicResource HeaderButtonMargin}"
@@ -2332,10 +2365,12 @@
                             Stroke="{DynamicResource ForegroundText}"
                             StrokeThickness="1.5"
                             StrokeStartLineCap="Round"
-                            StrokeEndLineCap="Round"/>
+                            StrokeEndLineCap="Round"
+                            RenderTransformOrigin="0.5,0.5"
+                            RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>
                 <Button x:Name="PinButton"
-                        Grid.Column="3"
+                        Grid.Column="2"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="PinButton_Click"
                         Margin="{DynamicResource HeaderButtonMargin}"
@@ -2366,7 +2401,9 @@
                     <Path Data="F1 M632.13-488.37l96 96v83.24H521.5v227.04L480-40.59l-41.5-41.5v-227.04H231.87v-83.24l96-96v-257.78h-48v-83h400.26v83h-48v257.78Zm-283.2 96.24h262.14l-61.94-61.94v-292.08H410.87v292.08l-61.94 61.94Z"
                             Fill="{DynamicResource ForegroundText}"
                             Stretch="Uniform"
-                            Height="13"/>
+                            Height="13"
+                            RenderTransformOrigin="0.5,0.5"
+                            RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>
                 <Button x:Name="CollapseAllButton"
                         Grid.Column="4"
@@ -2378,7 +2415,9 @@
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <Path x:Name="CollapseAllArrow"
                             Data="M4,10 L8,5 L12,10 Z"
-                            Fill="{DynamicResource ForegroundText}"/>
+                            Fill="{DynamicResource ForegroundText}"
+                            RenderTransformOrigin="0.5,0.5"
+                            RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>
                 <Button x:Name="OptionsButton"
                         Grid.Column="5"
@@ -2391,7 +2430,9 @@
                     <Grid>
                         <StackPanel Orientation="Horizontal"
                                 VerticalAlignment="Center"
-                                HorizontalAlignment="Center">
+                                HorizontalAlignment="Center"
+                                RenderTransformOrigin="0.5,0.5"
+                                RenderTransform="{StaticResource HeaderGlyphGrow}">
                             <Ellipse Width="3"
                                     Height="3"
                                     Fill="{DynamicResource ForegroundText}"
@@ -2436,7 +2477,9 @@
                             Height="1.5"
                             RadiusX="0.75"
                             RadiusY="0.75"
-                            Fill="{DynamicResource ForegroundText}"/>
+                            Fill="{DynamicResource ForegroundText}"
+                            RenderTransformOrigin="0.5,0.5"
+                            RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>
                 <!-- A few extra pixels on the right (vs. every other header
                      button's uniform 2px) so the X glyph reads as centered in
@@ -2454,7 +2497,9 @@
                             Stroke="{DynamicResource ForegroundText}"
                           StrokeThickness="1.5"
                             StrokeStartLineCap="Round"
-                            StrokeEndLineCap="Round"/>
+                            StrokeEndLineCap="Round"
+                            RenderTransformOrigin="0.5,0.5"
+                            RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>
             </Grid>
 

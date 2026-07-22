@@ -1397,6 +1397,21 @@ public partial class MainWindow : Window
         Resources["HeaderButtonSize"] = size;
         Resources["HeaderButtonMargin"] = new Thickness(gap);
         Resources["HeaderCloseButtonMargin"] = new Thickness(gap, gap, closeGap, gap);
+
+        // The glyph-only enlargement steps back to its original size on
+        // narrow windows (user call, 2026-07-22: "224 이하"), where the
+        // buttons are already tightening above and bigger drawings would
+        // crowd their shrinking hit-boxes. Mutated in place: the transform is
+        // shared by all six glyphs via StaticResource and is never used
+        // inside a sealed Style, so it is never frozen (see the resource's
+        // own comment in the XAML).
+        double glyphScale = width <= 224 ? 1.0 : 1.15;
+        if (Resources["HeaderGlyphGrow"] is System.Windows.Media.ScaleTransform glyphGrow &&
+            glyphGrow.ScaleX != glyphScale)
+        {
+            glyphGrow.ScaleX = glyphScale;
+            glyphGrow.ScaleY = glyphScale;
+        }
     }
 
     private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e) => ApplyHeaderMetrics();
@@ -3501,6 +3516,9 @@ public partial class MainWindow : Window
         var appResources = Application.Current.Resources;
         appResources["MenuFontSize"] = ExplorerTree.FontSize;
         appResources["MenuGestureFontSize"] = Math.Max(8.0, Math.Round(11.0 * scale));
+        // The thumbnail's info/date lines: one zoom step (1pt) below the menu
+        // text - it's metadata under a picture, not a menu item.
+        appResources["MenuThumbnailInfoFontSize"] = Math.Max(8.0, ExplorerTree.FontSize - 1.0);
         // The context menu's image-thumbnail slot (see UpdateThumbnailRow):
         // 4:3, sized to roughly fill the menu's own width at any font zoom.
         // The MAX matters as much as the min: the slot's Image reports the
@@ -4940,13 +4958,14 @@ public partial class MainWindow : Window
         _pendingThumbnailPath = null;
         if (thumbnailItem.Header is not StackPanel
             {
-                Children: [Border { Child: Grid { Children: [System.Windows.Controls.Image image] } }, TextBlock infoText]
+                Children: [Border { Child: Grid { Children: [System.Windows.Controls.Image image] } }, TextBlock infoText, TextBlock dateText]
             })
         {
             return;
         }
         image.Source = null;
         infoText.Text = string.Empty;
+        dateText.Text = string.Empty;
 
         bool show = filePath is not null &&
             ThumbnailExtensions.Contains(Path.GetExtension(filePath)) &&
@@ -4962,17 +4981,20 @@ public partial class MainWindow : Window
         string path = filePath!;
         _pendingThumbnailPath = path;
 
-        // Format + file size under the preview, shown immediately; the pixel
-        // dimensions (which need the file's header, read on the background
-        // hop) slot in between when the thumbnail arrives. Read the cheap
-        // parts synchronously: File.Exists above already touched this path's
-        // metadata, so the FileInfo comes from the same warm cache.
+        // Format + file size under the preview (modified date on its own
+        // second line), shown immediately; the pixel dimensions (which need
+        // the file's header, read on the background hop) slot in between when
+        // the thumbnail arrives. Read the cheap parts synchronously:
+        // File.Exists above already touched this path's metadata, so the
+        // FileInfo comes from the same warm cache.
         string format = Path.GetExtension(path).TrimStart('.').ToUpperInvariant();
         string sizeText = string.Empty;
         try
         {
-            sizeText = FormatFileSize(new FileInfo(path).Length);
+            var fileInfo = new FileInfo(path);
+            sizeText = FormatFileSize(fileInfo.Length);
             infoText.Text = format + "  ·  " + sizeText;
+            dateText.Text = fileInfo.LastWriteTime.ToString("yyyy-MM-dd HH:mm");
         }
         catch (Exception e2) when (e2 is IOException or UnauthorizedAccessException)
         {
