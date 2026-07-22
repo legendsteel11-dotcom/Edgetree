@@ -3514,12 +3514,27 @@ public partial class MainWindow : Window
         // after trying 12): full breathing room from 14pt up, the tightening
         // curve below. The vertical base of 8 is chosen so the approved
         // values are reproduced exactly at 9pt (3px) and 12pt (6px), while
-        // 14pt and up gain the "살짝 더" room that was asked for.
+        // 14pt gains the "살짝 더" room that was asked for.
+        //
+        // The per-row padding PLATEAUS at 6px - the approved 12pt value -
+        // instead of ever reaching the old 8/8+ range (2026-07-23, two rounds
+        // of feedback): first a low-resolution remote screen report ("행간이
+        // 너무 넓다" - a large-font menu read as almost filling the window),
+        // then the user's own VS Code side-by-side, whose menus stay compact
+        // at similar font sizes by keeping rows INSIDE a group tight and
+        // spending the air on group boundaries instead. That rhythm is
+        // recreated here: row padding stops growing (big text already makes
+        // rows taller by itself), and the separators' vertical margin went
+        // 4 -> 6 in the XAML so the saved space reads as group articulation
+        // rather than uniform looseness. Small fonts were explicitly
+        // reported fine - the below-pivot curve is untouched (9pt -> 3px,
+        // 12pt -> 6px, same as always).
         double menuVerticalScale = ExplorerTree.FontSize / 14.0;
         if (menuVerticalScale < 1.0)
         {
             menuVerticalScale *= menuVerticalScale;
         }
+        double menuVerticalPadding = Math.Min(6.0, Math.Round(8.0 * menuVerticalScale));
 
         var appResources = Application.Current.Resources;
         appResources["MenuFontSize"] = ExplorerTree.FontSize;
@@ -3536,11 +3551,11 @@ public partial class MainWindow : Window
         appResources["MenuThumbnailMaxWidth"] = Math.Round(240.0 * scale);
         appResources["MenuThumbnailHeight"] = Math.Round(120.0 * scale);
         appResources["MenuItemPadding"] = new Thickness(
-            Math.Round(15.0 * scale), Math.Round(8.0 * menuVerticalScale),
-            Math.Round(15.0 * scale), Math.Round(8.0 * menuVerticalScale));
+            Math.Round(15.0 * scale), menuVerticalPadding,
+            Math.Round(15.0 * scale), menuVerticalPadding);
         appResources["MenuPadding"] = new Thickness(
-            Math.Round(5.0 * scale), Math.Round(8.0 * menuVerticalScale),
-            Math.Round(5.0 * scale), Math.Round(8.0 * menuVerticalScale));
+            Math.Round(5.0 * scale), menuVerticalPadding,
+            Math.Round(5.0 * scale), menuVerticalPadding);
     }
 
     private void ColorSettingsMenuItem_Click(object sender, RoutedEventArgs e)

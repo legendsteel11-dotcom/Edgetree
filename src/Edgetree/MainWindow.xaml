@@ -616,9 +616,14 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Separator">
+                        <!-- Vertical margin 6 (was 4): group boundaries carry
+                             the menu's breathing room now that per-row padding
+                             plateaus at 6px - the VS Code rhythm the user
+                             compared against (rows inside a group tight,
+                             groups clearly parted). See ApplyLayoutMetrics. -->
                         <Border Height="1"
                                 Background="{DynamicResource SeparatorBrush}"
-                                Margin="2,4"/>
+                                Margin="2,6"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
