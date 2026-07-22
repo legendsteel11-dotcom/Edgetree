@@ -349,9 +349,115 @@ public class FileSystemItem : INotifyPropertyChanged
         return null;
     }
 
+    // Re-reads this folder from disk and applies the result as a DIFF against
+    // the current rows instead of clear-and-refill: entries that survived keep
+    // their existing FileSystemItem instance - and with it their loaded
+    // children, expanded state, and (crucially) their realized tree container.
+    // Only genuinely new/removed/moved rows touch the collection at all, so a
+    // change to one file cannot tear down and regenerate the whole expanded
+    // subtree beneath this folder.
+    //
+    // This replaced clear-and-refill for every WATCHER-driven refresh
+    // (2026-07-23 02:4x): a project switch in an IDE churns some ancestor
+    // folder's listing every few seconds, and rebuilding that ancestor
+    // wholesale destroyed every realized row below it - the whole viewport
+    // went blank until the user poked the layout, faster than the
+    // post-refresh forced redraw could win back (redraw.log showed dozens of
+    // external-refresh passes AROUND the blank, proving redraw-after-rebuild
+    // was the wrong altitude for the fix). A no-op change (hidden file,
+    // attribute flip) now results in zero collection operations.
+    public void MergeChildrenFromDisk()
+    {
+        if (!IsDirectory || !_childrenLoaded)
+        {
+            return;
+        }
+        PendingExternalRefresh = false;
+        // Same stamped-before-the-read rule as EnsureChildrenLoaded.
+        LastLoadedTicks = Environment.TickCount64;
+
+        var fresh = FileSystemService.LoadChildren(FullPath, this);
+
+        // Reuse the existing instance wherever the fresh listing has an entry
+        // of the same name (and same file-vs-folder kind - a name reused for
+        // the other kind gets a fresh instance, its old subtree is meaningless).
+        var existingByName = new Dictionary<string, FileSystemItem>(StringComparer.OrdinalIgnoreCase);
+        foreach (var child in Children)
+        {
+            if (!child.IsPlaceholder && !child.IsShowMore)
+            {
+                existingByName[child.Name] = child;
+            }
+        }
+        foreach (var child in _overflow)
+        {
+            existingByName[child.Name] = child;
+        }
+
+        var target = new List<FileSystemItem>(fresh.Count);
+        foreach (var loaded in fresh)
+        {
+            target.Add(existingByName.TryGetValue(loaded.Name, out var existing) && existing.IsDirectory == loaded.IsDirectory
+                ? existing
+                : loaded);
+        }
+
+        // Same cap semantics as PopulateCapped/ShowAllChildren: overflow only
+        // exists while not showing all, and shrinking back under the cap
+        // returns the folder to the plain uncapped state.
+        _overflow.Clear();
+        List<FileSystemItem> visibleTarget = target;
+        if (!_showingAll && target.Count > DisplayCap)
+        {
+            visibleTarget = target.GetRange(0, DisplayCap);
+            _overflow.AddRange(target.GetRange(DisplayCap, target.Count - DisplayCap));
+        }
+        else if (target.Count <= DisplayCap)
+        {
+            _showingAll = false;
+        }
+
+        // Sync Children to visibleTarget with minimal operations. Remove pass
+        // first (also drops the old "더 보기" row - re-added below with a
+        // fresh count), then walk the target order: after step i the first
+        // i+1 rows match the target, so a wanted row is only ever found
+        // further right (Move) or absent (Insert).
+        var keep = new HashSet<FileSystemItem>(visibleTarget);
+        for (int i = Children.Count - 1; i >= 0; i--)
+        {
+            if (!keep.Contains(Children[i]))
+            {
+                Children.RemoveAt(i);
+            }
+        }
+        for (int i = 0; i < visibleTarget.Count; i++)
+        {
+            var wanted = visibleTarget[i];
+            if (i < Children.Count && ReferenceEquals(Children[i], wanted))
+            {
+                continue;
+            }
+            int currentIndex = Children.IndexOf(wanted);
+            if (currentIndex >= 0)
+            {
+                Children.Move(currentIndex, i);
+            }
+            else
+            {
+                Children.Insert(i, wanted);
+            }
+        }
+
+        if (_overflow.Count > 0)
+        {
+            Children.Add(CreateShowMore(this, _overflow.Count));
+        }
+    }
+
     // Re-reads this folder's contents from disk after an operation that
     // changed them (rename/delete/paste). Note this rebuilds Children with
-    // fresh instances, so any previously-expanded descendants collapse.
+    // fresh instances, so any previously-expanded descendants collapse -
+    // background/watcher refreshes must use MergeChildrenFromDisk instead.
     public void RefreshChildren()
     {
         if (!IsDirectory)

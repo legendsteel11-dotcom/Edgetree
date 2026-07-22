@@ -3671,12 +3671,11 @@ public partial class MainWindow : Window
 
         // A watcher event landed on this folder while it sat collapsed (see
         // PendingExternalRefresh) - its cached listing predates that change,
-        // so re-read now that it's actually coming on screen. Flag cleared
-        // first: the refresh replays expand state, which re-enters this
-        // handler for descendants.
+        // so sync it now that it's actually coming on screen (a diff-merge:
+        // surviving rows and their subtrees stay put, see
+        // MergeChildrenFromDisk, which also clears the flag).
         if (item.PendingExternalRefresh)
         {
-            item.PendingExternalRefresh = false;
             RefreshFolderPreservingState(item);
         }
 
@@ -5151,9 +5150,36 @@ public partial class MainWindow : Window
             LogWatcherError(rootPath, e.GetException());
             if (FindLoadedItemForPath(rootPath) is { ChildrenLoaded: true } rootItem)
             {
-                RefreshFolderPreservingState(rootItem);
+                ResyncLoadedSubtree(rootItem);
             }
         });
+    }
+
+    // Event-loss recovery has to assume ANY loaded folder under the drive may
+    // be stale, not just the root's own listing: merge every loaded folder
+    // that's on screen (expanded), and flag loaded-but-collapsed ones to
+    // re-read on their next expand - same contract as the normal collapsed
+    // path in QueueExternalRefresh.
+    private void ResyncLoadedSubtree(FileSystemItem item)
+    {
+        if (!item.ChildrenLoaded)
+        {
+            return;
+        }
+        if (!item.IsExpanded)
+        {
+            item.PendingExternalRefresh = true;
+            return;
+        }
+
+        item.MergeChildrenFromDisk();
+        foreach (var child in item.Children)
+        {
+            if (child is { IsPlaceholder: false, IsShowMore: false, IsDirectory: true })
+            {
+                ResyncLoadedSubtree(child);
+            }
+        }
     }
 
     // Debug builds only - says how often drive-wide bursts actually overflow
@@ -5282,80 +5308,27 @@ public partial class MainWindow : Window
         return current;
     }
 
-    // Same snapshot -> refresh -> replay approach as RefreshAllLoadedFolders,
-    // scoped to just this one folder's own subtree - an external change the
-    // user didn't ask for should disturb whatever they had expanded/selected
-    // as little as possible, unlike a deliberate RefreshFolder_Click/F5 where
-    // losing a grandchild's expanded state is a lot less surprising.
+    // A background/watcher-driven refresh of one folder. This went through
+    // three designs; the history matters, don't regress it:
+    //
+    // 1. Clear-and-refill + expanded-path replay (snapshot -> RefreshChildren
+    //    -> re-expand). Rebuilding an ANCESTOR wholesale destroys every
+    //    realized row beneath it - during IDE project-switch churn (a
+    //    refresh every few seconds) the viewport sat blank faster than it
+    //    could recover (2026-07-23 02:4x incident; autocollapse.log caught
+    //    whole expanded chains regenerating twice within a second).
+    // 2. + a coalesced post-refresh ForceTreeRedraw. Wrong altitude:
+    //    redraw.log showed dozens of external-refresh passes around the
+    //    blank, so redraw-after-teardown demonstrably doesn't win.
+    // 3. Diff-merge (current): MergeChildrenFromDisk keeps surviving rows'
+    //    instances and containers, so expanded descendants and the scroll
+    //    position are structurally undisturbed, and a no-op change (hidden
+    //    file, attribute flip) performs zero collection operations. No
+    //    expanded-path replay is needed - state never leaves the surviving
+    //    instances. Reselect logic stays deliberately absent (the old
+    //    NavigateToPath reselect was its own bug saga - see git history).
     private void RefreshFolderPreservingState(FileSystemItem item)
-    {
-        var expandedPaths = new List<string>();
-        var showingAllPaths = new List<string>();
-        CollectExpandedPaths(item, expandedPaths, showingAllPaths);
-
-        item.RefreshChildren();
-
-        foreach (var path in expandedPaths.OrderBy(p => p.Length))
-        {
-            ExpandPathIfPossible(path);
-        }
-        foreach (var path in showingAllPaths.OrderBy(p => p.Length))
-        {
-            ShowAllChildrenIfPossible(path);
-        }
-
-        // The same blank-rows symptom ForceTreeRedraw exists for (rows gone
-        // until any scroll/resize/click pokes the layout) also showed up next
-        // to a folder receiving constant external changes - an all-night code
-        // churn kept this refresh's clear-and-refill running, and the
-        // virtualizing panel was left with unrealized containers mid-viewport
-        // (2026-07-22 ~01:00 report; redraw.log showed NO resume/display
-        // change near it, which is what pointed here). Same remedy, new
-        // trigger: force a layout pass once the refill settles. Coalesced so
-        // a burst of per-folder refreshes in one dispatcher batch pays for a
-        // single pass.
-        QueueExternalRefreshRedraw();
-
-        // Deliberately NOT attempting to reselect the previous selection here,
-        // even when it lived inside this subtree - an earlier version reused
-        // NavigateToPath's favorites-style reveal walk for that (a real
-        // FileSystemItem lookup + container realization + BringIntoView
-        // chain), which turned out to be exactly the wrong tool for a folder
-        // holding dozens+ of "더 보기"-revealed rows: RevealChainStep needs an
-        // actually-realized TreeViewItem container for every step, and a
-        // freshly-rebuilt, freshly-fully-revealed folder's deep rows can
-        // legitimately sit outside the (deliberately un-enlarged, see
-        // ExplorerTreeViewItemStyle) per-folder virtualization cache the
-        // instant after rebuilding - the exact class of bug the whole
-        // favorites-navigation saga was about, now hit from a different angle.
-        // The retries there give up silently after a few attempts, which is
-        // what surfaced as the selection landing on some unrelated row, or the
-        // view jumping somewhere unexpected, when resorting a large folder.
-        // Losing the highlight (selection simply clears if it was inside this
-        // subtree) is a far smaller cost than that, and expand/showingAll
-        // state above - both pure model operations with no container
-        // dependency - already cover what actually matters visually: nothing
-        // the user had open collapses out from under them.
-    }
-
-    // See the call in RefreshFolderPreservingState. Background priority so the
-    // pass runs after the current batch of collection changes has fully
-    // landed, mirroring how the resume/display-change callers schedule theirs.
-    private bool _externalRefreshRedrawQueued;
-
-    private void QueueExternalRefreshRedraw()
-    {
-        if (_externalRefreshRedrawQueued)
-        {
-            return;
-        }
-        _externalRefreshRedrawQueued = true;
-        Dispatcher.BeginInvoke(() =>
-        {
-            _externalRefreshRedrawQueued = false;
-            ForceTreeRedraw("external-refresh");
-        }, System.Windows.Threading.DispatcherPriority.Background);
-    }
+        => item.MergeChildrenFromDisk();
 
     private void OpenItem_Click(object sender, RoutedEventArgs e)
     {
