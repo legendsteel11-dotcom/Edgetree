@@ -118,6 +118,9 @@ public partial class App : Application
 
         if (window.IsVisible)
         {
+            // Same persist-before-hiding rule as the title bar's "_" button -
+            // see MainWindow.MinimizeButton_Click for why.
+            (window as MainWindow)?.SaveStateBeforeHiding();
             window.Hide();
             IsTrayIconVisible = true;
         }

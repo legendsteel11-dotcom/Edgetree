@@ -2373,6 +2373,14 @@ public partial class MainWindow : Window
     // brings it back (see App.RestoreMainWindow).
     private void MinimizeButton_Click(object sender, RoutedEventArgs e)
     {
+        // While tray-hidden the process can live for days and then end
+        // WITHOUT the close path running (logoff kill, crash, a dev rebuild's
+        // forced restart - the window handle is gone, so not even WM_CLOSE
+        // can reach it). Everything that normally flushes on close would roll
+        // back to the last graceful exit - surfaced 2026-07-23 as colors
+        // reverting to days-old picks. Save at the moment the window leaves
+        // the screen instead; the on-close save still runs as before.
+        SaveStateBeforeHiding();
         Hide();
 
         // The tray icon is the only way back once hidden, so force it visible
@@ -3540,6 +3548,15 @@ public partial class MainWindow : Window
         var window = new ColorSettingsWindow(_settings, ApplyColorSettings) { Owner = this };
         PositionNearOptionsButton(window);
         window.ShowDialog();
+
+        // Persisted the moment the dialog closes, not on app exit: settings
+        // normally flush on close only, so any exit that skips the close path
+        // (crash, task-manager kill, the dev rebuild loop's forced restarts)
+        // silently reverted every color picked that session - which is
+        // exactly how it surfaced (2026-07-23: colors kept snapping back to
+        // ones from days earlier across a day of forced rebuild restarts).
+        // Same immediate-save reasoning as the language change.
+        _settingsService.Save(_settings);
     }
 
     private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
@@ -5927,6 +5944,10 @@ public partial class MainWindow : Window
         }
         return null;
     }
+
+    // See MinimizeButton_Click - both tray-hide entry points (the "_" button
+    // here and App's tray-menu toggle) persist state on the way out.
+    public void SaveStateBeforeHiding() => SaveCurrentWidth();
 
     private void SaveCurrentWidth()
     {
