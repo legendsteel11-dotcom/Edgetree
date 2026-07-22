@@ -498,7 +498,26 @@ public partial class MainWindow : Window
         SetBrushColor("FolderNameHighlightForeground", light ? _settings.LightFolderNameHighlightColorHex : _settings.FolderNameHighlightColorHex);
         SetBrushColor("FileNameForeground", light ? _settings.LightFileNameColorHex : _settings.FileNameColorHex);
         SetBrushColor("FileNameHighlightForeground", light ? _settings.LightFileNameHighlightColorHex : _settings.FileNameHighlightColorHex);
-        SetBrushColor("TreeRowSelectedActiveBackground", light ? _settings.LightSelectionColorHex : _settings.SelectionColorHex);
+        // The selection highlight keeps TWO variants behind its one resource
+        // key: the user-picked color while this app is in the foreground, and
+        // a 40%-opacity version of that SAME color while it isn't - what was
+        // left selected still reads as "the row you were on", not as a live
+        // selection (VS Code's unfocused-selection treatment; selection is
+        // deliberately KEPT on app switch - Ctrl+V into the selected folder
+        // after copying something elsewhere depends on it). Derived here, not
+        // a 16th palette entry: repick the selection color in either theme
+        // and the dimmed variant follows automatically. Swapping the single
+        // resource (UpdateSelectionBrushForActivation) covers every consumer
+        // - tree rows, multi-select rows, favorites, search results - with
+        // zero per-row bindings.
+        string selectionHex = light ? _settings.LightSelectionColorHex : _settings.SelectionColorHex;
+        if (ColorConverter.ConvertFromString(selectionHex) is Color selectionColor)
+        {
+            _selectionActiveBrush = new SolidColorBrush(selectionColor);
+            selectionColor.A = (byte)Math.Round(selectionColor.A * 0.4);
+            _selectionInactiveBrush = new SolidColorBrush(selectionColor);
+        }
+        UpdateSelectionBrushForActivation();
         SetBrushColor("FavoritesBackground", light ? _settings.LightHistoryBackgroundColorHex : _settings.HistoryBackgroundColorHex);
         SetBrushColor("TreeRowHoverBackground", light ? _settings.LightHoverBackgroundColorHex : _settings.HoverBackgroundColorHex);
         SetBrushColor("FolderNameHoverForeground", light ? _settings.LightFolderNameHoverColorHex : _settings.FolderNameHoverColorHex);
@@ -514,6 +533,26 @@ public partial class MainWindow : Window
         // above reflects the current theme. ApplyColorSettings only ever runs
         // from Loaded onward (after InitializeComponent), so the element exists.
         UpdateSearchSortIcon();
+    }
+
+    private SolidColorBrush? _selectionActiveBrush;
+    private SolidColorBrush? _selectionInactiveBrush;
+
+    // "Active" deliberately means ANY of this app's windows, not just this
+    // one: while the Color Settings dialog holds focus the main window
+    // reports inactive, and dimming the selection at that moment would
+    // live-preview the wrong brush to the very person adjusting the
+    // selection color. Callers on the deactivation side re-check one
+    // dispatcher hop late because the incoming window's IsActive isn't set
+    // yet while the outgoing window's Deactivated handler runs.
+    private void UpdateSelectionBrushForActivation()
+    {
+        if (_selectionActiveBrush is null || _selectionInactiveBrush is null)
+        {
+            return;
+        }
+        bool anyAppWindowActive = Application.Current.Windows.OfType<Window>().Any(w => w.IsActive);
+        Resources["TreeRowSelectedActiveBackground"] = anyAppWindowActive ? _selectionActiveBrush : _selectionInactiveBrush;
     }
 
     private void SetBrushColor(string resourceKey, string hex)
@@ -5522,6 +5561,7 @@ public partial class MainWindow : Window
     {
         base.OnActivated(e);
         _lastActivatedTicks = Environment.TickCount64;
+        UpdateSelectionBrushForActivation();
     }
 
     // Leaving the app resolves rename state Total Commander-style: a pending
@@ -5541,6 +5581,10 @@ public partial class MainWindow : Window
             editing.IsEditing = false;
         }
         _inlineRenameItem = null;
+
+        // One hop late on purpose - see UpdateSelectionBrushForActivation.
+        Dispatcher.BeginInvoke(() => UpdateSelectionBrushForActivation(),
+            System.Windows.Threading.DispatcherPriority.Input);
     }
 
     private void BeginInlineRename(FileSystemItem item)
