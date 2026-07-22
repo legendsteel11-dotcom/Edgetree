@@ -3650,6 +3650,18 @@ public partial class MainWindow : Window
         }
 
         item.EnsureChildrenLoaded();
+
+        // A watcher event landed on this folder while it sat collapsed (see
+        // PendingExternalRefresh) - its cached listing predates that change,
+        // so re-read now that it's actually coming on screen. Flag cleared
+        // first: the refresh replays expand state, which re-enters this
+        // handler for descendants.
+        if (item.PendingExternalRefresh)
+        {
+            item.PendingExternalRefresh = false;
+            RefreshFolderPreservingState(item);
+        }
+
         if (IsWithinTreeGestureWindow)
         {
             ApplyAutoCollapse(item);
@@ -4149,6 +4161,16 @@ public partial class MainWindow : Window
 
     private void TreeViewItem_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
+        // The drag-out candidate lives exactly as long as the press that armed
+        // it - a release means no drag came of it, so it must never survive to
+        // be replayed against some LATER press's movement (the sort-icon
+        // phantom-drag postmortem was one such replay; the 2026-07-22 self-drop
+        // incident pointed at the same stale-candidate class). Cleared before
+        // the innermost filter below on purpose: this handler early-returns on
+        // ancestor passes, and the candidate must die on release regardless.
+        _itemDragStart = null;
+        _itemDragCandidate = null;
+
         // Innermost-item filtering FIRST, before touching the deferred state:
         // this preview event tunnels through every ancestor TreeViewItem ahead
         // of the row actually released on, and consuming the deferred item on
@@ -4378,9 +4400,19 @@ public partial class MainWindow : Window
 
     private void TreeViewItem_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
-        if (_itemDragCandidate is not { } item || _itemDragStart is not { } start ||
-            e.LeftButton != MouseButtonState.Pressed)
+        if (_itemDragCandidate is not { } item || _itemDragStart is not { } start)
         {
+            return;
+        }
+
+        // Belt-and-braces companion to the mouse-up clear: a release over
+        // empty tree space (below the last row) never reaches the row-level
+        // mouse-up handler, so the first unpressed movement afterwards retires
+        // the candidate here instead of leaving it armed for a later press.
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            _itemDragStart = null;
+            _itemDragCandidate = null;
             return;
         }
 
@@ -4491,7 +4523,22 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!FileOperationService.TryImportDroppedPaths(droppedPaths, item.FullPath, ConfirmOverwrite, out var error))
+        // Drops that would import an item into the folder it ALREADY lives in
+        // are ignored, not overwrite-prompted: importing a file onto itself is
+        // never what was meant, and the main way it happens is a click with a
+        // few pixels of travel (a micro-drag) releasing on the parent row -
+        // which is how "clicked the folder above and got 대체하시겠습니까?"
+        // (2026-07-22 20:17) presented. Also dropped here: a folder onto
+        // itself, and a folder into its own descendant - that one would
+        // recursively copy the tree into itself until the disk fills.
+        var importablePaths = droppedPaths.Where(p => !IsDropIntoOwnPlace(p, item.FullPath)).ToArray();
+        if (importablePaths.Length == 0)
+        {
+            LogSelfDropSkipped(droppedPaths.Length, item.FullPath);
+            return;
+        }
+
+        if (!FileOperationService.TryImportDroppedPaths(importablePaths, item.FullPath, ConfirmOverwrite, out var error))
         {
             return;
         }
@@ -4501,6 +4548,39 @@ public partial class MainWindow : Window
         }
 
         item.RefreshChildren();
+    }
+
+    // "Own place" = the item's current folder (it already lives in the drop
+    // target), the item itself, or anywhere inside the item (a folder dropped
+    // into its own subtree). See the guard in TreeViewItem_Drop.
+    private static bool IsDropIntoOwnPlace(string sourcePath, string destinationFolder)
+    {
+        string source = sourcePath.TrimEnd('\\');
+        string destination = destinationFolder.TrimEnd('\\');
+        return string.Equals(Path.GetDirectoryName(source), destination, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(source, destination, StringComparison.OrdinalIgnoreCase)
+            || destination.StartsWith(source + "\\", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Debug builds only - each line is one swallowed accidental self-drop,
+    // which doubles as the instrument for the micro-drag theory: if these
+    // lines appear during ordinary clicking (no deliberate drag), clicks are
+    // indeed occasionally turning into drags onto a neighboring row.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogSelfDropSkipped(int itemCount, string destinationFolder)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "selfdrop.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  skipped self-drop of {itemCount} item(s) into {destinationFolder}{Environment.NewLine}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     private bool ConfirmOverwrite(string name)
@@ -5094,8 +5174,23 @@ public partial class MainWindow : Window
         {
             timer.Stop();
             _pendingExternalRefreshes.Remove(folderPath);
-            if (FindLoadedItemForPath(folderPath) is not { IsExpanded: true } item)
+            if (FindLoadedItemForPath(folderPath) is not { } item)
             {
+                return;
+            }
+
+            // A loaded-but-collapsed folder can't be patched live (only
+            // expanded folders are), but it can't be forgotten either:
+            // EnsureChildrenLoaded caches, so the next expand would show the
+            // listing from BEFORE this change. Mark it; TreeViewItem_Expanded
+            // re-reads marked folders on the next expand. Same staleness test
+            // as the expanded path below.
+            if (!item.IsExpanded)
+            {
+                if (item.ChildrenLoaded && item.LastLoadedTicks <= pending.LastEventTicks)
+                {
+                    item.PendingExternalRefresh = true;
+                }
                 return;
             }
 

@@ -230,6 +230,15 @@ public class FileSystemItem : INotifyPropertyChanged
     // clock change can't make a fresh load look ancient.
     public long LastLoadedTicks { get; private set; }
 
+    // Set by MainWindow's external-change path when a watcher event lands on
+    // this folder while it is loaded but COLLAPSED: the live refresh only
+    // patches expanded folders, and EnsureChildrenLoaded caches - so without
+    // this flag the next expand would show the stale pre-change listing
+    // (2026-07-22: screenshot taken while its folder was auto-collapsed,
+    // expand showed the old newest-first top row). Consumed by
+    // TreeViewItem_Expanded, cleared by any real re-read.
+    public bool PendingExternalRefresh { get; set; }
+
     public void EnsureChildrenLoaded()
     {
         if (_childrenLoaded || !IsDirectory)
@@ -237,6 +246,7 @@ public class FileSystemItem : INotifyPropertyChanged
             return;
         }
         _childrenLoaded = true;
+        PendingExternalRefresh = false;
 
         // Stamped BEFORE the read, not after: a file created while LoadChildren
         // is enumerating can be missed by the enumeration yet have its watcher
