@@ -30,13 +30,13 @@ Either way, it's one `.exe` — no installer, just run it.
 - **Docked to the screen edge** — left by default, switchable to the right
   from the options menu — spanning the full work area height (excludes the
   taskbar), hidden from Alt+Tab and the taskbar while docked
-- **Auto-hide** by clicking the app icon: shrinks the window to a bare sliver
-  at the screen edge that peeks open on mouse-over and, by default, quietly
-  re-hides once you move away (turn off "Close Instantly on Mouse Leave" in
-  the options menu to close it on an outside click instead). The sliver's own
-  thickness is adjustable too, 3–8px from the options menu — pin it back open
-  from the peeked-out state to stop auto-hiding — all with a smooth width
-  animation
+- **Auto-hide** with one click of the header's pin button: shrinks the window
+  to a bare sliver at the screen edge that peeks open on mouse-over and, by
+  default, quietly re-hides once you move away (turn off "Close Instantly on
+  Mouse Leave" in the options menu to close it on an outside click instead).
+  The pin lying on its side is the auto-hide indicator — click it again and
+  it stands back up, pinned open. The sliver's own thickness is adjustable
+  too, 3–8px from the options menu
 - **Drag-to-resize** width while docked, or double-click the resize line to
   fit the window to the widest currently-shown row and double-click again to
   restore the previous width
@@ -85,6 +85,9 @@ Either way, it's one `.exe` — no installer, just run it.
   `Enter`) that **keep working while this same right-click menu is open**
   (not other popups, like Color Settings); opens below the row it targets so
   it never covers the item
+- **Image preview**: right-clicking an image file shows a thumbnail at the top
+  of the menu along with its format, pixel size, file size, and modified date
+  — check a picture without opening it, or click the thumbnail to open it
 - **Drag files out** of the sidebar into Explorer or any other app (standard
   Windows file drag, so copy/move/drop-to-open all work as expected)
 - **Folder search** (`Ctrl+F`, or the title-bar search icon toggles between
@@ -104,12 +107,13 @@ Either way, it's one `.exe` — no installer, just run it.
 - **Sort**: by name or date, ascending or descending — from the "..." options
   menu, or a folder's own right-click menu, which also re-sorts that folder
   immediately instead of waiting for the next expand
-- **Two icon styles**: Material Icon Theme file/folder icons by default (see
-  [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)), or switch to **the same
-  icons Windows Explorer shows** via "Icon Style" in the options menu — applies
-  instantly (tree, search results, and favorites alike), .exe/shortcut files
-  get their own real icons, and extraction runs in the background so network
-  drives never slow scrolling down; drive names shown in bold
+- **Two icon styles**: **the same icons Windows Explorer shows**, by default —
+  .exe/shortcut files get their own real icons, and extraction runs in the
+  background so network drives never slow scrolling down — or switch to the
+  bundled Material Icon Theme set (see
+  [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)) via "Icon Style" in the
+  options menu; applies instantly (tree, search results, and favorites
+  alike); drive names shown in bold
 - Header: pin, **collapse-all** (toggles: remembers which folders were
   expanded, collapses everything, then restores exactly that state on a
   second click), an **options ("...") menu** (Auto Collapse, always on top,
@@ -193,6 +197,39 @@ moment it's moved on its own.
 
 Either way, the resulting `.exe` is in
 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
+
+## Changelog
+
+### v1.2.1 (2026-07-23)
+
+- **Image preview in the right-click menu**: a thumbnail with format, pixel
+  size, file size, and modified date — click it to open the file
+- **The pin is now a pinned/auto-hide toggle**: click to auto-hide (the pin
+  lies down), click again to pin open (it stands back up) — replaces the old
+  app-icon click
+- **Menus follow the font zoom**: right-click/options menu text and spacing
+  now scale with the tree's Ctrl `+`/`-` zoom, with tightened row rhythm
+- **Windows Explorer icons are now the default** (the Material set remains an
+  option)
+- **Update notification**: a small dot on the options ("...") button when a
+  newer release is available
+- **Better behavior while you work elsewhere**: the selection highlight dims
+  while the app is in the background, and inline rename no longer carries
+  across app switches
+- **Fresher folder contents**: re-expanding a collapsed folder now reflects
+  changes made in the meantime, and external add/delete updates redraw more
+  steadily
+- Multi-select (Shift+click ranges) and right-click interaction polish;
+  color settings now save immediately
+
+### v1.2.0 (2026-07-21)
+
+- **Multi-select**: Ctrl/Shift+click several files or folders to copy,
+  delete, or drag them out together
+- **Icon style option**: the same icons Windows Explorer shows
+
+Earlier versions are covered on the
+[GitHub releases page](https://github.com/legendsteel11-dotcom/Edgetree/releases).
 
 ## Requests & bug reports
 

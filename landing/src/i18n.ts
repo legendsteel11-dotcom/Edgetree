@@ -30,7 +30,7 @@ const dict = {
     howto: {
       title: '사용방법',
       steps: [
-        { title: '도킹 / 자동접기 / 창모드 전환', desc: '제목표시줄 아이콘 클릭 한 번으로 화면 가장자리에 얇게 숨고, 마우스를 가장자리로 가져가면 다시 펼쳐집니다. 제목표시줄을 드래그하여 창모드로 전환할 수 있습니다.' },
+        { title: '도킹 / 자동접기 / 창모드 전환', desc: '제목표시줄 핀 클릭 한 번으로 화면 가장자리에 얇게 숨고, 마우스를 가장자리로 가져가면 다시 펼쳐집니다. 제목표시줄을 드래그하여 창모드로 전환할 수 있습니다.' },
         { title: '간단한 파일 검색', desc: '제목표시줄의 검색 아이콘 혹은 Ctrl + F / Ctrl + E 로 검색창과 탐색기 창을 전환하고 간단한 파일 검색을 할 수 있습니다.' },
         { title: '컨텍스트 메뉴 및 파일 액세스', desc: '탐색기에서 폴더나 파일을 우클릭하여 기본적인 기능 등을 편리하게 사용할 수 있습니다. 이미지 파일은 열지 않고도 메뉴 상단의 미리보기로 바로 확인됩니다. 파일을 창 외부로 복사하거나, VS Code의 탐색기에 바로 등록할 수 있습니다.' },
         { title: '전체 펼침/접기, 자동 아코디언', desc: '제목바의 ▲ 아이콘으로 펼쳐진 폴더 트리 전체를 한 번에 접었다 복원할 수 있습니다. 또 필요한 폴더만 펼치고 나머지는 자동으로 접히게 할 수 있습니다.' },
@@ -70,7 +70,7 @@ const dict = {
       items: [
         { title: '폴더 트리뷰', desc: 'VS Code 스타일 트리 탐색 — 전체 접기/복원, 자동 접기 토글, 폴더당 표시 개수 제한으로 큰 폴더도 빠르게 열립니다.' },
         { title: '도킹 및 창모드', desc: '화면 좌/우 도킹과 자유 이동 창모드를 오가고, 바깥 라인 더블클릭으로 창 크기를 자동으로 맞출 수 있습니다.' },
-        { title: '자동 숨김', desc: '아이콘 클릭 한 번으로 화면 가장자리에 숨고, 마우스를 올리면 펼쳐집니다. 핀으로 고정도 가능합니다.' },
+        { title: '자동 숨김', desc: '핀 클릭 한 번으로 화면 가장자리에 숨고, 마우스를 올리면 펼쳐집니다. 핀을 다시 누르면 고정됩니다.' },
         { title: '기본 옵션', desc: '윈도우 시작 시 자동 실행, 항상 위에 표시, 트레이로 최소화 등을 옵션으로 조절합니다.' },
         { title: '파일 관리', desc: '다른 앱으로 파일을 바로 드래그하고, 복사/붙여넣기/이름변경/속성 등을 지원하며 외부 변경사항도 실시간 반영됩니다. Ctrl+클릭·Shift+클릭으로 여러 항목을 선택해 한 번에 복사·삭제하거나 통째로 드래그할 수 있습니다.' },
         { title: '파일 검색', desc: '지정한 폴더를 인덱싱해 이름으로 바로 찾아갑니다. 인덱스는 저장되어 다음 실행 때 다시 훑지 않으므로, 네트워크 드라이브(NAS)처럼 오래 걸리는 곳도 앱을 켜자마자 검색할 수 있습니다.' },
@@ -136,7 +136,7 @@ const dict = {
     howto: {
       title: 'How to Use',
       steps: [
-        { title: 'Dock / Auto-Hide / Window Mode', desc: 'One click on the titlebar icon tucks it away to a thin sliver at the screen edge; move your mouse there to bring it back. Drag the titlebar to switch into a floating window.' },
+        { title: 'Dock / Auto-Hide / Window Mode', desc: 'One click on the titlebar pin tucks it away to a thin sliver at the screen edge; move your mouse there to bring it back. Drag the titlebar to switch into a floating window.' },
         { title: 'Quick File Search', desc: "The titlebar's search icon (or Ctrl + F / Ctrl + E) toggles between the search box and the explorer for a quick file lookup." },
         { title: 'Context Menu & File Access', desc: 'Right-click a folder or file in the explorer for the essentials at hand — image files show a preview right at the top of the menu, no need to open them. Copy files out to another window, or send them straight to the VS Code explorer.' },
         { title: 'Collapse/Restore All & Auto Accordion', desc: 'The ▲ icon on the titlebar collapses or restores the whole expanded tree at once; you can also keep only the folder you open expanded while the rest auto-collapse.' },
@@ -176,7 +176,7 @@ const dict = {
       items: [
         { title: 'Folder Tree View', desc: "VS Code-style tree browsing - collapse/restore all, Auto Collapse, and a per-folder item cap keep even huge folders fast." },
         { title: 'Docking & Window Mode', desc: "Dock to either screen edge or float as a free window - double-click the edge to auto-fit the width." },
-        { title: 'Auto-Hide', desc: 'One click tucks it away to a thin sliver at the screen edge; hover to reveal, pin to keep it open.' },
+        { title: 'Auto-Hide', desc: 'One click of the pin tucks it away to a thin sliver at the screen edge; hover to reveal, click it again to keep it open.' },
         { title: 'Core Options', desc: "Launch at Windows startup, stay always-on-top, minimize to tray - all toggleable from the options menu." },
         { title: 'File Management', desc: 'Drag files straight into other apps, plus copy/paste/rename/properties, with live updates when files change externally. Multi-select with Ctrl+click and Shift+click to copy, delete, or drag several items at once.' },
         { title: 'File Search', desc: 'Index a folder you choose and jump straight to a file by name. The index is saved, so it is not re-walked on the next launch - even a network drive is searchable the moment the app opens.' },
