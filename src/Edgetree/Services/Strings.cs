@@ -212,6 +212,7 @@ public static class Strings
     public static string AboutLicenseLabel = "라이센스 요약";
     public static string AboutGithubLabel = "GitHub";
     public static string AboutWebsiteLabel = "웹사이트";
+    public static string AboutUpdateAvailableFormat = "새 버전 {0} 다운로드";
     public static string AboutAuthorValue = "pjh85336@gmail.com";
     public static string AboutLicenseSummary =
         "MIT 라이선스. 번들된 아이콘은 Material Icon Theme 프로젝트(MIT)에서 가져왔습니다. " +
@@ -394,6 +395,7 @@ public static class Strings
         AboutDateLabel = "Date";
         AboutLicenseLabel = "License Summary";
         AboutWebsiteLabel = "Website";
+        AboutUpdateAvailableFormat = "Download update {0}";
         AboutLicenseSummary =
             "MIT License. Bundled icons are from the Material Icon Theme project (MIT). " +
             "Provided as-is, without warranty; use is at your own discretion.";

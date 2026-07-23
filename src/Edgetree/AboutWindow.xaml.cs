@@ -10,13 +10,24 @@ namespace SidebarExplorer.App;
 
 public partial class AboutWindow : Window
 {
-    public AboutWindow()
+    // updateAvailable: the newer version the startup check found, or null for
+    // "none known" - when set, a download link appears under the version row
+    // (the options-button dot announces an update; this is the in-app way to
+    // actually go get it).
+    public AboutWindow(Version? updateAvailable = null)
     {
         InitializeComponent();
         Deactivated += Window_Deactivated;
 
         var assembly = Assembly.GetExecutingAssembly();
         VersionText.Text = assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+
+        if (updateAvailable is not null)
+        {
+            UpdateLinkText.Text = string.Format(
+                Services.Strings.AboutUpdateAvailableFormat, "v" + updateAvailable.ToString(3));
+            UpdateLinkText.Visibility = Visibility.Visible;
+        }
 
         // No build-time step embeds a real build date (or git commit) yet, so
         // this reads the running exe's own last-write time as a reasonable
@@ -62,6 +73,15 @@ public partial class AboutWindow : Window
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
             FileName = "https://github.com/legendsteel11-dotcom/Edgetree",
+            UseShellExecute = true
+        });
+    }
+
+    private void UpdateLink_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "https://github.com/legendsteel11-dotcom/Edgetree/releases/latest",
             UseShellExecute = true
         });
     }

@@ -362,6 +362,7 @@ public partial class MainWindow : Window
 
             // Still on the UI thread here - no ConfigureAwait(false) above,
             // deliberately, so these touch the controls safely.
+            UpdateAvailableVersion = latest;
             UpdateAvailableDot.Visibility = Visibility.Visible;
             OptionsButton.ToolTip =
                 $"{Strings.ToolTipOptions} — {string.Format(Strings.ToolTipUpdateAvailable, "v" + latest)}";
@@ -375,6 +376,11 @@ public partial class MainWindow : Window
             // 표시만 - a check that can't complete simply doesn't show a dot.
         }
     }
+
+    // The newer release CheckForUpdateOnceAsync found, if any - read by the
+    // About window (both the menu path here and App's tray path) to show its
+    // download link next to the version it supersedes.
+    public Version? UpdateAvailableVersion { get; private set; }
 
     private void OnPowerModeChanged(object sender, Microsoft.Win32.PowerModeChangedEventArgs e)
     {
@@ -3617,7 +3623,7 @@ public partial class MainWindow : Window
 
     private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        var window = new AboutWindow { Owner = this };
+        var window = new AboutWindow(UpdateAvailableVersion) { Owner = this };
         PositionNearOptionsButton(window);
         window.ShowDialog();
     }

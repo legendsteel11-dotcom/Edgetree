@@ -136,7 +136,7 @@ public partial class App : Application
     // reusing MainWindow.PositionNearOptionsButton.
     private void ShowAboutCentered()
     {
-        var window = new AboutWindow
+        var window = new AboutWindow((MainWindow as MainWindow)?.UpdateAvailableVersion)
         {
             WindowStartupLocation = WindowStartupLocation.CenterScreen,
             Owner = MainWindow

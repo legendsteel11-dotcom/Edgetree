@@ -162,6 +162,19 @@
                         Style="{StaticResource AboutRowValueStyle}"
                         Margin="0,0,0,10"/>
 
+                <!-- Only appears when the startup update check found a newer
+                     release (see the constructor) - the options-button dot
+                     says "there's an update", this is where it can actually
+                     be fetched. Sits right under the version it supersedes. -->
+                <TextBlock x:Name="UpdateLinkText"
+                        Foreground="{DynamicResource AccentForeground}"
+                        FontSize="12"
+                        Cursor="Hand"
+                        TextDecorations="Underline"
+                        Margin="0,-4,0,10"
+                        Visibility="Collapsed"
+                        MouseLeftButtonDown="UpdateLink_MouseLeftButtonDown"/>
+
                 <TextBlock Text="{x:Static services:Strings.AboutAuthorLabel}"
                         Style="{StaticResource AboutRowLabelStyle}"/>
                 <TextBlock Text="{x:Static services:Strings.AboutAuthorValue}"
