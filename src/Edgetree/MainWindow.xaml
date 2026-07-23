@@ -2466,13 +2466,17 @@
                              CheckForUpdateOnceAsync when GitHub's latest
                              release is newer than this build. Display only -
                              clicking stays the normal options menu. -->
+                        <!-- Nudged further up-right than its first placement
+                             (-2,-3): the 15% glyph grow widened the "..." and
+                             the dot read as overlapping its last dot (user
+                             report on the live v1.2.1 update test). -->
                         <Ellipse x:Name="UpdateAvailableDot"
                                 Width="5"
                                 Height="5"
                                 Fill="{DynamicResource AccentForeground}"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Top"
-                                Margin="0,-2,-3,0"
+                                Margin="0,-7,-5,0"
                                 Visibility="Collapsed"/>
                     </Grid>
                 </Button>
