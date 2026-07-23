@@ -878,6 +878,7 @@ public partial class MainWindow : Window
         Topmost = true;
         SetExpandedContentVisibility(Visibility.Collapsed);
         AnimateWidth(AutoHideSliverWidth);
+        UpdatePinButtonVisibility();
     }
 
     // Reached only via the pin button while temporarily peeked open (see
@@ -1388,32 +1389,30 @@ public partial class MainWindow : Window
             : System.Windows.HorizontalAlignment.Right;
     }
 
-    // The pin (re-dock) button only makes sense while floating; docking itself
-    // happens by dragging the header, not by clicking anything.
-    // Same button, two unrelated jobs depending on which state it's shown in
-    // (see PinButton_Click) - floating (re-dock), or docked and temporarily
-    // peeked open out of auto-hide (stop auto-hiding and stay open).
+    // Same button, three jobs by state (see PinButton_Click): floating ->
+    // re-dock, docked+pinned -> enter auto-hide, docked+auto-hidden -> pin
+    // open. Always clickable now - the old greyed-out-while-pinned state was
+    // the reported confusion; the glyph's angle carries the state instead
+    // (upright = pinned, lying = auto-hiding, the classic tool-window
+    // pushpin language).
     private void UpdatePinButtonVisibility()
     {
-        bool usableForFloatingRedock = !_isDocked;
-        bool usableForAutoHideReveal = _isDocked && _settings.IsAutoHidden && _isAutoHideRevealed;
-
-        // Greyed out rather than hidden when pinning doesn't apply (already
-        // docked and pinned): a button that disappears shifts every other
-        // header icon sideways, which read as confusing - a dimmed pin stays
-        // put and says "not available here" instead. See the IsEnabled trigger
-        // in ToggleButtonStyle.
-        PinButton.IsEnabled = usableForFloatingRedock || usableForAutoHideReveal;
+        PinButton.IsEnabled = true;
 
         // It still hides completely along with the rest of the header when the
         // window collapses to the auto-hide sliver - mirroring one of the
         // buttons SetExpandedContentVisibility drives keeps that in step.
         PinButton.Visibility = CloseButton.Visibility;
 
+        bool autoHiding = _isDocked && _settings.IsAutoHidden;
+        PinIconRotation.Angle = autoHiding ? 90 : 0;
+
         // Which edge re-docking/pinning actually snaps to depends on
         // DockOnRight, so the tooltip can't be one fixed string the way the
         // header's other buttons' tooltips are.
-        PinButton.ToolTip = _settings.DockOnRight ? Strings.ToolTipPinRight : Strings.ToolTipPinLeft;
+        PinButton.ToolTip = !_isDocked
+            ? (_settings.DockOnRight ? Strings.ToolTipPinRight : Strings.ToolTipPinLeft)
+            : autoHiding ? Strings.ToolTipPinStayOpen : Strings.ToolTipPinAutoHide;
     }
 
     // The header's icon buttons are fixed-size, and the title between them is
@@ -1555,16 +1554,29 @@ public partial class MainWindow : Window
         (sender as UIElement)?.ReleaseMouseCapture();
     }
 
+    // The pin is a full pinned/auto-hide toggle now (user call, 2026-07-23,
+    // relayed "혼란스럽다" feedback on the old greyed-out-while-pinned pin):
+    // docked and pinned, clicking it enters auto-hide (what only the app icon
+    // did before - that path still works too); docked and auto-hidden,
+    // clicking pins it open again; floating, it re-docks as always. The glyph
+    // mirrors the state - upright while pinned, lying on its side while
+    // auto-hiding (see UpdatePinButtonVisibility).
     private void PinButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_isDocked && _settings.IsAutoHidden)
+        if (!_isDocked)
+        {
+            Dock();
+        }
+        else if (_settings.IsAutoHidden)
         {
             ExitAutoHide();
         }
         else
         {
-            Dock();
+            EnterAutoHide();
         }
+
+        UpdatePinButtonVisibility();
     }
 
     private void Undock(bool offsetFromCorner = false)

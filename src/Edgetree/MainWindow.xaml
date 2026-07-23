@@ -2403,12 +2403,26 @@
                          magnifier's ~10 units on purpose, since a narrow
                          upright shape looks smaller than a circular one of the
                          same height. -->
-                    <Path Data="F1 M632.13-488.37l96 96v83.24H521.5v227.04L480-40.59l-41.5-41.5v-227.04H231.87v-83.24l96-96v-257.78h-48v-83h400.26v83h-48v257.78Zm-283.2 96.24h262.14l-61.94-61.94v-292.08H410.87v292.08l-61.94 61.94Z"
+                    <Path x:Name="PinButtonIcon"
+                            Data="F1 M632.13-488.37l96 96v83.24H521.5v227.04L480-40.59l-41.5-41.5v-227.04H231.87v-83.24l96-96v-257.78h-48v-83h400.26v83h-48v257.78Zm-283.2 96.24h262.14l-61.94-61.94v-292.08H410.87v292.08l-61.94 61.94Z"
                             Fill="{DynamicResource ForegroundText}"
                             Stretch="Uniform"
                             Height="13"
-                            RenderTransformOrigin="0.5,0.5"
-                            RenderTransform="{StaticResource HeaderGlyphGrow}"/>
+                            RenderTransformOrigin="0.5,0.5">
+                        <!-- Upright pin = pinned open, lying pin = auto-hide -
+                             the classic tool-window pushpin state language
+                             (see UpdatePinButtonVisibility, which drives
+                             PinIconRotation). The shared grow transform stays
+                             in the group so this glyph keeps following the
+                             same size stepping as its five siblings. -->
+                        <Path.RenderTransform>
+                            <TransformGroup>
+                                <RotateTransform x:Name="PinIconRotation"
+                                        Angle="0"/>
+                                <StaticResource ResourceKey="HeaderGlyphGrow"/>
+                            </TransformGroup>
+                        </Path.RenderTransform>
+                    </Path>
                 </Button>
                 <Button x:Name="CollapseAllButton"
                         Grid.Column="4"

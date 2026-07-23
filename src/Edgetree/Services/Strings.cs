@@ -117,6 +117,8 @@ public static class Strings
     // is set from code, not bound to a single static string like the others.
     public static string ToolTipPinLeft = "좌측에 고정";
     public static string ToolTipPinRight = "우측에 고정";
+    public static string ToolTipPinAutoHide = "자동 숨김";
+    public static string ToolTipPinStayOpen = "고정";
     public static string ToolTipCollapseAll = "모두 접기";
     public static string ToolTipRestoreExpanded = "펼침 상태 복원";
     public static string ToolTipOptions = "옵션";
@@ -327,6 +329,8 @@ public static class Strings
         ToolTipToggle = "Auto-Hide";
         ToolTipPinLeft = "Pin to Left";
         ToolTipPinRight = "Pin to Right";
+        ToolTipPinAutoHide = "Auto Hide";
+        ToolTipPinStayOpen = "Pin Open";
         ToolTipCollapseAll = "Collapse All";
         ToolTipRestoreExpanded = "Restore Expanded";
         ToolTipOptions = "Options";
