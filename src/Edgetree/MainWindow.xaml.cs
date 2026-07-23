@@ -812,17 +812,6 @@ public partial class MainWindow : Window
     // not this, is the way back out from there). Floating has nothing to
     // collapse to, so this is a no-op there; AppIcon is just branding while
     // floating.
-    private void AppIcon_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (!_isDocked || _settings.IsAutoHidden)
-        {
-            return;
-        }
-
-        EnterAutoHide();
-        e.Handled = true;
-    }
-
     // Sets Width to targetWidth in one step - and, docked to the right edge,
     // Left with it so the right edge stays anchored to the screen edge (see
     // PositionToWorkArea/ResizeThumb_DragDelta, which anchor that same edge
@@ -1556,11 +1545,12 @@ public partial class MainWindow : Window
 
     // The pin is a full pinned/auto-hide toggle now (user call, 2026-07-23,
     // relayed "혼란스럽다" feedback on the old greyed-out-while-pinned pin):
-    // docked and pinned, clicking it enters auto-hide (what only the app icon
-    // did before - that path still works too); docked and auto-hidden,
-    // clicking pins it open again; floating, it re-docks as always. The glyph
-    // mirrors the state - upright while pinned, lying on its side while
-    // auto-hiding (see UpdatePinButtonVisibility).
+    // docked and pinned, clicking it enters auto-hide; docked and
+    // auto-hidden, clicking pins it open again; floating, it re-docks as
+    // always. The glyph mirrors the state - upright while pinned, lying on
+    // its side while auto-hiding (see UpdatePinButtonVisibility). The app
+    // icon used to be the auto-hide entry; that was retired the same day so
+    // exactly ONE control owns this state (user call, same feedback thread).
     private void PinButton_Click(object sender, RoutedEventArgs e)
     {
         if (!_isDocked)

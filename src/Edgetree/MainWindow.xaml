@@ -2322,12 +2322,12 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <!-- The app icon IS the auto-hide toggle now (see
-                     AppIcon_MouseLeftButtonDown) - the separate chevron
-                     button this used to sit next to is gone, so there's
-                     nothing left to click but this while docked. Floating
-                     mode still shows it, just as branding (auto-hide is a
-                     docked-only concept). -->
+                <!-- Pure branding since 2026-07-23: this was the auto-hide
+                     toggle for a while (the pin was greyed out when docked),
+                     but once the pin became the real pinned/auto-hide toggle
+                     the icon doing the same thing invisibly was exactly the
+                     kind of confusion the pin change was for - one state,
+                     one control. -->
                 <Image x:Name="AppIcon"
                         Grid.Column="0"
                         Source="pack://application:,,,/Resources/icon.png"
@@ -2335,9 +2335,6 @@
                         Height="20"
                         Margin="8,0,6,0"
                         VerticalAlignment="Center"
-                        Cursor="Hand"
-                        ToolTip="{x:Static services:Strings.ToolTipToggle}"
-                        MouseLeftButtonDown="AppIcon_MouseLeftButtonDown"
                         RenderOptions.BitmapScalingMode="HighQuality"/>
                 <TextBlock x:Name="RootPathText"
                         Grid.Column="1"
