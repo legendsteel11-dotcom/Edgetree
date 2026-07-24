@@ -144,6 +144,15 @@ Either way, the resulting `.exe` is in
 
 ## Changelog
 
+### v1.2.2 (2026-07-23)
+
+- **Network drives behave better**: a drive that is asleep or briefly
+  unreachable keeps its place in the tree and expands normally once it
+  responds
+- **Update download link**: when a newer release is available, the About
+  window now shows a direct download link under the version
+- Update-notification dot placement polish
+
 ### v1.2.1 (2026-07-23)
 
 - **Image preview in the right-click menu**: a thumbnail with format, pixel
