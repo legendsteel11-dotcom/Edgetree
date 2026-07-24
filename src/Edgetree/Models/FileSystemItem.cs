@@ -245,8 +245,6 @@ public class FileSystemItem : INotifyPropertyChanged
         {
             return;
         }
-        _childrenLoaded = true;
-        PendingExternalRefresh = false;
 
         // Stamped BEFORE the read, not after: a file created while LoadChildren
         // is enumerating can be missed by the enumeration yet have its watcher
@@ -255,7 +253,21 @@ public class FileSystemItem : INotifyPropertyChanged
         // refresh and the file never appear. Stamping first errs the other way:
         // worst case one redundant refresh of a folder that did catch the file.
         LastLoadedTicks = Environment.TickCount64;
-        PopulateCapped(FileSystemService.LoadChildren(FullPath, this));
+        var loaded = FileSystemService.LoadChildren(FullPath, this, out bool readFailed);
+
+        // A failed read (sleeping NAS, unplugged drive) is UNKNOWN contents,
+        // not empty contents: keep the placeholder so the expander arrow
+        // stays, and stay "not loaded" so the next expand simply retries -
+        // recording empty here is what left a network drive permanently
+        // arrow-less for the session.
+        if (readFailed)
+        {
+            return;
+        }
+
+        _childrenLoaded = true;
+        PendingExternalRefresh = false;
+        PopulateCapped(loaded);
     }
 
     // Fills Children with at most DisplayCap items; anything beyond that is
@@ -376,7 +388,16 @@ public class FileSystemItem : INotifyPropertyChanged
         // Same stamped-before-the-read rule as EnsureChildrenLoaded.
         LastLoadedTicks = Environment.TickCount64;
 
-        var fresh = FileSystemService.LoadChildren(FullPath, this);
+        var fresh = FileSystemService.LoadChildren(FullPath, this, out bool readFailed);
+
+        // A refresh that couldn't actually read the folder keeps what's on
+        // screen: stale rows beat wiping a NAS root (and every loaded subtree
+        // under it) because the drive blinked during a background refresh.
+        // The next successful watcher event or expand re-syncs for real.
+        if (readFailed)
+        {
+            return;
+        }
 
         // Reuse the existing instance wherever the fresh listing has an entry
         // of the same name (and same file-vs-folder kind - a name reused for

@@ -128,8 +128,16 @@ public static class FileSystemService
         IgnoreInaccessible = true
     };
 
-    public static List<FileSystemItem> LoadChildren(string path, FileSystemItem parent)
+    // readFailed distinguishes "this folder is genuinely empty" from "the
+    // read itself blew up" (sleeping/disconnected NAS, permissions, drive
+    // yanked). Callers MUST treat a failed read as unknown, never as empty:
+    // recording it as empty is how a network drive's root lost its expander
+    // arrow for the rest of the session (2026-07-23 NAS report) - and a
+    // background merge doing the same would strip every loaded row beneath
+    // the drive because it blinked once.
+    public static List<FileSystemItem> LoadChildren(string path, FileSystemItem parent, out bool readFailed)
     {
+        readFailed = false;
         var result = new List<FileSystemItem>();
         var (field, descending) = SortOverrides.TryGetValue(NormalizeSortOverridePath(path), out var over)
             ? (over.Field, over.Descending)
@@ -148,8 +156,8 @@ public static class FileSystemService
                 }
             }
         }
-        catch (UnauthorizedAccessException) { }
-        catch (IOException) { }
+        catch (UnauthorizedAccessException) { readFailed = true; }
+        catch (IOException) { readFailed = true; }
 
         try
         {
@@ -164,8 +172,8 @@ public static class FileSystemService
                 }
             }
         }
-        catch (UnauthorizedAccessException) { }
-        catch (IOException) { }
+        catch (UnauthorizedAccessException) { readFailed = true; }
+        catch (IOException) { readFailed = true; }
 
         return result;
     }
