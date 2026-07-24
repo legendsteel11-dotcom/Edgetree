@@ -1786,6 +1786,25 @@
                         Margin="{DynamicResource FolderRowIconMargin}"
                        VerticalAlignment="Center"
                         RenderOptions.BitmapScalingMode="HighQuality"/>
+                <!-- Network marker: a small dot on a folder icon's lower-left
+                     corner when the item lives on a network drive - the same
+                     idea as Explorer badging the network drive's own icon, so
+                     NAS territory stays recognizable deep in a scroll. Shown
+                     by trigger (IsOnNetworkDrive + folder + icon visible - it
+                     must vanish along with the icon when folder icons are
+                     toggled off). Green, the conventional "connected" hue,
+                     with a dark rim so it reads on top of the yellow folder. -->
+                <Ellipse x:Name="NetworkBadge"
+                        Grid.Column="0"
+                        Width="7"
+                        Height="7"
+                        Fill="#FF3FBF6B"
+                        Stroke="#66000000"
+                        StrokeThickness="1"
+                        Margin="{DynamicResource FolderRowIconMargin}"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Bottom"
+                        Visibility="Collapsed"/>
                 <!-- Foreground and FontSize intentionally not set here - both inherit
                      (Foreground from the TreeViewItem for selection-driven white text,
                      FontSize from the TreeView so Ctrl+/- zoom can rescale every row). -->
@@ -1928,6 +1947,22 @@
                             Property="Visibility"
                             Value="{DynamicResource FolderIconVisibility}"/>
                 </DataTrigger>
+                <!-- The network dot rides the folder icon: folder rows on a
+                     network drive only, and only while the icon itself is
+                     showing (folder icons toggled off hides the dot too). -->
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsOnNetworkDrive}"
+                                Value="True"/>
+                        <Condition Binding="{Binding IsDirectory}"
+                                Value="True"/>
+                        <Condition Binding="{Binding Visibility, ElementName=RowIcon}"
+                                Value="Visible"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="NetworkBadge"
+                            Property="Visibility"
+                            Value="Visible"/>
+                </MultiDataTrigger>
                 <DataTrigger Binding="{Binding IsDirectory}"
                         Value="False">
                     <Setter TargetName="RowIcon"

@@ -113,7 +113,10 @@ public static class FileSystemService
             string? label = TryGetVolumeLabel(drive);
             string displayName = string.IsNullOrWhiteSpace(label) ? driveName : $"{label} ({driveName})";
 
-            roots.Add(new FileSystemItem(displayName, drive.RootDirectory.FullName, isDirectory: true));
+            roots.Add(new FileSystemItem(displayName, drive.RootDirectory.FullName, isDirectory: true)
+            {
+                IsOnNetworkDrive = drive.DriveType == DriveType.Network
+            });
         }
 
         return roots;

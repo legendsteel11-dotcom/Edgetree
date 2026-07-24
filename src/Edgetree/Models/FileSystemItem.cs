@@ -165,12 +165,20 @@ public class FileSystemItem : INotifyPropertyChanged
         set => SetField(ref _editingName, value);
     }
 
+    // True for a network drive's root and everything beneath it - set on the
+    // root by FileSystemService.GetDriveRoots (DriveType.Network) and simply
+    // inherited down as children are constructed. Drives the small marker on
+    // folder icons so NAS territory is recognizable mid-scroll, the way
+    // Explorer badges the network drive icon itself.
+    public bool IsOnNetworkDrive { get; set; }
+
     public FileSystemItem(string name, string fullPath, bool isDirectory, FileSystemItem? parent = null)
     {
         Name = name;
         FullPath = fullPath;
         IsDirectory = isDirectory;
         Parent = parent;
+        IsOnNetworkDrive = parent?.IsOnNetworkDrive ?? false;
         if (isDirectory)
         {
             // Always resolves to SOME icon - this folder's own override if it
