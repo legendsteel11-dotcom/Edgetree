@@ -623,7 +623,7 @@
                              groups clearly parted). See ApplyLayoutMetrics. -->
                         <Border Height="1"
                                 Background="{DynamicResource SeparatorBrush}"
-                                Margin="2,6"/>
+                                Margin="2,5"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>

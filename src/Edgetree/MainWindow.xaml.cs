@@ -3612,7 +3612,12 @@ public partial class MainWindow : Window
         {
             menuVerticalScale *= menuVerticalScale;
         }
-        double menuVerticalPadding = Math.Min(6.0, Math.Round(8.0 * menuVerticalScale));
+        // Plateau lowered 6 -> 5 (2026-07-25): on a low-resolution laptop at
+        // 14pt, the menu - now carrying the bookmark row too - was pushing
+        // 800px tall with a thumbnail showing. Squeezed together with the
+        // separator margin (6 -> 5 in the XAML) and the thumbnail's growth
+        // cap below.
+        double menuVerticalPadding = Math.Min(5.0, Math.Round(8.0 * menuVerticalScale));
 
         var appResources = Application.Current.Resources;
         appResources["MenuFontSize"] = ExplorerTree.FontSize;
@@ -3625,9 +3630,15 @@ public partial class MainWindow : Window
         // The MAX matters as much as the min: the slot's Image reports the
         // picture's natural width during measure, so without a ceiling a wide
         // screenshot dragged the whole MENU out to its own width.
-        appResources["MenuThumbnailWidth"] = Math.Round(160.0 * scale);
-        appResources["MenuThumbnailMaxWidth"] = Math.Round(240.0 * scale);
-        appResources["MenuThumbnailHeight"] = Math.Round(120.0 * scale);
+        // The thumbnail SHRINKS with a smaller font (a small-font user is
+        // squeezing for space) but no longer GROWS with a bigger one
+        // (2026-07-25): picture size has no reason to follow text zoom, and
+        // its growth was the single biggest contributor to the menu nearing
+        // screen height at 14pt on a low-resolution laptop.
+        double thumbnailScale = Math.Min(1.0, scale);
+        appResources["MenuThumbnailWidth"] = Math.Round(160.0 * thumbnailScale);
+        appResources["MenuThumbnailMaxWidth"] = Math.Round(240.0 * thumbnailScale);
+        appResources["MenuThumbnailHeight"] = Math.Round(120.0 * thumbnailScale);
         appResources["MenuItemPadding"] = new Thickness(
             Math.Round(15.0 * scale), menuVerticalPadding,
             Math.Round(15.0 * scale), menuVerticalPadding);
