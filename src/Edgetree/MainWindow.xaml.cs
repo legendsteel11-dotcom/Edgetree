@@ -1928,13 +1928,34 @@ public partial class MainWindow : Window
             return;
         }
 
-        _settings.Favorites.Add(new FavoriteEntry { DisplayName = item.Name, Path = item.FullPath });
+        var entry = new FavoriteEntry { DisplayName = item.Name, Path = item.FullPath };
+        bool firstFavorite = _settings.Favorites.Count == 0;
+        _settings.Favorites.Add(entry);
 
         // The panel might not have existed at all yet (0 -> 1 favorites), so
         // the row/splitter need their initial reveal here - FitFavoritesPanel
         // alone only ever sets FavoritesRowDef's height, not FavoritesSplitterRow.
         UpdateFavoritesPanelVisibility();
-        FitFavoritesPanel();
+
+        // Adding does NOT auto-grow the panel anymore (2026-07-24): every
+        // growth shifted the entire tree under the cursor, and adding several
+        // favorites in a row became misclicks on rows that had just moved.
+        // The new entry slides in at the bottom instead - scrolled into view,
+        // older entries rolling up out of sight - and the panel keeps
+        // whatever height it has (the divider double-click still fits it on
+        // demand, as does removing). Only the very first favorite sizes the
+        // panel: it just appeared, so there is no height to disturb yet.
+        if (firstFavorite)
+        {
+            FitFavoritesPanel();
+        }
+        else
+        {
+            // One dispatcher hop so the ListBox has generated the new row
+            // before being asked to bring it on screen.
+            Dispatcher.BeginInvoke(() => FavoritesList.ScrollIntoView(entry),
+                System.Windows.Threading.DispatcherPriority.Loaded);
+        }
     }
 
     private void RemoveFavorite_Click(object sender, RoutedEventArgs e)
