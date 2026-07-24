@@ -230,6 +230,11 @@ public class AppSettings
     public List<string> ExpandedFolderPaths { get; set; } = new();
     public string? LastSelectedPath { get; set; }
 
+    // 책갈피 rows (MainWindow.ToggleBookmark) - list order is the Ctrl+Alt+L/J
+    // cycle order (insertion order). A bookmarked path that no longer exists
+    // is skipped when cycling, not an error.
+    public List<string> BookmarkPaths { get; set; } = new();
+
     // File-search feature (see Services/FileSearchService). The last folder
     // chosen via "폴더 찾기" is remembered so reopening search restores the same
     // scope. Null until the user picks one for the first time. A path that no

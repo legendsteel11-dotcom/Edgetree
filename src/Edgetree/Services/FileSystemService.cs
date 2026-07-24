@@ -98,6 +98,13 @@ public static class FileSystemService
     public static string NoSortOverrideTooltip
         => string.Format(Strings.SortTooltipFormat, Strings.SortModeFollowGlobal);
 
+    // Static mirror of AppSettings.BookmarkPaths, same pattern as
+    // SortOverrides/SortField: FileSystemItem instances are created lazily
+    // (and re-created by refreshes), so each constructor consults this set to
+    // decide its own IsBookmarked instead of anyone having to walk the tree
+    // re-applying flags. MainWindow keeps it in sync with the settings list.
+    public static readonly HashSet<string> BookmarkedPaths = new(StringComparer.OrdinalIgnoreCase);
+
     public static List<FileSystemItem> GetDriveRoots()
     {
         var roots = new List<FileSystemItem>();

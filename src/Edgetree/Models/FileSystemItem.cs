@@ -172,6 +172,19 @@ public class FileSystemItem : INotifyPropertyChanged
     // Explorer badges the network drive icon itself.
     public bool IsOnNetworkDrive { get; set; }
 
+    private bool _isBookmarked;
+
+    // The 책갈피 marker (see MainWindow's ToggleBookmark and the row
+    // template's bookmark glyph). Initialized from the static
+    // FileSystemService.BookmarkedPaths in the constructor so refreshes that
+    // rebuild items (and lazy loads that create them for the first time)
+    // come up already flagged; toggling flips both this and that set.
+    public bool IsBookmarked
+    {
+        get => _isBookmarked;
+        set => SetField(ref _isBookmarked, value);
+    }
+
     public FileSystemItem(string name, string fullPath, bool isDirectory, FileSystemItem? parent = null)
     {
         Name = name;
@@ -179,6 +192,7 @@ public class FileSystemItem : INotifyPropertyChanged
         IsDirectory = isDirectory;
         Parent = parent;
         IsOnNetworkDrive = parent?.IsOnNetworkDrive ?? false;
+        _isBookmarked = FileSystemService.BookmarkedPaths.Contains(fullPath);
         if (isDirectory)
         {
             // Always resolves to SOME icon - this folder's own override if it

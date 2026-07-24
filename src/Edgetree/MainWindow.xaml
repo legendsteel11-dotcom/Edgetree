@@ -750,6 +750,12 @@
             <Separator Visibility="Collapsed"/>
             <MenuItem Header="{x:Static services:Strings.MenuAddFavorite}"
                     Click="AddFavorite_Click"/>
+            <!-- Header swaps 북마크/북마크 해제 per the target row's current
+                 state (ExplorerItemContextMenu_Opened) - a toggle, like the
+                 Ctrl+Alt+K shortcut it mirrors. -->
+            <MenuItem Header="{x:Static services:Strings.MenuBookmark}"
+                    InputGestureText="Ctrl+Alt+K"
+                    Click="BookmarkMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
                     Click="NewFolder_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuRefresh}"
@@ -1882,6 +1888,34 @@
                             VerticalAlignment="Center"
                             RenderOptions.BitmapScalingMode="HighQuality"/>
                 </Border>
+                <!-- 책갈피 marker (IsBookmarked, toggled via Ctrl+Alt+K or the
+                     right-click menu; Ctrl+Alt+L/J cycles through them).
+                     Drawn as an OVERLAY at the row's right edge (column span
+                     + right alignment) rather than occupying a column of its
+                     own, so appearing never displaces the sort icon - it sits
+                     inside the 12px strip that icon already leaves clear for
+                     the scrollbar. Not a click target (IsHitTestVisible off,
+                     so it can't even steal a row click), which is why living
+                     under the scrollbar's hover zone costs nothing. Height
+                     follows the font zoom (BookmarkMarkerHeight, grow-only
+                     like the sort icon's). The glyph is Material Symbols
+                     "bookmark" (user-provided SVG v2, flat-top ribbon) kept
+                     in its native 960 grid, Stretch doing the fitting - same
+                     convention as the header's keep-pin. Fixed mid-blue by
+                     design: legible on both themes without adding a 16th
+                     palette entry. -->
+                <Path x:Name="BookmarkMarker"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="3"
+                        Data="F1 M240-144v-672h480v672l-240-96-240 96Z"
+                        Fill="#FF4A90E2"
+                        Stretch="Uniform"
+                        Height="{DynamicResource BookmarkMarkerHeight}"
+                        Margin="0,0,1,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        IsHitTestVisible="False"
+                        Visibility="Collapsed"/>
             </Grid>
             <HierarchicalDataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsEditing}"
@@ -1946,6 +1980,12 @@
                     <Setter TargetName="RowIcon"
                             Property="Visibility"
                             Value="{DynamicResource FolderIconVisibility}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsBookmarked}"
+                        Value="True">
+                    <Setter TargetName="BookmarkMarker"
+                            Property="Visibility"
+                            Value="Visible"/>
                 </DataTrigger>
                 <!-- The network dot rides the folder icon: folder rows on a
                      network drive only, and only while the icon itself is

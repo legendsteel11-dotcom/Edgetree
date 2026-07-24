@@ -238,6 +238,12 @@ public partial class MainWindow : Window
         ShellIconService.UseShellIcons = _settings.UseShellIcons;
         Resources["FavoriteFolderIconSource"] = ShellIconService.GetFavoritesFolderIcon();
 
+        FileSystemService.BookmarkedPaths.Clear();
+        foreach (var path in _settings.BookmarkPaths)
+        {
+            FileSystemService.BookmarkedPaths.Add(path);
+        }
+
         FileSystemService.SortOverrides.Clear();
         foreach (var entry in _settings.FolderSortOverrides)
         {
@@ -3485,6 +3491,10 @@ public partial class MainWindow : Window
         Resources["SortOverrideIconWidth"] = Math.Round(9.0 * growOnlyScale);
         Resources["SortOverrideIconHeight"] = Math.Round(13.0 * growOnlyScale);
 
+        // The bookmark marker follows the font zoom the same grow-only way
+        // the sort icon does (9px at the default 12pt - 11 read a touch loud).
+        Resources["BookmarkMarkerHeight"] = Math.Round(9.0 * growOnlyScale);
+
         // Row vertical padding: the font-size-scaled base (was
         // Converters/FontSizeToRowPaddingConverter's whole job, now folded in
         // here since it needed this second, independent input too) plus the
@@ -4947,7 +4957,7 @@ public partial class MainWindow : Window
         // auto-generated code-behind field the way named elements in the main
         // visual tree do, so these have to be found by position on the
         // ContextMenu itself instead.
-        if (sender is ContextMenu { Items: [MenuItem thumbnailItem, Separator thumbnailSeparator, MenuItem multiInfoItem, Separator multiInfoSeparator, MenuItem addFavoriteItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem searchInFolderItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, MenuItem renameItem, _, _, MenuItem copyPathItem, _, MenuItem openWithCodeItem, ..] })
+        if (sender is ContextMenu { Items: [MenuItem thumbnailItem, Separator thumbnailSeparator, MenuItem multiInfoItem, Separator multiInfoSeparator, MenuItem addFavoriteItem, MenuItem bookmarkItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem searchInFolderItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, MenuItem renameItem, _, _, MenuItem copyPathItem, _, MenuItem openWithCodeItem, ..] })
         {
             // The thumbnail row is NOT configured here - see
             // TreeViewItem_PreviewMouseRightButtonDown, which runs before the
@@ -4984,6 +4994,14 @@ public partial class MainWindow : Window
             // for the F2 path, which doesn't come through this menu.
             copyPathItem.IsEnabled = !isMultiSelection;
             renameItem.IsEnabled = !isMultiSelection;
+
+            // The bookmark toggle is single-target like rename/copy-path, and
+            // its label states the direction it would go for THIS row.
+            bookmarkItem.IsEnabled = !isMultiSelection &&
+                ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false };
+            bookmarkItem.Header = ExplorerTree.SelectedItem is FileSystemItem { IsBookmarked: true }
+                ? Strings.MenuBookmarkRemove
+                : Strings.MenuBookmark;
 
             bool isFolder = ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true };
             addFavoriteItem.IsEnabled = isFolder;
@@ -5434,6 +5452,112 @@ public partial class MainWindow : Window
     //    NavigateToPath reselect was its own bug saga - see git history).
     private void RefreshFolderPreservingState(FileSystemItem item)
         => item.MergeChildrenFromDisk();
+
+    // ----- 북마크 (책갈피) --------------------------------------------------
+    //
+    // A lightweight "mark this row" - deliberately NOT navigation the way
+    // favorites are: the marker (BookmarkMarker in the row template) makes a
+    // row recognizable mid-scroll, persists until toggled off, and survives
+    // restarts (AppSettings.BookmarkPaths, mirrored into the static
+    // FileSystemService.BookmarkedPaths that item constructors consult, so
+    // refresh-rebuilt rows come back already flagged). Ctrl+Alt+K toggles,
+    // Ctrl+Alt+L/J cycle-jump - the VS Code Bookmarks extension's bindings,
+    // chosen because that muscle memory is widespread.
+
+    // Where the Ctrl+Alt+L/J cycle currently stands in BookmarkPaths.
+    private int _bookmarkCycleIndex = -1;
+
+    private void BookmarkMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false } item)
+        {
+            ToggleBookmark(item);
+        }
+    }
+
+    private void ToggleBookmark(FileSystemItem item)
+    {
+        if (FileSystemService.BookmarkedPaths.Remove(item.FullPath))
+        {
+            item.IsBookmarked = false;
+            _settings.BookmarkPaths.RemoveAll(p =>
+                string.Equals(p, item.FullPath, StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            FileSystemService.BookmarkedPaths.Add(item.FullPath);
+            item.IsBookmarked = true;
+            _settings.BookmarkPaths.Add(item.FullPath);
+        }
+
+        // Saved immediately, same reasoning as the color settings: a bookmark
+        // is a deliberate act whose whole point is persisting.
+        _settingsService.Save(_settings);
+    }
+
+    // +1 = next (Ctrl+Alt+L), -1 = previous (Ctrl+Alt+J), cycling in the
+    // order bookmarks were added. An entry whose path doesn't answer right
+    // now is skipped but NOT removed - it may live on a network drive that's
+    // merely asleep (the same read-failure-isn't-emptiness rule as the tree's).
+    private void JumpToBookmark(int direction)
+    {
+        var paths = _settings.BookmarkPaths;
+        for (int attempts = 0; attempts < paths.Count; attempts++)
+        {
+            _bookmarkCycleIndex = ((_bookmarkCycleIndex + direction) % paths.Count + paths.Count) % paths.Count;
+            string path = paths[_bookmarkCycleIndex];
+
+            // Same route a search-result click takes for files (handles rows
+            // past a folder's "더 보기" cap); folders take the favorites-style
+            // walk with its usual pin-to-top.
+            if (File.Exists(path))
+            {
+                SetSearchViewActive(false);
+                NavigateToPath(path, pinParentToTop: true);
+                return;
+            }
+            if (Directory.Exists(path))
+            {
+                SetSearchViewActive(false);
+                NavigateToPath(path);
+                return;
+            }
+        }
+    }
+
+    // Ctrl+Alt+K/L/J work anywhere in the window. With Alt held WPF reports
+    // Key.System and hides the real key in SystemKey. Skipped while a TextBox
+    // has focus (inline rename, the search box) so typing never triggers a
+    // toggle or jump.
+    protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+
+        if (Keyboard.Modifiers != (ModifierKeys.Control | ModifierKeys.Alt) ||
+            Keyboard.FocusedElement is TextBox)
+        {
+            return;
+        }
+
+        switch (e.Key == Key.System ? e.SystemKey : e.Key)
+        {
+            case Key.K:
+                if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false } item)
+                {
+                    ToggleBookmark(item);
+                }
+                e.Handled = true;
+                break;
+            case Key.L:
+                JumpToBookmark(+1);
+                e.Handled = true;
+                break;
+            case Key.J:
+                JumpToBookmark(-1);
+                e.Handled = true;
+                break;
+        }
+    }
 
     private void OpenItem_Click(object sender, RoutedEventArgs e)
     {

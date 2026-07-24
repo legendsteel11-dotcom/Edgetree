@@ -10,6 +10,8 @@ public static class Strings
 {
     // Context menu (file/folder rows)
     public static string MenuAddFavorite = "즐겨찾기에 추가";
+    public static string MenuBookmark = "북마크";
+    public static string MenuBookmarkRemove = "북마크 해제";
     public static string MenuNewFolder = "새 폴더";
     public static string MenuRefresh = "새로고침";
     public static string MenuOpen = "열기";
@@ -266,6 +268,8 @@ public static class Strings
         }
 
         MenuAddFavorite = "Add to Favorites";
+        MenuBookmark = "Bookmark";
+        MenuBookmarkRemove = "Remove Bookmark";
         MenuNewFolder = "New Folder";
         MenuRefresh = "Refresh";
         MenuAutoCollapse = "Accordion Mode";
