@@ -2249,6 +2249,27 @@ public partial class MainWindow : Window
         return ExplorerTree.Template.FindName("PART_TreeScrollViewer", ExplorerTree) as ScrollViewer;
     }
 
+    // Ctrl+wheel: accelerated scrolling, about five times the ordinary wheel
+    // step (~240px per notch vs the default ~48). Deep trees mean a LOT of
+    // plain-wheel notches ("스크롤 피곤도", 2026-07-24), and Ctrl+wheel was
+    // unassigned - the font zoom lives on Ctrl +/- only. A constant factor
+    // rather than progressive velocity: predictable beats clever for a
+    // positioning gesture. The offset is in pixels here (the root panel
+    // scrolls with ScrollUnit=Pixel).
+    private void ExplorerTree_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            return;
+        }
+
+        if (FindTreeScrollViewer() is { } scrollViewer)
+        {
+            scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset - e.Delta * 2.0);
+            e.Handled = true;
+        }
+    }
+
     // The panel that hosts an ItemsControl's own item containers (IsItemsHost).
     // Used to force a specific child index to realize (BringIndexIntoViewPublic)
     // when its container is virtualized away. Descent stops at nested

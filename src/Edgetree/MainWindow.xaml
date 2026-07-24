@@ -2626,7 +2626,8 @@
                       TreeViewItem.Collapsed="ExplorerTree_ItemExpandedOrCollapsed"
                       SelectedItemChanged="ExplorerTree_SelectedItemChanged"
                       KeyDown="ExplorerTree_KeyDown"
-                      PreviewKeyDown="ExplorerTree_PreviewKeyDown"/>
+                      PreviewKeyDown="ExplorerTree_PreviewKeyDown"
+                      PreviewMouseWheel="ExplorerTree_PreviewMouseWheel"/>
 
             <!-- Same divider style FavoritesList already draws between itself
                  and the tree below, using the same dedicated "영역 구분선"
