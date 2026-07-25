@@ -192,11 +192,11 @@ public partial class MainWindow : Window
             {
                 PositionToWorkArea();
             }
-            if (Topmost)
-            {
-                Topmost = false;
-                Topmost = true;
-            }
+
+            // Was a Topmost false/true cycle, the only way to make WPF write
+            // the property through at all; ApplyTopmostState states it to the
+            // window manager outright and reports a mismatch if there was one.
+            ApplyTopmostState("resume");
         }));
     }
 
@@ -204,6 +204,11 @@ public partial class MainWindow : Window
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         NativeMethods.MakeToolWindow(hwnd);
+
+        // NOTE: no z-order call here on purpose. Settings are not loaded yet at
+        // this point (MainWindow_Loaded does that), so anything decided here
+        // would be decided against defaults; MainWindow_Loaded settles it
+        // instead, after the style rewrite above and with the real state.
 
         // A second Edgetree launch (any build/version) broadcasts this
         // instead of opening its own window - see App.OnStartup - so this
@@ -294,7 +299,20 @@ public partial class MainWindow : Window
 
         InitializeSearch();
 
-        Topmost = _settings.AlwaysOnTop || _settings.IsAutoHidden;
+        // Settings only exist from this handler on (they are read a few lines
+        // up), which is why the window's z-order is settled HERE and not in
+        // MainWindow_SourceInitialized where the extended style is rewritten -
+        // that runs first, against defaults, and would decide "not on top" for
+        // an app whose saved state says otherwise.
+        ApplyTopmostState("startup");
+
+        // ...and once more after the window has actually been shown: measured
+        // 2026-07-25, the correction above reports success and the window is
+        // still not topmost seconds later, so something in WPF's own show path
+        // undoes it. Cheap, and it lands before the user can reach the sliver.
+        Dispatcher.BeginInvoke(new Action(() => ApplyTopmostState("startup-shown")),
+            System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
         if (Application.Current is App app)
         {
             app.IsTrayIconVisible = _settings.AlwaysShowTrayIcon;
@@ -876,10 +894,83 @@ public partial class MainWindow : Window
     private void EnterAutoHide()
     {
         _settings.IsAutoHidden = true;
-        Topmost = true;
         SetExpandedContentVisibility(Visibility.Collapsed);
         AnimateWidth(AutoHideSliverWidth);
         UpdatePinButtonVisibility();
+        ApplyTopmostState("enter");
+    }
+
+    // The single place that decides whether this window belongs on top, and
+    // the only one that can be trusted to make it so.
+    //
+    // Two things had to be separated here. WPF's Topmost is a preference the
+    // framework writes through only when the property's VALUE changes - so
+    // once its belief and the real window disagree, no assignment can ever fix
+    // it. And the real window's z-order is lost easily: every
+    // read-modify-write of the extended style (MakeToolWindow/MakeAppWindow at
+    // startup and at each dock change) can drop it. Measured 2026-07-25 on a
+    // fresh launch: extended style 0x00000080, TOOLWINDOW only, no TOPMOST,
+    // while the app believed Topmost was true - meaning "항상 위에 표시" was not
+    // actually in effect until the option happened to be toggled, and an
+    // auto-hide sliver could be covered by any window with no way back to it
+    // but a restart (reported by a user 2026-07-25).
+    //
+    // So: recompute what the state should be, keep WPF's own belief in step
+    // with it, then state it to the window manager directly either way.
+    private void ApplyTopmostState(string reason)
+    {
+        bool shouldBeTopmost = _settings.AlwaysOnTop || (_isDocked && _settings.IsAutoHidden);
+        Topmost = shouldBeTopmost;
+
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        bool osTopmost = NativeMethods.HasTopmostStyle(hwnd);
+        if (osTopmost == shouldBeTopmost)
+        {
+            return;
+        }
+
+        // The window disagrees with what it should be, and neither obvious
+        // remedy works on its own (both measured 2026-07-25):
+        //
+        // - Assigning Topmost again does nothing: WPF writes the property
+        //   through only when its VALUE changes, and it already holds the
+        //   value we want. So the flip below is deliberate, not superstition.
+        // - A raw SetWindowPos(HWND_TOPMOST) on our own handle returns success
+        //   and changes nothing, from inside the app or out. With
+        //   ShowInTaskbar=false this window is OWNED by a hidden helper window
+        //   WPF creates, and an owned window's z-order follows its owner -
+        //   which only WPF's own setter knows to update as well.
+        Topmost = !shouldBeTopmost;
+        Topmost = shouldBeTopmost;
+
+        // Re-raise within the topmost band afterwards. Harmless when the flip
+        // already did the job, and it covers a window that holds the flag but
+        // sits below another topmost window.
+        NativeMethods.SetTopmost(hwnd, shouldBeTopmost);
+
+        LogTopmostMismatch(reason, hwnd, shouldBeTopmost, osTopmost, NativeMethods.HasTopmostStyle(hwnd));
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogTopmostMismatch(string reason, IntPtr hwnd, bool expected, bool before, bool after)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "autohide.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {reason}: hwnd=0x{hwnd.ToInt64():X} expected={expected} was={before} nowIs={after}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     // Reached only via the pin button while temporarily peeked open (see
@@ -893,7 +984,7 @@ public partial class MainWindow : Window
         StopAutoHideOutsideClickWatch();
         _settings.IsAutoHidden = false;
         _isAutoHideRevealed = false;
-        Topmost = _settings.AlwaysOnTop;
+        ApplyTopmostState("exit");
         UpdatePinButtonVisibility();
 
         // MainWindow_MouseEnter (the reveal that got us here) never itself
@@ -920,6 +1011,11 @@ public partial class MainWindow : Window
             SetExpandedContentVisibility(Visibility.Visible);
         });
         UpdatePinButtonVisibility();
+
+        // Growing the window doesn't change its z-order, so a sliver that had
+        // ended up behind another window peeks open behind it too - reported
+        // 2026-07-25 with a code editor moved over the docked edge.
+        ApplyTopmostState("reveal");
 
         if (!_settings.AutoHideCloseOnMouseLeave)
         {
@@ -1003,6 +1099,7 @@ public partial class MainWindow : Window
         SetExpandedContentVisibility(Visibility.Collapsed);
         AnimateWidth(AutoHideSliverWidth);
         UpdatePinButtonVisibility();
+        ApplyTopmostState("rehide");
     }
 
     // Alternative to the default AutoHideRehideTimer/MouseLeave close: instead
@@ -1629,6 +1726,11 @@ public partial class MainWindow : Window
 
         var hwnd = new WindowInteropHelper(this).Handle;
         NativeMethods.MakeAppWindow(hwnd);
+
+        // Re-stated after the extended-style rewrite - see
+        // MainWindow_SourceInitialized. Floating drops the auto-hide half of
+        // the rule, so this settles back to the plain preference.
+        ApplyTopmostState("undock");
         NativeMethods.SetWindowCornerPreference(hwnd, rounded: true);
         ShowInTaskbar = true;
 
@@ -1721,6 +1823,7 @@ public partial class MainWindow : Window
         NativeMethods.MakeToolWindow(hwnd);
         NativeMethods.SetWindowCornerPreference(hwnd, rounded: false);
         ShowInTaskbar = false;
+        ApplyTopmostState("dock");
 
         Width = ClampExpandedWidth(_settings.ExpandedWidth);
         PositionToWorkArea();
@@ -3327,7 +3430,12 @@ public partial class MainWindow : Window
         if (sender is MenuItem menuItem)
         {
             _settings.AlwaysOnTop = menuItem.IsChecked;
-            Topmost = menuItem.IsChecked;
+
+            // Auto-hide REQUIRES topmost whatever this preference says - the
+            // sliver is the only way back in, and one behind another window
+            // can never be reached by the mouse again. ApplyTopmostState owns
+            // that rule (and the writing-through problem) for every caller.
+            ApplyTopmostState("always-on-top toggle");
         }
     }
 

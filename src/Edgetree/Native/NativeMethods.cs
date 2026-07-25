@@ -8,6 +8,13 @@ internal static class NativeMethods
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_TOOLWINDOW = 0x00000080;
     private const int WS_EX_APPWINDOW = 0x00040000;
+    private const int WS_EX_TOPMOST = 0x00000008;
+
+    private static readonly IntPtr HwndTopmost = new(-1);
+    private static readonly IntPtr HwndNoTopmost = new(-2);
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOACTIVATE = 0x0010;
 
     private const int ASFW_ANY = -1;
 
@@ -34,6 +41,31 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     private static extern bool AllowSetForegroundWindow(int dwProcessId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+
+    // The window manager's own answer, not WPF's belief about it.
+    public static bool HasTopmostStyle(IntPtr hWnd)
+        => (GetWindowLong(hWnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
+
+    // WPF's Topmost property writes through to the window only when its value
+    // CHANGES, so a window that lost its topmost z-order behind the
+    // framework's back can never be restored by assigning Topmost = true again
+    // - the property already reads true. This goes straight to the window
+    // manager, and re-raises the window within the topmost band as well, which
+    // reading the style bit alone can't tell you is needed.
+    //
+    // Measured 2026-07-25: freshly launched, the window's real extended style
+    // was 0x00000080 - TOOLWINDOW only, no TOPMOST - while the app believed
+    // Topmost was true. Every read-modify-write of GWL_EXSTYLE here
+    // (MakeToolWindow/MakeAppWindow, called at startup and at every dock
+    // change) is a chance to land in that state, which is why the callers
+    // re-state the intended z-order afterwards rather than trusting it to
+    // survive.
+    public static bool SetTopmost(IntPtr hWnd, bool topmost)
+        => SetWindowPos(hWnd, topmost ? HwndTopmost : HwndNoTopmost, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint RegisterWindowMessage(string lpString);
