@@ -1,4 +1,4 @@
-# Edgetree v1.2.2
+# Edgetree v1.3.0
 
 [한국어 안내](README-ko.md)
 
@@ -58,15 +58,18 @@ Either way, it's one `.exe` — no installer, just run it.
   already-selected file again after a pause works too, like Explorer.
 - **Sorting** by name or date, ascending or descending — globally, or per
   folder from its right-click menu.
+- **Bookmarks** (`Ctrl+Alt+K`): mark rows you keep coming back to and cycle
+  through them with `Ctrl+Alt+L` / `Ctrl+Alt+J`.
 - **Live updates**: changes made outside the app (new, renamed, or deleted
   files) show up in the tree on their own.
 
 ### Files and the right-click menu
 
 - **A full right-click menu**: new folder, open, open with, copy/paste,
-  rename, delete to the Recycle Bin, copy path, open in terminal, reveal in
-  Explorer, properties — with the usual shortcuts (`F2`, `F5`, `Delete`,
-  `Ctrl+C`/`Ctrl+V`, `Enter`).
+  compress, rename, delete to the Recycle Bin, copy path, open in terminal,
+  reveal in Explorer, properties — with the usual shortcuts (`F2`, `F5`,
+  `F7`, `Delete`, `Ctrl+C`/`Ctrl+V`, `Enter`).
+- **Compress to zip** from the same menu, and unpack a `.zip` with Extract.
 - **Image preview.** Right-click an image and a thumbnail appears at the top
   of the menu, with its format, pixel size, file size, and modified date.
   Click the thumbnail to open the file.
@@ -143,6 +146,24 @@ Either way, the resulting `.exe` is in
 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
 
 ## Changelog
+
+### v1.3.0 (2026-07-25)
+
+- **Bookmarks**: mark a file or folder (`Ctrl+Alt+K`) and cycle through your
+  marks (`Ctrl+Alt+L` / `Ctrl+Alt+J`) — marks survive restarts
+- **Compress and extract**: zip the selection from the right-click menu
+  (several items become one archive), and unpack a `.zip` into a folder of
+  the same name
+- **New folder shortcut**: `F7`
+- **Faster scrolling**: hold `Ctrl` while scrolling the tree
+- **Network drive badge**: folders on a network drive carry a small mark on
+  their icon
+- **Expanded folders stay open**: pasting, deleting, renaming, or dropping
+  files in keeps the folders you had open and the place you were looking at
+- **Dropping onto a file row** puts the files in that file's folder, the
+  same as paste
+- Right-click menu spacing tuned for low-resolution screens; adding a
+  favorite no longer resizes the favorites panel
 
 ### v1.2.2 (2026-07-23)
 
