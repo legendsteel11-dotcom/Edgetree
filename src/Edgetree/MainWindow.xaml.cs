@@ -4711,7 +4711,9 @@ public partial class MainWindow : Window
             MessageBox.Show(this, error, Strings.ImportFailedTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-        item.RefreshChildren();
+        // Merge: a drop adds rows to the target folder, which may well have
+        // expanded folders of its own on screen.
+        RefreshFolderPreservingState(item);
     }
 
     // "Own place" = the item's current folder (it already lives in the drop
@@ -5651,7 +5653,14 @@ public partial class MainWindow : Window
             MessageBox.Show(this, error, Strings.PasteFailedTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-        (item.IsDirectory ? item : item.Parent)?.RefreshChildren();
+        // Diff-merge rather than rebuild: pasting adds rows to a folder the
+        // user is looking at, and a clear-and-refill collapses every expanded
+        // subtree beside them (and drops the scroll position with it). Same
+        // reasoning as the watcher paths - see RefreshFolderPreservingState.
+        if ((item.IsDirectory ? item : item.Parent) is { } pasteTarget)
+        {
+            RefreshFolderPreservingState(pasteTarget);
+        }
     }
 
     // Right-click on empty tree space (see ExplorerEmptySpaceContextMenu) has
@@ -5678,13 +5687,25 @@ public partial class MainWindow : Window
             return;
         }
 
-        target.RefreshChildren();
+        // Merge when the folder is already loaded (so its expanded children
+        // survive the new row appearing); only a folder that has never been
+        // read needs the full load, which is what RefreshChildren does for a
+        // never-loaded item - MergeChildrenFromDisk deliberately no-ops there.
+        if (target.ChildrenLoaded)
+        {
+            RefreshFolderPreservingState(target);
+        }
+        else
+        {
+            target.RefreshChildren();
+        }
         target.IsExpanded = true;
 
-        // RefreshChildren rebuilds Children with fresh instances, so the new
-        // folder has to be looked up by name rather than reusing any prior
-        // reference - then dropped straight into inline rename, matching
-        // Explorer/VS Code's "type the name right away" new-folder flow.
+        // The new folder is looked up by name rather than through any prior
+        // reference (a rebuild would have replaced every instance, and a merge
+        // creates a fresh instance for a row that wasn't there before) - then
+        // dropped straight into inline rename, matching Explorer/VS Code's
+        // "type the name right away" new-folder flow.
         string createdName = Path.GetFileName(createdPath!);
         var newItem = target.Children.FirstOrDefault(c =>
             !c.IsPlaceholder && string.Equals(c.Name, createdName, StringComparison.OrdinalIgnoreCase));
@@ -5905,7 +5926,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        item.Parent?.RefreshChildren();
+        // Merge, not rebuild - a rename changes one row's name, and the rest
+        // of the folder (including anything expanded under it) has no business
+        // being torn down for it.
+        if (item.Parent is { } renameParent)
+        {
+            RefreshFolderPreservingState(renameParent);
+        }
     }
 
     private void DeleteItem_Click(object sender, RoutedEventArgs e)
@@ -5961,7 +5988,9 @@ public partial class MainWindow : Window
         ClearMultiSelection();
         foreach (var parent in parentsToRefresh)
         {
-            parent.RefreshChildren();
+            // Merge drops exactly the deleted rows and leaves every surviving
+            // sibling - and whatever was expanded under them - untouched.
+            RefreshFolderPreservingState(parent);
         }
 
         if (failures.Count > 0)
