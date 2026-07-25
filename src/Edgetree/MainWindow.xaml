@@ -805,6 +805,17 @@
             <MenuItem Header="{x:Static services:Strings.MenuPaste}"
                     InputGestureText="Ctrl+V"
                     Click="PasteItem_Click"/>
+            <!-- 압축 sits with paste rather than in a group of its own: it
+                 makes a new file out of the selection, same as paste does, and
+                 an extra separator costs every right-click height the menu was
+                 deliberately squeezed to save. 압축 풀기 is Collapsed unless the
+                 row IS a .zip (ExplorerItemContextMenu_Opened) for the same
+                 reason - a permanently-dead row would tax every other menu. -->
+            <MenuItem Header="{x:Static services:Strings.MenuCompress}"
+                    Click="CompressItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuExtract}"
+                    Visibility="Collapsed"
+                    Click="ExtractItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuRename}"
                     InputGestureText="F2"
                     Click="RenameItem_Click"/>

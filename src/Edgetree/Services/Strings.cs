@@ -18,6 +18,8 @@ public static class Strings
     public static string MenuOpenWith = "연결 프로그램";
     public static string MenuCopy = "복사";
     public static string MenuPaste = "붙여넣기";
+    public static string MenuCompress = "압축";
+    public static string MenuExtract = "압축 풀기";
     public static string MenuRename = "이름 바꾸기";
     public static string MenuDelete = "삭제";
     public static string MenuCopyPath = "경로 복사";
@@ -234,6 +236,9 @@ public static class Strings
     public static string DeleteConfirmBody = "'{0}'을(를) 휴지통으로 보낼까요?";
     public static string DeleteConfirmBodyMultiple = "선택한 {0}개 항목을 휴지통으로 보낼까요?";
     public static string DeleteFailedTitle = "삭제 실패";
+    public static string CompressFailedTitle = "압축 실패";
+    public static string ExtractFailedTitle = "압축 풀기 실패";
+    public static string CompressSkippedBody = "{0}개 항목을 읽을 수 없어 건너뛰었습니다.";
     public static string StartWithWindowsFailedTitle = "윈도우 시작 시 실행";
     public static string StartWithWindowsFailedBody = "시작 프로그램 등록에 실패했습니다. 관리자 정책으로 제한되어 있을 수 있습니다.";
     public static string LanguageChangeTitle = "언어 변경";
@@ -280,6 +285,8 @@ public static class Strings
         MenuOpenWith = "Open With";
         MenuCopy = "Copy";
         MenuPaste = "Paste";
+        MenuCompress = "Compress";
+        MenuExtract = "Extract";
         MenuRename = "Rename";
         MenuDelete = "Delete";
         MenuCopyPath = "Copy Path";
@@ -416,6 +423,9 @@ public static class Strings
         DeleteConfirmBody = "Send '{0}' to the Recycle Bin?";
         DeleteConfirmBodyMultiple = "Send {0} selected items to the Recycle Bin?";
         DeleteFailedTitle = "Delete Failed";
+        CompressFailedTitle = "Compress Failed";
+        ExtractFailedTitle = "Extract Failed";
+        CompressSkippedBody = "{0} items could not be read and were skipped.";
         StartWithWindowsFailedTitle = "Start with Windows";
         StartWithWindowsFailedBody = "Failed to register as a startup program. It may be restricted by administrator policy.";
         LanguageChangeTitle = "Language Changed";

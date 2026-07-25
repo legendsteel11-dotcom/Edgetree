@@ -4991,7 +4991,7 @@ public partial class MainWindow : Window
         // auto-generated code-behind field the way named elements in the main
         // visual tree do, so these have to be found by position on the
         // ContextMenu itself instead.
-        if (sender is ContextMenu { Items: [MenuItem thumbnailItem, Separator thumbnailSeparator, MenuItem multiInfoItem, Separator multiInfoSeparator, MenuItem addFavoriteItem, MenuItem bookmarkItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem searchInFolderItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, MenuItem renameItem, _, _, MenuItem copyPathItem, _, MenuItem openWithCodeItem, ..] })
+        if (sender is ContextMenu { Items: [MenuItem thumbnailItem, Separator thumbnailSeparator, MenuItem multiInfoItem, Separator multiInfoSeparator, MenuItem addFavoriteItem, MenuItem bookmarkItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem searchInFolderItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, MenuItem compressItem, MenuItem extractItem, MenuItem renameItem, _, _, MenuItem copyPathItem, _, MenuItem openWithCodeItem, ..] })
         {
             // The thumbnail row is NOT configured here - see
             // TreeViewItem_PreviewMouseRightButtonDown, which runs before the
@@ -5036,6 +5036,21 @@ public partial class MainWindow : Window
             bookmarkItem.Header = ExplorerTree.SelectedItem is FileSystemItem { IsBookmarked: true }
                 ? Strings.MenuBookmarkRemove
                 : Strings.MenuBookmark;
+
+            // The zip lands next to the right-clicked row, so a drive root -
+            // the one kind of row with no parent folder - has nowhere to put
+            // it and is the only case this greys out.
+            compressItem.IsEnabled =
+                ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false, Parent: not null };
+
+            // Shown only on an actual .zip row, and never on a multi-selection
+            // (unpacking several archives at once isn't offered).
+            extractItem.Visibility =
+                _multiSelection.Count <= 1 &&
+                ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: false, Parent: not null } zipRow &&
+                ArchiveService.IsZipPath(zipRow.FullPath)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
 
             bool isFolder = ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true };
             addFavoriteItem.IsEnabled = isFolder;
@@ -6024,6 +6039,74 @@ public partial class MainWindow : Window
             _settings.Favorites.Remove(entry);
         }
         UpdateFavoritesPanelVisibility();
+    }
+
+    // Packs the current selection into one zip beside the right-clicked row,
+    // named after that row with its extension dropped ("photo.jpg" ->
+    // "photo.zip") - the naming Explorer already taught the user. The work
+    // runs off the UI thread because a large folder takes long enough to
+    // freeze the window, and nothing appears in the tree until it finishes
+    // (see ArchiveService's hidden-temp-then-rename note).
+    private async void CompressItem_Click(object sender, RoutedEventArgs e)
+    {
+        var items = GetEffectiveSelection();
+        if (items.Count == 0 ||
+            ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsShowMore: false } anchor ||
+            anchor.Parent is not { } destination)
+        {
+            return;
+        }
+
+        // Captured before the await: the selection can move, and the folder's
+        // rows get rebuilt underneath us while the archive is being written.
+        var sourcePaths = items.Select(i => i.FullPath).ToList();
+        string destinationFolder = destination.FullPath;
+        string baseName = anchor.IsDirectory ? anchor.Name : Path.GetFileNameWithoutExtension(anchor.Name);
+
+        var result = await Task.Run(() => ArchiveService.CreateZip(sourcePaths, destinationFolder, baseName));
+
+        // Diff-merge, NOT RefreshChildren: the new zip is one added row in a
+        // folder the user is looking at, and a clear-and-refill would take
+        // every expanded subtree beside it down with it (see
+        // RefreshFolderPreservingState's three-designs note).
+        RefreshFolderPreservingState(destination);
+
+        if (!result.Success)
+        {
+            MessageBox.Show(this, result.Error, Strings.CompressFailedTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        // A locked or unreadable file doesn't throw the archive away, but the
+        // user still has to be told it isn't in there.
+        if (result.SkippedCount > 0)
+        {
+            MessageBox.Show(this, string.Format(Strings.CompressSkippedBody, result.SkippedCount),
+                Strings.CompressFailedTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    // Unpacks the right-clicked .zip into a folder of the same name beside it.
+    // Only reachable from a .zip row (the menu item is Collapsed otherwise).
+    private async void ExtractItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsDirectory: false } item ||
+            item.Parent is not { } destination ||
+            !ArchiveService.IsZipPath(item.FullPath))
+        {
+            return;
+        }
+
+        string zipPath = item.FullPath;
+        var result = await Task.Run(() => ArchiveService.ExtractZip(zipPath));
+
+        // Same reason as 압축: merge, don't rebuild.
+        RefreshFolderPreservingState(destination);
+
+        if (!result.Success)
+        {
+            MessageBox.Show(this, result.Error, Strings.ExtractFailedTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void CopyPath_Click(object sender, RoutedEventArgs e)

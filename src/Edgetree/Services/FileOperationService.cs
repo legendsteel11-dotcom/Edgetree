@@ -126,8 +126,10 @@ public static class FileOperationService
     }
 
     // Pasting into a folder that already has an item with the same name
-    // appends " (2)", " (3)", ... instead of overwriting.
-    private static string GetUniqueDestination(string path)
+    // appends " (2)", " (3)", ... instead of overwriting. Shared with
+    // ArchiveService so a second 압축 of the same row numbers up the same way
+    // the rest of the app does.
+    internal static string GetUniqueDestination(string path)
     {
         if (!File.Exists(path) && !Directory.Exists(path))
         {
