@@ -4662,6 +4662,18 @@ public partial class MainWindow : Window
         }
     }
 
+    // Which folder a drop on this row lands in: the row itself when it's a
+    // folder, otherwise the folder the file sits in. The file fallback is the
+    // same one 붙여넣기 has always used - a drop and a paste are the same "put
+    // these here" gesture, and only one of them used to accept a file row.
+    private static FileSystemItem? ResolveDropTargetFolder(FileSystemItem row)
+        => row switch
+        {
+            { IsPlaceholder: true } or { IsShowMore: true } => null,
+            { IsDirectory: true } => row,
+            _ => row.Parent
+        };
+
     // DragEnter/DragOver/Drop all bubble, and every TreeViewItem has its own
     // handler for them (see ExplorerTreeViewItemStyle) - e.Handled = true
     // here stops that same bubble from also reaching (and re-selecting) every
@@ -4670,8 +4682,9 @@ public partial class MainWindow : Window
     {
         e.Handled = true;
 
-        if (sender is not TreeViewItem { DataContext: FileSystemItem { IsPlaceholder: false, IsDirectory: true } } treeViewItem ||
-            !e.Data.GetDataPresent(DataFormats.FileDrop))
+        if (sender is not TreeViewItem { DataContext: FileSystemItem row } treeViewItem ||
+            !e.Data.GetDataPresent(DataFormats.FileDrop) ||
+            ResolveDropTargetFolder(row) is null)
         {
             e.Effects = DragDropEffects.None;
             return;
@@ -4681,16 +4694,26 @@ public partial class MainWindow : Window
 
         // Reuses the tree's existing selection highlight as drop-target
         // feedback instead of a separate visual, so there's no ambiguity
-        // about which folder a drop would land in.
-        treeViewItem.IsSelected = true;
+        // about which folder a drop would land in. Over a FILE row that means
+        // highlighting the row ABOVE the cursor - its parent folder, the one
+        // actually receiving the files - rather than the file being hovered,
+        // which would read as "something happens to this file".
+        var highlight = row.IsDirectory
+            ? treeViewItem
+            : ItemsControl.ItemsControlFromItemContainer(treeViewItem) as TreeViewItem;
+        if (highlight is not null)
+        {
+            highlight.IsSelected = true;
+        }
     }
 
     private void TreeViewItem_Drop(object sender, DragEventArgs e)
     {
         e.Handled = true;
 
-        if (sender is not TreeViewItem { DataContext: FileSystemItem { IsPlaceholder: false, IsDirectory: true } item } ||
-            e.Data.GetData(DataFormats.FileDrop) is not string[] droppedPaths)
+        if (sender is not TreeViewItem { DataContext: FileSystemItem row } ||
+            e.Data.GetData(DataFormats.FileDrop) is not string[] droppedPaths ||
+            ResolveDropTargetFolder(row) is not { } item)
         {
             return;
         }
