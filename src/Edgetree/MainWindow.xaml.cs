@@ -2635,10 +2635,41 @@ public partial class MainWindow : Window
         {
             _settings.MaxItemsPerFolder = value;
             FileSystemItem.DisplayCap = value;
-            RefreshAllLoadedFolders();
+            QueueMaxItemsRefresh();
         }
 
         UpdateStepperRow(sender, value, 1, 50);
+    }
+
+    // RefreshAllLoadedFolders is the heaviest operation in the app - it drops
+    // every item instance, re-reads every expanded folder from disk, replays
+    // the expansion path by path and then re-reveals the selection. Running it
+    // per CLICK meant walking 20 -> 50 paid for it thirty times over, which is
+    // simply unusable once a few folders are open (reported 2026-07-25).
+    // The cap itself (FileSystemItem.DisplayCap) is applied on the spot, so
+    // anything loaded from here on already honours the new value; only the
+    // re-cap of already-loaded folders waits for the stepper to settle.
+    private System.Windows.Threading.DispatcherTimer? _maxItemsRefreshTimer;
+
+    private void QueueMaxItemsRefresh()
+    {
+        _maxItemsRefreshTimer ??= new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(350)
+        };
+        _maxItemsRefreshTimer.Tick -= MaxItemsRefreshTimer_Tick;
+        _maxItemsRefreshTimer.Tick += MaxItemsRefreshTimer_Tick;
+
+        // Restarted, not merely started: each further click pushes the single
+        // refresh back until the clicking stops.
+        _maxItemsRefreshTimer.Stop();
+        _maxItemsRefreshTimer.Start();
+    }
+
+    private void MaxItemsRefreshTimer_Tick(object? sender, EventArgs e)
+    {
+        _maxItemsRefreshTimer!.Stop();
+        RefreshAllLoadedFolders();
     }
 
     private void TabSpacingDecrement_Click(object sender, RoutedEventArgs e)
