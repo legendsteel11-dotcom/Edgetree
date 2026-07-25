@@ -2006,9 +2006,22 @@ public partial class MainWindow : Window
             // otherwise match on path alone and skip NavigateToPath - the one
             // call that actually expands it - leaving it selected but stuck
             // collapsed until some other selection change knocked it loose.
+            //
+            // "Nothing left to do" is about the WALK, not the scroll: the row
+            // being selected and expanded says nothing about where it is on
+            // screen. Wheel-scrolling away from a favorite leaves exactly this
+            // state, so returning outright swallowed the click completely -
+            // the one thing it was for (put that folder back at the top) did
+            // nothing at all, however far the view had drifted. Re-pin instead,
+            // which is the cheap half of the walk and the half that was
+            // actually missing; if the row scrolled far enough for its
+            // container to be virtualized away, fall through and let the full
+            // walk realize it again.
             if (ExplorerTree.SelectedItem is FileSystemItem { IsExpanded: true } selected &&
-                string.Equals(selected.FullPath.TrimEnd('\\'), entry.Path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                string.Equals(selected.FullPath.TrimEnd('\\'), entry.Path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) &&
+                FindRealizedContainer(selected) is { } selectedContainer)
             {
+                PinRowToTop(selectedContainer);
                 return;
             }
 
@@ -2263,11 +2276,46 @@ public partial class MainWindow : Window
             {
                 return;
             }
-            if (FindTreeScrollViewer() is { } scrollViewer)
-            {
-                anchor.BringIntoView(new Rect(0, 0, anchor.ActualWidth, scrollViewer.ActualHeight));
-            }
+            PinRowToTop(anchor);
         }));
+    }
+
+    // Bringing a viewport-tall rectangle anchored at the row's own top into
+    // view is what pins that row to the top edge rather than merely somewhere
+    // on screen. Shared by the end of a reveal walk and by re-clicking a
+    // favorite that is already selected (which skips the walk entirely).
+    private void PinRowToTop(TreeViewItem anchor)
+    {
+        if (FindTreeScrollViewer() is { } scrollViewer)
+        {
+            anchor.BringIntoView(new Rect(0, 0, anchor.ActualWidth, scrollViewer.ActualHeight));
+        }
+    }
+
+    // The realized container for an item, walked down from the root one level
+    // at a time - null the moment any level along the way is virtualized away,
+    // which is the caller's cue that only a full reveal walk can get there.
+    // Deliberately does NOT try to force realization (that's RevealChainStep's
+    // job, retries and all - see the favorites-navigation history).
+    private TreeViewItem? FindRealizedContainer(FileSystemItem item)
+    {
+        var chain = new List<FileSystemItem>();
+        for (var current = item; current is not null; current = current.Parent)
+        {
+            chain.Insert(0, current);
+        }
+
+        ItemsControl container = ExplorerTree;
+        foreach (var step in chain)
+        {
+            if (container.ItemContainerGenerator.ContainerFromItem(step) is not TreeViewItem next)
+            {
+                return null;
+            }
+            container = next;
+        }
+
+        return container as TreeViewItem;
     }
 
     private ScrollViewer? FindTreeScrollViewer()
