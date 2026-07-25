@@ -1,4 +1,4 @@
-# Edgetree v1.3.0
+# Edgetree v1.3.1
 
 [한국어 안내](README-ko.md)
 
@@ -146,6 +146,16 @@ Either way, the resulting `.exe` is in
 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
 
 ## Changelog
+
+### v1.3.1 (2026-07-25)
+
+- **Always on top**: now in effect from the moment the app starts, and an
+  auto-hidden sidebar can no longer end up behind another window with its
+  sliver unresponsive
+- **Favorites**: clicking a favorite you are already on brings that folder
+  back to the top, however far the tree has been scrolled since
+- **Items per folder**: the stepper responds immediately as you click through
+  it
 
 ### v1.3.0 (2026-07-25)
 
