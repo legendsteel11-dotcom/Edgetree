@@ -649,6 +649,7 @@
                 Closed="AnyMenu_Closed"
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
             <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
+                    InputGestureText="F7"
                     Click="NewFolder_Click"/>
         </ContextMenu>
 
@@ -757,6 +758,7 @@
                     InputGestureText="Ctrl+Alt+K"
                     Click="BookmarkMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
+                    InputGestureText="F7"
                     Click="NewFolder_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuRefresh}"
                     InputGestureText="F5"

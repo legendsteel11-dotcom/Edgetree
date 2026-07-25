@@ -3949,6 +3949,13 @@ public partial class MainWindow : Window
                 PasteItem_Click(sender, e);
                 e.Handled = true;
                 break;
+            // F7 = new folder, the binding Total Commander (and the file
+            // managers that copied it) has used for decades. Explorer has no
+            // key for this at all, so there's nothing to conflict with.
+            case Key.F7:
+                NewFolder_Click(sender, e);
+                e.Handled = true;
+                break;
             case Key.F5:
                 // A folder selected: refresh just that one (existing,
                 // narrowly-scoped behavior). Nothing usable selected: treat F5
@@ -4133,6 +4140,7 @@ public partial class MainWindow : Window
             Key.F2 => () => RenameItem_Click(sender, e),
             Key.Delete => () => DeleteItem_Click(sender, e),
             Key.F5 => () => RefreshFolder_Click(sender, e),
+            Key.F7 => () => NewFolder_Click(sender, e),
             Key.Enter when !menuItemHighlighted => () => OpenItem_Click(sender, e),
             Key.C when Keyboard.Modifiers == ModifierKeys.Control => () => CopyItem_Click(sender, e),
             Key.C when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) => () => CopyPath_Click(sender, e),
