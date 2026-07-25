@@ -113,6 +113,8 @@ const dict = {
     },
     footer: {
       contact: '요청·버그 신고',
+      otherTool: '같은 개발자의 다른 도구',
+      otherToolName: 'TabStick',
       copyright: `© ${new Date().getFullYear()} Edgetree. MIT License.`,
     },
   },
@@ -220,6 +222,8 @@ const dict = {
     },
     footer: {
       contact: 'Requests & bug reports',
+      otherTool: 'Another tool by the same maker',
+      otherToolName: 'TabStick',
       copyright: `© ${new Date().getFullYear()} Edgetree. MIT License.`,
     },
   },

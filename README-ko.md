@@ -217,6 +217,10 @@ dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -p:Publi
 
 pjh85336@gmail.com 으로 보내주세요.
 
+## 같은 개발자의 다른 도구
+
+[TabStick](https://tabstick-app.vercel.app/) — 창에 붙는 인덱스 메모.
+
 ## 라이선스
 
 MIT — [LICENSE.md](LICENSE.md) 참고. 번들된 아이콘은 Material Icon Theme

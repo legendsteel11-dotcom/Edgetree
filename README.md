@@ -188,6 +188,11 @@ Earlier versions are covered on the
 
 Email pjh85336@gmail.com.
 
+## Another tool by the same maker
+
+[TabStick](https://tabstick-app.vercel.app/) — index notes that stick beside
+the window they belong to.
+
 ## License
 
 MIT — see [LICENSE.md](LICENSE.md). Bundled icons are from the Material Icon
