@@ -195,7 +195,7 @@
 
                 <TextBlock Text="{x:Static services:Strings.AboutGithubLabel}"
                         Style="{StaticResource AboutRowLabelStyle}"/>
-                <TextBlock Text="github.com/legendsteel11-dotcom/Edgetree"
+                <TextBlock Text="github.com/legendsteel11/Edgetree"
                         Foreground="{DynamicResource AccentForeground}"
                         FontSize="12"
                         Cursor="Hand"

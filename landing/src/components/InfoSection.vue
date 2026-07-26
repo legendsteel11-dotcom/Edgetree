@@ -16,7 +16,7 @@ import { t } from '../i18n'
         <p>{{ t.info.licenseBody }}</p>
         <a
           class="link"
-          href="https://github.com/legendsteel11-dotcom/Edgetree/blob/main/LICENSE.md"
+          href="https://github.com/legendsteel11/Edgetree/blob/main/LICENSE.md"
           target="_blank"
           rel="noopener"
         >{{ t.info.licenseLink }} →</a>

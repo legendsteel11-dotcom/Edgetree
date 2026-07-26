@@ -15,7 +15,7 @@ import { t, lang, toggleLang } from '../i18n'
         <a href="#features">{{ t.nav.features }}</a>
         <a href="#howto">{{ t.nav.howto }}</a>
         <a href="#download">{{ t.nav.download }}</a>
-        <a href="https://github.com/legendsteel11-dotcom/Edgetree" target="_blank" rel="noopener">{{ t.nav.github }}</a>
+        <a href="https://github.com/legendsteel11/Edgetree" target="_blank" rel="noopener">{{ t.nav.github }}</a>
       </nav>
 
       <button class="lang-toggle" type="button" @click="toggleLang" :aria-label="lang === 'ko' ? 'Switch to English' : '한국어로 전환'">

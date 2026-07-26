@@ -11,7 +11,7 @@ straight to a file without opening a full Explorer window.
 
 ## Download
 
-Grab the latest build from the [Releases page](https://github.com/legendsteel11-dotcom/Edgetree/releases/latest). Two options are attached to each release:
+Grab the latest build from the [Releases page](https://github.com/legendsteel11/Edgetree/releases/latest). Two options are attached to each release:
 
 - **`Edgetree-<version>-win-x64.exe`** (~1 MB) — pick this if you already have
   the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) installed.
@@ -229,7 +229,7 @@ Either way, the resulting `.exe` is in
 - **Icon style option**: the same icons Windows Explorer shows
 
 Earlier versions are covered on the
-[GitHub releases page](https://github.com/legendsteel11-dotcom/Edgetree/releases).
+[GitHub releases page](https://github.com/legendsteel11/Edgetree/releases).
 
 ## Requests & bug reports
 

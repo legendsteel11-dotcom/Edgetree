@@ -3,8 +3,8 @@ import { ref } from 'vue'
 // Shared by HeroSection and DownloadSection so both sets of download
 // buttons resolve to the same direct file links from a single API call
 // (not one fetch per component instance).
-export const RELEASE_URL = 'https://github.com/legendsteel11-dotcom/Edgetree/releases/latest'
-const RELEASE_API_URL = 'https://api.github.com/repos/legendsteel11-dotcom/Edgetree/releases/latest'
+export const RELEASE_URL = 'https://github.com/legendsteel11/Edgetree/releases/latest'
+const RELEASE_API_URL = 'https://api.github.com/repos/legendsteel11/Edgetree/releases/latest'
 
 // Both start pointed at the releases page and only swap to a direct
 // per-file link once the actual latest-release asset list loads - a safe

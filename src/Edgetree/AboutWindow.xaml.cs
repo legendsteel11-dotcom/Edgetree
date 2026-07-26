@@ -72,7 +72,7 @@ public partial class AboutWindow : Window
     {
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
-            FileName = "https://github.com/legendsteel11-dotcom/Edgetree",
+            FileName = "https://github.com/legendsteel11/Edgetree",
             UseShellExecute = true
         });
     }
@@ -81,7 +81,7 @@ public partial class AboutWindow : Window
     {
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
-            FileName = "https://github.com/legendsteel11-dotcom/Edgetree/releases/latest",
+            FileName = "https://github.com/legendsteel11/Edgetree/releases/latest",
             UseShellExecute = true
         });
     }

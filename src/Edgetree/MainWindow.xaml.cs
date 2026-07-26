@@ -373,7 +373,7 @@ public partial class MainWindow : Window
             http.DefaultRequestHeaders.UserAgent.ParseAdd("Edgetree");
 
             string json = await http.GetStringAsync(
-                "https://api.github.com/repos/legendsteel11-dotcom/Edgetree/releases/latest");
+                "https://api.github.com/repos/legendsteel11/Edgetree/releases/latest");
 
             using var doc = System.Text.Json.JsonDocument.Parse(json);
             if (doc.RootElement.TryGetProperty("tag_name", out var tagElement) is false ||

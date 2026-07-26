@@ -8,7 +8,7 @@
 
 ## 다운로드
 
-[릴리즈 페이지](https://github.com/legendsteel11-dotcom/Edgetree/releases/latest)에서 최신 버전을 받으세요. 매 릴리즈마다 파일 2개가 첨부되어 있습니다.
+[릴리즈 페이지](https://github.com/legendsteel11/Edgetree/releases/latest)에서 최신 버전을 받으세요. 매 릴리즈마다 파일 2개가 첨부되어 있습니다.
 
 - **`Edgetree-<버전>-win-x64.exe`** (약 1MB) — [.NET 8 데스크톱 런타임](https://dotnet.microsoft.com/download/dotnet/8.0)이 이미 설치되어 있다면 이걸로.
 - **`Edgetree-<버전>-win-x64-standalone.exe`** (약 160MB) — .NET을 따로 설치할 필요 없이 바로 실행되는 단일 파일. 잘 모르겠거나, 작은 exe가 런타임이 없다는 오류를 낸다면 이걸로.
@@ -255,7 +255,7 @@ dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -p:Publi
   복사·삭제하거나 앱 밖으로 드래그
 - **아이콘 방식 선택**: 윈도우 탐색기와 동일한 아이콘 옵션 추가
 
-이전 버전의 변경 내용은 [GitHub 릴리즈](https://github.com/legendsteel11-dotcom/Edgetree/releases)에서 확인할 수 있습니다.
+이전 버전의 변경 내용은 [GitHub 릴리즈](https://github.com/legendsteel11/Edgetree/releases)에서 확인할 수 있습니다.
 
 ## 요청·버그 신고
 

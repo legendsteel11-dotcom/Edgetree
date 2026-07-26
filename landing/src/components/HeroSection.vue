@@ -18,7 +18,7 @@ onMounted(ensureReleaseAssetsLoaded)
         <div class="cta">
           <a class="btn btn-primary" :href="standaloneDownloadUrl" target="_blank" rel="noopener">{{ t.hero.ctaDownloadStandalone }}</a>
           <a class="btn btn-secondary" :href="standardDownloadUrl" target="_blank" rel="noopener">{{ t.hero.ctaDownloadStandard }}</a>
-          <a class="btn btn-secondary" href="https://github.com/legendsteel11-dotcom/Edgetree" target="_blank" rel="noopener">{{ t.hero.ctaGithub }}</a>
+          <a class="btn btn-secondary" href="https://github.com/legendsteel11/Edgetree" target="_blank" rel="noopener">{{ t.hero.ctaGithub }}</a>
         </div>
       </div>
       <div class="shot">
