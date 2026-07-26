@@ -234,7 +234,7 @@ public partial class MainWindow : Window
         VersionFooterText.Text = $"Edgetree v{version}";
 
         _settings = _settingsService.Load();
-        FileSystemService.SortField = _settings.SortByDate ? FileSortField.Date : FileSortField.Name;
+        FileSystemService.SortField = ReadSortField(_settings.SortField, _settings.SortByDate);
         FileSystemService.SortDescending = _settings.SortDescending;
         FileSystemItem.DisplayCap = Math.Clamp(_settings.MaxItemsPerFolder, 1, 50);
 
@@ -253,7 +253,7 @@ public partial class MainWindow : Window
         foreach (var entry in _settings.FolderSortOverrides)
         {
             FileSystemService.SortOverrides[FileSystemService.NormalizeSortOverridePath(entry.Path)] =
-                new FolderSortOverride(entry.SortByDate ? FileSortField.Date : FileSortField.Name, entry.SortDescending);
+                new FolderSortOverride(ReadSortField(entry.SortField, entry.SortByDate), entry.SortDescending);
         }
 
         // Re-applies the Run key every launch rather than only the moment the
@@ -593,12 +593,11 @@ public partial class MainWindow : Window
         }
     }
 
-    // Every directory's SortOverrideIconUri (override or, absent one, the
-    // global-default preview - see FileSystemItem's constructor) is a plain
-    // cached string computed once, so a theme flip alone wouldn't otherwise
-    // touch an already-realized instance - this walks every already-loaded
-    // folder and recomputes it fresh, mirroring the same override-or-global
-    // resolution the constructor itself does.
+    // The sort icon itself no longer needs this walk - it is a path that takes
+    // the row's brush, so a theme flip recolours it with no per-item work.
+    // Its TOOLTIP is still a cached string built from the language strings and
+    // the folder's own state, so that part is recomputed here (and the glyph
+    // with it, which costs nothing and keeps the two in step).
     private static void RefreshSortOverrideIconForTheme(FileSystemItem item)
     {
         if (item.IsDirectory)
@@ -606,12 +605,12 @@ public partial class MainWindow : Window
             if (FileSystemService.SortOverrides.TryGetValue(
                 FileSystemService.NormalizeSortOverridePath(item.FullPath), out var over))
             {
-                item.SortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(over.Field, over.Descending);
+                item.SortOverrideIconGeometry = FileSystemService.SortOverrideGeometry(over.Descending);
                 item.SortOverrideTooltip = FileSystemService.FormatSortTooltip(over.Field, over.Descending);
             }
             else
             {
-                item.SortOverrideIconUri = FileSystemService.NoSortOverrideIconUri;
+                item.SortOverrideIconGeometry = FileSystemService.FollowsGlobalSortGeometry;
                 item.SortOverrideTooltip = FileSystemService.NoSortOverrideTooltip;
             }
         }
@@ -2918,10 +2917,10 @@ public partial class MainWindow : Window
             dockOnRight.IsChecked = _settings.DockOnRight;
             autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
 
-            if (sortMenu.Items is [MenuItem byName, MenuItem byDate, _, MenuItem ascending, MenuItem descending])
+            if (sortMenu.Items is [MenuItem byName, MenuItem byDate, MenuItem byType, MenuItem bySize, _, MenuItem ascending, MenuItem descending])
             {
-                byName.IsChecked = !_settings.SortByDate;
-                byDate.IsChecked = _settings.SortByDate;
+                CheckSortFieldItems(ReadSortField(_settings.SortField, _settings.SortByDate),
+                    byName, byDate, byType, bySize);
                 ascending.IsChecked = !_settings.SortDescending;
                 descending.IsChecked = _settings.SortDescending;
             }
@@ -3095,8 +3094,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        _settings.SortByDate = field == "date";
-        FileSystemService.SortField = _settings.SortByDate ? FileSortField.Date : FileSortField.Name;
+        var parsed = FileSystemService.ParseSortField(field);
+        _settings.SortField = FileSystemService.FormatSortFieldName(parsed);
+        // Kept in step for older builds reading this file - see AppSettings.
+        _settings.SortByDate = parsed == FileSortField.Date;
+        FileSystemService.SortField = parsed;
         RefreshAllLoadedFolders();
     }
 
@@ -3128,7 +3130,7 @@ public partial class MainWindow : Window
         }
 
         var (_, sortDescending) = GetEffectiveFolderSort(item);
-        SetFolderSortOverride(item, sortByDate: field == "date", sortDescending);
+        SetFolderSortOverride(item, FileSystemService.ParseSortField(field), sortDescending);
     }
 
     private void FolderSortDirectionMenuItem_Click(object sender, RoutedEventArgs e)
@@ -3139,8 +3141,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var (sortByDate, _) = GetEffectiveFolderSort(item);
-        SetFolderSortOverride(item, sortByDate, sortDescending: direction == "desc");
+        var (currentField, _) = GetEffectiveFolderSort(item);
+        SetFolderSortOverride(item, currentField, sortDescending: direction == "desc");
     }
 
     // "전역 정렬 따르기" - only enabled from the menu when the selected folder
@@ -3156,14 +3158,22 @@ public partial class MainWindow : Window
 
     // What a specific folder's own "정렬" checkboxes should currently show -
     // its own override if it has one, otherwise the app-wide default.
-    private (bool SortByDate, bool SortDescending) GetEffectiveFolderSort(FileSystemItem item)
+    private (FileSortField Field, bool SortDescending) GetEffectiveFolderSort(FileSystemItem item)
     {
         var entry = _settings.FolderSortOverrides.FirstOrDefault(o =>
             string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
         return entry is not null
-            ? (entry.SortByDate, entry.SortDescending)
-            : (_settings.SortByDate, _settings.SortDescending);
+            ? (ReadSortField(entry.SortField, entry.SortByDate), entry.SortDescending)
+            : (ReadSortField(_settings.SortField, _settings.SortByDate), _settings.SortDescending);
     }
+
+    // Settings written before 유형/크기 existed carry only the SortByDate
+    // boolean, so an empty field name falls back to it rather than silently
+    // resetting somebody's saved order to 이름.
+    private static FileSortField ReadSortField(string? fieldName, bool legacySortByDate)
+        => string.IsNullOrWhiteSpace(fieldName)
+            ? (legacySortByDate ? FileSortField.Date : FileSortField.Name)
+            : FileSystemService.ParseSortField(fieldName);
 
     // Sets (or updates) this folder's own remembered sort: persists it,
     // mirrors it into FileSystemService.SortOverrides so LoadChildren picks
@@ -3173,7 +3183,7 @@ public partial class MainWindow : Window
     // not the plain RefreshFolder_Click F5 uses - resorting a folder
     // shouldn't silently collapse whatever subfolders the user had expanded
     // further down inside it.
-    private void SetFolderSortOverride(FileSystemItem item, bool sortByDate, bool sortDescending)
+    private void SetFolderSortOverride(FileSystemItem item, FileSortField field, bool sortDescending)
     {
         var entry = _settings.FolderSortOverrides.FirstOrDefault(o =>
             string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
@@ -3182,14 +3192,16 @@ public partial class MainWindow : Window
             entry = new FolderSortOverrideEntry { Path = item.FullPath };
             _settings.FolderSortOverrides.Add(entry);
         }
-        entry.SortByDate = sortByDate;
+        entry.SortField = FileSystemService.FormatSortFieldName(field);
+        // Still written for a settings file that may be read by an older
+        // build - it only knows name/date, and 유형/크기 land on 이름 there.
+        entry.SortByDate = field == FileSortField.Date;
         entry.SortDescending = sortDescending;
 
         FileSystemService.SortOverrides[FileSystemService.NormalizeSortOverridePath(item.FullPath)] =
-            new FolderSortOverride(sortByDate ? FileSortField.Date : FileSortField.Name, sortDescending);
+            new FolderSortOverride(field, sortDescending);
         item.HasSortOverride = true;
-        var field = sortByDate ? FileSortField.Date : FileSortField.Name;
-        item.SortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(field, sortDescending);
+        item.SortOverrideIconGeometry = FileSystemService.SortOverrideGeometry(sortDescending);
         item.SortOverrideTooltip = FileSystemService.FormatSortTooltip(field, sortDescending);
 
         if (item.ChildrenLoaded)
@@ -3198,40 +3210,75 @@ public partial class MainWindow : Window
         }
     }
 
-    // Clicking the folder's own override icon: cycles N↑ -> N↓ -> D↑ -> D↓ ->
-    // N↑... instead of clearing it - clearing is now a deliberate context-menu
-    // action only (FolderSortFollowGlobalMenuItem_Click), since a single click
-    // rotating through 4 states is a much faster way to try different sorts
-    // than reopening the menu each time.
-    // Five-state click rotation, mirroring the search view's sort button:
-    // 전역 따름(neutral) -> 이름↑ -> 이름↓ -> 날짜↑ -> 날짜↓ -> 전역 따름.
-    // Folding "follow the global sort" into the cycle means the override can be
-    // cleared by clicking the icon itself, instead of only via the right-click
-    // menu's "전역 정렬 따르기".
-    private void RotateFolderSortOverride(FileSystemItem item)
+    // Clicking a folder's sort icon opens that folder's sort menu, anchored to
+    // the icon. It used to rotate through the states instead - 전역 따름 ->
+    // 이름↑ -> 이름↓ -> 날짜↑ -> 날짜↓ -> 전역 따름 - which was already four
+    // clicks to reach the last state and would have been eight with 유형 and
+    // 크기 in it. A rotation only works while there are three or four states;
+    // past that it stops being a control and becomes a guessing game, so the
+    // icon's job shrank to showing whether this folder sorts its own way (and
+    // which direction), with the menu naming the rest in words.
+    // Shared by both places the folder's sort is shown - the right-click
+    // menu's "정렬 기준" submenu and the flat menu the row's icon opens. Same
+    // items in the same order, so one routine can tick them: the folder's own
+    // sort if it has one, otherwise the app-wide default, which is exactly
+    // what that folder would sort by if it were reloaded right now.
+    private void ApplyFolderSortMenuState(ItemCollection items, bool isFolder)
     {
-        if (!item.HasSortOverride)
+        if (items is not [MenuItem byName, MenuItem byDate, MenuItem byType, MenuItem bySize, _,
+                MenuItem ascending, MenuItem descending, _, MenuItem followGlobal])
         {
-            SetFolderSortOverride(item, sortByDate: false, sortDescending: false);
             return;
         }
 
-        var (sortByDate, sortDescending) = GetEffectiveFolderSort(item);
-        switch (sortByDate, sortDescending)
+        bool hasOverride = isFolder && ExplorerTree.SelectedItem is FileSystemItem { HasSortOverride: true };
+        var (field, sortDescending) = isFolder && ExplorerTree.SelectedItem is FileSystemItem folderItem
+            ? GetEffectiveFolderSort(folderItem)
+            : (ReadSortField(_settings.SortField, _settings.SortByDate), _settings.SortDescending);
+
+        CheckSortFieldItems(field, byName, byDate, byType, bySize);
+        ascending.IsChecked = !sortDescending;
+        descending.IsChecked = sortDescending;
+        followGlobal.IsEnabled = hasOverride;
+    }
+
+    private static void CheckSortFieldItems(FileSortField field, MenuItem byName, MenuItem byDate,
+        MenuItem byType, MenuItem bySize)
+    {
+        byName.IsChecked = field == FileSortField.Name;
+        byDate.IsChecked = field == FileSortField.Date;
+        byType.IsChecked = field == FileSortField.Type;
+        bySize.IsChecked = field == FileSortField.Size;
+    }
+
+    private void FolderSortContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        AnyMenu_Opened(sender, e);
+
+        if (sender is ContextMenu menu)
         {
-            case (false, false):
-                SetFolderSortOverride(item, sortByDate: false, sortDescending: true);
-                break;
-            case (false, true):
-                SetFolderSortOverride(item, sortByDate: true, sortDescending: false);
-                break;
-            case (true, false):
-                SetFolderSortOverride(item, sortByDate: true, sortDescending: true);
-                break;
-            default:
-                ClearFolderSortOverride(item);
-                break;
+            ApplyFolderSortMenuState(menu.Items,
+                isFolder: ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true });
         }
+    }
+
+    private void OpenFolderSortMenu(FileSystemItem item, UIElement anchor)
+    {
+        if (TryFindResource("FolderSortContextMenu") is not ContextMenu menu)
+        {
+            return;
+        }
+
+        // Every handler in that menu works off the tree's current selection,
+        // exactly as the right-click menu's own submenu does.
+        if (FindRealizedContainer(item) is { } container)
+        {
+            container.IsSelected = true;
+        }
+
+        menu.PlacementTarget = anchor;
+        menu.Placement = PlacementMode.Bottom;
+        menu.IsOpen = true;
     }
 
     // Drops this folder's own remembered sort so it goes back to picking up
@@ -3242,9 +3289,8 @@ public partial class MainWindow : Window
             string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
         FileSystemService.SortOverrides.Remove(FileSystemService.NormalizeSortOverridePath(item.FullPath));
         item.HasSortOverride = false;
-        // Back to the neutral "follows the global sort" icon - the rotation's
-        // starting point (see RotateFolderSortOverride).
-        item.SortOverrideIconUri = FileSystemService.NoSortOverrideIconUri;
+        // Back to the neutral "follows the app-wide default" glyph.
+        item.SortOverrideIconGeometry = FileSystemService.FollowsGlobalSortGeometry;
         item.SortOverrideTooltip = FileSystemService.NoSortOverrideTooltip;
 
         if (item.ChildrenLoaded)
@@ -4842,18 +4888,15 @@ public partial class MainWindow : Window
             return;
         }
 
-        // The small sort-override icon (see FileSystemItem.HasSortOverride)
-        // rotates this folder's own remembered sort (N↑ -> N↓ -> D↑ -> D↓ ->
-        // N↑...) instead of the row's normal click behavior (select + toggle
-        // expand/collapse) below - matched by name rather than type, since
-        // other Border ancestors exist further up the same row (RowBorder's
-        // hover/selection highlight) that must NOT match. Clearing the
-        // override entirely is a context-menu-only action now (see
-        // FolderSortFollowGlobalMenuItem_Click).
-        if ((e.OriginalSource as DependencyObject)?.FindAncestor<Border>() is { Name: "SortOverrideIconBorder" } &&
+        // The small sort icon (see FileSystemItem.HasSortOverride) opens this
+        // folder's sort menu instead of the row's normal click behavior
+        // (select + toggle expand/collapse) below - matched by name rather
+        // than type, since other Border ancestors exist further up the same
+        // row (RowBorder's hover/selection highlight) that must NOT match.
+        if ((e.OriginalSource as DependencyObject)?.FindAncestor<Border>() is { Name: "SortOverrideIconBorder" } iconBorder &&
             treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsDirectory: true } overrideItem)
         {
-            RotateFolderSortOverride(overrideItem);
+            OpenFolderSortMenu(overrideItem, iconBorder);
 
             // Returning early here used to skip the drag-candidate reset
             // below entirely (it's normally reached a few lines down, on
@@ -5532,19 +5575,7 @@ public partial class MainWindow : Window
             // otherwise the app-wide default - either way this submenu always
             // reflects what THIS folder would sort by if (re)loaded right now.
             sortMenu.IsEnabled = isFolder;
-            if (sortMenu.Items is [MenuItem byName, MenuItem byDate, _, MenuItem ascending, MenuItem descending, _, MenuItem followGlobal])
-            {
-                bool hasOverride = isFolder && ExplorerTree.SelectedItem is FileSystemItem { HasSortOverride: true };
-                var (sortByDate, sortDescending) = isFolder && ExplorerTree.SelectedItem is FileSystemItem folderItem
-                    ? GetEffectiveFolderSort(folderItem)
-                    : (_settings.SortByDate, _settings.SortDescending);
-
-                byName.IsChecked = !sortByDate;
-                byDate.IsChecked = sortByDate;
-                ascending.IsChecked = !sortDescending;
-                descending.IsChecked = sortDescending;
-                followGlobal.IsEnabled = hasOverride;
-            }
+            ApplyFolderSortMenuState(sortMenu.Items, isFolder);
 
             // "Open with" only makes sense for files - folders don't have a
             // file-association picker.

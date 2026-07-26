@@ -71,9 +71,11 @@ public static class Strings
     public static string MenuIconStyleShell = "Windows 탐색기";
 
     public static string MenuDefaultSort = "정렬 기본값";
-    public static string MenuSort = "이 폴더의 정렬";
-    public static string MenuSortByName = "이름순";
-    public static string MenuSortByDate = "날짜순";
+    public static string MenuSort = "정렬 기준";
+    public static string MenuSortByName = "이름";
+    public static string MenuSortByDate = "수정한 날짜";
+    public static string MenuSortByType = "유형";
+    public static string MenuSortBySize = "크기";
     public static string MenuSortAscending = "오름차순";
     public static string MenuSortDescending = "내림차순";
 
@@ -94,7 +96,7 @@ public static class Strings
     // since field (color) and direction (which triangle is filled) are easy to
     // misread at that size. {0} is one of the SortMode* labels below; built by
     // FileSystemService.FormatSortTooltip/NoSortOverrideTooltip.
-    public static string SortTooltipFormat = "정렬: {0} (클릭하여 전환)";
+    public static string SortTooltipFormat = "정렬 기준: {0}";
     public static string SortModeFollowGlobal = "전역 설정 따름";
     public static string SortModeFolderGroup = "폴더별 묶기";
     public static string SortModeNameAsc = "이름 오름차순";
@@ -314,14 +316,16 @@ public static class Strings
         MenuIconStyleShell = "Windows Explorer";
 
         MenuDefaultSort = "Default Sort";
-        MenuSort = "Sort";
-        MenuSortByName = "By Name";
-        MenuSortByDate = "By Date";
+        MenuSort = "Sort by";
+        MenuSortByName = "Name";
+        MenuSortByDate = "Date modified";
+        MenuSortByType = "Type";
+        MenuSortBySize = "Size";
         MenuSortAscending = "Ascending";
         MenuSortDescending = "Descending";
         MenuFollowDefaultSort = "Follow Default Sort";
         MenuSearchInFolder = "Search in This Folder";
-        SortTooltipFormat = "Sort: {0} (click to cycle)";
+        SortTooltipFormat = "Sorted by {0}";
         SortModeFollowGlobal = "Follow default";
         SortModeFolderGroup = "Group by folder";
         SortModeNameAsc = "Name ascending";

@@ -123,17 +123,17 @@ public class FileSystemItem : INotifyPropertyChanged
         set => SetField(ref _hasSortOverride, value);
     }
 
-    // Which of the sort-icon images this folder's row currently shows: one of
-    // the 4 field/direction images (see FileSystemService.FormatSortOverride-
-    // IconUri) while it has an override, or the neutral "follows the global
-    // sort" one when it doesn't. Kept in sync with HasSortOverride by
-    // MainWindow (SetFolderSortOverride/RotateFolderSortOverride/
+    // Which glyph this folder's sort icon currently draws: the direction arrow
+    // while it has its own sort, or the neutral "follows the app-wide default"
+    // one when it doesn't (see FileSystemService's geometries). Vector rather
+    // than an image so it takes the row's brush and needs no light/dark pair.
+    // Kept in sync with HasSortOverride by MainWindow (SetFolderSortOverride/
     // ClearFolderSortOverride), same externally-maintained pattern.
-    private string _sortOverrideIconUri = string.Empty;
-    public string SortOverrideIconUri
+    private Geometry? _sortOverrideIconGeometry;
+    public Geometry? SortOverrideIconGeometry
     {
-        get => _sortOverrideIconUri;
-        set => SetField(ref _sortOverrideIconUri, value);
+        get => _sortOverrideIconGeometry;
+        set => SetField(ref _sortOverrideIconGeometry, value);
     }
 
     // That icon's ToolTip, naming the state it's showing ("정렬: 이름 오름차순
@@ -204,14 +204,13 @@ public class FileSystemItem : INotifyPropertyChanged
                 FileSystemService.NormalizeSortOverridePath(fullPath), out var over))
             {
                 _hasSortOverride = true;
-                _sortOverrideIconUri = FileSystemService.FormatSortOverrideIconUri(over.Field, over.Descending);
+                _sortOverrideIconGeometry = FileSystemService.SortOverrideGeometry(over.Descending);
                 _sortOverrideTooltip = FileSystemService.FormatSortTooltip(over.Field, over.Descending);
             }
             else
             {
-                // No override - the neutral icon, which is also the first stop
-                // in the click-rotation ("follow the global sort").
-                _sortOverrideIconUri = FileSystemService.NoSortOverrideIconUri;
+                // No override of its own - the neutral glyph.
+                _sortOverrideIconGeometry = FileSystemService.FollowsGlobalSortGeometry;
                 _sortOverrideTooltip = FileSystemService.NoSortOverrideTooltip;
             }
             Children.Add(new FileSystemItem());

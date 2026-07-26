@@ -151,7 +151,12 @@ public class AppSettings
             ? "ko"
             : "en";
 
-    // File/folder sort order ("정렬" submenu) - see Services/FileSystemService.
+    // App-wide default sort ("정렬 기준" submenu) - see FileSystemService.
+    // SortField is the live one ("name" | "date" | "type" | "size"); SortByDate
+    // is its predecessor, kept written and read for the same reason as
+    // FolderSortOverrideEntry.SortField (older builds, and files written by
+    // them, still make sense).
+    public string SortField { get; set; } = string.Empty;
     public bool SortByDate { get; set; } = false;
     public bool SortDescending { get; set; } = false;
 

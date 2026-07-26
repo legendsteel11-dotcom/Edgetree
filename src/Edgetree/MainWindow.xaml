@@ -778,6 +778,14 @@
                         IsCheckable="True"
                         Tag="date"
                         Click="FolderSortFieldMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortByType}"
+                        IsCheckable="True"
+                        Tag="type"
+                        Click="FolderSortFieldMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortBySize}"
+                        IsCheckable="True"
+                        Tag="size"
+                        Click="FolderSortFieldMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="{x:Static services:Strings.MenuSortAscending}"
                         IsCheckable="True"
@@ -837,6 +845,47 @@
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuProperties}"
                     Click="ShowProperties_Click"/>
+        </ContextMenu>
+
+        <!-- What the row's sort icon opens. Same items, same handlers and same
+             target (the selected folder) as the "정렬 기준" submenu in the
+             right-click menu above - shown from a second place because the
+             icon is right there on the row, and reaching the submenu means
+             opening a menu and then walking into it. Kept flat for that
+             reason: one click to the icon, one to the order. -->
+        <ContextMenu x:Key="FolderSortContextMenu"
+                Style="{StaticResource DarkContextMenuStyle}"
+                Opened="FolderSortContextMenu_Opened"
+                Closed="AnyMenu_Closed"
+                PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
+            <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
+                    IsCheckable="True"
+                    Tag="name"
+                    Click="FolderSortFieldMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuSortByDate}"
+                    IsCheckable="True"
+                    Tag="date"
+                    Click="FolderSortFieldMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuSortByType}"
+                    IsCheckable="True"
+                    Tag="type"
+                    Click="FolderSortFieldMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuSortBySize}"
+                    IsCheckable="True"
+                    Tag="size"
+                    Click="FolderSortFieldMenuItem_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuSortAscending}"
+                    IsCheckable="True"
+                    Tag="asc"
+                    Click="FolderSortDirectionMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuSortDescending}"
+                    IsCheckable="True"
+                    Tag="desc"
+                    Click="FolderSortDirectionMenuItem_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuFollowDefaultSort}"
+                    Click="FolderSortFollowGlobalMenuItem_Click"/>
         </ContextMenu>
 
         <!-- Search result rows' own menu. Every action operates on the
@@ -1181,6 +1230,14 @@
                 <MenuItem Header="{x:Static services:Strings.MenuSortByDate}"
                         IsCheckable="True"
                         Tag="date"
+                        Click="SortFieldMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortByType}"
+                        IsCheckable="True"
+                        Tag="type"
+                        Click="SortFieldMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortBySize}"
+                        IsCheckable="True"
+                        Tag="size"
                         Click="SortFieldMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="{x:Static services:Strings.MenuSortAscending}"
@@ -1866,10 +1923,14 @@
                 <!-- Shown only when this folder has its own remembered sort
                      (HasSortOverride - see FileSystemItem and
                      Services/FileSystemService.SortOverrides), independent of
-                     the app-wide default. Click rotates it (see
+                     the app-wide default. Click OPENS THE SORT MENU (see
                      TreeViewItem_PreviewMouseLeftButtonDown's
-                     clickedOnSortOverrideIcon check) - clearing it entirely is
-                     the folder's own "정렬 -> 전역 정렬 따르기" menu item instead.
+                     clickedOnSortOverrideIcon check) - it used to rotate
+                     through the states instead, which stopped working the
+                     moment 유형/크기 joined 이름/날짜: five states already took
+                     four clicks to reach the last one, and nine is not a
+                     control. The menu names every state in words and clears
+                     the override too.
                      Wrapped in its own Border so that check can find the click
                      by name without also matching some other Border further
                      up the row (RowBorder's hover/selection highlight, etc). -->
@@ -1894,12 +1955,16 @@
                          widens the actual clickable area well beyond the
                          image itself, which is otherwise a fiddly target to
                          land a click on. -->
-                    <Image Source="{Binding SortOverrideIconUri}"
+                    <!-- Vector, not one of the old PNG pairs: it takes the
+                         row's own folder-name brush, so light and dark themes
+                         (and any custom colour) need no second asset - which
+                         was the blocker that kept 유형/크기 waiting. -->
+                    <Path Data="{Binding SortOverrideIconGeometry}"
+                            Fill="{DynamicResource FolderNameForeground}"
                             Width="{DynamicResource SortOverrideIconWidth}"
                             Height="{DynamicResource SortOverrideIconHeight}"
                             Stretch="Uniform"
-                            VerticalAlignment="Center"
-                            RenderOptions.BitmapScalingMode="HighQuality"/>
+                            VerticalAlignment="Center"/>
                 </Border>
                 <!-- 책갈피 marker (IsBookmarked, toggled via Ctrl+Alt+K or the
                      right-click menu; Ctrl+Alt+L/J cycles through them).
