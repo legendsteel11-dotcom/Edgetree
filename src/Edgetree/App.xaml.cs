@@ -57,6 +57,22 @@ public partial class App : Application
         // fields at that exact moment.
         Strings.Initialize(new SettingsService().Load().Language);
 
+        ExitLog.Record($"--- started (pid {Environment.ProcessId})");
+
+        // Windows signing the user out or shutting down closes the app without
+        // any click, and looks exactly like "it just disappeared" afterwards.
+        SessionEnding += (_, args) => ExitLog.Record($"windows session ending ({args.ReasonSessionEnding})");
+
+#if DEBUG
+        // Neither handler swallows anything (Handled stays false) - they only
+        // get the exception written down before the process goes, since a
+        // crash on a background thread can otherwise leave nothing behind.
+        DispatcherUnhandledException += (_, args) =>
+            ExitLog.Record($"UNHANDLED (ui thread): {args.Exception}");
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+            ExitLog.Record($"UNHANDLED (background): {args.ExceptionObject}");
+#endif
+
         base.OnStartup(e);
 
         var iconUri = new Uri("pack://application:,,,/Resources/app.ico");
@@ -76,7 +92,11 @@ public partial class App : Application
         contextMenu.Items.Add(new ToolStripSeparator());
         contextMenu.Items.Add(Strings.TrayAbout, null, (_, _) => ShowAboutCentered());
         contextMenu.Items.Add(new ToolStripSeparator());
-        contextMenu.Items.Add(Strings.TrayExit, null, (_, _) => Shutdown());
+        contextMenu.Items.Add(Strings.TrayExit, null, (_, _) =>
+        {
+            ExitLog.Record("tray menu: exit");
+            Shutdown();
+        });
 
         // The window can be shown/hidden by other means (title bar "_"
         // button, restoring from taskbar) between menu openings, so the
@@ -229,6 +249,10 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // The catch-all: whatever reason was (or wasn't) stamped above, this
+        // is the process actually going away.
+        ExitLog.Record($"process exiting (code {e.ApplicationExitCode})");
+
         _trayIcon?.Dispose();
         _singleInstanceMutex?.ReleaseMutex();
         _singleInstanceMutex?.Dispose();

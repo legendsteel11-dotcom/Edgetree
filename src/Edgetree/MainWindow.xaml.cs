@@ -687,6 +687,12 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        // The window itself going away - the tray "exit" path never comes
+        // through here. _closeReason is set by whichever control started it;
+        // "source unknown" means the close came from outside the app's own
+        // buttons (Alt+F4, a task-manager end task, an OS-level close).
+        ExitLog.Record($"window closing: {_closeReason ?? "source unknown"}");
+
         if (!_settingsResetPending)
         {
             SaveCurrentWidth();
@@ -2838,8 +2844,13 @@ public partial class MainWindow : Window
         }
     }
 
+    // Which control started the current close, for the exit log - see
+    // MainWindow_Closing.
+    private string? _closeReason;
+
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
+        _closeReason = "header close button";
         Close();
     }
 
@@ -3449,6 +3460,7 @@ public partial class MainWindow : Window
             MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (result == MessageBoxResult.Yes)
         {
+            ExitLog.Record("restart requested by the user (language/settings change)");
             System.Diagnostics.Process.Start(Environment.ProcessPath!);
             Application.Current.Shutdown();
         }
@@ -3594,6 +3606,7 @@ public partial class MainWindow : Window
             MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (result == MessageBoxResult.Yes)
         {
+            ExitLog.Record("restart requested by the user (language/settings change)");
             System.Diagnostics.Process.Start(Environment.ProcessPath!);
             Application.Current.Shutdown();
         }
@@ -3642,6 +3655,7 @@ public partial class MainWindow : Window
         _settingsService.Save(_settings);
         _settingsResetPending = true;
 
+        ExitLog.Record("restart after settings reset");
         System.Diagnostics.Process.Start(Environment.ProcessPath!);
         Application.Current.Shutdown();
     }
