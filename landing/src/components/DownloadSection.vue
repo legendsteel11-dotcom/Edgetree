@@ -1,9 +1,44 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { t } from '../i18n'
 import { standardDownloadUrl, standaloneDownloadUrl, releaseVersion, ensureReleaseAssetsLoaded } from '../releaseAssets'
 
 onMounted(ensureReleaseAssetsLoaded)
+
+// Hard-coded rather than read from location.host: the point is to hand over
+// the address of the published site, which is not where the visitor
+// necessarily is (a LAN dev server, a preview deployment).
+const siteUrl = 'edgetree.vercel.app'
+
+const copied = ref(false)
+let resetTimer: number | undefined
+
+async function copyAddress() {
+  const text = `https://${siteUrl}`
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      // The Clipboard API is https-only, and this box is aimed squarely at
+      // phones - including one browsing a plain-http dev server on the LAN.
+      // execCommand is deprecated but is what still works there.
+      const field = document.createElement('textarea')
+      field.value = text
+      field.setAttribute('readonly', '')
+      field.style.position = 'fixed'
+      field.style.opacity = '0'
+      document.body.appendChild(field)
+      field.select()
+      document.execCommand('copy')
+      document.body.removeChild(field)
+    }
+    copied.value = true
+    window.clearTimeout(resetTimer)
+    resetTimer = window.setTimeout(() => (copied.value = false), 1800)
+  } catch {
+    // Nothing to rescue: the address is on screen and selectable by hand.
+  }
+}
 </script>
 
 <template>
@@ -11,6 +46,16 @@ onMounted(ensureReleaseAssetsLoaded)
     <div class="container">
       <div class="section-heading">
         <h2>{{ t.download.title }}</h2>
+      </div>
+
+      <div class="mobile-note">
+        <p>{{ t.download.mobileTitle }}<br>{{ t.download.mobileDesc }}</p>
+        <div class="mobile-copy">
+          <code>{{ siteUrl }}</code>
+          <button type="button" class="btn btn-primary" @click="copyAddress">
+            {{ copied ? t.download.mobileCopied : t.download.mobileCopy }}
+          </button>
+        </div>
       </div>
 
       <div class="grid">
@@ -104,6 +149,63 @@ onMounted(ensureReleaseAssetsLoaded)
 
 .disclaimers p + p {
   margin-top: 6px;
+}
+
+/* Nearly half of all visitors arrive on a phone (measured), where every
+   download button below is a dead end - the file is a Windows exe. Rather
+   than let them tap one and get a useless file, hand them the address to
+   reopen on a PC. Hidden on desktop, where it would only be noise. */
+.mobile-note {
+  display: none;
+  max-width: 560px;
+  margin: 0 auto 28px;
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--accent-bg);
+  text-align: center;
+}
+
+.mobile-note p {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-strong);
+  margin-bottom: 16px;
+}
+
+.mobile-copy {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mobile-copy code {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  font-size: 13.5px;
+  color: var(--text-strong);
+  /* The address is the payload - let it shrink rather than wrap or clip. */
+  overflow-wrap: anywhere;
+}
+
+.mobile-copy .btn {
+  flex: none;
+  padding: 10px 16px;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+/* Touch pointers get it at any width - a tablet can't run the exe either. */
+@media (pointer: coarse), (max-width: 600px) {
+  .mobile-note {
+    display: block;
+  }
 }
 
 @media (max-width: 600px) {

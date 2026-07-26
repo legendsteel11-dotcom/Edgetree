@@ -108,6 +108,10 @@ const dict = {
       standaloneDesc: '~160 MB · 설치 없이 바로 실행',
       button: '다운로드',
       note: '어떤 버전을 받아야 할지 모르겠다면 독립 실행형을 선택하세요.',
+      mobileTitle: 'Windows에서 쓰는 앱입니다.',
+      mobileDesc: '주소를 복사해 두었다가 PC에서 열어보세요.',
+      mobileCopy: '주소 복사',
+      mobileCopied: '복사했습니다',
       smartscreenNote:
         '실행 파일에 정식 코드 서명 인증서가 없어 Windows에서 "알 수 없는 게시자" 경고가 뜰 수 있습니다 —\n"추가 정보" → "실행"을 누르시면 정상적으로 실행됩니다.',
       virustotalNote:
@@ -219,6 +223,10 @@ const dict = {
       standaloneDesc: '~160 MB · runs with nothing else installed',
       button: 'Download',
       note: "Not sure which one? Go with the standalone build.",
+      mobileTitle: 'This one runs on Windows.',
+      mobileDesc: 'Copy the address and open it on your PC.',
+      mobileCopy: 'Copy address',
+      mobileCopied: 'Copied',
       smartscreenNote:
         "There's no paid code-signing certificate on the exe, so Windows may show an \"Unknown publisher\" SmartScreen warning —\nclick \"More info\" then \"Run anyway\" to proceed.",
       virustotalNote:
