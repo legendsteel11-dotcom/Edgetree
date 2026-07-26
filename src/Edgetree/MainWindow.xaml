@@ -1938,13 +1938,14 @@
                         Grid.Column="2"
                         Visibility="Collapsed"
                         Background="Transparent"
-                        Margin="4,0,12,0"
+                        Margin="4,0,6,0"
                         Padding="10,0"
                         Cursor="Hand"
                         ToolTip="{Binding SortOverrideTooltip}">
-                    <!-- Right margin (12) clears the overlay scrollbar's 5px
-                         hit-test width (MinimalScrollBarStyle) plus a little
-                         slack - it's drawn on top of full-bleed row content
+                    <!-- Right margin (6) clears the overlay scrollbar's 5px
+                         hit-test width (MinimalScrollBarStyle) - that 5px is
+                         the floor for this number, not a preference: it's
+                         drawn on top of full-bleed row content
                          (see MinimalScrollViewerTemplate) and still hit-tests
                          at Opacity 0, so without this gap it silently steals
                          clicks meant for this icon. Padding (6 horizontal,
