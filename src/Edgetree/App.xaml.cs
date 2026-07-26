@@ -57,6 +57,9 @@ public partial class App : Application
         // fields at that exact moment.
         Strings.Initialize(new SettingsService().Load().Language);
 
+        // BeginSession first: it stamps the post-mortem of the previous
+        // session, which reads better above this session's own start line.
+        ExitLog.BeginSession();
         ExitLog.Record($"--- started (pid {Environment.ProcessId})");
 
         // Before anything touches a drive - see the method's own note.
@@ -255,6 +258,10 @@ public partial class App : Application
         // The catch-all: whatever reason was (or wasn't) stamped above, this
         // is the process actually going away.
         ExitLog.Record($"process exiting (code {e.ApplicationExitCode})");
+
+        // Reaching here at all is what makes this exit "clean" - dropping the
+        // heartbeat is how the next launch knows not to cry foul.
+        ExitLog.EndSession();
 
         _trayIcon?.Dispose();
         _singleInstanceMutex?.ReleaseMutex();
