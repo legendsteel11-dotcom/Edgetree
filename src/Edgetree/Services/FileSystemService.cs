@@ -174,18 +174,42 @@ public static class FileSystemService
 
         foreach (var drive in DriveInfo.GetDrives())
         {
-            if (!drive.IsReady)
+            bool isNetwork = drive.DriveType == DriveType.Network;
+
+            // A mapped network drive KEEPS its place while the server is away.
+            // Dropping it (which "not ready" used to do) is how both NAS drives
+            // vanished from the tree the moment the NAS rebooted, and a refresh
+            // couldn't bring them back either - it re-asked the same question
+            // and got the same "not ready" (reported 2026-07-26). Explorer
+            // shows exactly these as a crossed-out drive that reconnects when
+            // clicked, and the row has to exist for that click to be possible.
+            // Local drives still drop out when not ready: an empty card reader
+            // slot is not a place to go.
+            if (!drive.IsReady && !isNetwork)
             {
                 continue;
             }
 
             string driveName = drive.Name.TrimEnd('\\');
-            string? label = TryGetVolumeLabel(drive);
+            // Not readable while the drive is away - the letter alone stands in
+            // until it answers again and a later refresh picks the label up.
+            string? label = drive.IsReady ? TryGetVolumeLabel(drive) : null;
             string displayName = string.IsNullOrWhiteSpace(label) ? driveName : $"{label} ({driveName})";
+
+            if (isNetwork)
+            {
+                // Recorded here so a later read can tell, without asking the
+                // drive anything, whether a timeout means "the network went
+                // away" (back off) or "this folder is slow" (don't).
+                lock (UnreachableRootsUntil)
+                {
+                    NetworkRoots.Add(drive.RootDirectory.FullName);
+                }
+            }
 
             roots.Add(new FileSystemItem(displayName, drive.RootDirectory.FullName, isDirectory: true)
             {
-                IsOnNetworkDrive = drive.DriveType == DriveType.Network
+                IsOnNetworkDrive = isNetwork
             });
         }
 
@@ -208,8 +232,232 @@ public static class FileSystemService
     // arrow for the rest of the session (2026-07-23 NAS report) - and a
     // background merge doing the same would strip every loaded row beneath
     // the drive because it blinked once.
+    // Roots that just failed or crawled, and the tick they may be tried again.
+    // A network drive that goes away does NOT fail fast: every enumeration
+    // against it sits in the SMB client's own timeout, seconds at a time, and
+    // LoadChildren runs on the UI thread from every expand, watcher merge and
+    // restore - so a NAS being switched off froze the whole window, once per
+    // folder, for as long as the tree kept asking (reported 2026-07-26 with a
+    // Synology restarting).
+    //
+    // The first read after it disappears still pays that wait - there is no
+    // way to ask "are you there?" that isn't itself the same call - but the
+    // answer is remembered, so every read behind it returns instantly as a
+    // read FAILURE, which callers already handle by keeping what is on screen
+    // (see MergeChildrenFromDisk). The mark expires on its own, so nothing
+    // needs to notice the drive coming back.
+    private static readonly Dictionary<string, long> UnreachableRootsUntil = new(StringComparer.OrdinalIgnoreCase);
+    private const int UnreachableBackoffMs = 15_000;
+    private const int SlowReadMs = 500;
+
+    // Only network roots get marked: a slow or refused read on a local disk is
+    // a folder-level problem (permissions, a spinning-up drive), not a reason
+    // to declare C: gone.
+    private static readonly HashSet<string> NetworkRoots = new(StringComparer.OrdinalIgnoreCase);
+
+    private static bool IsOnNetworkRoot(string path)
+    {
+        if (path.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return true;
+        }
+        string? root = Path.GetPathRoot(path);
+        lock (UnreachableRootsUntil)
+        {
+            return root is not null && NetworkRoots.Contains(root);
+        }
+    }
+
+    // Cached "this root is not answering", written by the background poll and
+    // by any read that timed out. Never a syscall of its own.
+    private static readonly Dictionary<string, bool> NetworkRootOffline = new(StringComparer.OrdinalIgnoreCase);
+
+    // Answers from memory ONLY. Asking the drive here - which an earlier
+    // version did, via DriveInfo.IsReady - is the very thing this is supposed
+    // to prevent: with the mapping still open and the server rebooting, that
+    // question blocks as long as the read would, so the guard meant to cap a
+    // 20-second freeze took 20 seconds to decide (2026-07-26). Anything that
+    // has to actually ask runs on a worker (RefreshNetworkRootState).
+    private static bool IsRootUnreachable(string path)
+    {
+        string? root = Path.GetPathRoot(path);
+        if (root is null)
+        {
+            return false;
+        }
+
+        lock (UnreachableRootsUntil)
+        {
+            if (NetworkRootOffline.TryGetValue(root, out bool offline) && offline)
+            {
+                return true;
+            }
+            return UnreachableRootsUntil.TryGetValue(root, out long until) && Environment.TickCount64 < until;
+        }
+    }
+
+    // The cached answer, for callers that need it before the next poll has
+    // pushed it onto the rows. Memory only - safe from the UI thread.
+    public static bool IsNetworkPathUnreachable(string path) => IsRootUnreachable(path);
+
+    // Background only - this is the one place that asks the drive anything.
+    // Returns, and caches, whether the root is out of touch: either the
+    // mapping is disconnected (answered instantly) or a read against it has
+    // just timed out and the backoff still stands.
+    public static bool RefreshNetworkRootState(string root)
+    {
+        bool ready = IsNetworkRootReady(root);
+        lock (UnreachableRootsUntil)
+        {
+            bool backedOff = UnreachableRootsUntil.TryGetValue(root, out long until) && Environment.TickCount64 < until;
+            bool offline = !ready || backedOff;
+            NetworkRootOffline[root] = offline;
+            return offline;
+        }
+    }
+
+    // Cheap when the mapping is disconnected, and it can still block when the
+    // server is up but wedged - which is exactly the case the backoff mark
+    // above covers, so the two together handle both shapes of "not there".
+    private static bool IsNetworkRootReady(string root)
+    {
+        try
+        {
+            return new DriveInfo(root).IsReady;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static void MarkRootUnreachable(string path)
+    {
+        if (Path.GetPathRoot(path) is not { } root || !IsOnNetworkRoot(path))
+        {
+            return;
+        }
+        lock (UnreachableRootsUntil)
+        {
+            UnreachableRootsUntil[root] = Environment.TickCount64 + UnreachableBackoffMs;
+            // So the badge can turn red on the next poll tick without waiting
+            // for a syscall to confirm what the timeout already established.
+            NetworkRootOffline[root] = true;
+        }
+    }
+
+    // A read that came back normally is the clearest possible evidence the
+    // root is back - better than waiting out the backoff or the next poll.
+    private static void MarkRootReachable(string path)
+    {
+        if (Path.GetPathRoot(path) is not { } root || !IsOnNetworkRoot(path))
+        {
+            return;
+        }
+        lock (UnreachableRootsUntil)
+        {
+            UnreachableRootsUntil.Remove(root);
+            NetworkRootOffline[root] = false;
+        }
+    }
+
+    // Does this path exist, without hanging the caller on a network root that
+    // has already proved it won't answer? Used by anything that has to test a
+    // remembered path (bookmarks) rather than list a folder. The wait is
+    // remembered exactly as LoadChildren's is, so one dead root costs one
+    // timeout, not one per remembered path.
+    public static bool ProbeExists(string path, out bool isDirectory)
+    {
+        isDirectory = false;
+        if (IsRootUnreachable(path))
+        {
+            return false;
+        }
+
+        long startedTicks = Environment.TickCount64;
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                isDirectory = true;
+                return true;
+            }
+            return File.Exists(path);
+        }
+        finally
+        {
+            long elapsed = Environment.TickCount64 - startedTicks;
+            if (elapsed >= SlowReadMs)
+            {
+                MarkRootUnreachable(path);
+                LogSlowRead(path, elapsed, failed: false);
+            }
+        }
+    }
+
+    // How long the UI thread is willing to wait on a network folder before it
+    // gives up and calls the read failed. A NAS that is REBOOTING - as opposed
+    // to disconnected - still holds the mapping open, so the cheap "is the
+    // drive ready" question answers yes and the enumeration behind it sits in
+    // the SMB timeout: 21 seconds, measured, long enough for Windows to put up
+    // "Edgetree.exe is not responding" (2026-07-26, one click while a Synology
+    // was restarting).
+    //
+    // 1.5s is chosen against the other measurement from the same session: a
+    // genuinely slow-but-alive NAS folder came back in 1.4s. Below that and
+    // healthy-if-sluggish reads would start being thrown away; above it and
+    // the freeze becomes noticeable again.
+    private const int NetworkReadTimeoutMs = 1_500;
+
     public static List<FileSystemItem> LoadChildren(string path, FileSystemItem parent, out bool readFailed)
     {
+        // Known-unreachable: answer immediately rather than queue behind
+        // another multi-second timeout. Reported as a failure, never as an
+        // empty folder - the caller keeps its rows.
+        if (IsRootUnreachable(path))
+        {
+            readFailed = true;
+            return new List<FileSystemItem>();
+        }
+
+        // A network read is done on a worker with a deadline. The work itself
+        // can't be cancelled - the file system call blocks until the SMB stack
+        // is done with it - but the CALLER can stop waiting, which is the part
+        // the user feels. The abandoned task finishes into nothing; the root is
+        // marked, so the reads behind it return instantly instead of queueing
+        // up more of the same.
+        if (IsOnNetworkRoot(path))
+        {
+            var read = Task.Run(() => ReadChildrenFromDisk(path, parent));
+            if (!read.Wait(NetworkReadTimeoutMs))
+            {
+                MarkRootUnreachable(path);
+                LogSlowRead(path, NetworkReadTimeoutMs, failed: true);
+                readFailed = true;
+                return new List<FileSystemItem>();
+            }
+
+            readFailed = read.Result.ReadFailed;
+            if (readFailed)
+            {
+                MarkRootUnreachable(path);
+            }
+            else
+            {
+                MarkRootReachable(path);
+            }
+            return read.Result.Items;
+        }
+
+        var local = ReadChildrenFromDisk(path, parent);
+        readFailed = local.ReadFailed;
+        return local.Items;
+    }
+
+    private static (List<FileSystemItem> Items, bool ReadFailed) ReadChildrenFromDisk(string path, FileSystemItem parent)
+    {
+        bool readFailed;
+        var startedTicks = Environment.TickCount64;
         readFailed = false;
         var result = new List<FileSystemItem>();
         var (field, descending) = SortOverrides.TryGetValue(NormalizeSortOverridePath(path), out var over)
@@ -248,7 +496,44 @@ public static class FileSystemService
         catch (UnauthorizedAccessException) { readFailed = true; }
         catch (IOException) { readFailed = true; }
 
-        return result;
+        // A failure on a network path, or a read that took long enough to be
+        // felt as a freeze, closes the door on that root for a few seconds.
+        long elapsed = Environment.TickCount64 - startedTicks;
+        if (readFailed || elapsed >= SlowReadMs)
+        {
+            if (IsOnNetworkRoot(path))
+            {
+                MarkRootUnreachable(path);
+            }
+            LogSlowRead(path, elapsed, readFailed);
+        }
+
+        return (result, readFailed);
+    }
+
+    // Debug builds only: which folder read blocked, for how long, and whether
+    // it failed outright. "The app froze" is otherwise a report with nowhere
+    // to start - this names the path and the cost.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogSlowRead(string path, long elapsedMs, bool failed)
+    {
+        if (elapsedMs < SlowReadMs && !failed)
+        {
+            return;
+        }
+
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "slowread.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {elapsedMs,6}ms {(failed ? "FAILED " : "       ")}{path}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     // Explorer's own semantics, since that's the ordering people already have

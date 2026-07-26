@@ -6236,7 +6236,8 @@ public partial class MainWindow : Window
 
     private void OpenWithPicker_Click(object sender, RoutedEventArgs e)
     {
-        if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: false } item)
+        if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: false } item &&
+            !IsUnreachableNetworkItem(item))
         {
             ShellFileService.OpenWithPicker(item.FullPath);
         }

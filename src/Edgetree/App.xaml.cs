@@ -59,6 +59,9 @@ public partial class App : Application
 
         ExitLog.Record($"--- started (pid {Environment.ProcessId})");
 
+        // Before anything touches a drive - see the method's own note.
+        NativeMethods.SuppressDeviceErrorDialogs();
+
         // Windows signing the user out or shutting down closes the app without
         // any click, and looks exactly like "it just disappeared" afterwards.
         SessionEnding += (_, args) => ExitLog.Record($"windows session ending ({args.ReasonSessionEnding})");

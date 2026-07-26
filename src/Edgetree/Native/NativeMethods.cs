@@ -45,6 +45,22 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
 
+    [DllImport("kernel32.dll")]
+    private static extern uint SetErrorMode(uint mode);
+
+    private const uint SEM_FAILCRITICALERRORS = 0x0001;
+    private const uint SEM_NOOPENFILEERRORBOX = 0x8000;
+
+    // Windows, not the app, puts up a box when a drive stops answering mid-
+    // read ("network path not found", "no disk in the drive"). A sidebar that
+    // keeps a NAS folder open hits that every time the NAS is switched off -
+    // one flashed up during a 2026-07-26 test - and the app cannot dismiss or
+    // even see it. This tells the OS to fail those calls back to us instead of
+    // interrupting the user with a dialog they didn't ask for; every such call
+    // here already handles failure (see FileSystemService's readFailed rule).
+    public static void SuppressDeviceErrorDialogs()
+        => SetErrorMode(SetErrorMode(0) | SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX);
+
     // The window manager's own answer, not WPF's belief about it.
     public static bool HasTopmostStyle(IntPtr hWnd)
         => (GetWindowLong(hWnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
