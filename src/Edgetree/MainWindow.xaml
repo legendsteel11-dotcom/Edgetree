@@ -2640,7 +2640,25 @@
                     Padding="4,6,4,4"
                     FontSize="{Binding FontSize, ElementName=ExplorerTree}"
                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                    ItemContainerStyle="{StaticResource FavoriteListBoxItemStyle}"/>
+                    ItemContainerStyle="{StaticResource FavoriteListBoxItemStyle}"
+                    PreviewMouseMove="FavoritesList_PreviewMouseMove"
+                    PreviewMouseLeftButtonUp="FavoritesList_PreviewMouseLeftButtonUp"
+                    LostMouseCapture="FavoritesList_LostMouseCapture"/>
+
+            <!-- Where a dragged favorite would land. Sits over the list rather
+                 than inside the item template so it can be drawn BETWEEN two
+                 rows, and never takes a hit-test - the drag needs every mouse
+                 event to keep reaching the list underneath. Positioned from
+                 code (FavoritesReorder region). -->
+            <Border x:Name="FavoriteDropIndicator"
+                    Grid.Row="1"
+                    Height="2"
+                    Margin="0"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Stretch"
+                    Background="{DynamicResource AccentForeground}"
+                    IsHitTestVisible="False"
+                    Visibility="Collapsed"/>
 
             <!-- The splitter row's VISIBLE part is exactly this 1px divider -
                  which is why the tree's scrollbar (and first row) start flush

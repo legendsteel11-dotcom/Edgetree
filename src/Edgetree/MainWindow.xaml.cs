@@ -2087,14 +2087,26 @@ public partial class MainWindow : Window
         }
     }
 
+    // Press only ARMS the click now - navigation happens on release (see
+    // FavoritesList_PreviewMouseLeftButtonUp), because a press that turns into
+    // a drag is a reorder, not a click, and navigating on the way into a drag
+    // would jump the tree every time the list is rearranged.
     private void FavoriteListBoxItem_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        // Single click navigates (requirement a). The double-click workaround
-        // this used to require is gone: capping every folder at
-        // FileSystemItem.DisplayCap keeps the tree light enough that the reveal
-        // walk realizes the target's container reliably on the first click,
-        // even below a huge folder (NavigateToPath re-caps overflow first).
         if (sender is ListBoxItem { DataContext: FavoriteEntry entry })
+        {
+            _favoriteDragEntry = entry;
+            _favoriteDragStart = e.GetPosition(FavoritesList);
+        }
+    }
+
+    // Single click navigates (requirement a). The double-click workaround this
+    // used to require is gone: capping every folder at
+    // FileSystemItem.DisplayCap keeps the tree light enough that the reveal
+    // walk realizes the target's container reliably on the first click, even
+    // below a huge folder (NavigateToPath re-caps overflow first).
+    private void NavigateToFavorite(FavoriteEntry entry)
+    {
         {
             // Re-clicking a favorite that's already revealed, expanded, and
             // selected used to still re-run the entire walk: re-collapse
@@ -2136,6 +2148,223 @@ public partial class MainWindow : Window
             // clear the favorite we just clicked.
             NavigateToPath(entry.Path);
         }
+    }
+
+    // ----- 즐겨찾기 드래그 재정렬 ------------------------------------------
+    //
+    // No drag handle: the row itself is the target, with click and drag split
+    // by movement (the same rule the tree's drag-out uses). A handle would add
+    // permanent visual noise to a narrow row and make the same action a
+    // smaller target; "move up/down" menu items were considered and dropped as
+    // half a feature. Order is the settings list's own order, so nothing about
+    // the saved format changes.
+    //
+    // Mouse capture rather than DragDrop.DoDragDrop: this never leaves the
+    // list, and the OLE drag loop is the one that has cost this app real bugs
+    // (stuck captures, phantom self-drops). Capture is released on button-up
+    // AND on LostMouseCapture, with the app's own capture watchdog as the
+    // backstop underneath both.
+
+    private System.Windows.Point? _favoriteDragStart;
+    private FavoriteEntry? _favoriteDragEntry;
+    private bool _favoriteDragActive;
+    private int _favoriteDropIndex = -1;
+
+    private void FavoritesList_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed ||
+            _favoriteDragEntry is null ||
+            _favoriteDragStart is not { } start)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(FavoritesList);
+        if (!_favoriteDragActive)
+        {
+            // Below the system's own drag threshold this is still a click -
+            // a few pixels of travel while pressing is normal, especially on a
+            // high-DPI screen with a fast mouse.
+            if (Math.Abs(current.X - start.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(current.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance)
+            {
+                return;
+            }
+            if (_settings.Favorites.Count < 2)
+            {
+                return;
+            }
+
+            _favoriteDragActive = true;
+            FavoritesList.CaptureMouse();
+        }
+
+        // Dragged off the list entirely (onto the tree below, most often):
+        // that cancels, it does not drop at the nearest end. The cursor being
+        // past the last row means "the end of the list" only while it is still
+        // over the list - outside it, the gesture has left, and dumping the
+        // row at the bottom on release is a move nobody asked for.
+        bool overList =
+            current.X >= 0 && current.X <= FavoritesList.ActualWidth &&
+            current.Y >= 0 && current.Y <= FavoritesList.ActualHeight;
+
+        UpdateFavoriteDropIndicator(overList ? ComputeFavoriteDropIndex(current) : -1);
+
+        // The ListBox must not see this move. It reads mouse movement while it
+        // holds capture as its own drag-selection - and the capture here is
+        // OURS, taken for the reorder - so dragging a row down past the list
+        // was quietly selecting whichever item was nearest the cursor (the
+        // last one). Handling the preview event suppresses the bubbling
+        // MouseMove entirely, which is what Selector acts on.
+        e.Handled = true;
+    }
+
+    private void FavoritesList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        var entry = _favoriteDragEntry;
+        bool dragged = _favoriteDragActive;
+        int dropIndex = _favoriteDropIndex;
+
+        EndFavoriteDrag();
+
+        if (entry is null)
+        {
+            return;
+        }
+
+        // A press that never became a drag is the click it always was.
+        if (dragged)
+        {
+            CommitFavoriteReorder(entry, dropIndex);
+        }
+        else
+        {
+            NavigateToFavorite(entry);
+        }
+    }
+
+    // Capture can also be taken away (another window activating, a system
+    // dialog): the drag ends where it stands rather than reordering on a
+    // release that never came.
+    private void FavoritesList_LostMouseCapture(object sender, System.Windows.Input.MouseEventArgs e) => EndFavoriteDrag();
+
+    private void EndFavoriteDrag()
+    {
+        bool wasDragging = _favoriteDragActive;
+
+        // The selection belongs to the row that was picked up, whatever the
+        // list may have decided while the cursor was travelling over it.
+        if (wasDragging && _favoriteDragEntry is { } dragged)
+        {
+            FavoritesList.SelectedItem = dragged;
+        }
+
+        _favoriteDragActive = false;
+        _favoriteDragEntry = null;
+        _favoriteDragStart = null;
+        _favoriteDropIndex = -1;
+        FavoriteDropIndicator.Visibility = Visibility.Collapsed;
+
+        // Checked first: releasing capture raises LostMouseCapture, which
+        // lands right back here.
+        if (wasDragging && FavoritesList.IsMouseCaptured)
+        {
+            FavoritesList.ReleaseMouseCapture();
+        }
+    }
+
+    // Where the dragged row would be inserted: the first row whose middle the
+    // cursor is above, or the end of the list. Using the midpoint is what
+    // makes the indicator only move as a row boundary is actually crossed, so
+    // jitter within one row never changes anything.
+    private int ComputeFavoriteDropIndex(System.Windows.Point pointInList)
+    {
+        int count = _settings.Favorites.Count;
+        for (int i = 0; i < count; i++)
+        {
+            if (FavoritesList.ItemContainerGenerator.ContainerFromIndex(i) is not ListBoxItem container)
+            {
+                continue;
+            }
+
+            double top = container.TransformToAncestor(FavoritesList).Transform(new System.Windows.Point(0, 0)).Y;
+            if (pointInList.Y < top + container.ActualHeight / 2)
+            {
+                return i;
+            }
+        }
+        return count;
+    }
+
+    private void UpdateFavoriteDropIndicator(int dropIndex)
+    {
+        if (dropIndex == _favoriteDropIndex)
+        {
+            return;
+        }
+        _favoriteDropIndex = dropIndex;
+
+        // -1 is "nowhere to drop" (the cursor has left the list): no line, and
+        // CommitFavoriteReorder leaves the order alone when it sees it.
+        if (dropIndex < 0 || FavoriteDropIndicatorOffset(dropIndex) is not { } offset)
+        {
+            FavoriteDropIndicator.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // Centred on the boundary rather than hanging below it.
+        FavoriteDropIndicator.Margin = new Thickness(0, Math.Max(0, offset - 1), 0, 0);
+        FavoriteDropIndicator.Visibility = Visibility.Visible;
+    }
+
+    private double? FavoriteDropIndicatorOffset(int dropIndex)
+    {
+        int count = _settings.Favorites.Count;
+        if (count == 0)
+        {
+            return 0;
+        }
+
+        if (dropIndex < count)
+        {
+            return FavoritesList.ItemContainerGenerator.ContainerFromIndex(dropIndex) is ListBoxItem container
+                ? container.TransformToAncestor(FavoritesList).Transform(new System.Windows.Point(0, 0)).Y
+                : null;
+        }
+
+        return FavoritesList.ItemContainerGenerator.ContainerFromIndex(count - 1) is ListBoxItem last
+            ? last.TransformToAncestor(FavoritesList).Transform(new System.Windows.Point(0, 0)).Y + last.ActualHeight
+            : null;
+    }
+
+    private void CommitFavoriteReorder(FavoriteEntry entry, int dropIndex)
+    {
+        var favorites = _settings.Favorites;
+        int from = favorites.IndexOf(entry);
+        if (from < 0 || dropIndex < 0)
+        {
+            return;
+        }
+
+        // The insertion index was measured with the dragged row still in
+        // place, so removing it first shifts everything after it up one.
+        int to = dropIndex > from ? dropIndex - 1 : dropIndex;
+        if (to == from)
+        {
+            return;
+        }
+
+        favorites.RemoveAt(from);
+        favorites.Insert(to, entry);
+
+        // The list is a plain List<T> with no change notification of its own
+        // (same as everywhere else it's bound), so the view is told outright.
+        FavoritesList.Items.Refresh();
+        FavoritesList.SelectedItem = entry;
+
+        // Saved immediately, same reasoning as bookmarks: a deliberate
+        // arrangement whose whole point is that it persists.
+        _settingsService.Save(_settings);
     }
 
     // Expands every ancestor folder down to targetPath, and the target itself,
