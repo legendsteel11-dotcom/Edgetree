@@ -1869,7 +1869,14 @@
                      by trigger (IsOnNetworkDrive + folder + icon visible - it
                      must vanish along with the icon when folder icons are
                      toggled off). Green, the conventional "connected" hue,
-                     with a dark rim so it reads on top of the yellow folder. -->
+                     with a dark rim so it reads on top of the yellow folder.
+                     Turns RED while the drive isn't answering (see
+                     IsNetworkDriveOffline and MainWindow's poll) - Explorer
+                     crosses the drive out in the same situation. Same dot,
+                     same place, only the colour: at 7px a cross is mush,
+                     while a colour change on a shape already in the eye's
+                     memory reads instantly. -->
+
                 <Ellipse x:Name="NetworkBadge"
                         Grid.Column="0"
                         Width="7"
@@ -2166,6 +2173,33 @@
                     <Setter TargetName="NameText"
                             Property="FontWeight"
                             Value="Bold"/>
+                </DataTrigger>
+                <!-- Drive not answering: red dot, and the row greyed out.
+                     LAST on purpose - every folder/file/selection colour above
+                     targets the same Foreground, and the last matching trigger
+                     is the one that wins, so anywhere earlier and file names
+                     simply stayed their normal colour (2026-07-26: "파일은
+                     여전히 밝음, 아이콘만 어두워짐").
+                     What stays on screen while a drive is out is a listing
+                     from before it went away: worth keeping (it says where you
+                     were) but it must not read as live, and the subtree is
+                     collapsed and inert until the drive answers again (see
+                     ApplyNetworkOfflineState). The dot goes grey with
+                     everything else rather than red: the whole row already
+                     reads as switched off, and a warning colour on top of that
+                     is louder than the situation - a NAS being asleep is
+                     normal, not an error (user's call, 2026-07-26). -->
+                <DataTrigger Binding="{Binding IsNetworkDriveOffline}"
+                        Value="True">
+                    <Setter TargetName="NetworkBadge"
+                            Property="Fill"
+                            Value="#FF8C9196"/>
+                    <Setter TargetName="RowIcon"
+                            Property="Opacity"
+                            Value="0.5"/>
+                    <Setter TargetName="NameText"
+                            Property="Foreground"
+                            Value="#FF8C9196"/>
                 </DataTrigger>
             </HierarchicalDataTemplate.Triggers>
         </HierarchicalDataTemplate>

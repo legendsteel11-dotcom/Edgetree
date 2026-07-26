@@ -338,6 +338,7 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(PruneMissingBookmarks, System.Windows.Threading.DispatcherPriority.Background);
 
         StartStuckCaptureWatchdog();
+        StartNetworkRootStatusWatch();
 
         // Resuming from sleep and changing the display layout both make Windows
         // rebuild the surfaces WPF renders onto. The reported symptom is rows
@@ -4289,6 +4290,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Nothing under a drive that isn't answering can be opened - the read
+        // would only time out and the rows behind it are stale anyway. Fold it
+        // straight back and leave the drive row saying so.
+        if (item.IsNetworkDriveOffline)
+        {
+            item.IsExpanded = false;
+            return;
+        }
+
         item.EnsureChildrenLoaded();
 
         // A watcher event landed on this folder while it sat collapsed (see
@@ -4667,9 +4677,31 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (IsUnreachableNetworkItem(item))
+        {
+            e.Handled = true;
+            return;
+        }
+
         ShellFileService.OpenWithDefaultApp(item.FullPath);
         e.Handled = true;
     }
+
+    // Rows on a network drive that isn't answering are a listing from before
+    // it went away - fine to look at (that is why they stay on screen, dimmed
+    // and red-dotted), but handing one to the shell means the SHELL puts up
+    // its own "네트워크 오류 - 액세스할 수 없습니다" box, which this app can
+    // neither prevent (SetErrorMode only covers our own IO) nor dismiss.
+    // Reported 2026-07-26: clicking a file under a rebooting NAS. So opening
+    // is simply declined while the drive is out; the row's own dimming already
+    // says why, and nothing is lost by waiting for the dot to go green.
+    // Also consults the service's own cache, not just the row's flag: the flag
+    // is pushed down by a poll every couple of seconds, while the cache is
+    // written the instant a read times out - and the click that matters most
+    // is the one right after the drive goes quiet.
+    private static bool IsUnreachableNetworkItem(FileSystemItem item)
+        => item.IsOnNetworkDrive &&
+           (item.IsNetworkDriveOffline || FileSystemService.IsNetworkPathUnreachable(item.FullPath));
 
     // ----- Ctrl/Shift-click multi-selection ---------------------------------
     //
@@ -6009,6 +6041,106 @@ public partial class MainWindow : Window
     // Ctrl+Alt+L/J cycle-jump - the VS Code Bookmarks extension's bindings,
     // chosen because that muscle memory is widespread.
 
+    // ----- 네트워크 드라이브 연결 상태 -------------------------------------
+    //
+    // The badge on a network drive's rows is green while it answers and red
+    // while it doesn't. Asking is a disk call - instant when a mapping is
+    // disconnected, but seconds when the server is up and wedged - so it
+    // happens on a timer, off the UI thread, once per DRIVE rather than per
+    // row, and never while an earlier check is still out.
+    private System.Windows.Threading.DispatcherTimer? _networkStatusTimer;
+    private bool _networkStatusCheckRunning;
+
+    private void StartNetworkRootStatusWatch()
+    {
+        _networkStatusTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(2)
+        };
+        _networkStatusTimer.Tick += (_, _) => UpdateNetworkRootStatus();
+        _networkStatusTimer.Start();
+        UpdateNetworkRootStatus();
+    }
+
+    private async void UpdateNetworkRootStatus()
+    {
+        if (_networkStatusCheckRunning)
+        {
+            return;
+        }
+
+        var networkRoots = _roots.Where(r => r.IsOnNetworkDrive).ToList();
+        if (networkRoots.Count == 0)
+        {
+            return;
+        }
+
+        _networkStatusCheckRunning = true;
+        try
+        {
+            var paths = networkRoots.Select(r => r.FullPath).ToList();
+            var offline = await Task.Run(() => paths
+                .Where(FileSystemService.RefreshNetworkRootState)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase));
+
+            foreach (var root in networkRoots)
+            {
+                bool isOffline = offline.Contains(root.FullPath);
+                if (root.IsNetworkDriveOffline != isOffline)
+                {
+                    // Only on a CHANGE, so the walk below costs nothing while
+                    // a drive simply stays connected.
+                    ApplyNetworkOfflineState(root, isOffline);
+                }
+            }
+        }
+        finally
+        {
+            _networkStatusCheckRunning = false;
+        }
+    }
+
+    // The whole loaded subtree carries the drive's state, not just its root
+    // row: rows deep in a scroll are exactly where "is this still live?" gets
+    // asked, which is why the badge exists on them at all.
+    //
+    // Going offline also COLLAPSES the subtree. What was on screen was a
+    // half-updated listing - rows that could no longer be re-read, gaps where
+    // a merge had got partway - and every one of them was still a click that
+    // handed the shell a dead path. Folding it up leaves one grey, red-dotted
+    // drive row that says exactly what is true: this is not reachable right
+    // now. The rows are not discarded, only closed, so re-expanding after the
+    // drive returns costs nothing (user's call, 2026-07-26).
+    private static void ApplyNetworkOfflineState(FileSystemItem item, bool isOffline)
+    {
+        item.IsNetworkDriveOffline = isOffline;
+        if (isOffline)
+        {
+            item.IsExpanded = false;
+        }
+        if (!item.ChildrenLoaded)
+        {
+            return;
+        }
+
+        foreach (var child in item.Children)
+        {
+            if (child is { IsPlaceholder: false, IsShowMore: false })
+            {
+                // FILES take the flag too, not just folders - they are the
+                // rows that most need it, since a click on one is what hands
+                // the shell a dead path (see IsUnreachableNetworkItem). An
+                // earlier version walked directories only, which left every
+                // file looking live and still openable.
+                child.IsNetworkDriveOffline = isOffline;
+                if (child.IsDirectory)
+                {
+                    ApplyNetworkOfflineState(child, isOffline);
+                }
+            }
+        }
+    }
+
     // Where the Ctrl+Alt+L/J cycle currently stands in BookmarkPaths.
     private int _bookmarkCycleIndex = -1;
 
@@ -6153,30 +6285,54 @@ public partial class MainWindow : Window
     // order bookmarks were added. An entry whose path doesn't answer right
     // now is skipped but NOT removed - it may live on a network drive that's
     // merely asleep (the same read-failure-isn't-emptiness rule as the tree's).
-    private void JumpToBookmark(int direction)
+    // The search for the next reachable bookmark happens off the UI thread.
+    // Testing a path is a disk call, and against a network drive that has gone
+    // away each one sits in the SMB timeout for seconds - times however many
+    // bookmarks the cycle walks past. Pressing Ctrl+Alt+L with a NAS switched
+    // off froze the window and then did nothing, since every path had answered
+    // "no" (reported 2026-07-26). ProbeExists also remembers a root that made
+    // it wait, so the rest of the cycle skips it immediately.
+    private async void JumpToBookmark(int direction)
     {
-        var paths = _settings.BookmarkPaths;
+        var paths = _settings.BookmarkPaths.ToList();
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        int startIndex = _bookmarkCycleIndex;
+        var target = await Task.Run(() => FindNextReachableBookmark(paths, startIndex, direction));
+        if (target is not { } found)
+        {
+            return;
+        }
+
+        // The list can have changed while the search ran (a toggle, a prune) -
+        // the index is only meaningful against the list it was found in.
+        _bookmarkCycleIndex = _settings.BookmarkPaths.FindIndex(p =>
+            string.Equals(p, found.Path, StringComparison.OrdinalIgnoreCase));
+
+        SetSearchViewActive(false);
+
+        // Same route a search-result click takes for files (handles rows past
+        // a folder's "더 보기" cap); folders take the favorites-style walk with
+        // its usual pin-to-top.
+        NavigateToPath(found.Path, pinParentToTop: !found.IsDirectory);
+    }
+
+    private static (string Path, bool IsDirectory)? FindNextReachableBookmark(List<string> paths, int startIndex,
+        int direction)
+    {
+        int index = startIndex;
         for (int attempts = 0; attempts < paths.Count; attempts++)
         {
-            _bookmarkCycleIndex = ((_bookmarkCycleIndex + direction) % paths.Count + paths.Count) % paths.Count;
-            string path = paths[_bookmarkCycleIndex];
-
-            // Same route a search-result click takes for files (handles rows
-            // past a folder's "더 보기" cap); folders take the favorites-style
-            // walk with its usual pin-to-top.
-            if (File.Exists(path))
+            index = ((index + direction) % paths.Count + paths.Count) % paths.Count;
+            if (FileSystemService.ProbeExists(paths[index], out bool isDirectory))
             {
-                SetSearchViewActive(false);
-                NavigateToPath(path, pinParentToTop: true);
-                return;
-            }
-            if (Directory.Exists(path))
-            {
-                SetSearchViewActive(false);
-                NavigateToPath(path);
-                return;
+                return (paths[index], isDirectory);
             }
         }
+        return null;
     }
 
     // Ctrl+Alt+K/L/J work anywhere in the window. With Alt held WPF reports
@@ -6228,7 +6384,7 @@ public partial class MainWindow : Window
             _lastTreeUserInputTicks = Environment.TickCount64;
             item.IsExpanded = true;
         }
-        else
+        else if (!IsUnreachableNetworkItem(item))
         {
             ShellFileService.OpenWithDefaultApp(item.FullPath);
         }

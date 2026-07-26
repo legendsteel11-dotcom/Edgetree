@@ -172,6 +172,18 @@ public class FileSystemItem : INotifyPropertyChanged
     // Explorer badges the network drive icon itself.
     public bool IsOnNetworkDrive { get; set; }
 
+    // Whether that network drive is answering right now. Drives the badge's
+    // colour (green connected / red not), kept up to date by MainWindow's own
+    // poll rather than asked per row - one question per drive, not per folder,
+    // and never from the row's own render path where a dead mapping would cost
+    // seconds. Set on the root and pushed down its loaded rows on change.
+    private bool _isNetworkDriveOffline;
+    public bool IsNetworkDriveOffline
+    {
+        get => _isNetworkDriveOffline;
+        set => SetField(ref _isNetworkDriveOffline, value);
+    }
+
     private bool _isBookmarked;
 
     // The 책갈피 marker (see MainWindow's ToggleBookmark and the row
@@ -192,6 +204,10 @@ public class FileSystemItem : INotifyPropertyChanged
         IsDirectory = isDirectory;
         Parent = parent;
         IsOnNetworkDrive = parent?.IsOnNetworkDrive ?? false;
+        // Inherited so a row built while the drive is out (a merge running on
+        // a stale listing, a folder expanded from cache) starts out looking
+        // the same as its neighbours instead of alone in full colour.
+        _isNetworkDriveOffline = parent?.IsNetworkDriveOffline ?? false;
         _isBookmarked = FileSystemService.BookmarkedPaths.Contains(fullPath);
         if (isDirectory)
         {
