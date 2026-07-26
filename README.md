@@ -149,6 +149,10 @@ Either way, the resulting `.exe` is in
 
 ### v1.3.2 (2026-07-26)
 
+- **Drag onto the hidden edge to open it**: drag a file from another window,
+  rest it on the thin bar at the screen edge for a moment, and the sidebar
+  opens so you can drop it on the folder you want. Brushing past leaves it
+  closed
 - **Network drives (NAS and the like) hold up**: the window keeps working
   when a mapped drive stops answering. The drive keeps its place in the tree
   instead of vanishing, greys out with its folders folded away, and comes
