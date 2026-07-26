@@ -2143,6 +2143,27 @@
                     Handler="FavoriteListBoxItem_PreviewMouseRightButtonDown"/>
             <EventSetter Event="PreviewMouseLeftButtonDown"
                     Handler="FavoriteListBoxItem_PreviewMouseLeftButtonDown"/>
+            <!-- Favorites are a flat list of folder NAMES, so several entries
+                 can read identically ("dist", "src", ...) with nothing on
+                 screen to tell them apart - the one place in the app where the
+                 full path is information the window doesn't already show. The
+                 tree deliberately has no such tooltip: its rows sit under
+                 their own parents, so the path is already visible there.
+                 Delay is longer than the WPF default so brushing past a row on
+                 the way somewhere else doesn't pop anything up, and the font
+                 follows the tree's zoom through the placement target (a
+                 tooltip is its own window, outside the tree's visual tree, so
+                 it inherits nothing on its own). -->
+            <Setter Property="ToolTipService.InitialShowDelay"
+                    Value="900"/>
+            <Setter Property="ToolTipService.ShowDuration"
+                    Value="20000"/>
+            <Setter Property="ToolTip">
+                <Setter.Value>
+                    <ToolTip Content="{Binding Path}"
+                            FontSize="{Binding PlacementTarget.FontSize, RelativeSource={RelativeSource Self}}"/>
+                </Setter.Value>
+            </Setter>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
