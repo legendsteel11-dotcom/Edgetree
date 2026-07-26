@@ -333,6 +333,10 @@ public partial class MainWindow : Window
         // work runs, rather than reading as a startup freeze/flicker.
         Dispatcher.BeginInvoke(RestoreTreeState, System.Windows.Threading.DispatcherPriority.Background);
 
+        // Deferred for the same reason as the tree restore above - and its own
+        // disk work happens on a thread pool anyway (see the method).
+        Dispatcher.BeginInvoke(PruneMissingBookmarks, System.Windows.Threading.DispatcherPriority.Background);
+
         StartStuckCaptureWatchdog();
 
         // Resuming from sleep and changing the display layout both make Windows
@@ -6007,6 +6011,115 @@ public partial class MainWindow : Window
 
     // Where the Ctrl+Alt+L/J cycle currently stands in BookmarkPaths.
     private int _bookmarkCycleIndex = -1;
+
+    // 없는 경로 정리. A bookmark on a path that no longer exists is dead weight:
+    // the cycle skips it silently (see JumpToBookmark), so it never announces
+    // itself, it just makes Ctrl+Alt+L feel like it missed a press.
+    //
+    // The rule for removing one is deliberately narrow: ONLY when the volume
+    // holding it can testify right now that it is gone. A sleeping NAS, an
+    // unplugged drive or a disconnected mapping says nothing at all about
+    // whether the folder still exists, and a bookmark deleted on that evidence
+    // is gone for good - the exact reason bookmarks were left alone until now
+    // (and the same principle as "read failure is not an empty folder", the
+    // 2026-07-23 NAS incident).
+    //
+    // Runs off the UI thread: File.Exists against a path on a sleeping network
+    // drive blocks for seconds, and this runs at startup where that would be a
+    // visible freeze. Quiet by design - no prompt, no report - because the
+    // only thing it ever removes is a bookmark that could not be reached in
+    // the first place; debug builds record what went, in bookmarks.log.
+    private async void PruneMissingBookmarks()
+    {
+        var candidates = _settings.BookmarkPaths.ToList();
+        if (candidates.Count == 0)
+        {
+            return;
+        }
+
+        var missing = await Task.Run(() => candidates.Where(IsBookmarkConfirmedMissing).ToList());
+        if (missing.Count == 0)
+        {
+            return;
+        }
+
+        foreach (string path in missing)
+        {
+            _settings.BookmarkPaths.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+            FileSystemService.BookmarkedPaths.Remove(path);
+        }
+
+        // The cycle's position indexes into the list that just changed.
+        _bookmarkCycleIndex = -1;
+        _settingsService.Save(_settings);
+        LogBookmarkPrune(missing);
+    }
+
+    private static bool IsBookmarkConfirmedMissing(string path)
+    {
+        try
+        {
+            if (File.Exists(path) || Directory.Exists(path))
+            {
+                return false;
+            }
+
+            // The evidence required is the PARENT FOLDER's own listing: the
+            // entry is gone only if the folder that should hold it can be read
+            // right now and doesn't. Asking the drive instead is not good
+            // enough - DriveInfo.IsReady answers true for a mapped network
+            // drive whose server is only half up (a NAS mid-reboot), and a
+            // bookmark deleted on that answer is gone for good.
+            string? parent = Path.GetDirectoryName(path);
+            if (string.IsNullOrEmpty(parent))
+            {
+                return false;
+            }
+
+            // The parent itself may be what was deleted - walk up to the first
+            // level that still exists and let that one testify. Stops at the
+            // root: a root that doesn't answer proves nothing at all.
+            while (!Directory.Exists(parent))
+            {
+                string? grandParent = Path.GetDirectoryName(parent);
+                if (string.IsNullOrEmpty(grandParent))
+                {
+                    return false;
+                }
+                parent = grandParent;
+            }
+
+            // Enumerating is the actual test: Directory.Exists can answer from
+            // a cached handle, while listing has to reach the volume. Any
+            // failure here means "couldn't tell", which keeps the bookmark.
+            Directory.EnumerateFileSystemEntries(parent).Take(1).ToList();
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+                                       or NotSupportedException)
+        {
+            // Every uncertain answer keeps the bookmark. Only a folder that
+            // answered, and did not contain it, removes one.
+            return false;
+        }
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogBookmarkPrune(List<string> removed)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "bookmarks.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  pruned {removed.Count} missing: {string.Join(" | ", removed)}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
 
     private void BookmarkMenuItem_Click(object sender, RoutedEventArgs e)
     {
