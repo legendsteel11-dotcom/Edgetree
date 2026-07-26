@@ -1,4 +1,4 @@
-# Edgetree v1.3.1
+# Edgetree v1.3.2
 
 [한국어 안내](README-ko.md)
 
@@ -146,6 +146,22 @@ Either way, the resulting `.exe` is in
 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
 
 ## Changelog
+
+### v1.3.2 (2026-07-26)
+
+- **Network drives (NAS and the like) hold up**: the window keeps working
+  when a mapped drive stops answering. The drive keeps its place in the tree
+  instead of vanishing, greys out with its folders folded away, and comes
+  back on its own once the drive does
+- **Sort by type or size**, alongside name and date modified — per folder or
+  as the app-wide default. Clicking a row's sort icon opens that folder's
+  sort menu directly
+- **Reorder favorites** by dragging them, and hover one to see its full path
+  when several folders share a name
+- **Bookmarks tidy themselves**: a bookmark on a file or folder that has been
+  deleted is dropped, while bookmarks on a drive that isn't answering are
+  left alone
+- The About window now links to the maker's other tool, TabStick
 
 ### v1.3.1 (2026-07-25)
 

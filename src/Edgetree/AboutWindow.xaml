@@ -210,7 +210,21 @@
                         FontSize="12"
                         Cursor="Hand"
                         TextDecorations="Underline"
+                        Margin="0,0,0,10"
                         MouseLeftButtonDown="WebsiteLink_MouseLeftButtonDown"/>
+
+                <!-- The other half of a mutual link: TabStick's own site has
+                     pointed here since 2026-07-25. Last of the rows on
+                     purpose - it's the one line in this window that isn't
+                     about Edgetree. -->
+                <TextBlock Text="{x:Static services:Strings.AboutOtherToolLabel}"
+                        Style="{StaticResource AboutRowLabelStyle}"/>
+                <TextBlock Text="TabStick"
+                        Foreground="{DynamicResource AccentForeground}"
+                        FontSize="12"
+                        Cursor="Hand"
+                        TextDecorations="Underline"
+                        MouseLeftButtonDown="OtherToolLink_MouseLeftButtonDown"/>
 
                 <Button Content="{x:Static services:Strings.ButtonClose}"
                         Style="{StaticResource DialogButtonStyle}"
