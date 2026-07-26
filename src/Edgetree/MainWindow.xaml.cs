@@ -48,6 +48,13 @@ public partial class MainWindow : Window
     private const double UndockCornerOffset = 40;
     private const int AutoHideRehideDelayMs = 400;
 
+    // Deliberately NOT instant, unlike the plain mouse hover reveal. During a
+    // drag the cursor crosses the whole screen, and the sliver sits on the very
+    // edge of it, so brushing past on the way to another window is routine -
+    // hovering with an empty hand is a much better signal of intent than
+    // hovering with a file. Same 400ms as the re-hide, for one thing to tune.
+    private const int AutoHideDragRevealDelayMs = 400;
+
     private readonly SettingsService _settingsService = new();
     private AppSettings _settings = new();
     private List<FileSystemItem> _roots = new();
@@ -68,6 +75,13 @@ public partial class MainWindow : Window
     // re-hidden to the sliver even if _settings.IsAutoHidden was saved true.
     private bool _isAutoHideRevealed;
     private System.Windows.Threading.DispatcherTimer? _autoHideRehideTimer;
+
+    // Counting down while a drag is resting on the auto-hidden sliver, and a
+    // note of whether it was that drag - rather than the cursor - that opened
+    // the window, since a drag leaving again has to close what it opened
+    // (no MouseLeave arrives during a drag to do it).
+    private System.Windows.Threading.DispatcherTimer? _dragRevealTimer;
+    private bool _revealedByDrag;
 
     // Non-null while "Collapse All" has collapsed the tree via
     // CollapseAllButton_Click - holds the paths that were expanded right
@@ -992,8 +1006,10 @@ public partial class MainWindow : Window
     {
         _autoHideRehideTimer?.Stop();
         StopAutoHideOutsideClickWatch();
+        StopDragReveal();
         _settings.IsAutoHidden = false;
         _isAutoHideRevealed = false;
+        _revealedByDrag = false;
         ApplyTopmostState("exit");
         UpdatePinButtonVisibility();
 
@@ -1012,6 +1028,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        RevealFromAutoHide();
+    }
+
+    // Shared by the cursor reveal above and the drag reveal below. Callers
+    // check the "should this open at all" conditions themselves - by the time
+    // they get here, opening is decided.
+    private void RevealFromAutoHide()
+    {
         _autoHideRehideTimer?.Stop();
         _isAutoHideRevealed = true;
         // Width first, content after: the one full tree/favorites layout pass
@@ -1031,6 +1055,140 @@ public partial class MainWindow : Window
         {
             StartAutoHideOutsideClickWatch();
         }
+    }
+
+    // Windows sends no MouseEnter during an OLE drag - the drag loop owns the
+    // mouse and delivers DragEnter/DragOver instead - so the hover reveal above
+    // is blind to a file being dragged at the sliver. Without this an
+    // auto-hidden sidebar cannot be a drop target at all: its content is
+    // collapsed too, so there isn't a single row for the drop to land on.
+    private void MainWindow_DragOver(object sender, DragEventArgs e)
+    {
+        // Rows handle their own DragOver and mark it handled, so reaching here
+        // means the cursor is over the sliver or over chrome. Once the window
+        // is open, this has nothing left to do.
+        if (!_isDocked || !_settings.IsAutoHidden || _isAutoHideRevealed)
+        {
+            StopDragReveal();
+            return;
+        }
+
+        // The sliver itself can't take the drop - be honest about that with
+        // the cursor while the dwell counts down, rather than showing a copy
+        // cursor over something that would silently swallow the drop.
+        e.Effects = DragDropEffects.None;
+        e.Handled = true;
+
+        // DragOver repeats for as long as the drag is over the window, so the
+        // countdown starts on first contact and is not restarted by the small
+        // movements of a hand holding still.
+        if (_dragRevealTimer is not null)
+        {
+            return;
+        }
+
+        _dragRevealTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(AutoHideDragRevealDelayMs)
+        };
+        _dragRevealTimer.Tick += DragRevealTimer_Tick;
+        _dragRevealTimer.Start();
+    }
+
+    private void DragRevealTimer_Tick(object? sender, EventArgs e)
+    {
+        StopDragReveal();
+
+        // Re-checked rather than assumed: the pin button or a re-dock could
+        // have changed the state during the dwell.
+        if (!_isDocked || !_settings.IsAutoHidden || _isAutoHideRevealed)
+        {
+            return;
+        }
+
+        // The condition that has to hold is "the drag is still here", so ask
+        // that directly instead of relying on DragLeave to have cancelled the
+        // countdown. It doesn't reliably arrive for a fast brush past a
+        // 3-8px sliver, and when it's missed the window opens a moment after
+        // the drag is long gone and then shuts itself again - the flash
+        // reported 2026-07-27. A cancel that can be missed is no cancel.
+        if (!IsCursorInsideWindow())
+        {
+            LogDragReveal("dwell elapsed but the pointer had already left");
+            return;
+        }
+
+        LogDragReveal("revealed by drag dwell");
+        _revealedByDrag = true;
+        RevealFromAutoHide();
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogDragReveal(string what)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "autohide.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  drag reveal: {what}{Environment.NewLine}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private void MainWindow_DragLeave(object sender, DragEventArgs e)
+    {
+        // DragLeave bubbles up from every row the cursor crosses on its way
+        // through an open tree, so "the drag left the window" has to be
+        // measured, not taken at face value - believing it would close the
+        // window from under a drag that is still inside it.
+        System.Windows.Point p = e.GetPosition(this);
+        if (p.X >= 0 && p.Y >= 0 && p.X < ActualWidth && p.Y < ActualHeight)
+        {
+            return;
+        }
+
+        StopDragReveal();
+        EndDragReveal();
+    }
+
+    private void MainWindow_Drop(object sender, DragEventArgs e)
+    {
+        // Only reached for drops onto chrome, never onto a row (those are
+        // handled and don't bubble). Nothing to import - this just makes sure
+        // the dwell doesn't outlive the drag that started it.
+        StopDragReveal();
+    }
+
+    private void StopDragReveal()
+    {
+        if (_dragRevealTimer is null)
+        {
+            return;
+        }
+
+        _dragRevealTimer.Stop();
+        _dragRevealTimer.Tick -= DragRevealTimer_Tick;
+        _dragRevealTimer = null;
+    }
+
+    // A drag that opened the window and then left has to close it again: the
+    // cursor never "entered" as far as Windows is concerned, so no MouseLeave
+    // is coming to do it. Drops are the other ending, and those leave the
+    // cursor inside, where the ordinary MouseLeave takes over.
+    private void EndDragReveal()
+    {
+        if (!_revealedByDrag)
+        {
+            return;
+        }
+
+        _revealedByDrag = false;
+        ArmAutoHideRehideTimer();
     }
 
     // A short delay (rather than hiding the instant the cursor leaves) so
@@ -1106,6 +1264,7 @@ public partial class MainWindow : Window
     private void CloseAutoHideReveal()
     {
         _isAutoHideRevealed = false;
+        _revealedByDrag = false;
         SetExpandedContentVisibility(Visibility.Collapsed);
         AnimateWidth(AutoHideSliverWidth);
         UpdatePinButtonVisibility();
@@ -1222,6 +1381,9 @@ public partial class MainWindow : Window
         }
     }
 
+    // Asks Windows where the pointer actually is, rather than trusting an
+    // enter/leave event to have arrived. Also used by the outside-click watch
+    // and by the drag dwell, which has no reliable "left" event of its own.
     private bool IsCursorInsideWindow()
     {
         var cursor = System.Windows.Forms.Cursor.Position;
@@ -1414,12 +1576,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var cursor = System.Windows.Forms.Cursor.Position;
-        var dpi = VisualTreeHelper.GetDpi(this);
-        double cursorX = cursor.X / dpi.DpiScaleX;
-        double cursorY = cursor.Y / dpi.DpiScaleY;
-        bool insideWindow = cursorX >= Left && cursorX <= Left + Width && cursorY >= Top && cursorY <= Top + Height;
-        if (insideWindow)
+        if (IsCursorInsideWindow())
         {
             return;
         }
@@ -1713,7 +1870,9 @@ public partial class MainWindow : Window
         {
             _settings.IsAutoHidden = false;
             _isAutoHideRevealed = false;
+            _revealedByDrag = false;
             _autoHideRehideTimer?.Stop();
+            StopDragReveal();
             Topmost = _settings.AlwaysOnTop;
             SetExpandedContentVisibility(Visibility.Visible);
         }

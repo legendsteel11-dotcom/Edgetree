@@ -39,7 +39,12 @@
         Height="600"
         Width="280"
         MouseEnter="MainWindow_MouseEnter"
-        MouseLeave="MainWindow_MouseLeave">
+        MouseLeave="MainWindow_MouseLeave"
+        AllowDrop="True"
+        DragEnter="MainWindow_DragOver"
+        DragOver="MainWindow_DragOver"
+        DragLeave="MainWindow_DragLeave"
+        Drop="MainWindow_Drop">
     <shell:WindowChrome.WindowChrome>
         <!-- CaptionHeight/ResizeBorderThickness start at 0 (docked: fixed position,
              no native move/resize). Undock()/Dock() in code-behind flip these when
