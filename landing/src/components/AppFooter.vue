@@ -18,7 +18,7 @@ const EMAIL = 'pjh85336@gmail.com'
       <!-- 상호 링크는 푸터에(TabStick 랜딩과 같은 자리·같은 모양). -->
       <p class="other">
         {{ t.footer.otherTool }} ·
-        <a href="https://tabstick-app.vercel.app/" target="_blank" rel="noopener">{{ t.footer.otherToolName }}</a>
+        <a href="https://tabstick.com/" target="_blank" rel="noopener">{{ t.footer.otherToolName }}</a>
       </p>
 
       <p class="copyright">{{ t.footer.copyright }}</p>

@@ -99,7 +99,7 @@ public partial class AboutWindow : Window
     {
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
-            FileName = "https://tabstick-app.vercel.app/",
+            FileName = "https://tabstick.com/",
             UseShellExecute = true
         });
     }

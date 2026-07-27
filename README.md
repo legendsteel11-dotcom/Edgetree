@@ -241,7 +241,7 @@ Email pjh85336@gmail.com.
 
 ## Another tool by the same maker
 
-[TabStick](https://tabstick-app.vercel.app/) — index notes that stick beside
+[TabStick](https://tabstick.com/) — index notes that stick beside
 the window they belong to.
 
 ## License
