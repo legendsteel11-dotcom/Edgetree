@@ -76,6 +76,10 @@ import { t, lang, toggleLang } from '../i18n'
   display: flex;
   align-items: center;
   gap: 4px;
+  /* Pins it to the right edge on its own, rather than depending on the nav's
+     flex-grow to push it there - the nav is hidden on narrow screens, which
+     is exactly where it was landing beside the logo instead. */
+  margin-left: auto;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 999px;
