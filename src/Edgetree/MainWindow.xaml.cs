@@ -4231,8 +4231,30 @@ public partial class MainWindow : Window
         // what moves is the glyph inside that space, not the space.
         // The ribbon's own aspect is 480:672 in its native grid.
         double markerShift = Math.Round(Math.Round(bookmarkMarkerHeight * 0.714) * 0.8);
+        // Left is the gap to whatever sits before it (the sort icon); right is
+        // what keeps it off the very edge. Only the right one decides where the
+        // ribbon lands, so the left can be spent on closing that gap without
+        // moving the marker itself.
         Resources["BookmarkMarkerMargin"] =
-            new Thickness(6 + markerShift, 0, Math.Max(0, 7 - markerShift), 0);
+            new Thickness(3 + markerShift, 0, Math.Max(0, 7 - markerShift), 0);
+
+        // The sort icon follows the marker by the same amount, so the two stay
+        // in one line down the right edge instead of one sitting further in
+        // than the other. Left and right move together, so the column keeps its
+        // width and nothing beside it shifts.
+        //
+        // What this spends is the icon's clearance from the overlay scrollbar,
+        // which hit-tests even while invisible - the reason that right margin
+        // was 6 in the first place. See the note on SortOverrideIconBorder.
+        Resources["SortOverrideIconMargin"] =
+            new Thickness(4 + markerShift, 0, Math.Max(0, 6 - markerShift), 0);
+
+        // Asymmetric on purpose. The padding is click area, not spacing, and
+        // most of the room it buys was on the side facing the bookmark ribbon -
+        // which is where the two needed to close up. The left half keeps its
+        // width, so the target stays easy to hit from the direction the cursor
+        // actually arrives from.
+        Resources["SortOverrideIconPadding"] = new Thickness(10, 0, 4, 0);
 
         // Row vertical padding: the font-size-scaled base (was
         // Converters/FontSizeToRowPaddingConverter's whole job, now folded in
@@ -4361,6 +4383,38 @@ public partial class MainWindow : Window
         var appResources = Application.Current.Resources;
         appResources["MenuFontSize"] = ExplorerTree.FontSize;
         appResources["MenuGestureFontSize"] = Math.Max(8.0, Math.Round(11.0 * scale));
+        // The dialogs (색상 설정, 앱 정보) live in their own windows, so nothing
+        // of the tree's zoom reached them - they stayed at a hardcoded 12pt in a
+        // 300px frame however large the rest of the app had been made. Someone
+        // who raised the font did so to be able to read, and the settings window
+        // is exactly where they then go. App-level rather than window-level
+        // resources: another Window can only see these here.
+        appResources["DialogFontSize"] = ExplorerTree.FontSize;
+        appResources["DialogWidth"] = Math.Round(240.0 * scale);
+        // Lines the title up with the body below it, which sits at 16 - it had
+        // been at 10, close enough to look like a near-miss rather than a
+        // choice.
+        appResources["DialogTitleIndent"] = new Thickness(16, 0, 0, 0);
+        appResources["DialogButtonWidth"] = Math.Round(70.0 * scale);
+        appResources["DialogSwatchWidth"] = Math.Round(32.0 * scale);
+        appResources["DialogSwatchHeight"] = Math.Round(20.0 * scale);
+        // Grows at roughly half the font's rate. Straight proportional spacing
+        // read as airy once zoomed: the rows themselves are already taller, so
+        // the gap between them doesn't need the same again.
+        double dialogRowGap = Math.Max(6.0, Math.Round(10.0 + (scale - 1.0) * 4.0));
+        appResources["DialogRowSpacing"] = new Thickness(0, dialogRowGap, 0, 0);
+        // Even above and below. The row under a divider carries no spacing of
+        // its own, so the divider owes it that gap - without it the line sat
+        // against the next label.
+        appResources["DialogDividerMargin"] = new Thickness(0, dialogRowGap + 2, 0, dialogRowGap + 2);
+        // Grow-only: 28px is comfortable at the default font and only becomes
+        // cramped once the title inside it grows. A GridLength, not a double -
+        // RowDefinition.Height takes nothing else, and handing it a number
+        // throws while the window is being parsed rather than at build time.
+        appResources["DialogTitleBarHeight"] =
+            new GridLength(Math.Max(28.0, Math.Round(28.0 * scale)));
+        appResources["DialogTitleFontSize"] = ExplorerTree.FontSize + 2.0;
+        appResources["DialogTitleIconSize"] = Math.Round(24.0 * scale);
         // The stepper buttons carry a "+"/"−" that follows the menu font, so
         // their box has to follow it too. Left at a fixed 20px they stopped
         // fitting once the font was zoomed up - the glyph's line box outgrew
@@ -6832,13 +6886,23 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void ApplyBookmarkRowKind(System.Windows.Controls.Image icon, TextBlock name, string path, bool isDirectory)
+    private void ApplyBookmarkRowKind(System.Windows.Controls.Image icon, TextBlock name, string path, bool isDirectory)
     {
         // The tree's own name colours rather than the menu's grey: that grey
         // was picked against the tree's background and sits too close to the
         // menu's darker surface to read.
         name.SetResourceReference(TextBlock.ForegroundProperty,
             isDirectory ? "FolderNameForeground" : "FileNameForeground");
+
+        // Follows the same two toggles the tree does. Someone who turned icons
+        // off asked for that everywhere, not just in the tree - and the slot
+        // goes with them, so the names sit where they would in the tree rather
+        // than behind an empty gap.
+        if (!(isDirectory ? _settings.ShowFolderIcons : _settings.ShowFileIcons))
+        {
+            icon.Visibility = Visibility.Collapsed;
+            return;
+        }
 
         string leaf = BookmarkLeafName(path);
         if (isDirectory)
@@ -6919,6 +6983,23 @@ public partial class MainWindow : Window
 
     private void ClearAllBookmarks_Click(object sender, RoutedEventArgs e)
     {
+        // Asked about, unlike the per-row "−" beside it. That one drops a
+        // single bookmark the user is looking straight at and can put back in
+        // a click; this one throws away a list they may have built over weeks,
+        // with nothing to undo it. The count is in the question because it is
+        // the part worth knowing before answering. Same treatment as "모든
+        // 펼친 폴더 접기", the other one-shot in this menu.
+        var result = MessageBox.Show(
+            this,
+            string.Format(Strings.BookmarkClearAllConfirmBody, _settings.BookmarkPaths.Count),
+            Strings.BookmarkClearAllConfirmTitle,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
         foreach (var item in EnumerateLoadedItems(_roots))
         {
             item.IsBookmarked = false;

@@ -2048,8 +2048,8 @@
                         Grid.Column="2"
                         Visibility="Collapsed"
                         Background="Transparent"
-                        Margin="4,0,6,0"
-                        Padding="10,0"
+                        Margin="{DynamicResource SortOverrideIconMargin}"
+                        Padding="{DynamicResource SortOverrideIconPadding}"
                         Cursor="Hand"
                         ToolTip="{Binding SortOverrideTooltip}">
                     <!-- Right margin (6) clears the overlay scrollbar's 5px

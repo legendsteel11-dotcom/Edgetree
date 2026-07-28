@@ -4,12 +4,13 @@
         xmlns:services="clr-namespace:SidebarExplorer.App.Services"
         Title="{x:Static services:Strings.AboutTitle}"
         SizeToContent="Height"
-        Width="300"
+        Width="{DynamicResource DialogWidth}"
         WindowStartupLocation="Manual"
         ResizeMode="NoResize"
         WindowStyle="None"
         AllowsTransparency="False"
         ShowInTaskbar="False"
+        FontSize="{DynamicResource DialogFontSize}"
         Background="{DynamicResource DialogBackground}">
     <Window.Resources>
         <Style x:Key="DialogCloseButtonStyle"
@@ -51,7 +52,7 @@
             <Setter Property="Foreground"
                     Value="{DynamicResource SecondaryForeground}"/>
             <Setter Property="FontSize"
-                    Value="12"/>
+                    Value="{DynamicResource DialogFontSize}"/>
             <Setter Property="Margin"
                     Value="0,0,0,2"/>
         </Style>
@@ -61,7 +62,7 @@
             <Setter Property="Foreground"
                     Value="{DynamicResource DialogForeground}"/>
             <Setter Property="FontSize"
-                    Value="12"/>
+                    Value="{DynamicResource DialogFontSize}"/>
             <Setter Property="TextWrapping"
                     Value="Wrap"/>
         </Style>
@@ -77,7 +78,7 @@
             <Setter Property="BorderThickness"
                     Value="1"/>
             <Setter Property="FontSize"
-                    Value="12"/>
+                    Value="{DynamicResource DialogFontSize}"/>
             <Setter Property="Cursor"
                     Value="Hand"/>
             <Setter Property="Template">
@@ -114,7 +115,7 @@
             BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="28"/>
+                <RowDefinition Height="{DynamicResource DialogTitleBarHeight}"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -123,9 +124,9 @@
                     MouseLeftButtonDown="HeaderGrid_MouseLeftButtonDown">
                 <TextBlock Text="Edgetree"
                         Foreground="{DynamicResource DialogForeground}"
-                        FontSize="12"
+                        FontSize="{DynamicResource DialogFontSize}"
                         VerticalAlignment="Center"
-                        Margin="10,0,0,0"/>
+                        Margin="{DynamicResource DialogTitleIndent}"/>
                 <Button Style="{StaticResource DialogCloseButtonStyle}"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Center"
@@ -145,13 +146,16 @@
                 <StackPanel Orientation="Horizontal"
                         Margin="0,0,0,14">
                     <Image Source="pack://application:,,,/Resources/icon.png"
-                            Width="24"
-                            Height="24"
+                            Width="{DynamicResource DialogTitleIconSize}"
+                            Height="{DynamicResource DialogTitleIconSize}"
                             Margin="0,0,8,0"
                             RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <!-- The app's own name, one step above the body text -
+                            kept a step above it at every zoom rather than
+                            pinned to 14. -->
                     <TextBlock Text="Edgetree"
                             Foreground="{DynamicResource DialogForeground}"
-                            FontSize="14"
+                            FontSize="{DynamicResource DialogTitleFontSize}"
                             FontWeight="Bold"
                             VerticalAlignment="Center"/>
                 </StackPanel>
@@ -168,7 +172,7 @@
                      be fetched. Sits right under the version it supersedes. -->
                 <TextBlock x:Name="UpdateLinkText"
                         Foreground="{DynamicResource AccentForeground}"
-                        FontSize="12"
+                        FontSize="{DynamicResource DialogFontSize}"
                         Cursor="Hand"
                         TextDecorations="Underline"
                         Margin="0,-4,0,10"
@@ -197,7 +201,7 @@
                         Style="{StaticResource AboutRowLabelStyle}"/>
                 <TextBlock Text="github.com/legendsteel11/Edgetree"
                         Foreground="{DynamicResource AccentForeground}"
-                        FontSize="12"
+                        FontSize="{DynamicResource DialogFontSize}"
                         Cursor="Hand"
                         TextDecorations="Underline"
                         Margin="0,0,0,10"
@@ -207,7 +211,7 @@
                         Style="{StaticResource AboutRowLabelStyle}"/>
                 <TextBlock Text="edgetree.vercel.app"
                         Foreground="{DynamicResource AccentForeground}"
-                        FontSize="12"
+                        FontSize="{DynamicResource DialogFontSize}"
                         Cursor="Hand"
                         TextDecorations="Underline"
                         Margin="0,0,0,10"
@@ -221,14 +225,14 @@
                         Style="{StaticResource AboutRowLabelStyle}"/>
                 <TextBlock Text="TabStick"
                         Foreground="{DynamicResource AccentForeground}"
-                        FontSize="12"
+                        FontSize="{DynamicResource DialogFontSize}"
                         Cursor="Hand"
                         TextDecorations="Underline"
                         MouseLeftButtonDown="OtherToolLink_MouseLeftButtonDown"/>
 
                 <Button Content="{x:Static services:Strings.ButtonClose}"
                         Style="{StaticResource DialogButtonStyle}"
-                        Width="70"
+                        Width="{DynamicResource DialogButtonWidth}"
                         HorizontalAlignment="Right"
                         Margin="0,18,0,0"
                         IsCancel="True"
