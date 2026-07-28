@@ -36,12 +36,6 @@ public static class FileSystemService
     public static readonly Dictionary<string, FolderSortOverride> SortOverrides =
         new(StringComparer.OrdinalIgnoreCase);
 
-    // Mirrors AppSettings.IsLightMode - same static pattern as the fields
-    // above, kept in sync by MainWindow.ApplyColorSettings (every color
-    // change, including the light/dark toggle itself, runs through there).
-    // Only consulted by FormatSortOverrideIconUri below, to pick the "_L"
-    // light-mode icon variant.
-    public static bool IsLightMode = false;
 
     // Windows Explorer's own "smart" name sort (digit runs compared as
     // numbers, so "file2" sorts before "file10") - plain ordinal/ordinal-
@@ -103,21 +97,6 @@ public static class FileSystemService
 
     public static Geometry SortOverrideGeometry(bool descending)
         => descending ? DescendingSortGeometry : AscendingSortGeometry;
-
-    // The SEARCH view's own sort button still uses the original PNG set (name/
-    // date x asc/desc, each with an "_L" light variant, plus the neutral one).
-    // It is a different control with different states - it also groups by
-    // folder - and nothing about 유형/크기 reaches it, so it was left alone
-    // rather than dragged through this change for symmetry's sake.
-    public const string NoSortOverrideIconUri = "pack://application:,,,/Resources/Icons/aliginIconDefault.png";
-
-    public static string FormatSortOverrideIconUri(FileSortField field, bool descending)
-    {
-        string name = field == FileSortField.Date ? "Date" : "Name";
-        string direction = descending ? "Desc" : "Asc";
-        string suffix = IsLightMode ? "_L" : string.Empty;
-        return $"pack://application:,,,/Resources/Icons/aliginIcon{name}{direction}{suffix}.png";
-    }
 
     // The ToolTip naming whichever sort is active on this folder - the icon
     // shows the direction but never the field, so this is where "이름"/"크기"

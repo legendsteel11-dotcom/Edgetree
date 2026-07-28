@@ -386,6 +386,52 @@
              (mixed in alongside the MenuItems) gets handed a MenuItem-typed
              style. An implicit style only matches MenuItems, leaving
              Separators to their own separate implicit style below. -->
+        <!-- The per-row remove button in the 북마크 목록 submenu. Hidden until
+             its row is highlighted: the row is already lit under the cursor,
+             so the button appearing there reads as belonging to it, and the
+             list stays quiet the rest of the time. Foreground is inherited
+             from the MenuItem template's own TextBlock.Foreground, so it
+             follows the theme without naming a brush. -->
+        <Style x:Key="BookmarkRemoveButtonStyle"
+                TargetType="Button">
+            <Setter Property="Background"
+                    Value="Transparent"/>
+            <Setter Property="BorderThickness"
+                    Value="0"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="Padding"
+                    Value="6,0"/>
+            <Setter Property="Opacity"
+                    Value="0.55"/>
+            <Setter Property="Visibility"
+                    Value="Hidden"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsHighlighted, RelativeSource={RelativeSource AncestorType=MenuItem}}"
+                        Value="True">
+                    <Setter Property="Visibility"
+                            Value="Visible"/>
+                </DataTrigger>
+                <Trigger Property="IsMouseOver"
+                        Value="True">
+                    <Setter Property="Opacity"
+                            Value="1"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style TargetType="MenuItem">
             <!-- Follows the tree's font zoom (see ApplyLayoutMetrics), with a
                  roomier vertical base than the fixed 14,4 it replaces. That
@@ -554,10 +600,13 @@
              precise mouse containment needed. -->
         <Style x:Key="MenuStepperButtonStyle"
                 TargetType="Button">
+            <!-- Follows the menu font (ApplyLayoutMetrics): the "+"/"−" inside
+                 scales with it, and a fixed box stopped containing that glyph
+                 once the font was zoomed up. -->
             <Setter Property="Width"
-                    Value="20"/>
+                    Value="{DynamicResource MenuStepperButtonSize}"/>
             <Setter Property="Height"
-                    Value="20"/>
+                    Value="{DynamicResource MenuStepperButtonSize}"/>
             <Setter Property="Background"
                     Value="{DynamicResource ControlBackground}"/>
             <Setter Property="Foreground"
@@ -568,6 +617,10 @@
                     Value="1"/>
             <Setter Property="Cursor"
                     Value="Hand"/>
+            <!-- These two glyphs are the whole affordance - a hairline "+" at
+                 a small font reads as decoration rather than a button. -->
+            <Setter Property="FontWeight"
+                    Value="Bold"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -576,8 +629,12 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="3">
+                            <!-- Margin, not alignment: see MenuStepperGlyphMargin
+                                 in ApplyLayoutMetrics for why centring alone
+                                 leaves these sitting low. -->
                             <ContentPresenter HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"/>
+                                    VerticalAlignment="Center"
+                                    Margin="{DynamicResource MenuStepperGlyphMargin}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"
@@ -893,6 +950,39 @@
                     Click="FolderSortFollowGlobalMenuItem_Click"/>
         </ContextMenu>
 
+        <!-- The search results' own sort menu. Deliberately NOT the folder menu
+             above: these are different states over a different list - a flat
+             result set has no 유형/크기 to sort by, and it has 폴더 그룹 which no
+             folder does. Direction doesn't apply to that grouping, so those two
+             rows grey out while it's chosen (SearchSortContextMenu_Opened). -->
+        <ContextMenu x:Key="SearchSortContextMenu"
+                Style="{StaticResource DarkContextMenuStyle}"
+                Opened="SearchSortContextMenu_Opened"
+                Closed="AnyMenu_Closed"
+                PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
+            <MenuItem Header="{x:Static services:Strings.SortModeFolderGroup}"
+                    IsCheckable="True"
+                    Tag="group"
+                    Click="SearchSortFieldMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
+                    IsCheckable="True"
+                    Tag="name"
+                    Click="SearchSortFieldMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuSortByDate}"
+                    IsCheckable="True"
+                    Tag="date"
+                    Click="SearchSortFieldMenuItem_Click"/>
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuSortAscending}"
+                    IsCheckable="True"
+                    Tag="asc"
+                    Click="SearchSortDirectionMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuSortDescending}"
+                    IsCheckable="True"
+                    Tag="desc"
+                    Click="SearchSortDirectionMenuItem_Click"/>
+        </ContextMenu>
+
         <!-- Search result rows' own menu. Every action operates on the
              right-clicked result's path (SearchEntry.FullPath) via the same
              ShellFileService/FileOperationService the tree menu uses - no
@@ -1019,6 +1109,13 @@
             <MenuItem Header="{x:Static services:Strings.MenuAutoHideCloseOnLeave}"
                     IsCheckable="True"
                     Click="AutoHideCloseOnLeaveMenuItem_Click"/>
+            <Separator/>
+            <!-- Contents are built in code on every open (RebuildBookmarkListMenu)
+                 - the list is the user's own bookmarks, so there is nothing to
+                 declare here. Sits inside the separators with 색상 설정 rather
+                 than up among the toggles: like that one it opens something of
+                 its own rather than flipping a setting. -->
+            <MenuItem Header="{x:Static services:Strings.MenuBookmarkList}"/>
             <Separator/>
             <!-- Fenced off by separators on both sides: it opens a window,
                  unlike everything around it, so it belongs to neither the
@@ -1858,6 +1955,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Image x:Name="RowIcon"
                         Grid.Column="0"
@@ -1995,15 +2093,25 @@
                      convention as the header's keep-pin. Fixed mid-blue by
                      design: legible on both themes without adding a 16th
                      palette entry. -->
+                <!-- Column of its own (2026-07-28), replacing a full-width
+                     overlay pinned to the right edge. The overlay was chosen so
+                     that a marker appearing would never displace the sort icon,
+                     and it did hold that - but taking no part in layout meant
+                     the name simply ran underneath it, which at a narrow window
+                     put the ribbon on top of the last letters rather than on
+                     the ellipsis. It also came and went while the window was
+                     being resized, the row's content briefly outgrowing the
+                     viewport it was being right-aligned against. A real column
+                     ends both: the star column now measures against what is
+                     actually left, so the name trims before the ribbon instead
+                     of behind it, and there is nothing left to clip. -->
                 <Path x:Name="BookmarkMarker"
-                        Grid.Column="0"
-                        Grid.ColumnSpan="3"
+                        Grid.Column="3"
                         Data="F1 M240-144v-672h480v672l-240-96-240 96Z"
                         Fill="#FF4A90E2"
                         Stretch="Uniform"
                         Height="{DynamicResource BookmarkMarkerHeight}"
-                        Margin="0,0,1,0"
-                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource BookmarkMarkerMargin}"
                         VerticalAlignment="Center"
                         IsHitTestVisible="False"
                         Visibility="Collapsed"/>
@@ -2948,26 +3056,32 @@
                             <Path Data="M1.5,4 L6,4 L7.5,5.5 L14.5,5.5 L14.5,12.5 L1.5,12.5 Z"
                                     Fill="{DynamicResource ForegroundText}"/>
                         </Button>
-                        <!-- Results-only sort (name/date, asc/desc). Reuses the
-                             same rotating icons as the per-folder sort override
-                             (N↑→N↓→D↑→D↓ on click); its image Source is set from
-                             code (SearchSortIcon) so it tracks the light/dark
-                             theme the same way. -->
-                        <!-- ToolTip is set from UpdateSearchSortIcon rather than
-                             bound here - it names whichever of the 5 rotating
-                             modes is active, same as the tree's own sort icon. -->
+                        <!-- Results-only sort (folder grouping / name / date,
+                             asc/desc). Click opens the menu below rather than
+                             stepping to the next of five states - the same call
+                             the tree's own sort icon made on 2026-07-26, for the
+                             same reason: five states already took four clicks to
+                             reach the last one, and a picture that has to encode
+                             all five explains none of them.
+
+                             The glyph is the tree's own sort geometry (set from
+                             UpdateSearchSortIcon), so it takes the row brush and
+                             follows light/dark with no second asset - this was
+                             the last PNG pair in the app. ToolTip is set there
+                             too, since it names the active mode. -->
                         <Button x:Name="SearchSortButton"
                                 Grid.Column="2"
                                 Style="{StaticResource ToggleButtonStyle}"
                                 Width="26"
                                 Height="26"
                                 Margin="2,0"
+                                ContextMenu="{StaticResource SearchSortContextMenu}"
                                 Click="SearchSortButton_Click">
-                            <Image x:Name="SearchSortIcon"
+                            <Path x:Name="SearchSortIcon"
                                     Width="10"
                                     Height="14"
                                     Stretch="Uniform"
-                                    RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    Fill="{DynamicResource ForegroundText}"/>
                         </Button>
                         <Button x:Name="SearchRefreshButton"
                                 Grid.Column="3"

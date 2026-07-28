@@ -520,12 +520,9 @@ public partial class MainWindow : Window
     {
         bool light = _settings.IsLightMode;
 
-        // Mirrors the light/dark toggle for FormatSortOverrideIconUri, and
-        // refreshes the icon on every already-loaded folder that currently
-        // has a sort override - those were computed once (at construction or
-        // last override change) and otherwise wouldn't notice a theme flip
-        // that happened afterward.
-        FileSystemService.IsLightMode = light;
+        // Not for the icon any more - that became a path taking the row's own
+        // brush, so a theme flip recolours it for free. The walk stays for the
+        // TOOLTIP, which is a cached string built from the folder's state.
         foreach (var root in _roots)
         {
             RefreshSortOverrideIconForTheme(root);
@@ -2794,7 +2791,19 @@ public partial class MainWindow : Window
         // after, so subsequent user-driven selections sync normally again.
         selected.IsSelected = true;
         selected.BringIntoView();
-        selected.Focus();
+
+        // Taking focus dismisses whatever menu the navigation was started from
+        // - which is how a bookmark picked out of the 북마크 목록 submenu shut
+        // that list every time, defeating the point of a list you check several
+        // entries against. Selection plus BringIntoView already shows where the
+        // tree went; focus can wait until the menu is out of the way. Stated as
+        // a rule rather than a flag for that one caller: nothing should pull
+        // focus out from under an open menu.
+        if (!IsMenuOrDialogOpen)
+        {
+            selected.Focus();
+        }
+
         EndFavoriteNavigation(token);
 
         if (!pinToTop)
@@ -3108,16 +3117,25 @@ public partial class MainWindow : Window
 
         // Same reasoning as ExplorerItemContextMenu_Opened: MenuItems declared
         // in a resource dictionary don't get auto-generated code-behind fields.
-        // The two discards after the toggle group skip the separator and the
-        // "색상 변경" item, neither of which has state to sync here.
+        // That's also why the 북마크 목록 submenu is picked out positionally here
+        // and kept in a field - its rows are the user's own bookmarks, built
+        // fresh on every open rather than declared. The discards around it are
+        // the two separators fencing that group and the "색상 변경" item,
+        // none of which has state to sync.
         if (sender is ContextMenu
             {
-                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, _, _, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem autoHideSliverWidthRow, MenuItem scrollBarThicknessRow, MenuItem sortMenu, MenuItem languageMenu, MenuItem iconStyleMenu, ..]
+                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, MenuItem bookmarkList, _, _, _, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem autoHideSliverWidthRow, MenuItem scrollBarThicknessRow, MenuItem sortMenu, MenuItem languageMenu, MenuItem iconStyleMenu, ..]
             })
         {
             // Nothing expanded means nothing to collapse - grey it out rather
             // than offering a confirmation prompt that would do nothing.
             collapseAllExpanded.IsEnabled = CollectAllExpandedPaths().Count > 0;
+
+            _optionsMenu = sender as ContextMenu;
+            _bookmarkListMenuItem = bookmarkList;
+            bookmarkList.SubmenuOpened -= BookmarkSubmenu_Opened;
+            bookmarkList.SubmenuOpened += BookmarkSubmenu_Opened;
+            RebuildBookmarkListMenu();
 
             autoCollapse.IsChecked = _settings.AutoCollapseFolders;
             alwaysOnTop.IsChecked = _settings.AlwaysOnTop;
@@ -4203,7 +4221,18 @@ public partial class MainWindow : Window
 
         // The bookmark marker follows the font zoom the same grow-only way
         // the sort icon does (9px at the default 12pt - 11 read a touch loud).
-        Resources["BookmarkMarkerHeight"] = Math.Round(9.0 * growOnlyScale);
+        double bookmarkMarkerHeight = Math.Round(9.0 * growOnlyScale);
+        Resources["BookmarkMarkerHeight"] = bookmarkMarkerHeight;
+
+        // Slid toward the scrollbar by 80% of its own width (user's call,
+        // 2026-07-28) - the marker reads better tucked against the edge than
+        // floating in the middle of its column. The column's total width is
+        // unchanged, so the name still gives up exactly what it did before:
+        // what moves is the glyph inside that space, not the space.
+        // The ribbon's own aspect is 480:672 in its native grid.
+        double markerShift = Math.Round(Math.Round(bookmarkMarkerHeight * 0.714) * 0.8);
+        Resources["BookmarkMarkerMargin"] =
+            new Thickness(6 + markerShift, 0, Math.Max(0, 7 - markerShift), 0);
 
         // Row vertical padding: the font-size-scaled base (was
         // Converters/FontSizeToRowPaddingConverter's whole job, now folded in
@@ -4332,6 +4361,24 @@ public partial class MainWindow : Window
         var appResources = Application.Current.Resources;
         appResources["MenuFontSize"] = ExplorerTree.FontSize;
         appResources["MenuGestureFontSize"] = Math.Max(8.0, Math.Round(11.0 * scale));
+        // The stepper buttons carry a "+"/"−" that follows the menu font, so
+        // their box has to follow it too. Left at a fixed 20px they stopped
+        // fitting once the font was zoomed up - the glyph's line box outgrew
+        // the button and the symbol sat on its bottom edge (reported
+        // 2026-07-28 at 16pt). Grow-only, like the sort and bookmark glyphs:
+        // a smaller font has no trouble fitting, and shrinking the buttons
+        // would only make them harder to hit.
+        appResources["MenuStepperButtonSize"] = Math.Max(20.0, Math.Round(20.0 * scale));
+        // Centring the glyph centres its LINE box, and a line box carries
+        // descender room that "+" and "−" never use - so the ink they do draw
+        // lands below the middle, by more the larger the font gets. A bottom
+        // margin proportional to the font pushes it back up.
+        // Rounded UP, not to nearest: the correction only lands on whole
+        // pixels, and rounding down left 16-18pt a pixel short - the drift
+        // returns as soon as the fraction is discarded. Half a pixel high is
+        // not something the eye reports; half a pixel low is what it did.
+        appResources["MenuStepperGlyphMargin"] =
+            new Thickness(0, 0, 0, Math.Ceiling(ExplorerTree.FontSize * 0.13));
         // The thumbnail's info/date lines: one zoom step (1pt) below the menu
         // text - it's metadata under a picture, not a menu item.
         appResources["MenuThumbnailInfoFontSize"] = Math.Max(8.0, ExplorerTree.FontSize - 1.0);
@@ -6349,6 +6396,17 @@ public partial class MainWindow : Window
         }
     }
 
+    // The 북마크 목록 submenu, picked out of the options menu on open - a
+    // MenuItem living in a resource dictionary has no code-behind field of
+    // its own. Null until that menu has been opened once.
+    private MenuItem? _bookmarkListMenuItem;
+    private ContextMenu? _optionsMenu;
+
+    // Everything in that submenu whose width has to match the options menu
+    // above it, filled while the rows are built and applied once the parent has
+    // measured itself (BookmarkSubmenu_Opened).
+    private readonly List<FrameworkElement> _bookmarkWidthTargets = new();
+
     // Where the Ctrl+Alt+L/J cycle currently stands in BookmarkPaths.
     private int _bookmarkCycleIndex = -1;
 
@@ -6458,6 +6516,433 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+        }
+    }
+
+    // Built fresh every time the options menu opens: the marker on a row says
+    // "this one", but nothing said how many there were or where the rest had
+    // got to, and the Ctrl+Alt+L/J cycle only reveals them one at a time.
+    //
+    // Deliberately reads nothing from disk. Names come out of the path string
+    // alone, so opening the menu can't stall on a sleeping network drive -
+    // the same rule the jump cycle had to learn (see JumpToBookmark).
+    private void RebuildBookmarkListMenu()
+    {
+        if (_bookmarkListMenuItem is not { } menu)
+        {
+            return;
+        }
+
+        menu.Items.Clear();
+        _bookmarkWidthTargets.Clear();
+
+        if (_settings.BookmarkPaths.Count == 0)
+        {
+            menu.Items.Add(FollowMenuFont(new MenuItem
+            {
+                Header = Strings.MenuBookmarkListEmpty,
+                IsEnabled = false,
+            }));
+            return;
+        }
+
+        foreach (string path in _settings.BookmarkPaths.ToList())
+        {
+            menu.Items.Add(BuildBookmarkListRow(path));
+        }
+
+        menu.Items.Add(new Separator());
+        menu.Items.Add(BuildBookmarkShortcutHint());
+        menu.Items.Add(new Separator());
+
+        // Pushed to the right end, away from the rows' own text: it acts on all
+        // of them at once and can't be undone, so it shouldn't sit directly
+        // under the column the cursor has been travelling down.
+        var clearAllText = new TextBlock
+        {
+            Text = Strings.MenuBookmarkClearAll,
+            TextAlignment = TextAlignment.Right,
+        };
+        clearAllText.SetResourceReference(TextBlock.ForegroundProperty, "MenuForeground");
+        var clearAll = FollowMenuFont(new MenuItem { Header = clearAllText });
+        _bookmarkWidthTargets.Add(clearAll);
+        clearAll.Click += ClearAllBookmarks_Click;
+        menu.Items.Add(clearAll);
+    }
+
+    // The shortcuts are the fast way to work with bookmarks, and this list is
+    // the one place someone is already thinking about them - so they're stated
+    // here rather than left to a help page nobody opens.
+    //
+    // Set apart by SIZE alone, never by dimming. Opacity on menu text has now
+    // gone wrong twice in this menu (the parent-folder column, then these
+    // lines): the menu foreground is already a soft grey chosen against the
+    // tree's lighter background, and knocking it down again on the menu's own
+    // darker surface leaves text the user cannot read. Anything secondary here
+    // gets a smaller font, not a fainter one.
+    private MenuItem BuildBookmarkShortcutHint()
+    {
+        var lines = new StackPanel();
+        foreach (var (gesture, label) in new[]
+                 {
+                     ("Ctrl+Alt+K", Strings.BookmarkShortcutToggle),
+                     ("Ctrl+Alt+L", Strings.BookmarkShortcutNext),
+                     ("Ctrl+Alt+J", Strings.BookmarkShortcutPrev),
+                 })
+        {
+            var line = new Grid();
+            line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            // Description first, shortcut on the right - the same order every
+            // menu row above uses, where the label leads and the gesture
+            // follows in its own column.
+            //
+            // Both in SecondaryForeground, the brush the menu template gives
+            // that gesture column. This whole block is an aside about the rows
+            // above it, so it reads as one thing rather than a label paired
+            // with something else.
+            var labelText = new TextBlock { Text = label };
+            labelText.SetResourceReference(TextBlock.ForegroundProperty, "SecondaryForeground");
+            Grid.SetColumn(labelText, 0);
+            line.Children.Add(labelText);
+
+            var gestureText = new TextBlock
+            {
+                Text = gesture,
+                Margin = new Thickness(12, 0, 0, 0),
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            };
+            gestureText.SetResourceReference(TextBlock.ForegroundProperty, "SecondaryForeground");
+            Grid.SetColumn(gestureText, 1);
+            line.Children.Add(gestureText);
+
+            lines.Children.Add(line);
+        }
+
+        var hint = new MenuItem
+        {
+            Header = lines,
+            // Not a target: no hover highlight, no keyboard stop, nothing
+            // happens on click.
+            IsHitTestVisible = false,
+            Focusable = false,
+        };
+        // A step below even the menu's own gesture column: this block explains
+        // the rows above rather than being one of them, and the user asked for
+        // it quieter still. Computed rather than referenced, since there is no
+        // resource one size down - the floor keeps it legible at any zoom.
+        double gestureSize = Application.Current.Resources["MenuGestureFontSize"] as double? ?? 11.0;
+        hint.FontSize = Math.Max(8.0, gestureSize - 1);
+        _bookmarkWidthTargets.Add(hint);
+        return hint;
+    }
+
+    // The submenu's rows are made to span the options menu's own width, so the
+    // popup lines up with the menu it hangs off rather than sizing itself to
+    // whatever names happen to be bookmarked. Done here rather than at build
+    // time because the parent hasn't measured itself yet when its Opened fires.
+    private void BookmarkSubmenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (_optionsMenu is not { ActualWidth: > 0 } parent)
+        {
+            return;
+        }
+
+        // Applied to the ITEMS, not to what's inside them: a popup is as wide
+        // as its widest item plus the menu's own padding and border, so an item
+        // sized to the parent's width less that same trim produces a submenu
+        // exactly as wide as the menu it hangs off. Sizing the content instead
+        // left each row short by its own padding.
+        // Both templates frame their visible border with a transparent 10px
+        // margin for the drop shadow to render into (see the ContextMenu
+        // template and PART_Popup in MainWindow.xaml). ActualWidth counts that
+        // room, the eye doesn't - so it comes off first, or the submenu ends up
+        // exactly one shadow-frame wider than the menu it hangs off.
+        const double ShadowBleed = 10;
+
+        double inset = 2 * ShadowBleed + 2;
+        if (Application.Current.Resources["MenuPadding"] is Thickness menuPadding)
+        {
+            inset += menuPadding.Left + menuPadding.Right;
+        }
+
+        double width = Math.Max(80, parent.ActualWidth - inset);
+        foreach (var target in _bookmarkWidthTargets)
+        {
+            target.Width = width;
+        }
+    }
+
+    // Rows declared in XAML inherit the menu's font from DarkContextMenuStyle,
+    // which is where the Ctrl +/- zoom reaches menus at all. Ones built in code
+    // sit in a submenu popup that inheritance doesn't cross, so they came up in
+    // the system's default menu font - visibly larger than everything around
+    // them. A resource reference rather than a copied value, so they keep
+    // following the zoom while the menu is open.
+    private static MenuItem FollowMenuFont(MenuItem item)
+    {
+        item.SetResourceReference(FontSizeProperty, "MenuFontSize");
+        return item;
+    }
+
+    // `[아이콘] 이름 … [−] [책갈피]`, at the options menu's own width (applied by
+    // BookmarkSubmenu_Opened). Content-fit was tried first and is worse here:
+    // removing one long name visibly shrinks the whole popup, so the list
+    // appears to move under the cursor mid-cleanup. The full path is the
+    // tooltip.
+    private MenuItem BuildBookmarkListRow(string path)
+    {
+        var row = FollowMenuFont(new MenuItem
+        {
+            ToolTip = path,
+            // Neither the remove button nor a jump closes this menu: WPF would
+            // shut it on any click inside, and the point of the list is to keep
+            // looking. Clicking outside still dismisses it as usual.
+            StaysOpenOnClick = true,
+        });
+
+        _bookmarkWidthTargets.Add(row);
+
+        var grid = new Grid();
+        // icon | name | remove | bookmark glyph
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        // Same size the tree's own rows use, so the two read as one thing at
+        // every zoom step. Empty until the row's kind is known - see
+        // ResolveBookmarkRow - and the slot is held either way, so nothing
+        // shifts sideways when an icon does arrive.
+        var icon = new System.Windows.Controls.Image
+        {
+            Stretch = Stretch.Uniform,
+            Margin = new Thickness(0, 0, 8, 0),
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+            SnapsToDevicePixels = true,
+        };
+        icon.SetResourceReference(WidthProperty, "IconSize");
+        icon.SetResourceReference(HeightProperty, "IconSize");
+        Grid.SetColumn(icon, 0);
+        grid.Children.Add(icon);
+
+        // The name alone. A parent folder used to sit alongside it, to tell two
+        // same-named rows apart - built, tried, and dropped (2026-07-28): it
+        // read as clutter rather than as a distinction, and the tooltip already
+        // answers "which one is this" on demand. Trimmed to whatever the fixed
+        // row width leaves it.
+        var name = new TextBlock
+        {
+            Text = BookmarkLeafName(path),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+        };
+        // Readable from the first frame, before the row's kind is known and the
+        // folder/file colour replaces this. Without it the row would render in
+        // TextBlock's own default - black, i.e. invisible here.
+        name.SetResourceReference(TextBlock.ForegroundProperty, "MenuForeground");
+        ResolveBookmarkRow(icon, name, path);
+        Grid.SetColumn(name, 1);
+        grid.Children.Add(name);
+
+        var remove = new Button
+        {
+            Content = "−",
+            Style = (Style)FindResource("BookmarkRemoveButtonStyle"),
+            ToolTip = Strings.MenuBookmarkRemove,
+            Margin = new Thickness(6, 0, 0, 0),
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+        };
+        remove.Click += (_, args) =>
+        {
+            // Consumed so the row underneath doesn't also run and jump to the
+            // bookmark being removed. With StaysOpenOnClick the list stays up,
+            // which is the point - several can go in one visit.
+            args.Handled = true;
+            RemoveBookmark(path);
+            DropBookmarkListRow(row);
+        };
+        Grid.SetColumn(remove, 2);
+        grid.Children.Add(remove);
+
+        // The same ribbon that marks the row in the tree, repeated on every
+        // line. Redundant by design: the list is reached through a menu that
+        // says "북마크 목록" and then never says it again, and one glance at a
+        // familiar glyph settles what these rows are faster than reading does.
+        // Last in the row, so it sits where the eye already looks for it - the
+        // tree keeps its marker hard against the right edge too.
+        var marker = new System.Windows.Shapes.Path
+        {
+            Data = Geometry.Parse("F1 M240-144v-672h480v672l-240-96-240 96Z"),
+            Fill = new SolidColorBrush(Color.FromRgb(0x4A, 0x90, 0xE2)),
+            Stretch = Stretch.Uniform,
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+        };
+        marker.SetResourceReference(HeightProperty, "BookmarkMarkerHeight");
+        Grid.SetColumn(marker, 3);
+        grid.Children.Add(marker);
+
+        row.Header = grid;
+        row.Click += (_, args) =>
+        {
+            // Deliberately leaves the menu open. The tree moves behind it, so
+            // the next bookmark is one more click away rather than four -
+            // checking several in a row is the reason to open this list at all.
+            args.Handled = true;
+            JumpToBookmarkPath(path);
+        };
+        return row;
+    }
+
+    // Icon and name colour both hang on one question - is this a folder or a
+    // file - and that question costs a disk call, which this menu makes a point
+    // of not making (see RebuildBookmarkListMenu).
+    //
+    // So rows already present in the tree answer it instantly and for free,
+    // and only the rest are asked in the background. Those show no icon and
+    // the inherited menu colour until the answer arrives: immediate on a live
+    // drive, never at all on a sleeping one - and in neither case does the
+    // menu wait.
+    private void ResolveBookmarkRow(System.Windows.Controls.Image icon, TextBlock name, string path)
+    {
+        foreach (var item in EnumerateLoadedItems(_roots))
+        {
+            if (string.Equals(item.FullPath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyBookmarkRowKind(icon, name, path, item.IsDirectory);
+                return;
+            }
+        }
+
+        ResolveBookmarkRowFromDisk(icon, name, path);
+    }
+
+    private async void ResolveBookmarkRowFromDisk(System.Windows.Controls.Image icon, TextBlock name, string path)
+    {
+        // ProbeExists carries the cycle's own guard against a dead network
+        // root - the first wait is remembered so the rest give up at once.
+        bool? isDirectory = await Task.Run<bool?>(() =>
+            FileSystemService.ProbeExists(path, out bool directory) ? directory : null);
+
+        if (isDirectory is { } known)
+        {
+            ApplyBookmarkRowKind(icon, name, path, known);
+        }
+    }
+
+    private static void ApplyBookmarkRowKind(System.Windows.Controls.Image icon, TextBlock name, string path, bool isDirectory)
+    {
+        // The tree's own name colours rather than the menu's grey: that grey
+        // was picked against the tree's background and sits too close to the
+        // menu's darker surface to read.
+        name.SetResourceReference(TextBlock.ForegroundProperty,
+            isDirectory ? "FolderNameForeground" : "FileNameForeground");
+
+        string leaf = BookmarkLeafName(path);
+        if (isDirectory)
+        {
+            icon.Source = ShellIconService.GetFolderIcon(leaf, isExpanded: false);
+            return;
+        }
+
+        // Returns a generic icon for the extension at once and fetches the
+        // file's own (an .exe's, a shortcut's) in the background - the callback
+        // is how that later arrival gets picked up. The re-read passes no
+        // callback of its own, so it can't queue another round.
+        icon.Source = ShellIconService.GetFileIcon(leaf, path,
+            () => icon.Source = ShellIconService.GetFileIcon(leaf, path, null));
+    }
+
+    private void DropBookmarkListRow(MenuItem row)
+    {
+        _bookmarkListMenuItem?.Items.Remove(row);
+
+        // Nothing left but the separator and "전체 해제", which now have
+        // nothing to act on.
+        if (_settings.BookmarkPaths.Count == 0)
+        {
+            RebuildBookmarkListMenu();
+        }
+    }
+
+    private static string BookmarkLeafName(string path)
+    {
+        string trimmed = path.TrimEnd('\\');
+        string name = Path.GetFileName(trimmed);
+        // A drive root has no file name of its own - show the root itself.
+        return string.IsNullOrEmpty(name) ? path : name;
+    }
+
+    // Same destination as a Ctrl+Alt+L landing, minus the search for which one
+    // is next. Whether the target is a folder decides the route, and that
+    // question costs a disk call - off the UI thread, since a bookmark can
+    // point at a network drive that has gone to sleep.
+    private async void JumpToBookmarkPath(string path)
+    {
+        bool isDirectory = await Task.Run(() =>
+        {
+            try
+            {
+                return Directory.Exists(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+                                           or NotSupportedException)
+            {
+                return false;
+            }
+        });
+
+        SetSearchViewActive(false);
+        NavigateToPath(path, pinParentToTop: !isDirectory);
+    }
+
+    private void RemoveBookmark(string path)
+    {
+        _settings.BookmarkPaths.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+        FileSystemService.BookmarkedPaths.Remove(path);
+
+        foreach (var item in EnumerateLoadedItems(_roots))
+        {
+            if (string.Equals(item.FullPath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                item.IsBookmarked = false;
+                break;
+            }
+        }
+
+        // The cycle's position indexes into the list that just changed.
+        _bookmarkCycleIndex = -1;
+        _settingsService.Save(_settings);
+    }
+
+    private void ClearAllBookmarks_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var item in EnumerateLoadedItems(_roots))
+        {
+            item.IsBookmarked = false;
+        }
+
+        _settings.BookmarkPaths.Clear();
+        FileSystemService.BookmarkedPaths.Clear();
+        _bookmarkCycleIndex = -1;
+        _settingsService.Save(_settings);
+    }
+
+    // Rows that already exist in the tree, and only those - no lazy loading.
+    // FindItemForPath would walk down to a path, reading each level from disk
+    // on the way, which is the last thing a bookmark pointing at an absent
+    // network drive should trigger.
+    private static IEnumerable<FileSystemItem> EnumerateLoadedItems(IEnumerable<FileSystemItem> items)
+    {
+        foreach (var item in items)
+        {
+            yield return item;
+            foreach (var child in EnumerateLoadedItems(item.Children))
+            {
+                yield return child;
+            }
         }
     }
 
@@ -7462,35 +7947,108 @@ public partial class MainWindow : Window
         SearchResultsList.ItemsSource = rows;
     }
 
-    // Folder-group state uses the user-provided default icon; the four sort
-    // states reuse the same rotating field/direction icons as the per-folder
-    // sort override (which also swap their light variant on theme change - see
-    // the ApplyColorSettings call). aliginIconDefault has no "_L" light variant
-    // yet, so it's used as-is for both themes.
+    // Shares the tree's sort geometries rather than the PNG pairs this used to
+    // carry - a path takes the button's brush, so one asset covers both themes
+    // and any future palette. That was the last PNG pair left in the app, and
+    // the prerequisite the theme work had been waiting on.
     private void UpdateSearchSortIcon()
     {
         if (_searchSortMode == SearchSortMode.FolderGroup)
         {
-            SearchSortIcon.Source = new BitmapImage(new Uri(FileSystemService.NoSortOverrideIconUri));
+            // The neutral "sort" glyph, the same one a folder following the
+            // app-wide default shows: no direction is being applied.
+            SearchSortIcon.Data = FileSystemService.FollowsGlobalSortGeometry;
             SearchSortButton.ToolTip = string.Format(Strings.SortTooltipFormat, Strings.SortModeFolderGroup);
             return;
         }
 
-        var field = _searchSortMode is SearchSortMode.DateAsc or SearchSortMode.DateDesc
-            ? FileSortField.Date
-            : FileSortField.Name;
-        bool descending = _searchSortMode is SearchSortMode.NameDesc or SearchSortMode.DateDesc;
-        SearchSortIcon.Source = new BitmapImage(new Uri(FileSystemService.FormatSortOverrideIconUri(field, descending)));
-        SearchSortButton.ToolTip = FileSystemService.FormatSortTooltip(field, descending);
+        SearchSortIcon.Data = FileSystemService.SortOverrideGeometry(IsSearchSortDescending);
+        SearchSortButton.ToolTip = FileSystemService.FormatSortTooltip(SearchSortFieldOf(_searchSortMode),
+            IsSearchSortDescending);
     }
 
-    // Cycles 폴더그룹 -> 이름↑ -> 이름↓ -> 날짜↑ -> 날짜↓ -> 폴더그룹. Folder-group
-    // is the default (clusters same-folder results); the name/date states sort
-    // globally. Remembered separately from the tree's own sort.
+    private bool IsSearchSortDescending
+        => _searchSortMode is SearchSortMode.NameDesc or SearchSortMode.DateDesc;
+
+    private static FileSortField SearchSortFieldOf(SearchSortMode mode)
+        => mode is SearchSortMode.DateAsc or SearchSortMode.DateDesc ? FileSortField.Date : FileSortField.Name;
+
+    // Opens the menu instead of stepping to the next mode. Five states behind
+    // one button is a list, not a control - the same conclusion the tree's sort
+    // icon reached on 2026-07-26, reached here for the same reason.
     private void SearchSortButton_Click(object sender, RoutedEventArgs e)
     {
-        _searchSortMode = (SearchSortMode)(((int)_searchSortMode + 1) % 5);
-        _settings.SearchSortMode = (int)_searchSortMode;
+        if (sender is not Button { ContextMenu: { } menu } button)
+        {
+            return;
+        }
+
+        menu.PlacementTarget = button;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
+    private void SearchSortContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        AnyMenu_Opened(sender, e);
+
+        if (sender is not ContextMenu
+            {
+                Items: [MenuItem group, MenuItem byName, MenuItem byDate, _, MenuItem ascending, MenuItem descending]
+            })
+        {
+            return;
+        }
+
+        bool grouping = _searchSortMode == SearchSortMode.FolderGroup;
+        group.IsChecked = grouping;
+        byName.IsChecked = !grouping && SearchSortFieldOf(_searchSortMode) == FileSortField.Name;
+        byDate.IsChecked = !grouping && SearchSortFieldOf(_searchSortMode) == FileSortField.Date;
+
+        // Grouping has no direction of its own, so the two rows stand down
+        // rather than showing a state that isn't in effect.
+        ascending.IsEnabled = !grouping;
+        descending.IsEnabled = !grouping;
+        ascending.IsChecked = !grouping && !IsSearchSortDescending;
+        descending.IsChecked = !grouping && IsSearchSortDescending;
+    }
+
+    private void SearchSortFieldMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string tag })
+        {
+            return;
+        }
+
+        // Keeps whichever direction was already in effect when switching
+        // between 이름 and 날짜 - only the grouping mode discards it, having
+        // none.
+        bool descending = IsSearchSortDescending;
+        ApplySearchSortMode(tag switch
+        {
+            "name" => descending ? SearchSortMode.NameDesc : SearchSortMode.NameAsc,
+            "date" => descending ? SearchSortMode.DateDesc : SearchSortMode.DateAsc,
+            _ => SearchSortMode.FolderGroup,
+        });
+    }
+
+    private void SearchSortDirectionMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string tag } || _searchSortMode == SearchSortMode.FolderGroup)
+        {
+            return;
+        }
+
+        bool descending = tag == "desc";
+        ApplySearchSortMode(SearchSortFieldOf(_searchSortMode) == FileSortField.Date
+            ? (descending ? SearchSortMode.DateDesc : SearchSortMode.DateAsc)
+            : (descending ? SearchSortMode.NameDesc : SearchSortMode.NameAsc));
+    }
+
+    private void ApplySearchSortMode(SearchSortMode mode)
+    {
+        _searchSortMode = mode;
+        _settings.SearchSortMode = (int)mode;
         _settingsService.Save(_settings);
         UpdateSearchSortIcon();
         RunSearchFilter();

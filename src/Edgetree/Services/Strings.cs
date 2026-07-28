@@ -12,6 +12,12 @@ public static class Strings
     public static string MenuAddFavorite = "즐겨찾기에 추가";
     public static string MenuBookmark = "북마크";
     public static string MenuBookmarkRemove = "북마크 해제";
+    public static string MenuBookmarkList = "북마크 목록";
+    public static string MenuBookmarkListEmpty = "북마크 없음";
+    public static string MenuBookmarkClearAll = "전체 해제";
+    public static string BookmarkShortcutToggle = "지정 / 해제";
+    public static string BookmarkShortcutNext = "다음 북마크";
+    public static string BookmarkShortcutPrev = "이전 북마크";
     public static string MenuNewFolder = "새 폴더";
     public static string MenuRefresh = "새로고침";
     public static string MenuOpen = "열기";
@@ -278,6 +284,12 @@ public static class Strings
         MenuAddFavorite = "Add to Favorites";
         MenuBookmark = "Bookmark";
         MenuBookmarkRemove = "Remove Bookmark";
+        MenuBookmarkList = "Bookmarks";
+        MenuBookmarkListEmpty = "No bookmarks";
+        MenuBookmarkClearAll = "Clear all";
+        BookmarkShortcutToggle = "Set / clear";
+        BookmarkShortcutNext = "Next bookmark";
+        BookmarkShortcutPrev = "Previous bookmark";
         MenuNewFolder = "New Folder";
         MenuRefresh = "Refresh";
         MenuAutoCollapse = "Accordion Mode";
