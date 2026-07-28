@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { t } from '../i18n'
-import { standardDownloadUrl, standaloneDownloadUrl, releaseVersion, ensureReleaseAssetsLoaded } from '../releaseAssets'
+import { track } from '@vercel/analytics'
+import { standardDownloadUrl, standaloneDownloadUrl, releaseVersion, ensureReleaseAssetsLoaded, trackDownload } from '../releaseAssets'
 
 onMounted(ensureReleaseAssetsLoaded)
 
@@ -14,6 +15,12 @@ const copied = ref(false)
 let resetTimer: number | undefined
 
 async function copyAddress() {
+  // A phone visitor showing they intend to carry on at a PC. Close to half of
+  // all visitors arrive on one and none of them can install from there, so
+  // whether this button gets pressed is the measure of whether that half is
+  // being caught at all - until now there was no way to know it was ever used.
+  track('copy_link')
+
   const text = `https://${siteUrl}`
   try {
     if (navigator.clipboard && window.isSecureContext) {
@@ -63,13 +70,15 @@ async function copyAddress() {
           <h3>{{ t.download.standardTitle }}</h3>
           <p>{{ t.download.standardDesc }}</p>
           <p v-if="releaseVersion" class="version">{{ releaseVersion }}</p>
-          <a class="btn btn-secondary" :href="standardDownloadUrl" target="_blank" rel="noopener">{{ t.download.button }}</a>
+          <a class="btn btn-secondary" :href="standardDownloadUrl" target="_blank" rel="noopener"
+                  @click="trackDownload('standard', 'download')">{{ t.download.button }}</a>
         </div>
         <div class="card highlight">
           <h3>{{ t.download.standaloneTitle }}</h3>
           <p>{{ t.download.standaloneDesc }}</p>
           <p v-if="releaseVersion" class="version">{{ releaseVersion }}</p>
-          <a class="btn btn-primary" :href="standaloneDownloadUrl" target="_blank" rel="noopener">{{ t.download.button }}</a>
+          <a class="btn btn-primary" :href="standaloneDownloadUrl" target="_blank" rel="noopener"
+                  @click="trackDownload('standalone', 'download')">{{ t.download.button }}</a>
         </div>
       </div>
 

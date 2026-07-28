@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { track } from '@vercel/analytics'
 
 // Shared by HeroSection and DownloadSection so both sets of download
 // buttons resolve to the same direct file links from a single API call
@@ -41,4 +42,24 @@ export function ensureReleaseAssetsLoaded() {
     .catch(() => {
       // Leave both pointed at the releases page - already a working fallback.
     })
+}
+
+// Which build was taken, and from where on the page.
+//
+// Until now the only figure was GitHub's own download count, compared by eye
+// against visitors. Those two never lined up into a rate: the counts restart
+// with every release and include whatever crawls the API, while the visitors
+// are a different window entirely. Recorded here, a visit and a download sit
+// in the same picture. Event and property names match TabStick's landing so
+// the two read the same way side by side.
+//
+// `where` is this side's own addition: both the hero and the download section
+// carry the same pair of buttons, and which of them people actually use is
+// worth knowing before moving anything around again.
+//
+// The link is left alone - no preventDefault. A download link doesn't navigate
+// away, so there is no race between sending this and the browser starting the
+// file.
+export function trackDownload(build: 'standalone' | 'standard', where: 'hero' | 'download') {
+  track('download', { build, where, version: releaseVersion.value || 'unknown' })
 }
