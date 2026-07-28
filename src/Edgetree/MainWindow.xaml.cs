@@ -6293,7 +6293,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        Dispatcher.BeginInvoke(() => QueueExternalRefresh(folderPath));
+        Dispatcher.BeginInvoke(() =>
+        {
+            QueueExternalRefresh(folderPath);
+            NoteSearchScopeChanged(folderPath);
+        });
     }
 
     // The watcher's change buffer overflowed (or the handle failed): an
@@ -8605,6 +8609,9 @@ public partial class MainWindow : Window
             _searchEntries.Clear();
             _searchEntries.AddRange(cached.Entries);
             _searchIndexSavedAtUtc = cached.SavedAtUtc;
+            // Nothing has been observed changing since this listing arrived -
+            // whatever happened while the app was closed is what the age says.
+            ClearSearchIndexStale();
             _searchDisplayLimit = SearchResultDisplayCap;
             RunSearchFilter();
             return;
@@ -8617,6 +8624,61 @@ public partial class MainWindow : Window
     // a scan this session (i.e. it's current, and the status line has no age to
     // report).
     private DateTime? _searchIndexSavedAtUtc;
+
+    // A change was SEEN inside the searched folder since this index was built,
+    // so the results can be missing (or still listing) a file. The drive
+    // watchers already report every add/remove/rename on every root for the
+    // tree's sake, so this costs one path comparison and nothing else.
+    //
+    // What it does NOT claim: that an unmarked index is current. A watcher that
+    // died with a network drive (see the open item) reports nothing, and an
+    // index loaded from disk carries changes made while the app was closed -
+    // which is what the status line's age is there to say. Blue means "known to
+    // have changed", not "the only time refreshing is worth it".
+    private bool _searchIndexStale;
+
+    private void NoteSearchScopeChanged(string changedFolderPath)
+    {
+        if (_searchIndexStale || _searchScanning || _searchEntries.Count == 0 ||
+            _searchScopeFolder is not { Length: > 0 } scope)
+        {
+            return;
+        }
+
+        string scopeTrimmed = scope.TrimEnd(Path.DirectorySeparatorChar);
+        string changed = changedFolderPath.TrimEnd(Path.DirectorySeparatorChar);
+        bool inScope =
+            string.Equals(changed, scopeTrimmed, StringComparison.OrdinalIgnoreCase) ||
+            changed.StartsWith(scopeTrimmed + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        if (!inScope)
+        {
+            return;
+        }
+
+        _searchIndexStale = true;
+        UpdateSearchRefreshIndicator();
+    }
+
+    private void ClearSearchIndexStale()
+    {
+        if (!_searchIndexStale)
+        {
+            return;
+        }
+        _searchIndexStale = false;
+        UpdateSearchRefreshIndicator();
+    }
+
+    // The glyph keeps the row's own colour either way; only the dot appears.
+    // A whole glyph turning blue reads as a state the button is IN, while a dot
+    // reads as a notice attached to it - which is what this is.
+    private void UpdateSearchRefreshIndicator()
+    {
+        SearchRefreshStaleDot.Visibility = _searchIndexStale ? Visibility.Visible : Visibility.Collapsed;
+        SearchRefreshButton.ToolTip = _searchIndexStale
+            ? Strings.SearchTooltipRefreshStale
+            : Strings.SearchTooltipRefresh;
+    }
 
     // "3일 전" and friends - deliberately coarse. The point is only to let the
     // user judge whether something they created recently could be missing.
@@ -8682,6 +8744,10 @@ public partial class MainWindow : Window
         _searchEntries.Clear();
         _searchDisplayLimit = SearchResultDisplayCap;
         SetSearchRows(new List<SearchRow>());
+        // Cleared as the scan starts rather than when it ends: a change that
+        // lands mid-scan may well be one the walk has already passed, and
+        // re-marking is the honest answer to that.
+        ClearSearchIndexStale();
         // Whatever was loaded from disk is gone along with the entries above, so
         // the age must go too - otherwise a scan cancelled halfway would leave
         // the status line reporting an age for an index that no longer exists.

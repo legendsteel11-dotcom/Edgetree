@@ -151,6 +151,7 @@ public static class Strings
     public static string ToolTipExitSearch = "탐색기로 (Ctrl+E)";
     public static string SearchTooltipBrowseFolder = "검색할 폴더 선택";
     public static string SearchTooltipRefresh = "다시 인덱싱";
+    public static string SearchTooltipRefreshStale = "다시 인덱싱 · 이 폴더가 바뀌었습니다";
     public static string SearchTooltipHistory = "최근 검색어";
     public static string SearchHistoryDeleteTooltip = "이 검색어 삭제";
     public static string SearchBrowseFolderDialogTitle = "검색할 폴더를 선택하세요";
@@ -378,6 +379,7 @@ public static class Strings
         ToolTipExitSearch = "Back to Explorer (Ctrl+E)";
         SearchTooltipBrowseFolder = "Choose folder to search";
         SearchTooltipRefresh = "Reindex";
+        SearchTooltipRefreshStale = "Reindex · this folder has changed";
         SearchTooltipHistory = "Recent searches";
         SearchHistoryDeleteTooltip = "Remove this search";
         SearchBrowseFolderDialogTitle = "Choose a folder to search";
