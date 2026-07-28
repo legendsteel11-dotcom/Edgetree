@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.Win32;
@@ -242,12 +242,24 @@ public partial class MainWindow : Window
         NativeMethods.AddClipboardFormatListener(hwnd);
     }
 
+    private const int WM_LBUTTONDOWN = 0x0201;
+    private const int WM_LBUTTONUP = 0x0202;
+
     private IntPtr SingleInstanceWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == unchecked((int)NativeMethods.ActivateMessage))
         {
             (Application.Current as App)?.RestoreMainWindow();
             handled = true;
+        }
+        else if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP)
+        {
+            // The lowest point the app can watch from: a click that reaches
+            // this window shows up here even when WPF then routes it somewhere
+            // we don't expect. A swallowed click with a line here was lost
+            // INSIDE the app; a swallowed click with no line never reached the
+            // window at all (a popup's own hwnd took it).
+            LogClick(msg == WM_LBUTTONDOWN ? "win press" : "win up", null);
         }
         else if (msg == NativeMethods.WM_CLIPBOARDUPDATE)
         {
@@ -1451,6 +1463,7 @@ public partial class MainWindow : Window
         if (sender is ContextMenu menu)
         {
             _openMenus.Add(menu);
+            LogClick("menu opened", null);
 
             // Kill the popup fade WPF applies to context menus when the OS
             // menu-animation setting is on: menus opened/closed in quick
@@ -1474,6 +1487,7 @@ public partial class MainWindow : Window
         if (sender is ContextMenu menu)
         {
             _openMenus.Remove(menu);
+            LogClick("menu closed", null);
         }
 
         // Opening a menu moves the cursor out of the sidebar, so MouseLeave has
@@ -5339,6 +5353,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        LogTreeClick(treeViewItem.DataContext as FileSystemItem);
+
         // Marks a real gesture for the auto-collapse guard (see
         // _lastTreeUserInputTicks) - deliberately before the innermost-item
         // filter and the expander check: any press that can lead to an
@@ -9097,7 +9113,7 @@ public partial class MainWindow : Window
         _searchDragStart = null;
         _searchDragCandidate = null;
         var container = ItemsControl.ContainerFromElement(SearchResultsList, (DependencyObject)e.OriginalSource) as ListBoxItem;
-        LogSearchClick("press", container?.Content as SearchRow);
+        LogClick("press", container?.Content as SearchRow);
         if (container is { Content: SearchRow { Entry: { } entry } })
         {
             _searchDragStart = e.GetPosition(SearchResultsList);
@@ -9105,18 +9121,38 @@ public partial class MainWindow : Window
         }
     }
 
-    // Two outcomes were reported for the same gesture - left-clicking a result
-    // while its own context menu is still open: sometimes the row under the
-    // cursor opens, sometimes nothing happens at all and the right-clicked row
-    // keeps its selection (2026-07-28). Timing isn't the variable, per the
-    // report, so the question is which events actually arrive. A "press" with
-    // no matching "up" is the swallowed click; menu= says whether a capturing
-    // popup was up when it happened.
-    //
-    // Worth more than this one gesture: the open "간헐적 입력 씹힘" item has
-    // never had a repro, and this is one.
+    // One timeline for every click-shaped thing the app can see, written at
+    // three depths so a click that "didn't take" can be placed:
+    //   win press/up  - the raw window message (SingleInstanceWndProc)
+    //   press/up      - WPF routed it to a results row
+    //   menu          - a context menu opened or closed
+    // A click with a window line but no row line was lost inside the app; a
+    // click with no line at all never reached this window. That distinction is
+    // the whole question behind the open 간헐적 입력 씹힘 item, which has never
+    // had a repro until the alternating one found on 2026-07-28.
+    // The tree's own row line, so the same timeline covers both views - the
+    // swallowed clicks have been reported in ordinary tree use too.
     [System.Diagnostics.Conditional("DEBUG")]
-    private void LogSearchClick(string stage, SearchRow? row)
+    private void LogTreeClick(FileSystemItem? item)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "click.log"),
+                $"{DateTime.Now:HH:mm:ss.fff}  tree press: menu={(IsCapturingUiOpen ? "open" : "-")} " +
+                $"captured={(Mouse.Captured?.GetType().Name ?? "-")} target={item?.Name ?? "(none)"}" +
+                $"{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogClick(string stage, SearchRow? row)
     {
         try
         {
@@ -9124,14 +9160,14 @@ public partial class MainWindow : Window
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
             Directory.CreateDirectory(dir);
             string target = row is null
-                ? "(no row)"
-                : row.IsHeader ? $"header {row.DirectoryPath}"
-                : row.IsShowMore ? "showmore"
-                : row.FileName;
+                ? string.Empty
+                : row.IsHeader ? $" target=header {row.DirectoryPath}"
+                : row.IsShowMore ? " target=showmore"
+                : $" target={row.FileName}";
             File.AppendAllText(
-                Path.Combine(dir, "searchclick.log"),
+                Path.Combine(dir, "click.log"),
                 $"{DateTime.Now:HH:mm:ss.fff}  {stage}: menu={(IsCapturingUiOpen ? "open" : "-")} " +
-                $"captured={(Mouse.Captured?.GetType().Name ?? "-")} target={target}{Environment.NewLine}");
+                $"captured={(Mouse.Captured?.GetType().Name ?? "-")}{target}{Environment.NewLine}");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -9184,11 +9220,11 @@ public partial class MainWindow : Window
     {
         if (ItemsControl.ContainerFromElement(SearchResultsList, (DependencyObject)e.OriginalSource) is not ListBoxItem { Content: SearchRow row })
         {
-            LogSearchClick("up (no row)", null);
+            LogClick("up (no row)", null);
             return;
         }
 
-        LogSearchClick("up", row);
+        LogClick("up", row);
 
         if (row.IsShowMore)
         {
@@ -9479,3 +9515,4 @@ public partial class MainWindow : Window
         RunSearchFilter();
     }
 }
+
