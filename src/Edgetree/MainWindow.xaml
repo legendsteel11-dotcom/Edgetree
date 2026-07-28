@@ -3199,7 +3199,13 @@
                                     MinWidth="180"
                                     Effect="{DynamicResource MenuDropShadow}"
                                     Margin="0,2,8,8">
+                                <!-- Same overlay scrollbar as every other list in
+                                     the app: this dropdown was the last place
+                                     still falling back to the stock Windows bar
+                                     (arrows and all), which is exactly what
+                                     FavoritesListBoxStyle exists to replace. -->
                                 <ListBox x:Name="SearchHistoryList"
+                                        Style="{StaticResource FavoritesListBoxStyle}"
                                         Background="Transparent"
                                         BorderThickness="0"
                                         MaxHeight="220"
