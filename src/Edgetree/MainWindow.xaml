@@ -1351,6 +1351,23 @@
                         Tag="desc"
                         Click="SortDirectionMenuItem_Click"/>
             </MenuItem>
+            <!-- Applies live (no restart) - see IconStyleMenuItem_Click.
+                 Sits above 언어 rather than below it: this one changes how the
+                 tree looks, like the rows of settings it follows, while a
+                 language change restarts the app and belongs at the end with
+                 the other things that leave. OptionsMenu_Opened matches this
+                 menu's items by POSITION, so keep its pattern in sync when
+                 touching anything here. -->
+            <MenuItem Header="{x:Static services:Strings.MenuIconStyle}">
+                <MenuItem Header="{x:Static services:Strings.MenuIconStyleDefault}"
+                        IsCheckable="True"
+                        Tag="default"
+                        Click="IconStyleMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuIconStyleShell}"
+                        IsCheckable="True"
+                        Tag="shell"
+                        Click="IconStyleMenuItem_Click"/>
+            </MenuItem>
             <MenuItem Header="{x:Static services:Strings.MenuLanguage}">
                 <!-- Non-interactive note, not a language choice - IsEnabled
                      False keeps it unclickable and visually dimmed. -->
@@ -1364,20 +1381,6 @@
                         IsCheckable="True"
                         Tag="en"
                         Click="LanguageMenuItem_Click"/>
-            </MenuItem>
-            <!-- Applies live (no restart) - see IconStyleMenuItem_Click.
-                 Positioned with the other submenu items; OptionsMenu_Opened
-                 matches this menu's items by POSITION, so keep its pattern in
-                 sync when touching anything here. -->
-            <MenuItem Header="{x:Static services:Strings.MenuIconStyle}">
-                <MenuItem Header="{x:Static services:Strings.MenuIconStyleDefault}"
-                        IsCheckable="True"
-                        Tag="default"
-                        Click="IconStyleMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuIconStyleShell}"
-                        IsCheckable="True"
-                        Tag="shell"
-                        Click="IconStyleMenuItem_Click"/>
             </MenuItem>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuExportSettings}"
@@ -2644,6 +2647,19 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
+                <!-- The strip the six header buttons sit in is not a drag
+                     handle. Their gaps are 2-4px, and the header's drag only
+                     needs the system threshold to be crossed - easy to do by
+                     accident on a target that small - so a slightly wandering
+                     click on the space BETWEEN two buttons was undocking the
+                     window. Declared before the buttons so they stay on top and
+                     keep their own clicks; this only ever sees the misses, and
+                     swallows them. -->
+                <Border Grid.Column="2"
+                        Grid.ColumnSpan="6"
+                        Background="Transparent"
+                        MouseLeftButtonDown="HeaderButtonStrip_MouseLeftButtonDown"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
                 <!-- Pure branding since 2026-07-23: this was the auto-hide
                      toggle for a while (the pin was greyed out when docked),
                      but once the pin became the real pinned/auto-hide toggle

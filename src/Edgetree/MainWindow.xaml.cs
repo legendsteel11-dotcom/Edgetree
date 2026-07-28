@@ -1779,6 +1779,14 @@ public partial class MainWindow : Window
         (sender as UIElement)?.CaptureMouse();
     }
 
+    // Handled and no further: the header's drag never starts, because
+    // _headerDragStart is only set by the grid's own handler above and this
+    // stops the event before it gets there. A miss between two buttons now
+    // does nothing at all, which is the right answer for a gap - it was never
+    // somewhere anyone meant to grab the window by.
+    private void HeaderButtonStrip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        => e.Handled = true;
+
     private void HeaderGrid_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         if (_headerDragStart is not { } start || e.LeftButton != MouseButtonState.Pressed)
@@ -3124,7 +3132,7 @@ public partial class MainWindow : Window
         // none of which has state to sync.
         if (sender is ContextMenu
             {
-                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, MenuItem bookmarkList, _, _, _, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem autoHideSliverWidthRow, MenuItem scrollBarThicknessRow, MenuItem sortMenu, MenuItem languageMenu, MenuItem iconStyleMenu, ..]
+                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, MenuItem bookmarkList, _, _, _, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem autoHideSliverWidthRow, MenuItem scrollBarThicknessRow, MenuItem sortMenu, MenuItem iconStyleMenu, MenuItem languageMenu, ..]
             })
         {
             // Nothing expanded means nothing to collapse - grey it out rather

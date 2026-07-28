@@ -72,9 +72,9 @@ public static class Strings
     // MenuSort/MenuSortByName/etc. below - this is only the options-menu
     // ("...") copy, worded as "default" to distinguish "change how every
     // folder sorts from now on" from that per-folder one.
-    // "아이콘 방식" submenu: the bundled PNG set (기본) vs. the icons Windows
+    // "아이콘 종류" submenu: the bundled PNG set (기본) vs. the icons Windows
     // Explorer itself shows (see ShellIconService).
-    public static string MenuIconStyle = "아이콘 방식";
+    public static string MenuIconStyle = "아이콘 종류";
     public static string MenuIconStyleDefault = "기본";
     public static string MenuIconStyleShell = "Windows 탐색기";
 
