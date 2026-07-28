@@ -11,41 +11,109 @@ public static class FileOperationService
         Clipboard.SetText(path);
     }
 
+    // Where Windows keeps "was this a copy or a cut" - the file list alone
+    // doesn't say. Writing it is what makes Ctrl+X here paste as a MOVE in
+    // Explorer, and reading it is how a cut made in Explorer arrives here as
+    // one. (DROPEFFECT_COPY = 1, DROPEFFECT_MOVE = 2; Explorer writes 5 =
+    // COPY|LINK for a copy, hence the bit test rather than an equality one.)
+    private const string PreferredDropEffect = "Preferred DropEffect";
+    private const int DropEffectCopy = 1;
+    private const int DropEffectMove = 2;
+
     public static void CopyToClipboard(string path)
         => CopyToClipboard(new[] { path });
 
     public static void CopyToClipboard(IEnumerable<string> paths)
+        => SetClipboardFiles(paths, move: false);
+
+    // Ctrl+X. Nothing is moved here - the clipboard just records the intent,
+    // and the paste is what acts on it (same as Explorer, so a cut left
+    // unpasted costs nothing).
+    public static bool CutToClipboard(string path)
+        => CutToClipboard(new[] { path });
+
+    public static bool CutToClipboard(IEnumerable<string> paths)
+        => SetClipboardFiles(paths, move: true);
+
+    private static bool SetClipboardFiles(IEnumerable<string> paths, bool move)
     {
         var files = new System.Collections.Specialized.StringCollection();
         foreach (string path in paths)
         {
             files.Add(path);
         }
-        if (files.Count > 0)
-        {
-            Clipboard.SetFileDropList(files);
-        }
-    }
-
-    // Returns false only when the clipboard has nothing pasteable, so the
-    // caller can distinguish "nothing to do" from "tried and failed".
-    public static bool TryPaste(string destinationFolder, out string? error)
-    {
-        error = null;
-        if (!Clipboard.ContainsFileDropList())
+        if (files.Count == 0)
         {
             return false;
         }
 
-        foreach (string? sourcePath in Clipboard.GetFileDropList())
+        var data = new System.Windows.DataObject();
+        data.SetFileDropList(files);
+        data.SetData(PreferredDropEffect,
+            new MemoryStream(BitConverter.GetBytes(move ? DropEffectMove : DropEffectCopy)));
+
+        try
         {
-            if (sourcePath is null)
+            // copy: true so the list outlives this process - a cut made here
+            // and pasted in Explorer after the sidebar is closed still works.
+            Clipboard.SetDataObject(data, copy: true);
+            return true;
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            // Another process had the clipboard open. Nothing was placed, so
+            // the caller must not mark anything as cut.
+            return false;
+        }
+    }
+
+    // What a paste turned out to be, so the caller knows whether the source
+    // folders need refreshing too (a move empties them) and can drop its cut
+    // markers once they've been acted on.
+    public sealed record PasteOutcome(bool WasMove, IReadOnlyList<string> SourcePaths)
+    {
+        public static readonly PasteOutcome None = new(false, Array.Empty<string>());
+    }
+
+    // Returns false only when the clipboard has nothing pasteable, so the
+    // caller can distinguish "nothing to do" from "tried and failed".
+    public static bool TryPaste(string destinationFolder, out PasteOutcome outcome, out string? error)
+    {
+        error = null;
+        outcome = PasteOutcome.None;
+
+        string[] sourcePaths;
+        bool move;
+        try
+        {
+            var data = Clipboard.GetDataObject();
+            if (data is null || !data.GetDataPresent(System.Windows.DataFormats.FileDrop) ||
+                data.GetData(System.Windows.DataFormats.FileDrop) is not string[] paths || paths.Length == 0)
             {
-                continue;
+                return false;
             }
+            sourcePaths = paths;
+            move = IsMoveRequested(data);
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            return false;
+        }
+
+        outcome = new PasteOutcome(move, sourcePaths);
+
+        foreach (string sourcePath in sourcePaths)
+        {
             try
             {
-                CopyEntry(sourcePath, destinationFolder);
+                if (move)
+                {
+                    MoveEntry(sourcePath, destinationFolder);
+                }
+                else
+                {
+                    CopyEntry(sourcePath, destinationFolder);
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -54,6 +122,57 @@ public static class FileOperationService
         }
 
         return true;
+    }
+
+    // Is the clipboard STILL holding exactly the cut these paths were marked
+    // for? Anything else - a copy somewhere, another app's cut, a paste that
+    // consumed ours (Explorer empties the clipboard after a move) - means the
+    // markers are stale. null = couldn't tell, because another process had the
+    // clipboard open at that instant; the caller must leave the markers alone
+    // rather than clear them on a failed read (our own cut raises the change
+    // notification too, and clearing there would erase what was just set).
+    public static bool? ClipboardStillHoldsCut(IReadOnlyCollection<string> paths)
+    {
+        try
+        {
+            var data = Clipboard.GetDataObject();
+            if (data is null || !data.GetDataPresent(System.Windows.DataFormats.FileDrop) ||
+                !IsMoveRequested(data) ||
+                data.GetData(System.Windows.DataFormats.FileDrop) is not string[] onClipboard ||
+                onClipboard.Length != paths.Count)
+            {
+                return false;
+            }
+
+            foreach (string path in onClipboard)
+            {
+                if (!paths.Contains(path, StringComparer.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsMoveRequested(System.Windows.IDataObject data)
+    {
+        if (data.GetData(PreferredDropEffect) is MemoryStream stream && stream.Length >= 4)
+        {
+            var bytes = new byte[4];
+            stream.Position = 0;
+            if (stream.Read(bytes, 0, 4) == 4)
+            {
+                return (BitConverter.ToInt32(bytes, 0) & DropEffectMove) == DropEffectMove;
+            }
+        }
+
+        return false;
     }
 
     private static void CopyEntry(string sourcePath, string destinationFolder)
@@ -70,6 +189,70 @@ public static class FileOperationService
             File.Copy(sourcePath, destPath);
         }
     }
+
+    // The cut half of paste. Name conflicts number up to " (2)" exactly like a
+    // copied paste does - the app has never asked before writing, and a move
+    // is not the place to start.
+    private static void MoveEntry(string sourcePath, string destinationFolder)
+    {
+        string trimmedSource = sourcePath.TrimEnd(Path.DirectorySeparatorChar);
+        string name = Path.GetFileName(trimmedSource);
+
+        // Cut and pasted back into the folder it came from: Explorer does
+        // nothing here, and the alternative - numbering it up to " (2)" - would
+        // silently turn a move into a copy.
+        if (Path.GetDirectoryName(trimmedSource) is { } sourceParent && IsSamePath(sourceParent, destinationFolder))
+        {
+            return;
+        }
+
+        if (Directory.Exists(sourcePath))
+        {
+            // Into itself or into its own subtree: refuse before anything is
+            // written, since carrying it out would consume the source.
+            if (IsSameOrBeneath(destinationFolder, trimmedSource))
+            {
+                throw new IOException(Strings.MoveIntoSelfError);
+            }
+
+            string destPath = GetUniqueDestination(Path.Combine(destinationFolder, name));
+            if (IsSameVolume(trimmedSource, destPath))
+            {
+                Directory.Move(sourcePath, destPath);
+            }
+            else
+            {
+                // Directory.Move can't cross volumes. Copy the whole tree
+                // FIRST and delete the source only once that has succeeded -
+                // a failure halfway leaves the original untouched, so there is
+                // never a half-moved folder to roll back.
+                CopyDirectoryRecursive(sourcePath, destPath, overwrite: false);
+                Directory.Delete(sourcePath, recursive: true);
+            }
+        }
+        else if (File.Exists(sourcePath))
+        {
+            // File.Move handles crossing volumes on its own (copy + delete,
+            // with the delete only after the copy landed).
+            File.Move(sourcePath, GetUniqueDestination(Path.Combine(destinationFolder, name)));
+        }
+    }
+
+    private static bool IsSamePath(string a, string b)
+        => string.Equals(a.TrimEnd(Path.DirectorySeparatorChar), b.TrimEnd(Path.DirectorySeparatorChar),
+            StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsSameOrBeneath(string candidate, string root)
+    {
+        string trimmedCandidate = candidate.TrimEnd(Path.DirectorySeparatorChar);
+        string trimmedRoot = root.TrimEnd(Path.DirectorySeparatorChar);
+        return string.Equals(trimmedCandidate, trimmedRoot, StringComparison.OrdinalIgnoreCase) ||
+            trimmedCandidate.StartsWith(trimmedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSameVolume(string a, string b)
+        => string.Equals(Path.GetPathRoot(Path.GetFullPath(a)), Path.GetPathRoot(Path.GetFullPath(b)),
+            StringComparison.OrdinalIgnoreCase);
 
     private static void CopyDirectoryRecursive(string sourceDir, string destDir, bool overwrite)
     {

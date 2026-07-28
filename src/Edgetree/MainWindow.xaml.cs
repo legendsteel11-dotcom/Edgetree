@@ -236,6 +236,10 @@ public partial class MainWindow : Window
         // "Open" does, regardless of whether it's currently docked or
         // hidden to the tray.
         HwndSource.FromHwnd(hwnd).AddHook(SingleInstanceWndProc);
+
+        // Also the only way to hear that our own 잘라내기 has been consumed or
+        // replaced - by Explorer's paste, or by a copy in any other app.
+        NativeMethods.AddClipboardFormatListener(hwnd);
     }
 
     private IntPtr SingleInstanceWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -245,7 +249,57 @@ public partial class MainWindow : Window
             (Application.Current as App)?.RestoreMainWindow();
             handled = true;
         }
+        else if (msg == NativeMethods.WM_CLIPBOARDUPDATE)
+        {
+            // One hop late: this arrives while the process that wrote the
+            // clipboard may still hold it open, and reading it inline would
+            // just fail.
+            Dispatcher.BeginInvoke(new Action(DropCutMarksIfClipboardMovedOn),
+                System.Windows.Threading.DispatcherPriority.Background);
+        }
         return IntPtr.Zero;
+    }
+
+    // The markers mean one thing: "this is on the clipboard, waiting to move".
+    // Checking that claim directly - rather than trying to enumerate every way
+    // it could stop being true - is what covers the paths nobody thought of,
+    // Explorer's own paste among them.
+    private void DropCutMarksIfClipboardMovedOn()
+    {
+        if (FileSystemService.CutPaths.Count == 0)
+        {
+            return;
+        }
+
+        bool? stillOurs = FileOperationService.ClipboardStillHoldsCut(FileSystemService.CutPaths);
+        LogCutClipboardCheck(stillOurs);
+        if (stillOurs == false)
+        {
+            ClearCutMarks("clipboard");
+        }
+    }
+
+    // Which of the three answers came back: true = still ours (leave it),
+    // false = someone else's clipboard now (clear), null = couldn't read it,
+    // which is the case that would leave a marker standing with nothing behind
+    // it. Written only in debug builds, same as the rest of cut.log.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogCutClipboardCheck(bool? stillOurs)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "cut.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  clipboard check: " +
+                $"{(stillOurs is null ? "unreadable" : stillOurs.Value ? "still ours" : "moved on")}" +
+                $"{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     private void MainWindow_Loaded(object? sender, RoutedEventArgs e)
@@ -1069,6 +1123,14 @@ public partial class MainWindow : Window
 
     private void MainWindow_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        // The cut markers get their re-check here as well as on activation:
+        // this window is usually reached by moving the mouse onto it, NOT by
+        // clicking it, so OnActivated can be minutes late (2026-07-28: "돌아와서
+        // 공백에 클릭을 해서 포커스를 줘야 풀립니다"). Both cost nothing while
+        // nothing is cut.
+        DropCutMarksIfClipboardMovedOn();
+        DropCutMarksForVanishedPaths();
+
         if (!_isDocked || !_settings.IsAutoHidden || _isAutoHideRevealed)
         {
             return;
@@ -4809,8 +4871,15 @@ public partial class MainWindow : Window
                 CopyPath_Click(sender, e);
                 e.Handled = true;
                 break;
-            case Key.Escape when _multiSelection.Count > 0:
+            case Key.X when Keyboard.Modifiers == ModifierKeys.Control:
+                CutItem_Click(sender, e);
+                e.Handled = true;
+                break;
+            // Esc calls off a pending cut as well as the multi-selection -
+            // Explorer's own way out of "I didn't mean to cut that".
+            case Key.Escape when _multiSelection.Count > 0 || FileSystemService.CutPaths.Count > 0:
                 ClearMultiSelection();
+                ClearCutMarks("esc");
                 e.Handled = true;
                 break;
             case Key.V when Keyboard.Modifiers == ModifierKeys.Control:
@@ -7247,7 +7316,129 @@ public partial class MainWindow : Window
         var items = GetEffectiveSelection();
         if (items.Count > 0)
         {
+            // A copy replaces the clipboard outright, so whatever was cut
+            // before is no longer going anywhere - drop its markers with it.
+            ClearCutMarks();
             FileOperationService.CopyToClipboard(items.Select(i => i.FullPath));
+        }
+    }
+
+    private void CutItem_Click(object sender, RoutedEventArgs e)
+    {
+        var items = GetEffectiveSelection();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        // Mark only after the clipboard actually took it: a failed write would
+        // otherwise leave rows faded with nothing to paste.
+        if (FileOperationService.CutToClipboard(items.Select(i => i.FullPath)))
+        {
+            MarkCutPaths(items.Select(i => i.FullPath));
+        }
+    }
+
+    // The cut markers live in FileSystemService.CutPaths (so rows rebuilt by a
+    // merge come back marked) and on whatever rows are realized right now, in
+    // both views.
+    private void MarkCutPaths(IEnumerable<string> paths)
+    {
+        FileSystemService.CutPaths.Clear();
+        foreach (string path in paths)
+        {
+            FileSystemService.CutPaths.Add(path);
+        }
+        ApplyCutMarks("cut");
+    }
+
+    // The reason is only ever written to the log, but that is the whole point:
+    // the first round of this feature shipped without it and the answer to
+    // "why is this row still faded" turned out to be a clear that never ran.
+    private void ClearCutMarks(string reason = "clear")
+    {
+        if (FileSystemService.CutPaths.Count == 0)
+        {
+            return;
+        }
+        FileSystemService.CutPaths.Clear();
+        ApplyCutMarks(reason);
+    }
+
+    private void ApplyCutMarks(string reason)
+    {
+        foreach (var item in EnumerateLoadedItems(_roots))
+        {
+            item.IsCut = FileSystemService.CutPaths.Count > 0 &&
+                FileSystemService.CutPaths.Contains(item.FullPath);
+        }
+
+        int markedRows = 0;
+        foreach (var row in _searchRows)
+        {
+            row.IsCut = row.Entry is { } entry &&
+                FileSystemService.CutPaths.Count > 0 &&
+                FileSystemService.CutPaths.Contains(entry.FullPath);
+            if (row.IsCut)
+            {
+                markedRows++;
+            }
+        }
+
+        LogCutState(reason, markedRows);
+    }
+
+    // A search result faded by a cut was reported still faded after the paste
+    // (2026-07-28), and the code path that would explain it isn't visible from
+    // reading alone - every clear walks the very list the results are bound to.
+    // So: record what the clear actually saw. A line with cut=0 rows=N and a
+    // still-faded row on screen means the model was cleared and the VIEW kept
+    // the fade; cut=0 rows=0 means the results list had already been replaced
+    // out from under the walk.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogCutState(string reason, int markedRows)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "cut.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {reason}: cut={FileSystemService.CutPaths.Count} " +
+                $"searchRows={_searchRows.Count} markedRows={markedRows}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    // The search index is a snapshot of the last scan, so a move leaves it
+    // pointing at paths the file has left - the row stays listed, and clicking
+    // it now opens nothing. Drop those entries (files moved directly, and
+    // everything indexed beneath a moved FOLDER) and re-filter, so the results
+    // stop showing a place the file no longer is. Its new home comes back on
+    // the next scan rather than being patched in here: the destination may sit
+    // outside the searched scope entirely.
+    private void DropMovedSearchEntries(IReadOnlyList<string> movedPaths)
+    {
+        if (_searchEntries.Count == 0 || movedPaths.Count == 0)
+        {
+            return;
+        }
+
+        var moved = movedPaths
+            .Select(p => p.TrimEnd(Path.DirectorySeparatorChar))
+            .ToList();
+
+        int removed = _searchEntries.RemoveAll(entry =>
+            moved.Any(m =>
+                string.Equals(entry.FullPath, m, StringComparison.OrdinalIgnoreCase) ||
+                entry.FullPath.StartsWith(m + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)));
+
+        if (removed > 0)
+        {
+            RunSearchFilter();
         }
     }
 
@@ -7264,7 +7455,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!FileOperationService.TryPaste(destinationFolder, out var error))
+        if (!FileOperationService.TryPaste(destinationFolder, out var outcome, out var error))
         {
             return; // Clipboard has nothing pasteable.
         }
@@ -7277,9 +7468,33 @@ public partial class MainWindow : Window
         // user is looking at, and a clear-and-refill collapses every expanded
         // subtree beside them (and drops the scroll position with it). Same
         // reasoning as the watcher paths - see RefreshFolderPreservingState.
-        if ((item.IsDirectory ? item : item.Parent) is { } pasteTarget)
+        var pasteTarget = item.IsDirectory ? item : item.Parent;
+        if (pasteTarget is not null)
         {
             RefreshFolderPreservingState(pasteTarget);
+        }
+
+        if (outcome.WasMove)
+        {
+            // A move empties the folders it came from, which the paste target
+            // refresh above knows nothing about. The watcher would catch up on
+            // its own, but only for folders it's watching and only after its
+            // debounce - the rows the user just moved should be gone by the
+            // time they look. Sources cut in Explorer are covered too, since
+            // this walks the clipboard's own list rather than our markers.
+            ClearCutMarks("paste");
+            DropMovedSearchEntries(outcome.SourcePaths);
+            foreach (string sourceParent in outcome.SourcePaths
+                .Select(p => Path.GetDirectoryName(p.TrimEnd(Path.DirectorySeparatorChar)) ?? string.Empty)
+                .Where(p => p.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (FindLoadedItemForPath(sourceParent) is { ChildrenLoaded: true } sourceFolder &&
+                    !ReferenceEquals(sourceFolder, pasteTarget))
+                {
+                    RefreshFolderPreservingState(sourceFolder);
+                }
+            }
         }
     }
 
@@ -7388,6 +7603,62 @@ public partial class MainWindow : Window
         base.OnActivated(e);
         _lastActivatedTicks = Environment.TickCount64;
         UpdateSelectionBrushForActivation();
+
+        // Both halves of the claim, re-checked at the one moment the marks are
+        // about to be looked at again. The listener alone wasn't enough: an app
+        // that writes the clipboard while we're in the background can leave the
+        // notification unread or unreadable (another process still holding it),
+        // and then nothing ever revisits the question (2026-07-28, reported as
+        // "브라우저에서 복사해도 그대로 남아 있음").
+        DropCutMarksIfClipboardMovedOn();
+        DropCutMarksForVanishedPaths();
+    }
+
+    // The clipboard listener covers a cut that was consumed or replaced, but
+    // not an app that moves the files and leaves the clipboard as it found it.
+    // So the second half of the same claim gets checked on the way back in:
+    // something that isn't there any more cannot be waiting to move.
+    //
+    // Off the UI thread, and "gone" means the PARENT answered and the item
+    // wasn't in it - a whole drive being asleep answers nothing and must not
+    // be read as a deletion (the 2026-07-23 NAS rule, same as the bookmark
+    // prune).
+    private async void DropCutMarksForVanishedPaths()
+    {
+        if (FileSystemService.CutPaths.Count == 0)
+        {
+            return;
+        }
+
+        var candidates = FileSystemService.CutPaths.ToList();
+        var gone = await Task.Run(() => candidates.Where(IsCutPathConfirmedGone).ToList());
+        if (gone.Count == 0)
+        {
+            return;
+        }
+
+        foreach (string path in gone)
+        {
+            FileSystemService.CutPaths.Remove(path);
+        }
+        ApplyCutMarks("vanished");
+
+        // The same knowledge the marks just acted on applies to the results
+        // list: a cut item confirmed gone from its old place is a search row
+        // pointing at nothing. This is the other half of the paste path's own
+        // cleanup, for the case where the move happened in another app.
+        DropMovedSearchEntries(gone);
+    }
+
+    private static bool IsCutPathConfirmedGone(string path)
+    {
+        if (File.Exists(path) || Directory.Exists(path))
+        {
+            return false;
+        }
+
+        string? parent = Path.GetDirectoryName(path.TrimEnd(Path.DirectorySeparatorChar));
+        return parent is { Length: > 0 } && Directory.Exists(parent);
     }
 
     // Leaving the app resolves rename state Total Commander-style: a pending
@@ -7718,6 +7989,7 @@ public partial class MainWindow : Window
     {
         if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false } item)
         {
+            ClearCutMarks();
             FileOperationService.CopyPathToClipboard(item.FullPath);
         }
     }
@@ -8824,10 +9096,45 @@ public partial class MainWindow : Window
     {
         _searchDragStart = null;
         _searchDragCandidate = null;
-        if (ItemsControl.ContainerFromElement(SearchResultsList, (DependencyObject)e.OriginalSource) is ListBoxItem { Content: SearchRow { Entry: { } entry } })
+        var container = ItemsControl.ContainerFromElement(SearchResultsList, (DependencyObject)e.OriginalSource) as ListBoxItem;
+        LogSearchClick("press", container?.Content as SearchRow);
+        if (container is { Content: SearchRow { Entry: { } entry } })
         {
             _searchDragStart = e.GetPosition(SearchResultsList);
             _searchDragCandidate = entry;
+        }
+    }
+
+    // Two outcomes were reported for the same gesture - left-clicking a result
+    // while its own context menu is still open: sometimes the row under the
+    // cursor opens, sometimes nothing happens at all and the right-clicked row
+    // keeps its selection (2026-07-28). Timing isn't the variable, per the
+    // report, so the question is which events actually arrive. A "press" with
+    // no matching "up" is the swallowed click; menu= says whether a capturing
+    // popup was up when it happened.
+    //
+    // Worth more than this one gesture: the open "간헐적 입력 씹힘" item has
+    // never had a repro, and this is one.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogSearchClick(string stage, SearchRow? row)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            string target = row is null
+                ? "(no row)"
+                : row.IsHeader ? $"header {row.DirectoryPath}"
+                : row.IsShowMore ? "showmore"
+                : row.FileName;
+            File.AppendAllText(
+                Path.Combine(dir, "searchclick.log"),
+                $"{DateTime.Now:HH:mm:ss.fff}  {stage}: menu={(IsCapturingUiOpen ? "open" : "-")} " +
+                $"captured={(Mouse.Captured?.GetType().Name ?? "-")} target={target}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
         }
     }
 
@@ -8877,8 +9184,11 @@ public partial class MainWindow : Window
     {
         if (ItemsControl.ContainerFromElement(SearchResultsList, (DependencyObject)e.OriginalSource) is not ListBoxItem { Content: SearchRow row })
         {
+            LogSearchClick("up (no row)", null);
             return;
         }
+
+        LogSearchClick("up", row);
 
         if (row.IsShowMore)
         {
@@ -8915,6 +9225,10 @@ public partial class MainWindow : Window
                 break;
             case Key.C when Keyboard.Modifiers == ModifierKeys.Control:
                 SearchCopy_Click(sender, e);
+                e.Handled = true;
+                break;
+            case Key.X when Keyboard.Modifiers == ModifierKeys.Control:
+                SearchCut_Click(sender, e);
                 e.Handled = true;
                 break;
             case Key.C when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
@@ -9081,7 +9395,19 @@ public partial class MainWindow : Window
     {
         if (SelectedSearchResult is { } entry)
         {
+            ClearCutMarks();
             FileOperationService.CopyToClipboard(entry.FullPath);
+        }
+    }
+
+    // A search result can be cut from here even though there's nothing to
+    // paste INTO in this view - the paste happens back in the tree, which is
+    // exactly the trip this saves (find it by name, then move it).
+    private void SearchCut_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedSearchResult is { } entry && FileOperationService.CutToClipboard(entry.FullPath))
+        {
+            MarkCutPaths(new[] { entry.FullPath });
         }
     }
 
@@ -9089,6 +9415,7 @@ public partial class MainWindow : Window
     {
         if (SelectedSearchResult is { } entry)
         {
+            ClearCutMarks();
             FileOperationService.CopyPathToClipboard(entry.FullPath);
         }
     }

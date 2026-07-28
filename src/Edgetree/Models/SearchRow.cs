@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Windows;
 using System.Windows.Media;
 using SidebarExplorer.App.Services;
 
@@ -47,6 +48,35 @@ public sealed class SearchRow : INotifyPropertyChanged
     public int MatchStart { get; init; } = -1;
     public int MatchLength { get; init; }
 
+    // Same meaning as FileSystemItem.IsCut - the row's icon fades while a
+    // Ctrl+X on it is waiting to be pasted. Settable (not init-only) because
+    // the cut can happen while the row is already on screen, and seeded from
+    // FileSystemService.CutPaths so a re-run search comes back marked.
+    private bool _isCut;
+    public bool IsCut
+    {
+        get => _isCut;
+        set
+        {
+            if (_isCut != value)
+            {
+                _isCut = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCut)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CutOpacity)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CutFontStyle)));
+            }
+        }
+    }
+
+    // The two marks as plain values the row template binds to DIRECTLY, rather
+    // than as trigger conditions. Triggers on this template applied when a row
+    // was built but did not repaint a row already on screen when IsCut changed
+    // under it (2026-07-28, twice - as a DataTemplate trigger and again as a
+    // style trigger); a direct binding takes the same notification path as
+    // Icon, which has always updated live in this very template.
+    public double CutOpacity => _isCut ? 0.4 : 1.0;
+    public System.Windows.FontStyle CutFontStyle => _isCut ? FontStyles.Italic : FontStyles.Normal;
+
     public static SearchRow Header(string directoryPath) => new()
     {
         IsHeader = true,
@@ -66,7 +96,8 @@ public sealed class SearchRow : INotifyPropertyChanged
         FileName = entry.FileName,
         Entry = entry,
         MatchStart = matchStart,
-        MatchLength = matchLength
+        MatchLength = matchLength,
+        IsCut = FileSystemService.CutPaths.Count > 0 && FileSystemService.CutPaths.Contains(entry.FullPath)
     };
 
     public event PropertyChangedEventHandler? PropertyChanged;

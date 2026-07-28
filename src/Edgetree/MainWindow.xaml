@@ -871,6 +871,9 @@
             <MenuItem Header="{x:Static services:Strings.MenuOpenWith}"
                     Click="OpenWithPicker_Click"/>
             <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuCut}"
+                    InputGestureText="Ctrl+X"
+                    Click="CutItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuCopy}"
                     InputGestureText="Ctrl+C"
                     Click="CopyItem_Click"/>
@@ -1038,6 +1041,9 @@
             <MenuItem Header="{x:Static services:Strings.MenuOpenWith}"
                     Click="SearchOpenWith_Click"/>
             <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuCut}"
+                    InputGestureText="Ctrl+X"
+                    Click="SearchCut_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuCopy}"
                     InputGestureText="Ctrl+C"
                     Click="SearchCopy_Click"/>
@@ -2290,6 +2296,23 @@
                             Property="FontWeight"
                             Value="Bold"/>
                 </DataTrigger>
+                <!-- Waiting on a Ctrl+X paste: the icon fades AND the name goes
+                     italic. The name is not dimmed - the app never says
+                     anything by fading text - but the icon alone left the mark
+                     invisible to anyone running with icons turned off, which is
+                     a supported way to use the tree (2026-07-28).
+                     Deliberately above the offline trigger below, which sets
+                     the same Opacity - a row on a sleeping drive should read
+                     as switched off first, and the last matching trigger wins. -->
+                <DataTrigger Binding="{Binding IsCut}"
+                        Value="True">
+                    <Setter TargetName="RowIcon"
+                            Property="Opacity"
+                            Value="0.4"/>
+                    <Setter TargetName="NameText"
+                            Property="FontStyle"
+                            Value="Italic"/>
+                </DataTrigger>
                 <!-- Drive not answering: red dot, and the row greyed out.
                      LAST on purpose - every folder/file/selection colour above
                      targets the same Foreground, and the last matching trigger
@@ -3345,7 +3368,16 @@
                                 <StackPanel x:Name="FilePanel"
                                         Orientation="Horizontal"
                                         Margin="14,0,0,0">
-                                    <Image Source="{Binding Icon}"
+                                    <!-- Cut marks bound as VALUES (SearchRow's
+                                         CutOpacity / CutFontStyle), not as
+                                         triggers: triggers here applied when a
+                                         row was built but did not repaint a row
+                                         already on screen when the mark changed
+                                         under it. See the note on those
+                                         properties. -->
+                                    <Image x:Name="SearchRowIcon"
+                                            Source="{Binding Icon}"
+                                            Opacity="{Binding CutOpacity}"
                                             Width="{DynamicResource IconSize}"
                                             Height="{DynamicResource IconSize}"
                                             Margin="0,0,6,0"
@@ -3355,9 +3387,11 @@
                                     <!-- Inlines built by SearchHighlightBehavior
                                          (matched run in the highlight color)
                                          instead of a plain Text binding. -->
-                                    <TextBlock local:SearchHighlightBehavior.Row="{Binding}"
+                                    <TextBlock x:Name="SearchRowName"
+                                            local:SearchHighlightBehavior.Row="{Binding}"
                                             Foreground="{DynamicResource FileNameForeground}"
                                             FontSize="{DynamicResource SearchFileFontSize}"
+                                            FontStyle="{Binding CutFontStyle}"
                                             VerticalAlignment="Center"
                                             TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>

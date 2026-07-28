@@ -138,6 +138,18 @@ internal static class NativeMethods
         => SetWindowPos(hWnd, topmost ? HwndTopmost : HwndNoTopmost, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
+    // Clipboard change notification. Nothing else tells an app that its own
+    // cut has been consumed or replaced - the 잘라내기 markers would otherwise
+    // outlive the clipboard entry they stand for (2026-07-28: pasting an
+    // Edgetree cut in Explorer left the row faded here forever).
+    public const int WM_CLIPBOARDUPDATE = 0x031D;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool AddClipboardFormatListener(IntPtr hwnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint RegisterWindowMessage(string lpString);
 

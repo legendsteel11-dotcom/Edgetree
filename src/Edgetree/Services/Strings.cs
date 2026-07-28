@@ -24,6 +24,7 @@ public static class Strings
     public static string MenuRefresh = "새로고침";
     public static string MenuOpen = "열기";
     public static string MenuOpenWith = "연결 프로그램";
+    public static string MenuCut = "잘라내기";
     public static string MenuCopy = "복사";
     public static string MenuPaste = "붙여넣기";
     public static string MenuCompress = "압축";
@@ -241,6 +242,7 @@ public static class Strings
 
     // MessageBox titles/bodies
     public static string PasteFailedTitle = "붙여넣기 실패";
+    public static string MoveIntoSelfError = "폴더를 자기 자신이나 그 하위 폴더로 옮길 수 없습니다.";
     public static string NewFolderFailedTitle = "새 폴더 만들기 실패";
     public static string RenameFailedTitle = "이름 바꾸기 실패";
     public static string DeleteConfirmTitle = "삭제 확인";
@@ -302,6 +304,7 @@ public static class Strings
         CollapseAllConfirmBody = "Collapse every folder that is currently expanded?";
         MenuOpen = "Open";
         MenuOpenWith = "Open With";
+        MenuCut = "Cut";
         MenuCopy = "Copy";
         MenuPaste = "Paste";
         MenuCompress = "Compress";
@@ -439,6 +442,7 @@ public static class Strings
         TrayExit = "Exit";
 
         PasteFailedTitle = "Paste Failed";
+        MoveIntoSelfError = "A folder can't be moved into itself or into one of its own subfolders.";
         NewFolderFailedTitle = "Failed to Create Folder";
         RenameFailedTitle = "Rename Failed";
         DeleteConfirmTitle = "Confirm Delete";

@@ -197,6 +197,18 @@ public class FileSystemItem : INotifyPropertyChanged
         set => SetField(ref _isBookmarked, value);
     }
 
+    private bool _isCut;
+
+    // Waiting on a Ctrl+X paste. Fades the row's ICON only (see the tree
+    // template) - the name keeps its full weight, since dimmed text isn't how
+    // this app marks anything. Initialized from FileSystemService.CutPaths in
+    // the constructor, same as IsBookmarked above.
+    public bool IsCut
+    {
+        get => _isCut;
+        set => SetField(ref _isCut, value);
+    }
+
     public FileSystemItem(string name, string fullPath, bool isDirectory, FileSystemItem? parent = null)
     {
         Name = name;
@@ -209,6 +221,7 @@ public class FileSystemItem : INotifyPropertyChanged
         // the same as its neighbours instead of alone in full colour.
         _isNetworkDriveOffline = parent?.IsNetworkDriveOffline ?? false;
         _isBookmarked = FileSystemService.BookmarkedPaths.Contains(fullPath);
+        _isCut = FileSystemService.CutPaths.Count > 0 && FileSystemService.CutPaths.Contains(fullPath);
         if (isDirectory)
         {
             // Always resolves to SOME icon - this folder's own override if it

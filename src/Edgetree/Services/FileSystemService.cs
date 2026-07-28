@@ -147,6 +147,12 @@ public static class FileSystemService
     // re-applying flags. MainWindow keeps it in sync with the settings list.
     public static readonly HashSet<string> BookmarkedPaths = new(StringComparer.OrdinalIgnoreCase);
 
+    // What Ctrl+X is currently holding, for the same reason as the set above:
+    // a row that gets re-created by a watcher merge or a refresh while the cut
+    // is pending has to come back still marked. Unlike bookmarks this is not
+    // persisted - it dies with the paste, with Esc, or with the next copy.
+    public static readonly HashSet<string> CutPaths = new(StringComparer.OrdinalIgnoreCase);
+
     public static List<FileSystemItem> GetDriveRoots()
     {
         var roots = new List<FileSystemItem>();
