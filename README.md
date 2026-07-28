@@ -1,4 +1,4 @@
-# Edgetree v1.3.2
+# Edgetree v1.3.3
 
 [한국어 안내](README-ko.md)
 
@@ -146,6 +146,23 @@ Either way, the resulting `.exe` is in
 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
 
 ## Changelog
+
+### v1.3.3 (2026-07-28)
+
+- **Bookmark list**: the options menu now shows every bookmark you have set.
+  Click one to go there — the list stays open, so several can be checked in a
+  row — drop one with the "−" at the end of its row, or clear them all from the
+  bottom. The shortcuts are spelled out underneath
+- **Search sorting opens a menu**: folder grouping, name or date modified, and
+  the direction, all named. No more clicking through five states to reach the
+  last one
+- **Color Settings and About follow the font**: what Ctrl +/- does to the tree
+  now reaches those windows too, swatches included
+- **Works with an auto-hidden taskbar**: moving the cursor to the bottom edge
+  brings the taskbar up as it should
+- Clicking the space between the title bar icons no longer undocks the window
+- The last favorite is no longer clipped after a restart
+- The +/− steppers in the options menu stay centred at any font size
 
 ### v1.3.2 (2026-07-26)
 
