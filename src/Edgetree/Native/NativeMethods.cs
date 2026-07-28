@@ -33,6 +33,61 @@ internal static class NativeMethods
     private const uint SEE_MASK_INVOKEIDLIST = 0x0000000C;
     private const int SW_SHOWNORMAL = 1;
 
+    private const uint ABM_GETSTATE = 0x00000004;
+    private const uint ABM_GETTASKBARPOS = 0x00000005;
+    private const int ABS_AUTOHIDE = 0x0000001;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left, Top, Right, Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct APPBARDATA
+    {
+        public int cbSize;
+        public IntPtr hWnd;
+        public uint uCallbackMessage;
+        public uint uEdge;
+        public RECT rc;
+        public int lParam;
+    }
+
+    [DllImport("shell32.dll")]
+    private static extern IntPtr SHAppBarMessage(uint dwMessage, ref APPBARDATA pData);
+
+    // Which screen edge an AUTO-HIDDEN taskbar sits on, in that monitor's own
+    // physical pixels - null when the taskbar is always visible.
+    //
+    // Worth asking because Windows does NOT subtract an auto-hidden taskbar
+    // from the work area: it reports the whole screen. A window that fills
+    // that work area therefore covers the strip the taskbar pops out of, and
+    // the cursor arriving there lands inside the window instead of on the
+    // screen edge - so the taskbar never comes up (measured 2026-07-28 on a
+    // 3840x2160 screen: work area 3840x2160, taskbar rect y 2112-2160).
+    //
+    // Returns the taskbar's own rect too, so the caller can tell whether it
+    // even belongs to the monitor being positioned on.
+    internal static (int Edge, int Left, int Top, int Right, int Bottom)? GetAutoHiddenTaskbar()
+    {
+        var state = new APPBARDATA();
+        state.cbSize = Marshal.SizeOf(state);
+        if (((int)SHAppBarMessage(ABM_GETSTATE, ref state) & ABS_AUTOHIDE) == 0)
+        {
+            return null;
+        }
+
+        var pos = new APPBARDATA();
+        pos.cbSize = Marshal.SizeOf(pos);
+        if (SHAppBarMessage(ABM_GETTASKBARPOS, ref pos) == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        return ((int)pos.uEdge, pos.rc.Left, pos.rc.Top, pos.rc.Right, pos.rc.Bottom);
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
 

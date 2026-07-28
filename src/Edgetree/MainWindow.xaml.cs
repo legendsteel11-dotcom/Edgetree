@@ -48,6 +48,12 @@ public partial class MainWindow : Window
     private const double UndockCornerOffset = 40;
     private const int AutoHideRehideDelayMs = 400;
 
+    // Device-independent pixels left clear of an auto-hidden taskbar's edge so
+    // the cursor can still reach the screen edge and summon it. Only needs to
+    // be big enough that the last row of pixels isn't ours - see
+    // LeaveTaskbarRevealStrip.
+    private const double TaskbarRevealStrip = 2;
+
     // Deliberately NOT instant, unlike the plain mouse hover reveal. During a
     // drag the cursor crosses the whole screen, and the sliver sits on the very
     // edge of it, so brushing past on the way to another window is routine -
@@ -846,11 +852,54 @@ public partial class MainWindow : Window
         // can still return the scale being left behind.
         var dpi = dpiScale ?? VisualTreeHelper.GetDpi(this);
         var working = screen.WorkingArea;
-        return new Rect(
+        var area = new Rect(
             working.Left / dpi.DpiScaleX,
             working.Top / dpi.DpiScaleY,
             working.Width / dpi.DpiScaleX,
             working.Height / dpi.DpiScaleY);
+
+        return LeaveTaskbarRevealStrip(area, screen);
+    }
+
+    // Windows leaves an auto-hidden taskbar OUT of the work area - it hands
+    // back the whole screen. Filling that meant the sidebar covered the strip
+    // the taskbar pops out of, and a cursor sent down there landed inside this
+    // window rather than on the screen edge, so the taskbar never came up.
+    // Only along the sidebar's own width, which is what made it look
+    // intermittent (reported 2026-07-28).
+    //
+    // A few pixels is all it takes: the reveal only needs the cursor to reach
+    // the true edge. Giving back the taskbar's full thickness would work too,
+    // but auto-hide is turned on precisely to reclaim that space - taking it
+    // back would undo the reason the setting exists.
+    private static Rect LeaveTaskbarRevealStrip(Rect area, System.Windows.Forms.Screen screen)
+    {
+        if (NativeMethods.GetAutoHiddenTaskbar() is not { } bar)
+        {
+            return area;
+        }
+
+        // Multi-monitor: only the primary taskbar has a position to report, so
+        // leave other monitors' geometry alone rather than carving a strip out
+        // of a screen the taskbar isn't even on.
+        var barRect = new System.Drawing.Rectangle(
+            bar.Left, bar.Top, bar.Right - bar.Left, bar.Bottom - bar.Top);
+        if (!screen.Bounds.IntersectsWith(barRect))
+        {
+            return area;
+        }
+
+        // Left/right taskbars are deliberately not handled: the fix there
+        // would be to inset the sidebar from the screen edge it is docked
+        // against, and sitting flush to that edge is the whole point of it.
+        const int ABE_TOP = 1;
+        const int ABE_BOTTOM = 3;
+        return bar.Edge switch
+        {
+            ABE_BOTTOM => new Rect(area.Left, area.Top, area.Width, area.Height - TaskbarRevealStrip),
+            ABE_TOP => new Rect(area.Left, area.Top + TaskbarRevealStrip, area.Width, area.Height - TaskbarRevealStrip),
+            _ => area,
+        };
     }
 
     private static double ClampExpandedWidth(double width)
