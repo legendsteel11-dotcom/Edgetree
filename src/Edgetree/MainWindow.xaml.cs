@@ -2181,18 +2181,79 @@ public partial class MainWindow : Window
         return Math.Ceiling(height);
     }
 
+    // A row that exists can be measured; one that doesn't has to be guessed at,
+    // and the guess is what FavoriteRowHeight falls back to. Both are wanted -
+    // but only the measurement should be allowed to stand.
+    private bool HasRealizedFavoriteRow
+        => FavoritesList.ItemContainerGenerator.ContainerFromIndex(0) is ListBoxItem { ActualHeight: > 0 };
+
+    private bool _favoritesHeightRecheckPending;
+    private int _favoritesHeightRechecksLeft;
+
     private void UpdateFavoritesPanelVisibility()
     {
         bool hasFavorites = _settings.Favorites.Count > 0;
         if (hasFavorites)
         {
+            bool measured = HasRealizedFavoriteRow;
             FavoritesRowDef.Height = new GridLength(Math.Min(ComputeFavoritesContentHeight(), _settings.FavoritesPanelHeight));
+
+            // Sized off the estimate rather than a real row - startup, or the
+            // very first favorite. The estimate runs short, so the panel came
+            // up one row too small and clipped the last favorite; it survived
+            // as far as it did because it only shows on the launch after
+            // something forced a restart. Ask again once there is a row to ask.
+            if (!measured)
+            {
+                QueueFavoritesHeightRecheck();
+            }
         }
         else
         {
             FavoritesRowDef.Height = new GridLength(0);
         }
         FavoritesSplitterRow.Height = hasFavorites ? GridLength.Auto : new GridLength(0);
+    }
+
+    // Re-runs once the list has had a layout pass, which is when its containers
+    // exist. Bounded rather than "until it works": if rows never realize (a
+    // panel already at zero height, say) this stops instead of re-queueing
+    // itself forever - a sizing correction is not worth a spin.
+    private void QueueFavoritesHeightRecheck()
+    {
+        if (_favoritesHeightRecheckPending)
+        {
+            return;
+        }
+
+        _favoritesHeightRecheckPending = true;
+        _favoritesHeightRechecksLeft = 5;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(RecheckFavoritesHeight));
+    }
+
+    private void RecheckFavoritesHeight()
+    {
+        _favoritesHeightRecheckPending = false;
+
+        if (_settings.Favorites.Count == 0)
+        {
+            return;
+        }
+
+        if (!HasRealizedFavoriteRow)
+        {
+            if (--_favoritesHeightRechecksLeft <= 0)
+            {
+                return;
+            }
+
+            _favoritesHeightRecheckPending = true;
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(RecheckFavoritesHeight));
+            return;
+        }
+
+        FavoritesRowDef.Height =
+            new GridLength(Math.Min(ComputeFavoritesContentHeight(), _settings.FavoritesPanelHeight));
     }
 
     private void FavoritesSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
