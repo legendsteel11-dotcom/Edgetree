@@ -160,8 +160,8 @@ Either way, the resulting `.exe` is in
   (Material Icon Theme) and the interface glyphs (Google's Material Symbols) come
   from, with their licences. The app carries the full Apache License 2.0 text and
   opens it from that window
-- **Every click on a folder registers**: clicking a folder open and shut in quick
-  succession could leave one of those clicks without effect. It always counts now
+- **Folder clicks in quick succession**: clicking a folder open and shut quickly
+  could leave one of those clicks without effect. Fixed
 - Reindex moved to the right of the results line, and the search history list now
   uses the same scrollbar as the rest of the app
 
