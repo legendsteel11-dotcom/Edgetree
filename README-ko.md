@@ -195,6 +195,8 @@ dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -p:Publi
 - **아이콘 라이선스 고지**: 앱 정보 창에 파일·폴더 아이콘(Material Icon Theme)과
   화면 글리프(구글 Material Symbols)의 출처와 라이선스를 적었고, Apache License
   2.0 전문을 앱이 직접 담고 있어 정보 창에서 바로 열어볼 수 있습니다
+- **폴더를 빠르게 접었다 펼칠 때**: 클릭 간격이 짧으면 그 클릭이 반응하지 않는
+  경우가 있었습니다. 이제 매번 반응합니다
 - 새로고침 버튼이 결과 표시줄 오른쪽으로 옮겨졌고, 검색 기록 목록의 스크롤바가
   앱의 다른 목록과 같은 모양이 되었습니다
 
