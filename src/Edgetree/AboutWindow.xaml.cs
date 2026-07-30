@@ -95,6 +95,41 @@ public partial class AboutWindow : Window
         });
     }
 
+    // Hands over the licence copy the exe carries: extracted next to the other
+    // app data (not %TEMP%, which cleaners empty) and opened in whatever reads
+    // .txt. Rewritten each time so a stale copy can't outlive an update.
+    private void IconLicenseLink_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        try
+        {
+            string dir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            System.IO.Directory.CreateDirectory(dir);
+            string path = System.IO.Path.Combine(dir, "APACHE-2.0.txt");
+
+            var resource = System.Windows.Application.GetResourceStream(
+                new Uri("Resources/APACHE-2.0.txt", UriKind.Relative));
+            if (resource is not null)
+            {
+                using var stream = resource.Stream;
+                using var file = System.IO.File.Create(path);
+                stream.CopyTo(file);
+            }
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException
+            or System.ComponentModel.Win32Exception)
+        {
+            // Nothing to recover: the same text is in the repo's
+            // THIRD-PARTY-NOTICES.md, which the landing and README both link.
+        }
+    }
+
     private void OtherToolLink_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo

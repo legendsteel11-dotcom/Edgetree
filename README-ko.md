@@ -1,4 +1,4 @@
-# Edgetree v1.3.3
+# Edgetree v1.3.4
 
 [English](README.md)
 
@@ -123,7 +123,7 @@
   기본 색상 선택창으로 직접 지정, 커스텀 팔레트도 항목을 오가며 유지됨,
   기본값 복원 버튼 포함
 - **한국어/영어 UI 언어** 전환 (옵션 메뉴에서 선택, 적용하려면 앱 재시작)
-- **정보 창**: 버전, 제작자, 빌드 날짜, 라이센스 요약(보증 없이 제공된다는
+- **정보 창**: 버전, 제작자, 빌드 날짜, 라이선스 요약(보증 없이 제공된다는
   안내 포함)
 - 트리·즐겨찾기 행에 마우스를 올리면 손가락 커서로 바뀜, 헤더 아이콘은 기본
   상태에서 살짝 톤다운되어 있다가 hover 시 밝아짐
@@ -184,6 +184,19 @@ dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -p:Publi
 경로에 생성됩니다.
 
 ## 변경 이력
+
+### v1.3.4 (2026-07-30)
+
+- **잘라내기**: 우클릭 메뉴와 Ctrl+X로 잘라내고 원하는 폴더에 붙여넣으면 복사가
+  아니라 이동합니다. 탐색기와 같은 방식이라 양쪽을 오가며 써도 그대로 동작합니다.
+  잘라낸 항목은 아이콘이 흐려지고 이름이 기울어져 어느 것을 옮기는 중인지 보입니다
+- **검색 목록이 최신인지 알려줍니다**: 검색 중인 폴더 안에서 파일이 생기거나
+  없어지면 새로고침 버튼에 파란 점이 붙습니다. 다시 인덱싱하면 사라집니다
+- **아이콘 라이선스 고지**: 앱 정보 창에 파일·폴더 아이콘(Material Icon Theme)과
+  화면 글리프(구글 Material Symbols)의 출처와 라이선스를 적었고, Apache License
+  2.0 전문을 앱이 직접 담고 있어 정보 창에서 바로 열어볼 수 있습니다
+- 새로고침 버튼이 결과 표시줄 오른쪽으로 옮겨졌고, 검색 기록 목록의 스크롤바가
+  앱의 다른 목록과 같은 모양이 되었습니다
 
 ### v1.3.3 (2026-07-28)
 
@@ -285,9 +298,12 @@ pjh85336@gmail.com 으로 보내주세요.
 
 ## 라이선스
 
-MIT — [LICENSE.md](LICENSE.md) 참고. 번들된 아이콘은 Material Icon Theme
-프로젝트(역시 MIT)에서 가져왔습니다 —
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) 참고.
+MIT — [LICENSE.md](LICENSE.md) 참고. 파일·폴더 아이콘은 Material Icon Theme
+프로젝트(MIT), 화면 글리프는 구글 Material Symbols(Apache License 2.0)에서
+가져왔습니다 — [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) 참고. Apache
+라이선스 전문은 앱이 직접 담고 있고(정보 창에서 열 수 있습니다), 저장소에서는
+[src/Edgetree/Resources/APACHE-2.0.txt](src/Edgetree/Resources/APACHE-2.0.txt)에
+있습니다.
 
 ## 개발 과정에 대하여
 

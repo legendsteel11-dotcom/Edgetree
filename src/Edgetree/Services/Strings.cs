@@ -225,15 +225,19 @@ public static class Strings
     public static string AboutVersionLabel = "버전";
     public static string AboutAuthorLabel = "제작자";
     public static string AboutDateLabel = "날짜";
-    public static string AboutLicenseLabel = "라이센스 요약";
+    public static string AboutLicenseLabel = "라이선스 요약";
     public static string AboutGithubLabel = "GitHub";
     public static string AboutWebsiteLabel = "웹사이트";
     public static string AboutOtherToolLabel = "같은 개발자의 다른 도구";
     public static string AboutUpdateAvailableFormat = "새 버전 {0} 다운로드";
     public static string AboutAuthorValue = "pjh85336@gmail.com";
     public static string AboutLicenseSummary =
-        "MIT 라이선스. 번들된 아이콘은 Material Icon Theme 프로젝트(MIT)에서 가져왔습니다. " +
-        "별도의 보증 없이 있는 그대로 제공되며, 사용에 따른 책임은 사용자 본인에게 있습니다.";
+        "MIT 라이선스. 별도의 보증 없이 있는 그대로 제공되며, 사용에 따른 책임은 사용자 본인에게 있습니다.";
+    public static string AboutIconLicenseLabel = "아이콘";
+    public static string AboutIconLicenseValue =
+        "파일·폴더 아이콘: Material Icon Theme (MIT)\n" +
+        "화면 글리프: Material Symbols, Google (Apache License 2.0)";
+    public static string AboutIconLicenseOpen = "Apache License 2.0 전문 보기";
 
     // Tray
     public static string TrayOpen = "열기";
@@ -435,8 +439,12 @@ public static class Strings
         AboutOtherToolLabel = "Another tool by the same maker";
         AboutUpdateAvailableFormat = "Download update {0}";
         AboutLicenseSummary =
-            "MIT License. Bundled icons are from the Material Icon Theme project (MIT). " +
-            "Provided as-is, without warranty; use is at your own discretion.";
+            "MIT License. Provided as-is, without warranty; use is at your own discretion.";
+        AboutIconLicenseLabel = "Icons";
+        AboutIconLicenseValue =
+            "File and folder icons: Material Icon Theme (MIT)\n" +
+            "Interface glyphs: Material Symbols, Google (Apache License 2.0)";
+        AboutIconLicenseOpen = "Read the Apache License 2.0";
 
         TrayOpen = "Open";
         TrayHide = "Send to Tray";

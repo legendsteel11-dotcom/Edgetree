@@ -1,4 +1,4 @@
-# Edgetree v1.3.3
+# Edgetree v1.3.4
 
 [한국어 안내](README-ko.md)
 
@@ -147,6 +147,22 @@ Either way, the resulting `.exe` is in
 
 ## Changelog
 
+### v1.3.4 (2026-07-30)
+
+- **Cut**: cut with the right-click menu or Ctrl+X and paste into another folder
+  to move rather than copy. It uses the same clipboard convention Explorer does,
+  so cutting in one and pasting in the other works either way round. Cut rows
+  keep a faded icon and an italic name, so it stays clear what is on its way out
+- **The search list says when it is out of date**: a blue dot appears on the
+  reindex button once a file has been added or removed inside the folder you are
+  searching. Reindexing clears it
+- **Icon licence notices**: About now names where the file and folder icons
+  (Material Icon Theme) and the interface glyphs (Google's Material Symbols) come
+  from, with their licences. The app carries the full Apache License 2.0 text and
+  opens it from that window
+- Reindex moved to the right of the results line, and the search history list now
+  uses the same scrollbar as the rest of the app
+
 ### v1.3.3 (2026-07-28)
 
 - **Bookmark list**: the options menu now shows every bookmark you have set.
@@ -263,8 +279,11 @@ the window they belong to.
 
 ## License
 
-MIT — see [LICENSE.md](LICENSE.md). Bundled icons are from the Material Icon
-Theme project (also MIT) — see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+MIT — see [LICENSE.md](LICENSE.md). File and folder icons come from the Material
+Icon Theme project (MIT) and the interface glyphs from Google's Material Symbols
+(Apache License 2.0) — see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), and
+the Apache licence text the app itself carries at
+[src/Edgetree/Resources/APACHE-2.0.txt](src/Edgetree/Resources/APACHE-2.0.txt).
 
 ## About Development
 

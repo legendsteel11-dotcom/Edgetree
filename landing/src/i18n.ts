@@ -99,6 +99,9 @@ const dict = {
       licenseBody:
         'MIT 라이선스로 배포됩니다 — 자유롭게 사용, 수정, 배포할 수 있으며 별도의 보증 없이 있는 그대로 제공됩니다.',
       licenseLink: 'LICENSE.md 전문 보기',
+      iconNotice:
+        '파일·폴더 아이콘: Material Icon Theme (MIT)\n화면 글리프: Material Symbols, Google (Apache License 2.0)',
+      noticesLink: '서드파티 고지',
     },
     download: {
       title: '다운로드',
@@ -214,6 +217,9 @@ const dict = {
       licenseBody:
         'Released under the MIT License — free to use, modify, and distribute, provided as-is without warranty.',
       licenseLink: 'Read the full LICENSE.md',
+      iconNotice:
+        'File and folder icons: Material Icon Theme (MIT)\nInterface glyphs: Material Symbols, Google (Apache License 2.0)',
+      noticesLink: 'Third-party notices',
     },
     download: {
       title: 'Download',

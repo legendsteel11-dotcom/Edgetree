@@ -191,12 +191,6 @@
                         Style="{StaticResource AboutRowValueStyle}"
                         Margin="0,0,0,10"/>
 
-                <TextBlock Text="{x:Static services:Strings.AboutLicenseLabel}"
-                        Style="{StaticResource AboutRowLabelStyle}"/>
-                <TextBlock Text="{x:Static services:Strings.AboutLicenseSummary}"
-                        Style="{StaticResource AboutRowValueStyle}"
-                        Margin="0,0,0,10"/>
-
                 <TextBlock Text="{x:Static services:Strings.AboutGithubLabel}"
                         Style="{StaticResource AboutRowLabelStyle}"/>
                 <TextBlock Text="github.com/legendsteel11/Edgetree"
@@ -218,8 +212,8 @@
                         MouseLeftButtonDown="WebsiteLink_MouseLeftButtonDown"/>
 
                 <!-- The other half of a mutual link: TabStick's own site has
-                     pointed here since 2026-07-25. Last of the rows on
-                     purpose - it's the one line in this window that isn't
+                     pointed here since 2026-07-25. Last of the three link rows
+                     on purpose - it's the one line in this window that isn't
                      about Edgetree. -->
                 <TextBlock Text="{x:Static services:Strings.AboutOtherToolLabel}"
                         Style="{StaticResource AboutRowLabelStyle}"/>
@@ -228,7 +222,33 @@
                         FontSize="{DynamicResource DialogFontSize}"
                         Cursor="Hand"
                         TextDecorations="Underline"
+                        Margin="0,0,0,10"
                         MouseLeftButtonDown="OtherToolLink_MouseLeftButtonDown"/>
+
+                <!-- Licence rows sit under the links (author's call, 2026-07-30):
+                     what someone opens this window for is the version and where
+                     to go, and the attribution is what they read once. -->
+                <TextBlock Text="{x:Static services:Strings.AboutLicenseLabel}"
+                        Style="{StaticResource AboutRowLabelStyle}"/>
+                <TextBlock Text="{x:Static services:Strings.AboutLicenseSummary}"
+                        Style="{StaticResource AboutRowValueStyle}"
+                        Margin="0,0,0,10"/>
+
+                <!-- The icons come from two projects under two licences, and the
+                     Apache one (Material Symbols) asks for a copy of its licence
+                     to travel with the distribution - so this row opens the copy
+                     that shipped inside the exe rather than linking out. -->
+                <TextBlock Text="{x:Static services:Strings.AboutIconLicenseLabel}"
+                        Style="{StaticResource AboutRowLabelStyle}"/>
+                <TextBlock Text="{x:Static services:Strings.AboutIconLicenseValue}"
+                        Style="{StaticResource AboutRowValueStyle}"
+                        Margin="0,0,0,2"/>
+                <TextBlock Text="{x:Static services:Strings.AboutIconLicenseOpen}"
+                        Foreground="{DynamicResource AccentForeground}"
+                        FontSize="{DynamicResource DialogFontSize}"
+                        Cursor="Hand"
+                        TextDecorations="Underline"
+                        MouseLeftButtonDown="IconLicenseLink_MouseLeftButtonDown"/>
 
                 <Button Content="{x:Static services:Strings.ButtonClose}"
                         Style="{StaticResource DialogButtonStyle}"

@@ -14,12 +14,22 @@ import { t } from '../i18n'
       <div class="card">
         <h2>{{ t.info.licenseTitle }}</h2>
         <p>{{ t.info.licenseBody }}</p>
+        <!-- The icons are third-party and under two different licences, so the
+             attribution lives beside the app's own licence rather than only in
+             the repository. -->
+        <p class="notices">{{ t.info.iconNotice }}</p>
         <a
           class="link"
           href="https://github.com/legendsteel11/Edgetree/blob/main/LICENSE.md"
           target="_blank"
           rel="noopener"
         >{{ t.info.licenseLink }} →</a>
+        <a
+          class="link"
+          href="https://github.com/legendsteel11/Edgetree/blob/main/THIRD-PARTY-NOTICES.md"
+          target="_blank"
+          rel="noopener"
+        >{{ t.info.noticesLink }} →</a>
       </div>
     </div>
   </section>
@@ -61,11 +71,20 @@ import { t } from '../i18n'
     font-size: 14px;
 }
 
+/* A step smaller than the licence line above it, which is what marks it as the
+   fine print - no opacity, so it stays as readable as everything else. */
+.card p.notices {
+  font-size: 13px;
+  white-space: pre-line;
+}
+
 .link {
   color: var(--accent-strong);
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;
+  display: inline-block;
+  margin-right: 18px;
 }
 
 .link:hover {
