@@ -1,4 +1,4 @@
-<!-- Crispness settings on the Window below, inherited by everything in it.
+﻿<!-- Crispness settings on the Window below, inherited by everything in it.
 
      UseLayoutRounding: without it, layout lands on fractional device pixels, so
      a 1px divider gets spread across two pixels as two grey halves. Subtle at
@@ -730,6 +730,7 @@
                  Shown/loaded by UpdateThumbnailRow via the POSITIONAL pattern
                  in ExplorerItemContextMenu_Opened - keep that in sync. -->
             <MenuItem Visibility="Collapsed"
+                    Tag="thumbnail"
                     Click="ThumbnailMenuItem_Click">
                 <MenuItem.Header>
                     <StackPanel>
@@ -791,7 +792,7 @@
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
-            <Separator Visibility="Collapsed"/>
+            <Separator Visibility="Collapsed" Tag="thumbnailSep"/>
             <!-- Multi-selection header row ("N개 항목 선택됨"): shown, with its
                  separator, only while a Ctrl/Shift-click multi-selection is
                  active - text and visibility both set on every open by
@@ -804,25 +805,43 @@
                  on the TextBlock outranks that - so this row stays accented
                  while still being unclickable. -->
             <MenuItem IsEnabled="False"
+                    Tag="multiInfo"
                     Visibility="Collapsed">
                 <MenuItem.Header>
                     <TextBlock FontWeight="SemiBold"
                             Foreground="{DynamicResource AccentForeground}"/>
                 </MenuItem.Header>
             </MenuItem>
-            <Separator Visibility="Collapsed"/>
+            <Separator Visibility="Collapsed" Tag="multiInfoSep"/>
             <MenuItem Header="{x:Static services:Strings.MenuAddFavorite}"
+                    Tag="addFavorite"
                     Click="AddFavorite_Click"/>
-            <!-- Header swaps 북마크/북마크 해제 per the target row's current
-                 state (ExplorerItemContextMenu_Opened) - a toggle, like the
-                 Ctrl+Alt+K shortcut it mirrors. -->
+            <!-- A submenu rather than the single toggle it used to be (user
+                 request 2026-07-30, from a relayed enquiry): setting one was the
+                 only bookmark action reachable by mouse, so the jumps existed
+                 only for whoever found the shortcuts, and the options menu's
+                 list looked like the whole feature. The first item's header
+                 still swaps 추가/해제 per the target row (see
+                 ExplorerItemContextMenu_Opened), which also enables the two
+                 jumps only while there is somewhere to jump to. -->
             <MenuItem Header="{x:Static services:Strings.MenuBookmark}"
-                    InputGestureText="Ctrl+Alt+K"
-                    Click="BookmarkMenuItem_Click"/>
+                    SubmenuOpened="BookmarkRowSubmenu_Opened">
+                <MenuItem Header="{x:Static services:Strings.MenuBookmarkAdd}"
+                        InputGestureText="Ctrl+Alt+K"
+                        Click="BookmarkMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.BookmarkShortcutPrev}"
+                        InputGestureText="Ctrl+Alt+J"
+                        Click="BookmarkPrev_Click"/>
+                <MenuItem Header="{x:Static services:Strings.BookmarkShortcutNext}"
+                        InputGestureText="Ctrl+Alt+L"
+                        Click="BookmarkNext_Click"/>
+            </MenuItem>
             <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
+                    Tag="newFolder"
                     InputGestureText="F7"
                     Click="NewFolder_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuRefresh}"
+                    Tag="refresh"
                     InputGestureText="F5"
                     Click="RefreshFolder_Click"/>
             <!-- Grouped with the other "do something to this folder" actions
@@ -830,8 +849,9 @@
                  the user is already looking at the folder they want to search,
                  and reaching for the picker means browsing back to it. -->
             <MenuItem Header="{x:Static services:Strings.MenuSearchInFolder}"
+                    Tag="searchInFolder"
                     Click="SearchInFolder_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuSort}">
+            <MenuItem Header="{x:Static services:Strings.MenuSort}" Tag="sort">
                 <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
                         IsCheckable="True"
                         Tag="name"
@@ -869,6 +889,7 @@
                     InputGestureText="Enter"
                     Click="OpenItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpenWith}"
+                    Tag="openWith"
                     Click="OpenWithPicker_Click"/>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuCut}"
@@ -887,11 +908,14 @@
                  row IS a .zip (ExplorerItemContextMenu_Opened) for the same
                  reason - a permanently-dead row would tax every other menu. -->
             <MenuItem Header="{x:Static services:Strings.MenuCompress}"
+                    Tag="compress"
                     Click="CompressItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuExtract}"
+                    Tag="extract"
                     Visibility="Collapsed"
                     Click="ExtractItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuRename}"
+                    Tag="rename"
                     InputGestureText="F2"
                     Click="RenameItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuDelete}"
@@ -899,11 +923,13 @@
                     Click="DeleteItem_Click"/>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuCopyPath}"
+                    Tag="copyPath"
                     InputGestureText="Ctrl+Shift+C"
                     Click="CopyPath_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpenTerminal}"
                     Click="OpenTerminal_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpenWithCode}"
+                    Tag="openWithCode"
                     Click="OpenWithCode_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuRevealInExplorer}"
                     Click="RevealInExplorer_Click"/>
@@ -1004,6 +1030,7 @@
                  pattern in SearchResultContextMenu_Opened - keep in sync).
                  Clicking opens the file, like the row itself. -->
             <MenuItem Visibility="Collapsed"
+                    Tag="thumbnail"
                     Click="SearchOpen_Click">
                 <MenuItem.Header>
                     <StackPanel>
@@ -1031,7 +1058,7 @@
                     </StackPanel>
                 </MenuItem.Header>
             </MenuItem>
-            <Separator Visibility="Collapsed"/>
+            <Separator Visibility="Collapsed" Tag="thumbnailSep"/>
             <!-- Groups mirror the tree menu's taxonomy (open / edit /
                  path-and-tools / properties) so the same action always lives
                  in the same group in both menus - the items the search view
@@ -1057,6 +1084,7 @@
             <MenuItem Header="{x:Static services:Strings.MenuOpenTerminal}"
                     Click="SearchOpenTerminal_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpenWithCode}"
+                    Tag="openWithCode"
                     Click="SearchOpenWithCode_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuRevealInExplorer}"
                     Click="SearchReveal_Click"/>

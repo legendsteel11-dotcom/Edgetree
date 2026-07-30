@@ -11,6 +11,7 @@ public static class Strings
     // Context menu (file/folder rows)
     public static string MenuAddFavorite = "즐겨찾기에 추가";
     public static string MenuBookmark = "북마크";
+    public static string MenuBookmarkAdd = "북마크 추가";
     public static string MenuBookmarkRemove = "북마크 해제";
     public static string MenuBookmarkList = "북마크 목록";
     public static string MenuBookmarkListEmpty = "북마크 없음";
@@ -292,6 +293,7 @@ public static class Strings
 
         MenuAddFavorite = "Add to Favorites";
         MenuBookmark = "Bookmark";
+        MenuBookmarkAdd = "Add Bookmark";
         MenuBookmarkRemove = "Remove Bookmark";
         MenuBookmarkList = "Bookmarks";
         MenuBookmarkListEmpty = "No bookmarks";

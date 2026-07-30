@@ -6018,10 +6018,44 @@ public partial class MainWindow : Window
 
         // MenuItems declared inside a resource dictionary don't get an
         // auto-generated code-behind field the way named elements in the main
-        // visual tree do, so these have to be found by position on the
-        // ContextMenu itself instead.
-        if (sender is ContextMenu { Items: [MenuItem thumbnailItem, Separator thumbnailSeparator, MenuItem multiInfoItem, Separator multiInfoSeparator, MenuItem addFavoriteItem, MenuItem bookmarkItem, MenuItem newFolderItem, MenuItem refreshItem, MenuItem searchInFolderItem, MenuItem sortMenu, _, _, MenuItem openWithItem, _, _, _, MenuItem compressItem, MenuItem extractItem, MenuItem renameItem, _, _, MenuItem copyPathItem, _, MenuItem openWithCodeItem, ..] })
+        // visual tree do, so they are found by their Tag instead.
+        //
+        // This used to be one positional list pattern over the whole menu, and
+        // it cost a shipped release: adding 잘라내기 to the menu shifted every
+        // row after it, the pattern stopped matching, and the entire block below
+        // went silently dead - no greyed 이름 바꾸기, no "N개 항목 선택됨", no
+        // 압축 풀기 row, nothing (found 2026-07-30, in v1.3.4). Tags don't care
+        // where a row sits or how many rows join it.
+        if (sender is ContextMenu menu)
         {
+            var thumbnailItem = FindTaggedMenuElement<MenuItem>(menu, "thumbnail");
+            var thumbnailSeparator = FindTaggedMenuElement<Separator>(menu, "thumbnailSep");
+            var multiInfoItem = FindTaggedMenuElement<MenuItem>(menu, "multiInfo");
+            var multiInfoSeparator = FindTaggedMenuElement<Separator>(menu, "multiInfoSep");
+            var addFavoriteItem = FindTaggedMenuElement<MenuItem>(menu, "addFavorite");
+            var newFolderItem = FindTaggedMenuElement<MenuItem>(menu, "newFolder");
+            var refreshItem = FindTaggedMenuElement<MenuItem>(menu, "refresh");
+            var searchInFolderItem = FindTaggedMenuElement<MenuItem>(menu, "searchInFolder");
+            var sortMenu = FindTaggedMenuElement<MenuItem>(menu, "sort");
+            var openWithItem = FindTaggedMenuElement<MenuItem>(menu, "openWith");
+            var compressItem = FindTaggedMenuElement<MenuItem>(menu, "compress");
+            var extractItem = FindTaggedMenuElement<MenuItem>(menu, "extract");
+            var renameItem = FindTaggedMenuElement<MenuItem>(menu, "rename");
+            var copyPathItem = FindTaggedMenuElement<MenuItem>(menu, "copyPath");
+            var openWithCodeItem = FindTaggedMenuElement<MenuItem>(menu, "openWithCode");
+
+            if (thumbnailItem is null || thumbnailSeparator is null || multiInfoItem is null ||
+                multiInfoSeparator is null || addFavoriteItem is null || newFolderItem is null ||
+                refreshItem is null || searchInFolderItem is null || sortMenu is null ||
+                openWithItem is null || compressItem is null || extractItem is null ||
+                renameItem is null || copyPathItem is null || openWithCodeItem is null)
+            {
+                // A tag was renamed or dropped in the XAML. Debug builds say so
+                // rather than leaving the menu quietly half-configured.
+                LogClickLine("row menu: a tagged item is missing - menu half-configured");
+                return;
+            }
+
             // The thumbnail row is NOT configured here - see
             // TreeViewItem_PreviewMouseRightButtonDown, which runs before the
             // menu opens (this event fires after the popup has already sized
@@ -6058,13 +6092,9 @@ public partial class MainWindow : Window
             copyPathItem.IsEnabled = !isMultiSelection;
             renameItem.IsEnabled = !isMultiSelection;
 
-            // The bookmark toggle is single-target like rename/copy-path, and
-            // its label states the direction it would go for THIS row.
-            bookmarkItem.IsEnabled = !isMultiSelection &&
-                ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false };
-            bookmarkItem.Header = ExplorerTree.SelectedItem is FileSystemItem { IsBookmarked: true }
-                ? Strings.MenuBookmarkRemove
-                : Strings.MenuBookmark;
+            // The bookmark submenu configures itself when it opens (see
+            // BookmarkRowSubmenu_Opened) - its label depends on the row and is
+            // read at the moment it is shown.
 
             // The zip lands next to the right-clicked row, so a drive root -
             // the one kind of row with no parent folder - has nowhere to put
@@ -6115,6 +6145,11 @@ public partial class MainWindow : Window
                 ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false } && ShellFileService.IsCodeRegistered();
         }
     }
+
+    // Menu rows are addressed by Tag rather than by position - see the note in
+    // ExplorerItemContextMenu_Opened for what position-addressing cost.
+    private static T? FindTaggedMenuElement<T>(ItemsControl menu, string tag) where T : FrameworkElement
+        => menu.Items.OfType<T>().FirstOrDefault(item => (item.Tag as string) == tag);
 
     // The image formats worth even asking the shell for a thumbnail of -
     // gating by extension keeps a right-click on an exe/txt from paying a
@@ -6781,6 +6816,14 @@ public partial class MainWindow : Window
                 Header = Strings.MenuBookmarkListEmpty,
                 IsEnabled = false,
             }));
+
+            // The shortcuts belong here MOST of all. This used to stop at the
+            // "none yet" line, so the one person who needed to be told how to
+            // make a bookmark - someone who has never made one - was the only
+            // person shown nothing (2026-07-30, from a user asking whether the
+            // options menu was the only way to work with bookmarks).
+            menu.Items.Add(new Separator());
+            menu.Items.Add(BuildBookmarkShortcutHint());
             return;
         }
 
@@ -7210,6 +7253,43 @@ public partial class MainWindow : Window
             }
         }
     }
+
+    // The 북마크 submenu, set up as it opens: the first row says which way the
+    // toggle would go for the row under the cursor, and the two jumps only need
+    // a bookmark to exist somewhere - so they stay live even on a
+    // multi-selection, where the toggle greys out like rename/경로 복사 do.
+    //
+    // Reading the state HERE is the point. The same code ran from the context
+    // menu's own Opened handler when this was a single row, and it silently
+    // stopped once the row became a submenu - the label stayed on 북마크 추가 for
+    // rows that were already bookmarked (2026-07-30).
+    private void BookmarkRowSubmenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Items: [MenuItem toggle, MenuItem prev, MenuItem next] })
+        {
+            return;
+        }
+
+        bool isMultiSelection = _multiSelection.Count > 1;
+        var selected = ExplorerTree.SelectedItem as FileSystemItem;
+
+        toggle.IsEnabled = !isMultiSelection && selected is { IsPlaceholder: false, IsShowMore: false };
+        toggle.Header = selected is { IsBookmarked: true }
+            ? Strings.MenuBookmarkRemove
+            : Strings.MenuBookmarkAdd;
+
+        bool hasBookmarks = _settings.BookmarkPaths.Count > 0;
+        prev.IsEnabled = hasBookmarks;
+        next.IsEnabled = hasBookmarks;
+    }
+
+    // The two jumps, from the context menu's 북마크 submenu - the same calls
+    // Ctrl+Alt+L / Ctrl+Alt+J make, so both routes behave identically.
+    private void BookmarkNext_Click(object sender, RoutedEventArgs e)
+        => JumpToBookmark(+1);
+
+    private void BookmarkPrev_Click(object sender, RoutedEventArgs e)
+        => JumpToBookmark(-1);
 
     private void BookmarkMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -9507,13 +9587,20 @@ public partial class MainWindow : Window
     {
         AnyMenu_Opened(sender, e);
 
-        // Menu items in a resource-dictionary ContextMenu have no code-behind
-        // field, so items are found by position - same approach as
-        // ExplorerItemContextMenu_Opened. "Code로 열기" sits at index 10 now
-        // that the groups mirror the tree menu's (open / edit / path-and-tools
-        // / properties).
-        if (sender is ContextMenu { Items: [MenuItem thumbnailItem, Separator thumbnailSeparator, _, _, _, _, _, _, _, _, MenuItem openWithCodeItem, ..] })
+        // By Tag, not by position - this menu gained 잘라내기 on 2026-07-30 and
+        // the index this used to count to ("Code로 열기 sits at 10") moved with
+        // it, which is the same way the tree menu's whole block went dead.
+        if (sender is ContextMenu menu)
         {
+            var thumbnailItem = FindTaggedMenuElement<MenuItem>(menu, "thumbnail");
+            var thumbnailSeparator = FindTaggedMenuElement<Separator>(menu, "thumbnailSep");
+            var openWithCodeItem = FindTaggedMenuElement<MenuItem>(menu, "openWithCode");
+            if (thumbnailItem is null || thumbnailSeparator is null || openWithCodeItem is null)
+            {
+                LogClickLine("search menu: a tagged item is missing - menu half-configured");
+                return;
+            }
+
             openWithCodeItem.IsEnabled = ShellFileService.IsCodeRegistered();
 
             // Guard for opens that bypassed the right-click handler (keyboard

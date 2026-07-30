@@ -1,4 +1,4 @@
-# Edgetree v1.3.4
+# Edgetree v1.3.5
 
 [한국어 안내](README-ko.md)
 
@@ -146,6 +146,14 @@ Either way, the resulting `.exe` is in
 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
 
 ## Changelog
+
+### v1.3.5 (2026-07-30)
+
+- **Bookmarks from the right-click menu**: Bookmark is now a submenu carrying set
+  and clear plus **previous and next bookmark**, each with its shortcut beside it.
+  The shortcuts also show while no bookmark has been set yet
+- **Right-click menu states**: rows that don't apply to what you clicked are
+  greyed again (New Folder and Refresh on a file, Rename on a multi-selection)
 
 ### v1.3.4 (2026-07-30)
 
