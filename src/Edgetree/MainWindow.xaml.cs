@@ -3167,7 +3167,16 @@ public partial class MainWindow : Window
     }
 
     private void ExplorerTree_ItemExpandedOrCollapsed(object sender, RoutedEventArgs e)
-        => UpdateCollapseAllButtonState();
+    {
+        // The outcome side of the click instrument (see LogTreeToggle): a press
+        // with no matching line here asked for a toggle that never happened.
+        if (e.OriginalSource is TreeViewItem { DataContext: FileSystemItem item })
+        {
+            LogTreeToggle(item, e.RoutedEvent == TreeViewItem.ExpandedEvent);
+        }
+
+        UpdateCollapseAllButtonState();
+    }
 
     // The options-menu "모든 펼친 폴더 접기" - a one-shot cleanup, unlike the title
     // bar's collapse button next to it (a toggle that remembers what was open
@@ -5127,6 +5136,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        LogClickLine("tree double-click");
+
         if ((e.OriginalSource as DependencyObject)?.FindAncestor<TreeViewItem>() is not { } treeViewItem)
         {
             return;
@@ -5353,8 +5364,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        LogTreeClick(treeViewItem.DataContext as FileSystemItem);
-
         // Marks a real gesture for the auto-collapse guard (see
         // _lastTreeUserInputTicks) - deliberately before the innermost-item
         // filter and the expander check: any press that can lead to an
@@ -5419,6 +5428,12 @@ public partial class MainWindow : Window
         bool clickedOnExpander =
             (e.OriginalSource as DependencyObject)?.FindAncestor<ToggleButton>() is { } expander
             && ReferenceEquals(expander.FindAncestor<TreeViewItem>(), treeViewItem);
+
+        // Logged here rather than at the top of this handler: only the row the
+        // press actually landed on is interesting, and by this point we know
+        // whether it hit the arrow, what the row's state was BEFORE the toggle
+        // below, and how long it has been since the previous press.
+        LogTreeClick(treeViewItem.DataContext as FileSystemItem, clickedOnExpander, e.ClickCount);
 
         // Multi-selection gestures. All three modifier branches mark the event
         // handled and return, so none of the single-selection behavior below
@@ -5504,7 +5519,18 @@ public partial class MainWindow : Window
             _multiSelectAnchor = target;
         }
 
-        if (!clickedOnExpander &&
+        // ClickCount == 1 is what stops a folder from ignoring every other
+        // click. Two clicks closer together than Windows' double-click time
+        // (500ms by default - 400ms feels like two separate clicks to a person,
+        // and the reports said as much) arrive as ONE press with ClickCount 2,
+        // and WPF's TreeViewItem toggles IsExpanded on that by itself. Toggling
+        // here as well ran the row through two toggles in the same press and
+        // left it exactly where it started, which is precisely the reported
+        // "click didn't take" (measured 2026-07-30: every ClickCount 2 press
+        // logged a collapse and an expand one millisecond apart). Stepping
+        // aside on the second press leaves the built-in behaviour to do the one
+        // toggle, so each click still registers.
+        if (!clickedOnExpander && e.ClickCount == 1 &&
             treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsDirectory: true, IsEditing: false } item)
         {
             treeViewItem.IsSelected = true;
@@ -9198,8 +9224,44 @@ public partial class MainWindow : Window
     // had a repro until the alternating one found on 2026-07-28.
     // The tree's own row line, so the same timeline covers both views - the
     // swallowed clicks have been reported in ordinary tree use too.
+    //
+    // Arrival alone turned out not to be enough: on 2026-07-30 every press of a
+    // reportedly-swallowed expand/collapse WAS in the log, so the loss is in
+    // what the app did with it, not in delivery. Hence the extra fields - the
+    // gap to the previous press and the ClickCount say whether Windows folded
+    // it into a double-click, and the pre-toggle state plus the expanded/
+    // collapsed line below say whether the toggle actually took.
+    private long _lastTreePressTicks;
+
     [System.Diagnostics.Conditional("DEBUG")]
-    private void LogTreeClick(FileSystemItem? item)
+    private void LogTreeClick(FileSystemItem? item, bool onExpander, int clickCount)
+    {
+        long now = Environment.TickCount64;
+        long gap = _lastTreePressTicks == 0 ? -1 : now - _lastTreePressTicks;
+        _lastTreePressTicks = now;
+
+        LogClickLine(
+            $"tree press: gap={(gap < 0 ? "-" : gap + "ms")} click={clickCount} " +
+            $"expander={(onExpander ? "yes" : "no")} " +
+            $"target={item?.Name ?? "(none)"} dir={(item?.IsDirectory == true ? "yes" : "no")} " +
+            $"wasExpanded={(item?.IsExpanded == true ? "yes" : "no")} " +
+            $"menu={(IsCapturingUiOpen ? "open" : "-")} " +
+            $"captured={(Mouse.Captured?.GetType().Name ?? "-")}");
+    }
+
+    // The outcome half: did a toggle actually happen, and how long after the
+    // press that asked for it.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogTreeToggle(FileSystemItem item, bool expanded)
+    {
+        long sincePress = _lastTreePressTicks == 0 ? -1 : Environment.TickCount64 - _lastTreePressTicks;
+        LogClickLine(
+            $"tree {(expanded ? "expanded" : "collapsed")}: {item.Name} " +
+            $"(+{(sincePress < 0 ? "-" : sincePress + "ms")} after press)");
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogClickLine(string line)
     {
         try
         {
@@ -9208,9 +9270,7 @@ public partial class MainWindow : Window
             Directory.CreateDirectory(dir);
             File.AppendAllText(
                 Path.Combine(dir, "click.log"),
-                $"{DateTime.Now:HH:mm:ss.fff}  tree press: menu={(IsCapturingUiOpen ? "open" : "-")} " +
-                $"captured={(Mouse.Captured?.GetType().Name ?? "-")} target={item?.Name ?? "(none)"}" +
-                $"{Environment.NewLine}");
+                $"{DateTime.Now:HH:mm:ss.fff}  {line}{Environment.NewLine}");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
