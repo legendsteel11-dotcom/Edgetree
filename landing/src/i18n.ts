@@ -103,6 +103,11 @@ const dict = {
         '파일·폴더 아이콘: Material Icon Theme (MIT)\n화면 글리프: Material Symbols, Google (Apache License 2.0)',
       noticesLink: '서드파티 고지',
     },
+    updates: {
+      title: '업데이트 내역',
+      older: '이전 버전',
+      newer: '다음 버전',
+    },
     download: {
       title: '다운로드',
       standardTitle: '일반 버전',
@@ -220,6 +225,11 @@ const dict = {
       iconNotice:
         'File and folder icons: Material Icon Theme (MIT)\nInterface glyphs: Material Symbols, Google (Apache License 2.0)',
       noticesLink: 'Third-party notices',
+    },
+    updates: {
+      title: 'update notes',
+      older: 'Older version',
+      newer: 'Newer version',
     },
     download: {
       title: 'Download',

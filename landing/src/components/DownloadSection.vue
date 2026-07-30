@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { t } from '../i18n'
 import { track } from '@vercel/analytics'
+import UpdateNotes from './UpdateNotes.vue'
 import { standardDownloadUrl, standaloneDownloadUrl, releaseVersion, ensureReleaseAssetsLoaded, trackDownload } from '../releaseAssets'
 
 onMounted(ensureReleaseAssetsLoaded)
@@ -54,6 +55,11 @@ async function copyAddress() {
       <div class="section-heading">
         <h2>{{ t.download.title }}</h2>
       </div>
+
+      <!-- Above the buttons on purpose: it is the one place someone is already
+           deciding whether to take the file, and "what changed" belongs there
+           rather than in a section further down that nobody scrolls to. -->
+      <UpdateNotes />
 
       <div class="mobile-note">
         <p>{{ t.download.mobileTitle }}<br>{{ t.download.mobileDesc }}</p>

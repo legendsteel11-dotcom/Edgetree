@@ -1,0 +1,59 @@
+// What the "업데이트 내역" card above the download buttons shows, newest first.
+//
+// Kept here rather than fetched from the GitHub release body on purpose: those
+// notes run several paragraphs per item in two languages, which is the wrong
+// shape for a card someone glances at on the way to the download button. Three
+// short lines per version is the whole point.
+//
+// One rule when releasing: add an entry here in the same pass that bumps the
+// csproj. If this list falls behind, the card notices - the section only shows
+// its lines when the newest entry matches the version GitHub reports as latest
+// (see UpdateNotes.vue), so a forgotten entry costs a hidden card rather than a
+// landing page claiming the wrong thing.
+export interface ChangelogEntry {
+  version: string
+  ko: string[]
+  en: string[]
+}
+
+export const changelog: ChangelogEntry[] = [
+  {
+    version: 'v1.3.5',
+    ko: [
+      '잘라내기 추가 — Ctrl+X로 옮기기, 탐색기와 함께 사용 가능',
+      '북마크를 우클릭 메뉴에서 지정·이동',
+      '검색 목록이 최신이 아닐 때 알려줌',
+    ],
+    en: [
+      'Cut added — move with Ctrl+X, works with Explorer',
+      'Bookmarks set and browsed from the right-click menu',
+      'The search list says when it is out of date',
+    ],
+  },
+  {
+    version: 'v1.3.3',
+    ko: [
+      '북마크 목록을 옵션 메뉴에서 한눈에',
+      '검색 정렬을 메뉴에서 고르기',
+      '색상 설정·앱 정보 창이 글꼴 크기를 따라감',
+    ],
+    en: [
+      'Every bookmark listed in the options menu',
+      'Search sorting picked from a menu',
+      'Color Settings and About follow the font size',
+    ],
+  },
+  {
+    version: 'v1.3.2',
+    ko: [
+      '네트워크 드라이브(NAS 등)가 잠들어 있어도 멈추지 않음',
+      '즐겨찾기 드래그로 순서 바꾸기',
+      '정렬 기준에 유형·크기 추가',
+    ],
+    en: [
+      'A sleeping network drive no longer stalls the tree',
+      'Favorites reordered by dragging',
+      'Sort by type and size',
+    ],
+  },
+]
