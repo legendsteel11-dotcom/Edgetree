@@ -2053,7 +2053,8 @@
                          VerticalAlignment="Center"
                          IsVisibleChanged="RenameTextBox_IsVisibleChanged"
                          KeyDown="RenameTextBox_KeyDown"
-                         LostFocus="RenameTextBox_LostFocus"/>
+                         LostFocus="RenameTextBox_LostFocus"
+                         Loaded="RenameTextBox_Loaded"/>
                 <!-- Shown in place of icon+name for the synthetic "… 더 보기 (N)"
                      row that caps oversized folders (FileSystemItem.DisplayCap);
                      clicking it reveals the rest (see

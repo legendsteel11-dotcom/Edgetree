@@ -11,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
+using SidebarExplorer.App.Behaviors;
 using SidebarExplorer.App.Models;
 using SidebarExplorer.App.Native;
 using SidebarExplorer.App.Services;
@@ -7869,6 +7870,17 @@ public partial class MainWindow : Window
         BeginInlineRename(item);
     }
 
+    // Every rename box gets the overtype guard as it is created - one per tree
+    // row, and a virtualized row that scrolls away and comes back is a new box
+    // (see OvertypeGuard for what a bare Insert does to a Korean composition).
+    private void RenameTextBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox box)
+        {
+            OvertypeGuard.Disable(box);
+        }
+    }
+
     private void RenameTextBox_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         if (sender is not TextBox { DataContext: FileSystemItem item } textBox || !textBox.IsVisible)
@@ -8451,6 +8463,10 @@ public partial class MainWindow : Window
     private void InitializeSearch()
     {
         SearchResultsList.ItemsSource = _searchRows;
+
+        // The other text box in the app (the rename box is handled per row, in
+        // RenameTextBox_Loaded) - see OvertypeGuard.
+        OvertypeGuard.Disable(SearchBox);
 
         _searchDebounceTimer = new System.Windows.Threading.DispatcherTimer
         {
