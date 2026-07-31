@@ -8642,6 +8642,16 @@ public partial class MainWindow : Window
         SearchButtonIcon.Data = active ? SearchGlyphBack : SearchGlyphMagnifier;
         SearchButton.ToolTip = active ? Strings.ToolTipExitSearch : Strings.ToolTipSearch;
 
+        // The favorites splitter is a transparent 9px grab strip floating over
+        // its neighbours on ZIndex 1, and the search view merely covers rows
+        // 1-4 underneath it - so while search is up that strip still answered
+        // the mouse ON TOP of the results: a resize cursor over one of the top
+        // rows, and a click there grabbing a splitter nobody can see instead of
+        // opening the result (2026-07-31, reported as "맨 윗줄은 위아래 아이콘으로
+        // 바뀌네요"). Visibility is left to the favorites panel's own logic;
+        // only the hit-testing is taken away for the duration.
+        FavoritesSplitter.IsHitTestVisible = !active;
+
         if (active)
         {
             // Fresh history recall each time the view opens.
