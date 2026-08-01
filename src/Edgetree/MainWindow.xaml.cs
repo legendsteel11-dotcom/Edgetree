@@ -336,6 +336,13 @@ public partial class MainWindow : Window
             FileSystemService.BookmarkedPaths.Add(path);
         }
 
+        FileSystemService.HiddenPaths.Clear();
+        foreach (var path in _settings.HiddenFolderPaths)
+        {
+            FileSystemService.HiddenPaths.Add(FileSystemService.NormalizeHiddenPath(path));
+        }
+        FileSystemService.ShowHiddenFolders = _settings.ShowHiddenFolders;
+
         FileSystemService.SortOverrides.Clear();
         foreach (var entry in _settings.FolderSortOverrides)
         {
@@ -615,6 +622,27 @@ public partial class MainWindow : Window
         SetBrushColor("SidebarBackground", light ? _settings.LightBackgroundColorHex : _settings.BackgroundColorHex);
         SetBrushColor("FolderNameForeground", light ? _settings.LightFolderNameColorHex : _settings.FolderNameColorHex);
         SetBrushColor("FolderNameHighlightForeground", light ? _settings.LightFolderNameHighlightColorHex : _settings.FolderNameHighlightColorHex);
+        // Quieted variants of the two name colours, for the row states that mean
+        // "this row is not in its ordinary condition": a hidden folder being
+        // shown anyway, and anything waiting on a Ctrl+X paste. The user's own
+        // colour taken a step towards the background - darker in the dark theme,
+        // lighter in the light one - rather than a fixed grey, and derived here
+        // for the same reason the inactive selection colour is: repick a colour
+        // and these follow, and they can never clash with a palette they were
+        // not told about. Deliberately NOT the offline drive's grey, which has
+        // to keep meaning "this drive is not answering" by itself.
+        if (ColorConverter.ConvertFromString(
+                light ? _settings.LightFolderNameColorHex : _settings.FolderNameColorHex) is Color folderColor)
+        {
+            Resources["MutedFolderNameForeground"] = new SolidColorBrush(
+                MoveTowardsBackground(folderColor, light, MutedNameBlend));
+        }
+        if (ColorConverter.ConvertFromString(
+                light ? _settings.LightFileNameColorHex : _settings.FileNameColorHex) is Color fileColor)
+        {
+            Resources["MutedFileNameForeground"] = new SolidColorBrush(
+                MoveTowardsBackground(fileColor, light, MutedNameBlend));
+        }
         SetBrushColor("FileNameForeground", light ? _settings.LightFileNameColorHex : _settings.FileNameColorHex);
         SetBrushColor("FileNameHighlightForeground", light ? _settings.LightFileNameHighlightColorHex : _settings.FileNameHighlightColorHex);
         // The selection highlight keeps TWO variants behind its one resource
@@ -680,6 +708,28 @@ public partial class MainWindow : Window
         {
             Resources[resourceKey] = new SolidColorBrush(color);
         }
+    }
+
+    // How far a quieted name travels towards the background. Matched to the
+    // "… 더 보기" row, which is the app's existing example of text that is
+    // present but not competing: that row renders its own colour at Opacity
+    // 0.65, i.e. 35% of the way to the background. Asked for by eye and then
+    // taken from that row rather than guessed (user, 2026-08-02: "… 더 보기
+    // 정도 되면 딱 적당할 듯").
+    private const double MutedNameBlend = 0.35;
+
+    // Blends a colour `amount` of the way towards the theme's own extreme -
+    // black in the dark theme, white in the light one. A blend rather than an
+    // Opacity: opacity over an unknown background is a different colour every
+    // time, and the app's rule is that nothing says "secondary" by fading.
+    private static Color MoveTowardsBackground(Color color, bool light, double amount)
+    {
+        byte target = light ? (byte)255 : (byte)0;
+        return Color.FromArgb(
+            color.A,
+            (byte)Math.Round(color.R + (target - color.R) * amount),
+            (byte)Math.Round(color.G + (target - color.G) * amount),
+            (byte)Math.Round(color.B + (target - color.B) * amount));
     }
 
     // The sort icon itself no longer needs this walk - it is a path that takes
@@ -2811,6 +2861,11 @@ public partial class MainWindow : Window
         // navigating to.
         _isNavigatingFromFavorite = true;
 
+        // Before the walk, not during it: a hidden folder on the way down has
+        // no row at all, so the walk would stop at its parent and the jump
+        // would look like it had gone to the wrong place.
+        RevealHiddenFoldersOnPathTo(targetPath);
+
         // Return any folder that had its "더 보기" expanded to the capped state
         // before walking, so this navigation - and the next - never has to
         // realize or scroll past a huge list (requirement c: a favorite below
@@ -3487,17 +3542,42 @@ public partial class MainWindow : Window
         // instead. Its Closed is wired to AnyMenu_Closed as usual.
         AnyMenu_Opened(sender, e);
 
-        // Same reasoning as ExplorerItemContextMenu_Opened: MenuItems declared
-        // in a resource dictionary don't get auto-generated code-behind fields.
-        // That's also why the 북마크 목록 submenu is picked out positionally here
-        // and kept in a field - its rows are the user's own bookmarks, built
-        // fresh on every open rather than declared. The discards around it are
-        // the two separators fencing that group and the "색상 변경" item,
-        // none of which has state to sync.
-        if (sender is ContextMenu
-            {
-                Items: [MenuItem autoCollapse, MenuItem collapseAllExpanded, MenuItem alwaysOnTop, MenuItem startWithWindows, MenuItem trayIcon, MenuItem showFolderIcons, MenuItem showFileIcons, MenuItem hideTitleBarTitle, MenuItem favoritesAtBottom, MenuItem dockOnRight, MenuItem autoHideCloseOnLeave, _, MenuItem bookmarkList, _, _, _, MenuItem fontSizeRow, MenuItem maxItemsRow, MenuItem tabSpacingRow, MenuItem rowSpacingRow, MenuItem autoHideSliverWidthRow, MenuItem scrollBarThicknessRow, MenuItem sortMenu, MenuItem iconStyleMenu, MenuItem languageMenu, ..]
-            })
+        // MenuItems declared in a resource dictionary don't get auto-generated
+        // code-behind fields, so they have to be found at runtime. This used to
+        // match them POSITIONALLY - one long list pattern over the menu's items
+        // - and adding a single row to the XAML made the whole pattern fail,
+        // which left every toggle unchecked and the steppers dead: the menu
+        // simply "stopped working" (2026-08-02, adding 숨긴 폴더). That is the
+        // second time a positional menu pattern has broken this way; the row
+        // context menu was converted after the first (v1.3.4, where it SHIPPED
+        // broken). Rows are addressed by name now, and a new row can be dropped
+        // anywhere in the XAML without touching this.
+        //
+        // AutomationId rather than Tag: Tag is already spoken for in this menu -
+        // the MenuItem template reads it to reserve the check column
+        // ("reserve-check-column"), so identity had to live somewhere else.
+        if (sender is ContextMenu menu &&
+            FindMenuItem(menu, "autoCollapse") is { } autoCollapse &&
+            FindMenuItem(menu, "collapseAllExpanded") is { } collapseAllExpanded &&
+            FindMenuItem(menu, "alwaysOnTop") is { } alwaysOnTop &&
+            FindMenuItem(menu, "startWithWindows") is { } startWithWindows &&
+            FindMenuItem(menu, "trayIcon") is { } trayIcon &&
+            FindMenuItem(menu, "showFolderIcons") is { } showFolderIcons &&
+            FindMenuItem(menu, "showFileIcons") is { } showFileIcons &&
+            FindMenuItem(menu, "hideTitleBarTitle") is { } hideTitleBarTitle &&
+            FindMenuItem(menu, "favoritesAtBottom") is { } favoritesAtBottom &&
+            FindMenuItem(menu, "dockOnRight") is { } dockOnRight &&
+            FindMenuItem(menu, "autoHideCloseOnLeave") is { } autoHideCloseOnLeave &&
+            FindMenuItem(menu, "bookmarkList") is { } bookmarkList &&
+            FindMenuItem(menu, "fontSizeRow") is { } fontSizeRow &&
+            FindMenuItem(menu, "maxItemsRow") is { } maxItemsRow &&
+            FindMenuItem(menu, "tabSpacingRow") is { } tabSpacingRow &&
+            FindMenuItem(menu, "rowSpacingRow") is { } rowSpacingRow &&
+            FindMenuItem(menu, "autoHideSliverWidthRow") is { } autoHideSliverWidthRow &&
+            FindMenuItem(menu, "scrollBarThicknessRow") is { } scrollBarThicknessRow &&
+            FindMenuItem(menu, "sortMenu") is { } sortMenu &&
+            FindMenuItem(menu, "iconStyleMenu") is { } iconStyleMenu &&
+            FindMenuItem(menu, "languageMenu") is { } languageMenu)
         {
             // Nothing expanded means nothing to collapse - grey it out rather
             // than offering a confirmation prompt that would do nothing.
@@ -3553,8 +3633,24 @@ public partial class MainWindow : Window
                 defaultIcons.IsChecked = !_settings.UseShellIcons;
                 shellIcons.IsChecked = _settings.UseShellIcons;
             }
+
+        }
+        else
+        {
+            // An id was renamed or dropped in the XAML. Debug builds say so
+            // rather than leaving the whole menu quietly unconfigured, which is
+            // what the positional version did silently.
+            LogClickLine("options menu: a named item is missing - menu unconfigured");
         }
     }
+
+    // By AutomationId, the options menu's counterpart to the row menus'
+    // FindTaggedMenuElement. Direct children only: every id here belongs to a
+    // top-level row, and searching deeper would let a submenu's own row answer
+    // for its parent.
+    private static MenuItem? FindMenuItem(ItemsControl menu, string id)
+        => menu.Items.OfType<MenuItem>()
+            .FirstOrDefault(item => System.Windows.Automation.AutomationProperties.GetAutomationId(item) == id);
 
     private void MaxItemsPerFolderDecrement_Click(object sender, RoutedEventArgs e)
         => StepMaxItemsPerFolder(sender, -1);
@@ -3909,7 +4005,10 @@ public partial class MainWindow : Window
     // to reflect the new setting, not just whichever one happens to be
     // selected), and for F5 with nothing selected (see ExplorerTree_KeyDown) -
     // a true whole-app refresh.
-    private void RefreshAllLoadedFolders()
+    // pinSelectionToTop: the restored selection is normally put at the top, the
+    // way a jump does. A DISPLAY change (the hidden-folder toggle) should not
+    // move the view at all, so it asks for the quiet restore instead.
+    private void RefreshAllLoadedFolders(bool pinSelectionToTop = true)
     {
         // The rebuild below replaces every item instance, so whatever the
         // multi-selection held would keep only dead instances - flags lost,
@@ -3977,7 +4076,7 @@ public partial class MainWindow : Window
         // caused the bug above.
         if (selectedPath is not null)
         {
-            NavigateToPath(selectedPath);
+            NavigateToPath(selectedPath, pinToTop: pinSelectionToTop);
         }
     }
 
@@ -4754,6 +4853,10 @@ public partial class MainWindow : Window
 
         var appResources = Application.Current.Resources;
         appResources["MenuFontSize"] = ExplorerTree.FontSize;
+        // The "해제" chip on a list row (MenuRowActionButtonStyle). Follows the
+        // zoom like everything else, one step down and floored so it stays
+        // legible at the smallest tree font.
+        appResources["MenuChipFontSize"] = Math.Max(9.0, ExplorerTree.FontSize - 2.0);
         appResources["MenuGestureFontSize"] = Math.Max(8.0, Math.Round(11.0 * scale));
         // The dialogs (색상 설정, 앱 정보) live in their own windows, so nothing
         // of the tree's zoom reached them - they stayed at a hardcoded 12pt in a
@@ -6175,6 +6278,8 @@ public partial class MainWindow : Window
             ClearMultiSelection();
         }
 
+        ReHideFoldersLeftBehind(e.NewValue as FileSystemItem);
+
         // The navigation token is deliberately NOT bumped here. A favorites
         // walk expands folders as it goes, and with auto-collapse on that
         // collapses the previously-open drive - which makes WPF move the tree
@@ -6342,6 +6447,22 @@ public partial class MainWindow : Window
 
             // The search scope is always a folder (see StartScopeScan).
             searchInFolderItem.IsEnabled = isFolder;
+
+            // Only folders can be hidden, and for now only folders UNDER a
+            // drive - a drive root has no parent listing to be filtered out of,
+            // so hiding one is its own presentation (greyed and inert in place)
+            // and is not built yet.
+            if (FindTaggedMenuElement<MenuItem>(menu, "hideFolder") is { } hideItem)
+            {
+                hideItem.IsEnabled = !isMultiSelection && isFolder &&
+                    ExplorerTree.SelectedItem is FileSystemItem { Parent: not null };
+            }
+
+            // Deliberately NOT greyed out when nothing is hidden. It was, and a
+            // disabled row that still shows its submenu arrow reads as broken
+            // rather than as unavailable (user, 2026-08-02). There is also
+            // something in there either way now: "숨긴 폴더 표시" leads the
+            // submenu, and an empty list says so in words.
 
             // Only makes sense to reach for while looking at a folder. Shows
             // that folder's own override if it has one (GetEffectiveFolderSort),
@@ -7254,10 +7375,10 @@ public partial class MainWindow : Window
 
         var remove = new Button
         {
-            Content = "−",
-            Style = (Style)FindResource("BookmarkRemoveButtonStyle"),
+            Content = Strings.MenuListRowRemove,
+            Style = (Style)FindResource("MenuRowActionButtonStyle"),
             ToolTip = Strings.MenuBookmarkRemove,
-            Margin = new Thickness(6, 0, 0, 0),
+            Margin = new Thickness(14, 0, 0, 0),
             VerticalAlignment = System.Windows.VerticalAlignment.Center,
         };
         remove.Click += (_, args) =>
@@ -7300,6 +7421,418 @@ public partial class MainWindow : Window
             JumpToBookmarkPath(path);
         };
         return row;
+    }
+
+    // ----- 폴더 숨기기 -------------------------------------------------------
+    //
+    // Takes a folder out of the TREE only. The file search still indexes and
+    // finds what is inside it, because a search is a deliberate act of looking
+    // and "분명 있는데 검색이 안 된다" is the worse surprise (decided
+    // 2026-08-02, with the user). The list below is not a nicety either: hiding
+    // a folder removes the only row you could have right-clicked to get it
+    // back, so the two ship together or not at all.
+    // Shows the hidden folders in place without unhiding them - so "어디로
+    //갔지" has an answer that costs the tree nothing while it is off. Every
+    // loaded folder has to be re-read, since the rows in question were never
+    // built; that is the same heavy refresh the sort and cap settings use, and
+    // like them this is a deliberate one-off click, not something that repeats.
+    private void ShowHiddenFoldersMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ShowHiddenFolders = !_settings.ShowHiddenFolders;
+        FileSystemService.ShowHiddenFolders = _settings.ShowHiddenFolders;
+        _settingsService.Save(_settings);
+
+        // Nothing hidden, so nothing on screen can change - and the refresh
+        // below is the heaviest thing in the app. Remember the setting and stop.
+        if (_settings.HiddenFolderPaths.Count == 0)
+        {
+            return;
+        }
+
+        // Turning the display OFF while the selection sits inside a folder it
+        // is about to hide: move up to the nearest ancestor that is staying.
+        // Otherwise the refresh below restores the selection by path, that
+        // restore counts as a deliberate navigation, and the navigation puts
+        // the folder straight back on screen - the row stayed selected and
+        // visible after being switched off (user, 2026-08-02).
+        if (!_settings.ShowHiddenFolders &&
+            ExplorerTree.SelectedItem is FileSystemItem selected &&
+            NearestVisibleAncestor(selected) is { } stays &&
+            !ReferenceEquals(stays, selected))
+        {
+            stays.IsSelected = true;
+        }
+
+        // Not pinned to the top: this is a display toggle, not a jump. Pinning
+        // threw the row the menu had been opened from to the top of the tree,
+        // which read as the view having moved somewhere (same report).
+        RefreshAllLoadedFolders(pinSelectionToTop: false);
+    }
+
+    // The first ancestor (or the item itself) that is not inside anything the
+    // user has hidden. Null only if the item is somehow not under a root.
+    private static FileSystemItem? NearestVisibleAncestor(FileSystemItem item)
+    {
+        var current = item;
+        while (current is not null &&
+               FileSystemService.HiddenPaths.Contains(FileSystemService.NormalizeHiddenPath(current.FullPath)))
+        {
+            current = current.Parent;
+        }
+
+        return current;
+    }
+
+    private void HideFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsDirectory: true, Parent: not null } folder)
+        {
+            return;
+        }
+
+        HideFolder(folder);
+    }
+
+    private void HideFolder(FileSystemItem folder)
+    {
+        string path = FileSystemService.NormalizeHiddenPath(folder.FullPath);
+        if (!FileSystemService.HiddenPaths.Add(path))
+        {
+            return;
+        }
+
+        _settings.HiddenFolderPaths.Add(path);
+
+        // With "숨긴 폴더 표시" on, hiding must not make the row disappear -
+        // that is the one state where a hidden folder is supposed to stay on
+        // screen. It just starts saying so instead.
+        if (_settings.ShowHiddenFolders)
+        {
+            folder.IsHiddenFolderShown = true;
+            _settingsService.Save(_settings);
+            return;
+        }
+
+        // A folder hidden while it is the current selection would leave the
+        // tree selected on a row that no longer exists - and the favorites
+        // panel syncing to it. Move up to its parent, which is where the eye
+        // already is once the row goes.
+        if (folder.Parent is { } parent)
+        {
+            if (ExplorerTree.SelectedItem is FileSystemItem selected &&
+                IsSelfOrDescendant(selected, folder))
+            {
+                parent.IsSelected = true;
+            }
+
+            // Removed in place rather than by re-reading the parent from disk:
+            // the listing is already correct apart from this one row, and a
+            // reload would collapse whatever else is open under that parent
+            // (the defect found 2026-07-25 when every file operation still
+            // rebuilt).
+            parent.Children.Remove(folder);
+        }
+
+        _settingsService.Save(_settings);
+    }
+
+    private void UnhideFolder(string path)
+    {
+        path = FileSystemService.NormalizeHiddenPath(path);
+        FileSystemService.HiddenPaths.Remove(path);
+        FileSystemService.TemporarilyVisiblePaths.Remove(path);
+        _settings.HiddenFolderPaths.RemoveAll(
+            p => string.Equals(FileSystemService.NormalizeHiddenPath(p), path, StringComparison.OrdinalIgnoreCase));
+        _settingsService.Save(_settings);
+
+        // The row may already be on screen - "숨긴 폴더 표시" is on, or a jump is
+        // passing through it - and in that case it is an EXISTING instance that
+        // read its flag in its constructor. Merges reuse instances by name, so
+        // nothing would ever clear it and the folder went on looking hidden
+        // after being released (reported 2026-08-02, with everything unhidden
+        // and one row still italic). Same reason RemoveBookmark walks the tree.
+        foreach (var item in EnumerateLoadedItems(_roots))
+        {
+            if (string.Equals(FileSystemService.NormalizeHiddenPath(item.FullPath), path, StringComparison.OrdinalIgnoreCase))
+            {
+                item.IsHiddenFolderShown = false;
+                return;
+            }
+        }
+
+        // Not on screen at all, so the row has to come back from disk. Merge
+        // rather than rebuild, so the rest of the parent's open subtree stays.
+        if (System.IO.Path.GetDirectoryName(path) is { } parentPath &&
+            FindItemForPath(parentPath) is { ChildrenLoaded: true } parent)
+        {
+            RefreshFolderPreservingState(parent);
+        }
+    }
+
+    // A jump has to be able to land inside a folder the user hid: a search
+    // result, bookmark or favorite in there is still reachable by design (the
+    // search deliberately does not filter), and a click that silently went
+    // nowhere would be the worst of both. So the hidden folders along the way
+    // are put back on screen for the trip, and they leave again on their own
+    // once the selection is no longer inside them - "숨긴 폴더는 지금 그 안에
+    // 있는 동안만 보인다", one rule covering every jump route rather than a
+    // decision per caller (agreed 2026-08-02).
+    private void RevealHiddenFoldersOnPathTo(string targetPath)
+    {
+        if (FileSystemService.HiddenPaths.Count == 0)
+        {
+            return;
+        }
+
+        // Shallowest first: a hidden folder's row can only be brought back once
+        // its own parent is listed, and one hidden folder can sit inside
+        // another.
+        var chain = new List<string>();
+        for (var current = FileSystemService.NormalizeHiddenPath(targetPath);
+             !string.IsNullOrEmpty(current);
+             current = System.IO.Path.GetDirectoryName(current) ?? string.Empty)
+        {
+            chain.Insert(0, current);
+        }
+
+        foreach (string path in chain)
+        {
+            if (!FileSystemService.HiddenPaths.Contains(path) ||
+                !FileSystemService.TemporarilyVisiblePaths.Add(path))
+            {
+                continue;
+            }
+
+            // The row was never built - it has to come back from disk. Merge,
+            // so nothing else open under that parent collapses.
+            if (System.IO.Path.GetDirectoryName(path) is { } parentPath &&
+                FindItemForPath(parentPath) is { ChildrenLoaded: true } parent)
+            {
+                RefreshFolderPreservingState(parent);
+            }
+        }
+    }
+
+    private void ReHideFoldersLeftBehind(FileSystemItem? selected)
+    {
+        if (FileSystemService.TemporarilyVisiblePaths.Count == 0)
+        {
+            return;
+        }
+
+        string? selectedPath = selected is null
+            ? null
+            : FileSystemService.NormalizeHiddenPath(selected.FullPath);
+
+        foreach (string path in FileSystemService.TemporarilyVisiblePaths.ToList())
+        {
+            // Still in there (the folder itself, or anything under it) - leave
+            // it alone. Compared as paths rather than by walking parents,
+            // because the row for a temporarily-visible folder can be replaced
+            // by a refresh while the user is inside it.
+            if (selectedPath is not null &&
+                (selectedPath.Equals(path, StringComparison.OrdinalIgnoreCase) ||
+                 selectedPath.StartsWith(path + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            FileSystemService.TemporarilyVisiblePaths.Remove(path);
+
+            if (FindItemForPath(path) is { } item && item.Parent is { } parent)
+            {
+                parent.Children.Remove(item);
+            }
+        }
+    }
+
+    // Built fresh on every open, like the bookmark list - the contents are the
+    // user's own hidden folders, so there is nothing to declare in XAML. The
+    // same handler serves the copy in the row menu and the copy in the options
+    // menu; `sender` says which one is asking.
+    private void HiddenFolderSubmenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem submenu)
+        {
+            AppendHiddenFolderListTo(submenu);
+        }
+    }
+
+    private void AppendHiddenFolderListTo(MenuItem submenu)
+    {
+        submenu.Items.Clear();
+
+        // "숨긴 폴더 표시" leads the list rather than sitting as its own row in
+        // the menu outside. It was there first and read badly: a checkable row
+        // among unheckable ones does not line up, and it made an already long
+        // context menu longer for something reached rarely (user, 2026-08-02).
+        // Here it is one step further in, next to the folders it acts on, and
+        // fenced off from them by a separator.
+        var showAll = FollowMenuFont(new MenuItem
+        {
+            Header = Strings.MenuShowHiddenFolders,
+            IsCheckable = true,
+            IsChecked = _settings.ShowHiddenFolders,
+            // Nothing hidden, nothing to show: flipping it could only cost a
+            // full re-read of every open folder and the flicker that comes with
+            // it, for no visible change (user, 2026-08-02).
+            IsEnabled = _settings.HiddenFolderPaths.Count > 0,
+            StaysOpenOnClick = true,
+        });
+        showAll.Click += ShowHiddenFoldersMenuItem_Click;
+        submenu.Items.Add(showAll);
+        submenu.Items.Add(new Separator());
+
+        // This row also guarantees the submenu is never EMPTY. A MenuItem whose
+        // Items go to zero reports HasItems=false, WPF stops opening a popup for
+        // it at all, and SubmenuOpened - the only thing that could refill it -
+        // never fires again: the row goes dead until the app restarts.
+        // Releasing the last hidden folder used to leave it in exactly that
+        // state.
+        if (_settings.HiddenFolderPaths.Count == 0)
+        {
+            submenu.Items.Add(FollowMenuFont(new MenuItem
+            {
+                Header = Strings.MenuHiddenFolderListEmpty,
+                IsEnabled = false,
+            }));
+            return;
+        }
+
+        foreach (string path in _settings.HiddenFolderPaths.ToList())
+        {
+            submenu.Items.Add(BuildHiddenFolderRow(path));
+        }
+
+        // Same closing row the bookmark list has, for the same reason: releasing
+        // a dozen folders one at a time is the case a list is supposed to spare
+        // you. Right-aligned and asked about (with the count) exactly like that
+        // one - a per-row 해제 undoes something you are looking straight at,
+        // while this throws away a list that may have taken a while to build.
+        var clearAllText = FollowMenuFont(new MenuItem
+        {
+            Header = new TextBlock
+            {
+                Text = Strings.MenuBookmarkClearAll,
+                TextAlignment = TextAlignment.Right,
+            },
+        });
+        if (clearAllText.Header is TextBlock clearLabel)
+        {
+            clearLabel.SetResourceReference(TextBlock.ForegroundProperty, "MenuForeground");
+        }
+        clearAllText.Click += ClearAllHiddenFolders_Click;
+        submenu.Items.Add(new Separator());
+        submenu.Items.Add(clearAllText);
+    }
+
+    private void ClearAllHiddenFolders_Click(object sender, RoutedEventArgs e)
+    {
+        var result = MessageBox.Show(
+            this,
+            string.Format(Strings.HiddenClearAllConfirmBody, _settings.HiddenFolderPaths.Count),
+            Strings.HiddenClearAllConfirmTitle,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        // One at a time through the same path a single 해제 takes, so each
+        // folder's row comes back the same way and nothing needs a second
+        // implementation of "put it back".
+        foreach (string path in _settings.HiddenFolderPaths.ToList())
+        {
+            UnhideFolder(path);
+        }
+    }
+
+    // `[폴더 아이콘] 이름 … [−]`, the bookmark list's row minus the jump and the
+    // ribbon. No disk probe for the icon either: every row here is a folder by
+    // construction, where a bookmark could be either and had to ask.
+    private MenuItem BuildHiddenFolderRow(string path)
+    {
+        var row = FollowMenuFont(new MenuItem
+        {
+            ToolTip = path,
+            // Nothing to run by clicking the row itself - the folder is hidden,
+            // so there is nowhere to jump to. StaysOpenOnClick keeps a stray
+            // click from closing the list mid-cleanup all the same.
+            StaysOpenOnClick = true,
+        });
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var icon = new System.Windows.Controls.Image
+        {
+            Source = Resources["FavoriteFolderIconSource"] as ImageSource,
+            Stretch = Stretch.Uniform,
+            Margin = new Thickness(0, 0, 8, 0),
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+            SnapsToDevicePixels = true,
+        };
+        icon.SetResourceReference(WidthProperty, "IconSize");
+        icon.SetResourceReference(HeightProperty, "IconSize");
+        Grid.SetColumn(icon, 0);
+        grid.Children.Add(icon);
+
+        var name = new TextBlock
+        {
+            Text = BookmarkLeafName(path),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+        };
+        name.SetResourceReference(TextBlock.ForegroundProperty, "FolderNameForeground");
+        Grid.SetColumn(name, 1);
+        grid.Children.Add(name);
+
+        var unhide = new Button
+        {
+            Content = Strings.MenuListRowRemove,
+            Style = (Style)FindResource("MenuRowActionButtonStyle"),
+            ToolTip = Strings.MenuUnhideFolder,
+            Margin = new Thickness(14, 0, 0, 0),
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+        };
+        unhide.Click += (_, args) =>
+        {
+            args.Handled = true;
+            UnhideFolder(path);
+
+            // From whichever menu this row actually belongs to - the list is
+            // built into two different menus, and a hardcoded host quietly did
+            // nothing in the other one when the bookmark list first learned
+            // this (2026-07-31).
+            if (ItemsControl.ItemsControlFromItemContainer(row) is MenuItem host)
+            {
+                // Rebuilt rather than just dropping the row: taking the last one
+                // out would leave the submenu empty, which is a state it never
+                // comes back from (see AppendHiddenFolderListTo).
+                AppendHiddenFolderListTo(host);
+            }
+        };
+        Grid.SetColumn(unhide, 2);
+        grid.Children.Add(unhide);
+
+        row.Header = grid;
+        return row;
+    }
+
+    private static bool IsSelfOrDescendant(FileSystemItem item, FileSystemItem ancestor)
+    {
+        for (var current = item; current is not null; current = current.Parent)
+        {
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Icon and name colour both hang on one question - is this a folder or a

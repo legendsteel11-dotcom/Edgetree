@@ -240,6 +240,23 @@ public class AppSettings
     // is skipped when cycling, not an error.
     public List<string> BookmarkPaths { get; set; } = new();
 
+    // Folders the user has taken out of the tree ("이 폴더 숨기기"). Only the
+    // tree hides them - the file search still finds what is inside, because a
+    // search is a deliberate act of looking and "분명 있는데 검색이 안 된다" is
+    // a worse surprise than seeing a folder you hid (decided 2026-08-02).
+    //
+    // Kept as paths rather than as a flag on the items for the same reason
+    // bookmarks are: item instances are created lazily and thrown away by every
+    // refresh, so the truth has to live somewhere that outlives them.
+    // A path that no longer exists is simply never matched - no pruning pass,
+    // and nothing to go wrong while a drive is briefly away.
+    public List<string> HiddenFolderPaths { get; set; } = new();
+
+    // Shows the folders above in place (italic, recessed) without unhiding
+    // them - Explorer's "숨긴 항목" checkbox, same idea. Off by default: the
+    // point of hiding is that the tree is quieter afterwards.
+    public bool ShowHiddenFolders { get; set; } = false;
+
     // File-search feature (see Services/FileSearchService). The last folder
     // chosen via "폴더 찾기" is remembered so reopening search restores the same
     // scope. Null until the user picks one for the first time. A path that no

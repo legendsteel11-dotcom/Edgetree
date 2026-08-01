@@ -197,6 +197,20 @@ public class FileSystemItem : INotifyPropertyChanged
         set => SetField(ref _isBookmarked, value);
     }
 
+    private bool _isHiddenFolderShown;
+
+    // A folder the user has hidden that is on screen anyway - either because a
+    // jump is passing through it (TemporarilyVisiblePaths) or because "숨긴
+    // 폴더 표시" is on. The row marks itself so neither case reads as "this
+    // folder came back on its own": italic name plus a recessed row, no dimming
+    // (see the tree template). False for every ordinary row, so it costs
+    // nothing to nobody who has never hidden anything.
+    public bool IsHiddenFolderShown
+    {
+        get => _isHiddenFolderShown;
+        set => SetField(ref _isHiddenFolderShown, value);
+    }
+
     private bool _isCut;
 
     // Waiting on a Ctrl+X paste. Fades the row's ICON only (see the tree
@@ -222,6 +236,11 @@ public class FileSystemItem : INotifyPropertyChanged
         _isNetworkDriveOffline = parent?.IsNetworkDriveOffline ?? false;
         _isBookmarked = FileSystemService.BookmarkedPaths.Contains(fullPath);
         _isCut = FileSystemService.CutPaths.Count > 0 && FileSystemService.CutPaths.Contains(fullPath);
+        // Built at all while hidden means it is being shown deliberately - the
+        // filter in ReadChildrenFromDisk is what keeps the other case out.
+        _isHiddenFolderShown = isDirectory &&
+            FileSystemService.HiddenPaths.Count > 0 &&
+            FileSystemService.HiddenPaths.Contains(FileSystemService.NormalizeHiddenPath(fullPath));
         if (isDirectory)
         {
             // Always resolves to SOME icon - this folder's own override if it

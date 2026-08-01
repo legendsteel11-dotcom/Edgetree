@@ -147,6 +147,45 @@ public static class FileSystemService
     // re-applying flags. MainWindow keeps it in sync with the settings list.
     public static readonly HashSet<string> BookmarkedPaths = new(StringComparer.OrdinalIgnoreCase);
 
+    // Folders taken out of the tree by the user ("이 폴더 숨기기"), mirrored
+    // from AppSettings.HiddenFolderPaths for the same reason as the set above -
+    // ReadChildrenFromDisk consults it as it builds each level, which is the one
+    // place every folder listing passes through.
+    //
+    // Trailing separators are stripped on the way in (NormalizeHiddenPath) so a
+    // path recorded as "D:\Work\" still matches the "D:\Work" the enumerator
+    // hands back.
+    public static readonly HashSet<string> HiddenPaths = new(StringComparer.OrdinalIgnoreCase);
+
+    // Except while a deliberate navigation is passing THROUGH a hidden folder:
+    // a search result, bookmark or favorite inside one still has to be
+    // reachable, and a jump that silently went nowhere would be the worst of
+    // both. So the chain being revealed is exempted for as long as the user is
+    // in there, and the folder returns to hidden once they leave it - one rule
+    // covering every jump route rather than a decision per caller
+    // (agreed 2026-08-02).
+    public static readonly HashSet<string> TemporarilyVisiblePaths = new(StringComparer.OrdinalIgnoreCase);
+
+    public static string NormalizeHiddenPath(string path)
+        => path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+    // "숨긴 폴더 표시" - Explorer's own "숨긴 항목" checkbox, in shape and in
+    // meaning: it shows them where they belong without unhiding anything, so
+    // there is a way to answer "did I hide something here" that costs the tree
+    // nothing while it is off. Mirrored from AppSettings.ShowHiddenFolders.
+    public static bool ShowHiddenFolders;
+
+    public static bool IsHiddenByUser(string path)
+    {
+        if (HiddenPaths.Count == 0 || ShowHiddenFolders)
+        {
+            return false;
+        }
+
+        string normalized = NormalizeHiddenPath(path);
+        return HiddenPaths.Contains(normalized) && !TemporarilyVisiblePaths.Contains(normalized);
+    }
+
     // What Ctrl+X is currently holding, for the same reason as the set above:
     // a row that gets re-created by a watcher merge or a refresh while the cut
     // is pending has to come back still marked. Unlike bookmarks this is not
@@ -456,7 +495,7 @@ public static class FileSystemService
             foreach (var dir in directories)
             {
                 var name = Path.GetFileName(dir);
-                if (!string.IsNullOrEmpty(name))
+                if (!string.IsNullOrEmpty(name) && !IsHiddenByUser(dir))
                 {
                     result.Add(new FileSystemItem(name, dir, isDirectory: true, parent));
                 }

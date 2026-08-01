@@ -16,6 +16,19 @@ public static class Strings
     public static string MenuBookmarkList = "북마크 목록";
     public static string MenuBookmarkListEmpty = "북마크 없음";
     public static string MenuBookmarkClearAll = "전체 해제";
+    // "이 폴더" rather than just "숨기기": the row under the cursor is what goes,
+    // and a bare verb next to 잘라내기/삭제 reads like it might mean the
+    // selection or the whole view.
+    public static string MenuHideFolder = "이 폴더 숨기기";
+    public static string MenuHiddenFolderList = "숨긴 폴더";
+    public static string MenuHiddenFolderListEmpty = "숨긴 폴더 없음";
+    public static string MenuUnhideFolder = "숨김 해제";
+    public static string MenuShowHiddenFolders = "숨긴 폴더 표시";
+    // The button on every row of the bookmark / hidden-folder lists. One word
+    // for both because the row it sits on already says what is being released.
+    public static string MenuListRowRemove = "해제";
+    public static string HiddenClearAllConfirmTitle = "숨긴 폴더 전체 해제";
+    public static string HiddenClearAllConfirmBody = "숨긴 폴더 {0}개를 모두 다시 표시하겠습니까?";
     public static string BookmarkClearAllConfirmTitle = "북마크 전체 해제";
     public static string BookmarkClearAllConfirmBody = "북마크 {0}개를 모두 해제하겠습니까?";
     public static string BookmarkShortcutToggle = "지정 / 해제";
@@ -299,6 +312,14 @@ public static class Strings
         MenuBookmarkRemove = "Remove Bookmark";
         MenuBookmarkList = "Bookmarks";
         MenuBookmarkListEmpty = "No bookmarks";
+        MenuHideFolder = "Hide This Folder";
+        MenuHiddenFolderList = "Hidden Folders";
+        MenuHiddenFolderListEmpty = "No hidden folders";
+        MenuUnhideFolder = "Unhide";
+        MenuShowHiddenFolders = "Show Hidden Folders";
+        MenuListRowRemove = "Remove";
+        HiddenClearAllConfirmTitle = "Unhide All Folders";
+        HiddenClearAllConfirmBody = "Show all {0} hidden folders again?";
         MenuBookmarkClearAll = "Clear all";
         BookmarkClearAllConfirmTitle = "Clear All Bookmarks";
         BookmarkClearAllConfirmBody = "Clear all {0} bookmarks?";

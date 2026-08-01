@@ -75,6 +75,14 @@ public sealed class SearchRow : INotifyPropertyChanged
     // style trigger); a direct binding takes the same notification path as
     // Icon, which has always updated live in this very template.
     public double CutOpacity => _isCut ? 0.4 : 1.0;
+
+    // Still italic HERE, while the tree's cut mark moved to a quieted name
+    // colour (2026-08-02). Not an oversight: italic became ambiguous in the
+    // TREE, where it now also means "a hidden folder being shown", and that
+    // state cannot occur in a result list - these rows are files. Matching the
+    // tree would mean pushing live brushes into this model, since a search row
+    // repaints only from direct value bindings (see the note above), and the
+    // ambiguity it would solve does not exist here.
     public System.Windows.FontStyle CutFontStyle => _isCut ? FontStyles.Italic : FontStyles.Normal;
 
     public static SearchRow Header(string directoryPath) => new()

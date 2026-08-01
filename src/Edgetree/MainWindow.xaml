@@ -392,7 +392,18 @@
              list stays quiet the rest of the time. Foreground is inherited
              from the MenuItem template's own TextBlock.Foreground, so it
              follows the theme without naming a brush. -->
-        <Style x:Key="BookmarkRemoveButtonStyle"
+        <!-- The "해제" button on a bookmark-list / hidden-folder-list row.
+             It used to be a "−" that appeared only on the hovered row: compact,
+             but easy to miss entirely and a small target once found (user,
+             2026-08-02: "-가 너무 작아서 놓치기가 쉽네요"). Now it is a word,
+             on every row, always there - so the list says what can be done with
+             it without being explored first.
+             Quiet by outline rather than by fading: a hairline border and no
+             fill until the pointer is on it, at which point it takes the row's
+             hover colour. Nothing here is dimmed - that is not how this app
+             marks anything secondary - and the smaller font is what keeps the
+             word from competing with the folder name beside it. -->
+        <Style x:Key="MenuRowActionButtonStyle"
                 TargetType="Button">
             <Setter Property="Background"
                     Value="Transparent"/>
@@ -401,35 +412,38 @@
             <Setter Property="Cursor"
                     Value="Hand"/>
             <Setter Property="Padding"
-                    Value="6,0"/>
-            <Setter Property="Opacity"
-                    Value="0.55"/>
-            <Setter Property="Visibility"
-                    Value="Hidden"/>
+                    Value="7,1"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource MenuForeground}"/>
+            <!-- A step below the menu's own size, so the word reads as an
+                 action attached to the row rather than as part of the name
+                 beside it. A smaller font, not a faded one - the app never
+                 marks anything secondary by fading. -->
+            <Setter Property="FontSize"
+                    Value="{DynamicResource MenuChipFontSize}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
+                        <Border x:Name="Chip"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{DynamicResource MenuDisabledForeground}"
+                                BorderThickness="1"
                                 CornerRadius="3"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center"
                                     VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Chip"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowHoverBackground}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsHighlighted, RelativeSource={RelativeSource AncestorType=MenuItem}}"
-                        Value="True">
-                    <Setter Property="Visibility"
-                            Value="Visible"/>
-                </DataTrigger>
-                <Trigger Property="IsMouseOver"
-                        Value="True">
-                    <Setter Property="Opacity"
-                            Value="1"/>
-                </Trigger>
-            </Style.Triggers>
         </Style>
 
         <Style TargetType="MenuItem">
@@ -842,6 +856,21 @@
                         InputGestureText="Ctrl+Alt+L"
                         Click="BookmarkNext_Click"/>
             </MenuItem>
+            <!-- Takes the folder out of the tree; the list below it is how it
+                 comes back, so the two are one feature and sit together. Only
+                 the tree hides it - the file search still finds what is inside
+                 (see AppSettings.HiddenFolderPaths). Enabled per row in
+                 ExplorerItemContextMenu_Opened: folders only. -->
+            <MenuItem Header="{x:Static services:Strings.MenuHideFolder}"
+                    Tag="hideFolder"
+                    Click="HideFolder_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuHiddenFolderList}"
+                    Tag="hiddenFolderList"
+                    SubmenuOpened="HiddenFolderSubmenu_Opened">
+                <!-- Placeholder so WPF gives this item a submenu at all; the
+                     real rows replace it on open (AppendHiddenFolderListTo). -->
+                <MenuItem Header=""/>
+            </MenuItem>
             <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
                     Tag="newFolder"
                     InputGestureText="F7"
@@ -1106,6 +1135,7 @@
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
             <MenuItem Header="{x:Static services:Strings.MenuAutoCollapse}"
                     IsCheckable="True"
+                    AutomationProperties.AutomationId="autoCollapse"
                     Click="AutoCollapseMenuItem_Click"/>
             <!-- One-shot cleanup, unlike the title bar's collapse button (which
                  is a toggle that remembers what was expanded and can restore
@@ -1121,33 +1151,43 @@
                  siblings get, at every font size. -->
             <MenuItem Header="{x:Static services:Strings.MenuCollapseAllExpanded}"
                     Tag="reserve-check-column"
+                    AutomationProperties.AutomationId="collapseAllExpanded"
                     Click="CollapseAllExpandedMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuAlwaysOnTop}"
                     IsCheckable="True"
+                    AutomationProperties.AutomationId="alwaysOnTop"
                     Click="AlwaysOnTopMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuStartWithWindows}"
                     IsCheckable="True"
+                    AutomationProperties.AutomationId="startWithWindows"
                     Click="StartWithWindowsMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuAlwaysShowTrayIcon}"
                     IsCheckable="True"
+                    AutomationProperties.AutomationId="trayIcon"
                     Click="TrayIconMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuShowFolderIcons}"
                     IsCheckable="True"
+                    AutomationProperties.AutomationId="showFolderIcons"
                     Click="ShowFolderIconsMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuShowFileIcons}"
                     IsCheckable="True"
+                    AutomationProperties.AutomationId="showFileIcons"
                     Click="ShowFileIconsMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuHideTitleBarTitle}"
                     IsCheckable="True"
+                    AutomationProperties.AutomationId="hideTitleBarTitle"
                     Click="HideTitleBarTitleMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuFavoritesAtBottom}"
                     IsCheckable="True"
+                    AutomationProperties.AutomationId="favoritesAtBottom"
                     Click="FavoritesAtBottomMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuDockOnRight}"
                     IsCheckable="True"
+                    AutomationProperties.AutomationId="dockOnRight"
                     Click="DockOnRightMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuAutoHideCloseOnLeave}"
                     IsCheckable="True"
+                    AutomationProperties.AutomationId="autoHideCloseOnLeave"
                     Click="AutoHideCloseOnLeaveMenuItem_Click"/>
             <Separator/>
             <!-- Contents are built in code on every open (RebuildBookmarkListMenu)
@@ -1155,7 +1195,16 @@
                  declare here. Sits inside the separators with 색상 설정 rather
                  than up among the toggles: like that one it opens something of
                  its own rather than flipping a setting. -->
-            <MenuItem Header="{x:Static services:Strings.MenuBookmarkList}"/>
+            <MenuItem Header="{x:Static services:Strings.MenuBookmarkList}"
+                    AutomationProperties.AutomationId="bookmarkList"/>
+            <!-- Same shape as the bookmark list above and built the same way -
+                 the row context menu carries one too, but this is where someone
+                 looks who no longer has the folder's row to right-click. -->
+            <MenuItem Header="{x:Static services:Strings.MenuHiddenFolderList}"
+                    AutomationProperties.AutomationId="hiddenFolderList"
+                    SubmenuOpened="HiddenFolderSubmenu_Opened">
+                <MenuItem Header=""/>
+            </MenuItem>
             <Separator/>
             <!-- Fenced off by separators on both sides: it opens a window,
                  unlike everything around it, so it belongs to neither the
@@ -1170,7 +1219,8 @@
                  hard to read looks in the settings menu, not a shortcut list -
                  so the row carries the shortcut in its own label too. -->
             <MenuItem StaysOpenOnClick="True"
-                    Focusable="False">
+                    Focusable="False"
+                    AutomationProperties.AutomationId="fontSizeRow">
                 <MenuItem.Header>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -1202,7 +1252,8 @@
             <!-- StaysOpenOnClick so stepping the value doesn't close the whole
                  options menu out from under the user. -->
             <MenuItem StaysOpenOnClick="True"
-                    Focusable="False">
+                    Focusable="False"
+                    AutomationProperties.AutomationId="maxItemsRow">
                 <MenuItem.Header>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -1234,7 +1285,8 @@
             <!-- StaysOpenOnClick so stepping the value doesn't close the whole
                  options menu out from under the user. -->
             <MenuItem StaysOpenOnClick="True"
-                    Focusable="False">
+                    Focusable="False"
+                    AutomationProperties.AutomationId="tabSpacingRow">
                 <MenuItem.Header>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -1266,7 +1318,8 @@
             <!-- StaysOpenOnClick so stepping the value doesn't close the whole
                  options menu out from under the user. -->
             <MenuItem StaysOpenOnClick="True"
-                    Focusable="False">
+                    Focusable="False"
+                    AutomationProperties.AutomationId="rowSpacingRow">
                 <MenuItem.Header>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -1302,7 +1355,8 @@
                  shape first, and a lone stepper among checkmarks looks like a
                  mistake. -->
             <MenuItem StaysOpenOnClick="True"
-                    Focusable="False">
+                    Focusable="False"
+                    AutomationProperties.AutomationId="autoHideSliverWidthRow">
                 <MenuItem.Header>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -1332,7 +1386,8 @@
                 </MenuItem.Header>
             </MenuItem>
             <MenuItem StaysOpenOnClick="True"
-                    Focusable="False">
+                    Focusable="False"
+                    AutomationProperties.AutomationId="scrollBarThicknessRow">
                 <MenuItem.Header>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -1364,7 +1419,8 @@
             <!-- Kept next to Language: both open a submenu, so they read as a
                  pair at the end of the settings block rather than one submenu
                  stranded above a run of steppers. -->
-            <MenuItem Header="{x:Static services:Strings.MenuDefaultSort}">
+            <MenuItem Header="{x:Static services:Strings.MenuDefaultSort}"
+                    AutomationProperties.AutomationId="sortMenu">
                 <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
                         IsCheckable="True"
                         Tag="name"
@@ -1398,7 +1454,8 @@
                  the other things that leave. OptionsMenu_Opened matches this
                  menu's items by POSITION, so keep its pattern in sync when
                  touching anything here. -->
-            <MenuItem Header="{x:Static services:Strings.MenuIconStyle}">
+            <MenuItem Header="{x:Static services:Strings.MenuIconStyle}"
+                    AutomationProperties.AutomationId="iconStyleMenu">
                 <MenuItem Header="{x:Static services:Strings.MenuIconStyleDefault}"
                         IsCheckable="True"
                         Tag="default"
@@ -1408,7 +1465,8 @@
                         Tag="shell"
                         Click="IconStyleMenuItem_Click"/>
             </MenuItem>
-            <MenuItem Header="{x:Static services:Strings.MenuLanguage}">
+            <MenuItem Header="{x:Static services:Strings.MenuLanguage}"
+                    AutomationProperties.AutomationId="languageMenu">
                 <!-- Non-interactive note, not a language choice - IsEnabled
                      False keeps it unclickable and visually dimmed. -->
                 <MenuItem Header="{x:Static services:Strings.LanguageRestartNote}"
@@ -2368,22 +2426,70 @@
                             Property="FontWeight"
                             Value="Bold"/>
                 </DataTrigger>
-                <!-- Waiting on a Ctrl+X paste: the icon fades AND the name goes
-                     italic. The name is not dimmed - the app never says
-                     anything by fading text - but the icon alone left the mark
-                     invisible to anyone running with icons turned off, which is
-                     a supported way to use the tree (2026-07-28).
+                <!-- Waiting on a Ctrl+X paste: the icon fades and the name goes
+                     quiet - the row's own colour taken towards the background,
+                     not an Opacity (the app doesn't say things by fading text,
+                     and over an unknown background a fade is a different colour
+                     every time). The icon alone was not enough: it leaves the
+                     mark invisible to anyone running with icons off, which is a
+                     supported way to use the tree (2026-07-28).
+                     It used to go ITALIC too, which is now what "hidden but
+                     shown" means (see below). Two states that both quiet the
+                     name needed the second signal to differ, so the line is
+                     drawn here: italic = hidden, faded icon = cut
+                     (2026-08-02, with the user).
+                     Split folder/file because the muted colour is derived from
+                     whichever colour that row would normally use.
                      Deliberately above the offline trigger below, which sets
                      the same Opacity - a row on a sleeping drive should read
                      as switched off first, and the last matching trigger wins. -->
-                <DataTrigger Binding="{Binding IsCut}"
-                        Value="True">
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsCut}" Value="True"/>
+                        <Condition Binding="{Binding IsDirectory}" Value="True"/>
+                    </MultiDataTrigger.Conditions>
                     <Setter TargetName="RowIcon"
                             Property="Opacity"
                             Value="0.4"/>
                     <Setter TargetName="NameText"
+                            Property="Foreground"
+                            Value="{DynamicResource MutedFolderNameForeground}"/>
+                </MultiDataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsCut}" Value="True"/>
+                        <Condition Binding="{Binding IsDirectory}" Value="False"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="RowIcon"
+                            Property="Opacity"
+                            Value="0.4"/>
+                    <Setter TargetName="NameText"
+                            Property="Foreground"
+                            Value="{DynamicResource MutedFileNameForeground}"/>
+                </MultiDataTrigger>
+                <!-- A hidden folder on screen anyway - a jump passing through
+                     it, or "숨긴 폴더 표시" being on. Italic name, in the user's
+                     own folder colour taken a step towards the background
+                     (HiddenFolderNameForeground, derived in ApplyUserColors),
+                     so it never reads as a folder that simply came back: it is
+                     here on purpose and only for now.
+                     A translucent row backdrop was built first and dropped -
+                     over a dark background it read as a bright rim around the
+                     row rather than as a dent (2026-08-02).
+                     The ICON is deliberately left alone: a faded icon is what
+                     cut means, and these two states have to stay tellable
+                     apart at a glance.
+                     Above the offline trigger below, which owns the "this row
+                     is not live" look outright; the last matching trigger
+                     wins. -->
+                <DataTrigger Binding="{Binding IsHiddenFolderShown}"
+                        Value="True">
+                    <Setter TargetName="NameText"
                             Property="FontStyle"
                             Value="Italic"/>
+                    <Setter TargetName="NameText"
+                            Property="Foreground"
+                            Value="{DynamicResource MutedFolderNameForeground}"/>
                 </DataTrigger>
                 <!-- Drive not answering: red dot, and the row greyed out.
                      LAST on purpose - every folder/file/selection colour above
