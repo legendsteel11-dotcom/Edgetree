@@ -153,11 +153,15 @@ Either way, the resulting `.exe` is in
 
 ### v1.4.1 (2026-08-02)
 
+- **Hide several folders at once**: pick them with Ctrl/Shift, then right-click →
+  "Hide Selected Folders", and clear away everything you never open in one go
 - **Long menus scroll**: a menu with more entries than the screen can hold now
   scrolls to the end instead of running off it - the hidden-folder list and the
   bookmark list included
 - **Bookmark jumps fixed**: fixed an issue that could occur when jumping to a
   bookmark
+- Making several new folders in a row now leaves the name box open on the last
+  one only
 
 ### v1.4.0 (2026-08-02)
 

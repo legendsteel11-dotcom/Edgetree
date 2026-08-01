@@ -22,10 +22,12 @@ export const changelog: ChangelogEntry[] = [
   {
     version: 'v1.4.1',
     ko: [
+      '여러 폴더를 한 번에 골라서 숨기기',
       '항목이 많은 메뉴를 스크롤해서 볼 수 있음',
       '북마크로 이동할 때 생기던 문제 수정',
     ],
     en: [
+      'Hide several folders in one go',
       'Long menus scroll instead of running off the screen',
       'Fixed an issue when jumping to a bookmark',
     ],
