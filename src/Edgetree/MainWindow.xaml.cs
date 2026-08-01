@@ -3085,20 +3085,122 @@ public partial class MainWindow : Window
     // pass above be free. The offset itself is exact because the tree scrolls
     // in PIXELS (VirtualizingPanel.ScrollUnit="Pixel", see MainWindow.xaml);
     // under the default Item unit this arithmetic would be meaningless.
-    private static void PinRowToTop(TreeViewItem anchor, ScrollViewer scrollViewer)
+    private void PinRowToTop(TreeViewItem anchor, ScrollViewer scrollViewer)
     {
         if (ContentTopOf(anchor, scrollViewer) is not { } top)
         {
             return;
         }
 
-        // ScrollToVerticalOffset clamps to the scrollable range on its own, so
-        // a row near the end of the tree still stops short of the top edge -
-        // there is nothing below it to scroll into view. That shortfall is the
-        // open "아래 여백" item, not something this call can decide.
+        // Near the end of the tree there is nothing left below the row to
+        // scroll into view, so ScrollToVerticalOffset clamps and the row stops
+        // partway down - the jump looks like it landed somewhere arbitrary.
+        // Make the room instead of giving up on the pin.
+        double shortfall = top - scrollViewer.ScrollableHeight;
+        if (shortfall > 0.5)
+        {
+            SetBottomGap(_bottomGapSize + shortfall, scrollViewer);
+        }
+
         if (Math.Abs(scrollViewer.VerticalOffset - top) > 0.5)
         {
             scrollViewer.ScrollToVerticalOffset(top);
+        }
+    }
+
+    // ----- 트리 끝의 아래 여백 ----------------------------------------------
+    //
+    // Extra scrollable room past the last row, so a row near the end can still
+    // be pinned to the top. It is a bottom MARGIN on the last root's container,
+    // which lands after that root's entire rendered block - i.e. at the very
+    // bottom of the content - and grows the extent without touching the
+    // viewport. Measured 2026-08-02 in a standalone WPF spike: with every row
+    // realized, a 300px margin bought exactly 300px of extra range and removing
+    // it returned the range to the byte.
+    //
+    // The same spike is why this hangs off the ROOT and not off some row deeper
+    // down. With 200 rows in one virtualizing panel the 300px margin bought
+    // 1034px instead: VirtualizingStackPanel estimates the height of everything
+    // it hasn't realized from the average of what it has, and one 316px-tall
+    // item skews that average. The root level is the one place immune to it -
+    // there are only ever a handful of drives and the tree caches 1000 items,
+    // so every root is realized and the extent there is a real sum, not an
+    // estimate.
+    //
+    // Only while a jump needs it (the user's call, 2026-07-30, over always
+    // keeping a gap the way a code editor does): a drive tree is not a file,
+    // and permanent empty space at the end is a permanent cost for something
+    // that matters at the moment of a jump. The gap leaves on its own - see
+    // TreeScrollViewer_ScrollChanged.
+    private TreeViewItem? _bottomGapHost;
+
+    private double _bottomGapSize;
+
+    private void SetBottomGap(double gap, ScrollViewer scrollViewer)
+    {
+        gap = Math.Max(0, gap);
+
+        // Whatever carried the last gap gives it up first: the last root can
+        // change under us (a drive appearing, a refresh regenerating
+        // containers), and a margin left behind on a row that is no longer last
+        // is a gap in the MIDDLE of the tree. ClearValue rather than a zero
+        // Thickness so the item style's own margin, if it ever gains one, comes
+        // back instead of being overwritten with a hardcoded default.
+        if (_bottomGapHost is { } previous)
+        {
+            previous.ClearValue(MarginProperty);
+            _bottomGapHost = null;
+        }
+
+        _bottomGapSize = 0;
+
+        if (gap > 0.5 && LastRootContainer() is { } host)
+        {
+            host.Margin = new Thickness(0, 0, 0, gap);
+            _bottomGapHost = host;
+            _bottomGapSize = gap;
+
+            scrollViewer.ScrollChanged -= TreeScrollViewer_ScrollChanged;
+            scrollViewer.ScrollChanged += TreeScrollViewer_ScrollChanged;
+        }
+
+        // The new range has to exist before the caller scrolls into it.
+        ExplorerTree.UpdateLayout();
+    }
+
+    private TreeViewItem? LastRootContainer()
+        => _roots.Count == 0
+            ? null
+            : ExplorerTree.ItemContainerGenerator.ContainerFromItem(_roots[^1]) as TreeViewItem;
+
+    // The gap is taken back the moment it is no longer on screen - scrolling up
+    // past it, in practice. Removing it then is invisible: the space being
+    // reclaimed is below the viewport, so nothing on screen moves, and the
+    // offset stays inside the smaller range by construction. Waiting for that
+    // instead of removing it on a timer or on the next click is what keeps the
+    // gap from ever vanishing under the user while they are looking at it.
+    private void TreeScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (sender is not ScrollViewer scrollViewer)
+        {
+            return;
+        }
+
+        // The tree was rebuilt and took the gap's host with it - the margin is
+        // already gone with the container, so just forget it.
+        if (_bottomGapHost is null || !ReferenceEquals(_bottomGapHost, LastRootContainer()))
+        {
+            _bottomGapHost = null;
+            _bottomGapSize = 0;
+            scrollViewer.ScrollChanged -= TreeScrollViewer_ScrollChanged;
+            return;
+        }
+
+        double gapTop = scrollViewer.ExtentHeight - _bottomGapSize;
+        if (scrollViewer.VerticalOffset + scrollViewer.ViewportHeight <= gapTop + 0.5)
+        {
+            scrollViewer.ScrollChanged -= TreeScrollViewer_ScrollChanged;
+            SetBottomGap(0, scrollViewer);
         }
     }
 
