@@ -9285,7 +9285,17 @@ public partial class MainWindow : Window
 
         if (total == 0)
         {
-            SearchStatusText.Text = Strings.SearchStatusNoResults;
+            // Nothing found is exactly when the index's age matters, and it was
+            // the one moment the age wasn't on screen: it shows while the box is
+            // empty and is replaced by the count as soon as anything is typed.
+            // Someone who points the search at a folder whose saved index
+            // predates the files they are looking for then reads "결과 없음" as
+            // "not in this folder" (2026-07-31 report - a screenshots folder,
+            // where new files arrive constantly). Naming the refresh here is the
+            // "and says so" half of loading a saved index in the first place.
+            SearchStatusText.Text = _searchIndexSavedAtUtc is { } noResultAge
+                ? string.Format(Strings.SearchStatusNoResultsCached, FormatSearchIndexAge(noResultAge))
+                : Strings.SearchStatusNoResults;
         }
         else if (total > shownFiles)
         {
@@ -9294,6 +9304,13 @@ public partial class MainWindow : Window
         else
         {
             SearchStatusText.Text = string.Format(Strings.SearchStatusResults, total);
+        }
+
+        // Results that came out of a saved index carry its age; results from a
+        // scan this session carry nothing, because there is nothing to say.
+        if (total > 0 && _searchIndexSavedAtUtc is { } age)
+        {
+            SearchStatusText.Text += string.Format(Strings.SearchStatusIndexAgeSuffix, FormatSearchIndexAge(age));
         }
     }
 

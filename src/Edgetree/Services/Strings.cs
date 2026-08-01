@@ -168,6 +168,8 @@ public static class Strings
     // {0} = shown, {1} = total (results were capped for display).
     public static string SearchStatusResultsCapped = "{0} / {1}개 결과 표시";
     public static string SearchStatusNoResults = "결과 없음";
+    public static string SearchStatusNoResultsCached = "결과 없음 · 인덱스 {0} · 새로고침으로 갱신";
+    public static string SearchStatusIndexAgeSuffix = " · 인덱스 {0}";
     // These three all have to survive a docked sidebar's width, which is far
     // narrower than a normal dialog - full sentences get clipped mid-word
     // there. Written as terse fragments on purpose; the search box's own
@@ -395,6 +397,8 @@ public static class Strings
         SearchStatusResults = "{0} results";
         SearchStatusResultsCapped = "Showing {0} of {1} results";
         SearchStatusNoResults = "No results";
+        SearchStatusNoResultsCached = "No results · index from {0} · refresh to update";
+        SearchStatusIndexAgeSuffix = " · index from {0}";
         SearchStatusCached = "Index from {0} · refresh to update";
         SearchAgeJustNow = "just now";
         SearchAgeMinutes = "{0} min ago";
