@@ -177,16 +177,31 @@ public static class FileOperationService
 
     private static void CopyEntry(string sourcePath, string destinationFolder)
     {
-        string name = Path.GetFileName(sourcePath.TrimEnd(Path.DirectorySeparatorChar));
-        string destPath = GetUniqueDestination(Path.Combine(destinationFolder, name));
+        string trimmedSource = sourcePath.TrimEnd(Path.DirectorySeparatorChar);
+        string name = Path.GetFileName(trimmedSource);
 
         if (Directory.Exists(sourcePath))
         {
-            CopyDirectoryRecursive(sourcePath, destPath, overwrite: false);
+            // Into itself or into its own subtree. MoveEntry has refused this
+            // from the start; copy never did, and the difference was not
+            // harmless - copying a folder into ITSELF walks into the copy it
+            // just made and does it again, forever, writing the whole time.
+            // Reported 2026-08-02 as the app hanging (Windows killed it as
+            // "not responding") after a Ctrl+C, Ctrl+V on one selected folder,
+            // which is as ordinary a sequence as this app has: paste targets
+            // the selected folder, so the source IS the destination. It left
+            // behind a folder nested into itself dozens of levels deep.
+            if (IsSameOrBeneath(destinationFolder, trimmedSource))
+            {
+                throw new IOException(Strings.CopyIntoSelfError);
+            }
+
+            CopyDirectoryRecursive(sourcePath, GetUniqueDestination(Path.Combine(destinationFolder, name)),
+                overwrite: false);
         }
         else if (File.Exists(sourcePath))
         {
-            File.Copy(sourcePath, destPath);
+            File.Copy(sourcePath, GetUniqueDestination(Path.Combine(destinationFolder, name)));
         }
     }
 
@@ -256,13 +271,23 @@ public static class FileOperationService
 
     private static void CopyDirectoryRecursive(string sourceDir, string destDir, bool overwrite)
     {
+        // Both listings are taken BEFORE anything is written. EnumerateFiles/
+        // Directories stream lazily, so a folder created inside the source
+        // while the walk is still running gets picked up by that same walk and
+        // copied in turn - which is how a folder pasted into itself produced an
+        // endless chain of copies. The caller now refuses that case outright;
+        // this is the second lock on the same door, and it also covers the
+        // cross-volume move path that comes through here.
+        var files = Directory.EnumerateFiles(sourceDir).ToList();
+        var dirs = Directory.EnumerateDirectories(sourceDir).ToList();
+
         Directory.CreateDirectory(destDir);
-        foreach (var file in Directory.EnumerateFiles(sourceDir))
+        foreach (var file in files)
         {
             string destFile = Path.Combine(destDir, Path.GetFileName(file));
             File.Copy(file, overwrite ? destFile : GetUniqueDestination(destFile), overwrite);
         }
-        foreach (var dir in Directory.EnumerateDirectories(sourceDir))
+        foreach (var dir in dirs)
         {
             CopyDirectoryRecursive(dir, Path.Combine(destDir, Path.GetFileName(dir)), overwrite);
         }
@@ -292,6 +317,14 @@ public static class FileOperationService
 
                 if (Directory.Exists(sourcePath))
                 {
+                    // Same guard as CopyEntry's, for the drag-in route: an
+                    // outside folder dropped onto something inside itself is
+                    // the same endless walk.
+                    if (IsSameOrBeneath(destinationFolder, sourcePath.TrimEnd(Path.DirectorySeparatorChar)))
+                    {
+                        throw new IOException(Strings.CopyIntoSelfError);
+                    }
+
                     CopyDirectoryRecursive(sourcePath, destPath, overwrite: exists);
                 }
                 else if (File.Exists(sourcePath))

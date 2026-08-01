@@ -270,6 +270,7 @@ public static class Strings
     // MessageBox titles/bodies
     public static string PasteFailedTitle = "붙여넣기 실패";
     public static string MoveIntoSelfError = "폴더를 자기 자신이나 그 하위 폴더로 옮길 수 없습니다.";
+    public static string CopyIntoSelfError = "폴더를 자기 자신이나 그 하위 폴더로 복사할 수 없습니다.";
     public static string NewFolderFailedTitle = "새 폴더 만들기 실패";
     public static string RenameFailedTitle = "이름 바꾸기 실패";
     public static string DeleteConfirmTitle = "삭제 확인";
@@ -488,6 +489,7 @@ public static class Strings
 
         PasteFailedTitle = "Paste Failed";
         MoveIntoSelfError = "A folder can't be moved into itself or into one of its own subfolders.";
+        CopyIntoSelfError = "A folder can't be copied into itself or into one of its own subfolders.";
         NewFolderFailedTitle = "Failed to Create Folder";
         RenameFailedTitle = "Rename Failed";
         DeleteConfirmTitle = "Confirm Delete";
