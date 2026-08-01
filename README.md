@@ -1,4 +1,4 @@
-# Edgetree v1.4.0
+# Edgetree v1.4.1
 
 [한국어 안내](README-ko.md)
 
@@ -150,6 +150,14 @@ Either way, the resulting `.exe` is in
 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
 
 ## Changelog
+
+### v1.4.1 (2026-08-02)
+
+- **Long menus scroll**: a menu with more entries than the screen can hold now
+  scrolls to the end instead of running off it - the hidden-folder list and the
+  bookmark list included
+- **Bookmark jumps fixed**: fixed an issue that could occur when jumping to a
+  bookmark
 
 ### v1.4.0 (2026-08-02)
 

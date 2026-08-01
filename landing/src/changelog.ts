@@ -20,6 +20,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: 'v1.4.1',
+    ko: [
+      '항목이 많은 메뉴를 스크롤해서 볼 수 있음',
+      '북마크로 이동할 때 생기던 문제 수정',
+    ],
+    en: [
+      'Long menus scroll instead of running off the screen',
+      'Fixed an issue when jumping to a bookmark',
+    ],
+  },
+  {
     version: 'v1.4.0',
     ko: [
       '안 쓰는 폴더·드라이브를 트리에서 숨기기',

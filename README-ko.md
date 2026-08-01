@@ -1,4 +1,4 @@
-# Edgetree v1.4.0
+# Edgetree v1.4.1
 
 [English](README.md)
 
@@ -189,6 +189,12 @@ dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -p:Publi
 경로에 생성됩니다.
 
 ## 변경 이력
+
+### v1.4.1 (2026-08-02)
+
+- **긴 메뉴 스크롤**: 항목이 많아 화면보다 길어진 메뉴를 스크롤해서 끝까지 볼 수
+  있습니다. 숨긴 폴더 목록이나 북마크 목록이 길어져도 마찬가지입니다
+- **북마크 이동 수정**: 북마크로 이동할 때 생기던 문제를 고쳤습니다
 
 ### v1.4.0 (2026-08-02)
 
