@@ -240,6 +240,18 @@ public class AppSettings
     // is skipped when cycling, not an error.
     public List<string> BookmarkPaths { get; set; } = new();
 
+    // What the panel above (or below) the tree shows: "favorites", "bookmarks"
+    // or "none". Defaults to favorites so an existing install looks exactly as
+    // it did before the choice existed.
+    //
+    // "none" is not the same as an empty favorites list, even though both end
+    // with no panel on screen: the list keeps its entries and comes back when
+    // the mode does. Before this, giving that row back to the tree meant
+    // deleting favorites (see MainWindow.UpdateFavoritesPanelVisibility, which
+    // collapses the row only when the list is empty) - a real cost on a
+    // 1080p screen, paid in data.
+    public string SidePanelMode { get; set; } = "favorites";
+
     // Folders the user has taken out of the tree ("이 폴더 숨기기"). Only the
     // tree hides them - the file search still finds what is inside, because a
     // search is a deliberate act of looking and "분명 있는데 검색이 안 된다" is

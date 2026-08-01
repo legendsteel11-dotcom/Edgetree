@@ -1256,10 +1256,39 @@
                     IsCheckable="True"
                     AutomationProperties.AutomationId="hideTitleBarTitle"
                     Click="HideTitleBarTitleMenuItem_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuFavoritesAtBottom}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="favoritesAtBottom"
-                    Click="FavoritesAtBottomMenuItem_Click"/>
+            <!-- Everything about the panel beside the tree in one place: WHAT it
+                 shows, then - past a separator - WHERE it sits. The position
+                 toggle used to be a row of its own out here, named after
+                 favorites; folding it in both drops a line from this menu and
+                 stops the name lying now that the panel can hold either list
+                 (user's call, 2026-08-02).
+
+                 Three states rather than a favorites on/off toggle: the panel
+                 only used to disappear when the favorites list was EMPTY, so
+                 giving that row back to the tree meant deleting entries.
+                 Checkable so exactly one mode reads as current;
+                 OptionsMenu_Opened sets which. -->
+            <MenuItem Header="{x:Static services:Strings.MenuSidePanel}"
+                    AutomationProperties.AutomationId="sidePanel"
+                    Tag="reserve-check-column">
+                <MenuItem Header="{x:Static services:Strings.MenuSidePanelFavorites}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="sidePanelFavorites"
+                        Click="SidePanelModeMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSidePanelBookmarks}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="sidePanelBookmarks"
+                        Click="SidePanelModeMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSidePanelNone}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="sidePanelNone"
+                        Click="SidePanelModeMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="{x:Static services:Strings.MenuFavoritesAtBottom}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="favoritesAtBottom"
+                        Click="FavoritesAtBottomMenuItem_Click"/>
+            </MenuItem>
             <MenuItem Header="{x:Static services:Strings.MenuDockOnRight}"
                     IsCheckable="True"
                     AutomationProperties.AutomationId="dockOnRight"
@@ -2738,6 +2767,169 @@
             </Setter>
         </Style>
 
+        <ContextMenu x:Key="BookmarkPanelItemContextMenu"
+                Style="{StaticResource DarkContextMenuStyle}"
+                Opened="AnyMenu_Opened"
+                Closed="AnyMenu_Closed"
+                PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
+            <MenuItem Header="{x:Static services:Strings.MenuBookmarkRemove}"
+                    Click="RemoveBookmarkFromPanel_Click"/>
+        </ContextMenu>
+
+        <!-- The favorites row's twin, for when the panel is showing bookmarks
+             (AppSettings.SidePanelMode). Kept as its OWN style rather than
+             teaching the favorites one to serve both: the favorites row is
+             folder-only, drag-reorderable and bound straight to the stored
+             entries, and every one of those is different here. The metrics are
+             shared through the same resources, so both still line up with the
+             tree rows underneath.
+
+             Two things it has that the favorites row does not: a number, and a
+             marker for where the Ctrl+Alt+L/J cycle is standing. -->
+        <Style x:Key="BookmarkPanelItemStyle"
+                TargetType="ListBoxItem">
+            <Setter Property="Padding"
+                    Value="{DynamicResource RowPadding}"/>
+            <Setter Property="Background"
+                    Value="Transparent"/>
+            <Setter Property="BorderThickness"
+                    Value="0"/>
+            <Setter Property="HorizontalContentAlignment"
+                    Value="Stretch"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="ContextMenu"
+                    Value="{StaticResource BookmarkPanelItemContextMenu}"/>
+            <EventSetter Event="PreviewMouseRightButtonDown"
+                    Handler="BookmarkPanelItem_PreviewMouseRightButtonDown"/>
+            <!-- Same reasoning as the favorites tooltip: a flat list of leaf
+                 names, where several rows can read identically. -->
+            <Setter Property="ToolTipService.InitialShowDelay"
+                    Value="900"/>
+            <Setter Property="ToolTipService.ShowDuration"
+                    Value="20000"/>
+            <Setter Property="ToolTip">
+                <Setter.Value>
+                    <ToolTip Content="{Binding Path}"
+                            FontSize="{Binding PlacementTarget.FontSize, RelativeSource={RelativeSource Self}}"/>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <!-- Just the marker and a hair of air after
+                                         it, NOT the tree's full indent
+                                         stand-in: the number column is already
+                                         width this row's favorites twin does
+                                         not spend, and starting the content
+                                         further in on top of that pushed it
+                                         visibly away from the marker
+                                         (2026-08-02). -->
+                                    <ColumnDefinition Width="{DynamicResource PanelMarkerColumnWidth}"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Where Ctrl+Alt+L/J is standing right now.
+                                     Same blue as the ribbon marker the tree
+                                     draws on a bookmarked row, so the two read
+                                     as one feature. A bar rather than a
+                                     background because selection already owns
+                                     the row background, and the two answer
+                                     different questions - what you last
+                                     clicked, versus where the cycle is. -->
+                                <Border x:Name="CycleMarker"
+                                        Grid.Column="0"
+                                        Width="3"
+                                        HorizontalAlignment="Left"
+                                        Background="#FF4A90E2"
+                                        Visibility="Hidden"/>
+
+                                <!-- Counted from the top, so it is also how many
+                                     presses away the row is. A smaller font
+                                     rather than a faded one - dimming text to
+                                     mark it as secondary is not done in this
+                                     app. -->
+                                <TextBlock x:Name="BookmarkNumberText"
+                                        Grid.Column="1"
+                                        Text="{Binding Number}"
+                                        Foreground="{DynamicResource ShowMoreForeground}"
+                                        FontSize="{DynamicResource PanelNumberFontSize}"
+                                        MinWidth="{DynamicResource PanelNumberWidth}"
+                                        TextAlignment="Right"
+                                        Margin="0,0,4,0"
+                                        VerticalAlignment="Center"/>
+
+                                <Image x:Name="BookmarkRowIcon"
+                                        Grid.Column="2"
+                                        Source="{Binding Icon}"
+                                        Width="{DynamicResource IconSize}"
+                                        Height="{DynamicResource IconSize}"
+                                        Margin="{DynamicResource FolderRowIconMargin}"
+                                        VerticalAlignment="Center"
+                                        RenderOptions.BitmapScalingMode="HighQuality"/>
+
+                                <TextBlock x:Name="BookmarkNameText"
+                                        Grid.Column="3"
+                                        Text="{Binding Name}"
+                                        Foreground="{DynamicResource FolderNameForeground}"
+                                        VerticalAlignment="Center"
+                                        TextTrimming="CharacterEllipsis"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsDirectory}"
+                                    Value="False">
+                                <Setter TargetName="BookmarkNameText"
+                                        Property="Foreground"
+                                        Value="{DynamicResource FileNameForeground}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsCurrent}"
+                                    Value="True">
+                                <Setter TargetName="CycleMarker"
+                                        Property="Visibility"
+                                        Value="Visible"/>
+                            </DataTrigger>
+                            <!-- Icons turned off: the SLOT goes with the icon,
+                                 same as the tree, so the names keep their
+                                 column instead of sitting behind an empty gap.
+                                 A null Source is how the row says so. -->
+                            <DataTrigger Binding="{Binding Icon}"
+                                    Value="{x:Null}">
+                                <Setter TargetName="BookmarkRowIcon"
+                                        Property="Visibility"
+                                        Value="Collapsed"/>
+                            </DataTrigger>
+                            <!-- No matching IsDirectory=True trigger: the folder
+                                 colour is already the setter above, and in WPF
+                                 the LAST matching trigger wins - a redundant
+                                 pair here is exactly how the NAS greying lost
+                                 to the file/folder colours in July. -->
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowHoverBackground}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- FavoritesList otherwise falls back to the default ListBox chrome
              (stock Windows scrollbar) since it only had ItemContainerStyle set;
              reusing MinimalScrollViewerTemplate here matches the tree below. -->
@@ -3153,6 +3345,27 @@
                     PreviewMouseMove="FavoritesList_PreviewMouseMove"
                     PreviewMouseLeftButtonUp="FavoritesList_PreviewMouseLeftButtonUp"
                     LostMouseCapture="FavoritesList_LostMouseCapture"/>
+
+            <!-- Shares the row with FavoritesList; exactly one of the two is
+                 ever visible, and in "none" mode neither is (see
+                 MainWindow.xaml.cs's ApplySidePanelMode). A second ListBox
+                 rather than one that swaps its source: the favorites list is
+                 bound straight to the stored entries and carries the whole
+                 drag-to-reorder gesture on top of them, none of which a
+                 bookmark row wants. Deliberately no reorder here - the order
+                 IS the Ctrl+Alt+L/J cycle order, so dragging it would rewire
+                 the shortcuts silently (user's call, 2026-08-02). -->
+            <ListBox x:Name="BookmarkPanelList"
+                    Grid.Row="1"
+                    Style="{StaticResource FavoritesListBoxStyle}"
+                    Background="{DynamicResource FavoritesBackground}"
+                    BorderThickness="0"
+                    Padding="4,6,4,4"
+                    FontSize="{Binding FontSize, ElementName=ExplorerTree}"
+                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                    ItemContainerStyle="{StaticResource BookmarkPanelItemStyle}"
+                    Visibility="Collapsed"
+                    PreviewMouseLeftButtonUp="BookmarkPanelList_PreviewMouseLeftButtonUp"/>
 
             <!-- Where a dragged favorite would land. Sits over the list rather
                  than inside the item template so it can be drawn BETWEEN two

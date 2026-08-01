@@ -19,6 +19,12 @@ public static class Strings
     // "이 폴더" rather than just "숨기기": the row under the cursor is what goes,
     // and a bare verb next to 잘라내기/삭제 reads like it might mean the
     // selection or the whole view.
+    // The panel beside the tree: which list it shows, or none at all.
+    public static string MenuSidePanel = "패널 표시";
+    public static string MenuSidePanelFavorites = "즐겨찾기";
+    public static string MenuSidePanelBookmarks = "북마크";
+    public static string MenuSidePanelNone = "표시 안 함";
+
     public static string MenuHideFolder = "이 폴더 숨기기";
     // Replaces the line above while several rows are picked. Files among them
     // are skipped, so it names folders rather than "선택 항목".
@@ -66,7 +72,9 @@ public static class Strings
     public static string MenuShowFolderIcons = "폴더 아이콘";
     public static string MenuShowFileIcons = "파일 아이콘";
     public static string MenuHideTitleBarTitle = "제목 표시줄 타이틀 제거";
-    public static string MenuFavoritesAtBottom = "즐겨찾기를 아래에 표시";
+    // Named after the PANEL, not favorites: it now holds either list. Lives
+    // inside the 패널 표시 submenu, under the three modes.
+    public static string MenuFavoritesAtBottom = "아래에 표시";
     public static string MenuDockOnRight = "고정 위치 오른쪽";
     public static string MenuAutoHideCloseOnLeave = "마우스 이탈 시 닫기";
     public static string MenuAutoHideSliverWidth = "숨김 시 막대 두께";
@@ -319,6 +327,10 @@ public static class Strings
         MenuBookmarkRemove = "Remove Bookmark";
         MenuBookmarkList = "Bookmarks";
         MenuBookmarkListEmpty = "No bookmarks";
+        MenuSidePanel = "Side Panel";
+        MenuSidePanelFavorites = "Favorites";
+        MenuSidePanelBookmarks = "Bookmarks";
+        MenuSidePanelNone = "Hidden";
         MenuHideFolder = "Hide This Folder";
         MenuHideSelectedFolders = "Hide Selected Folders";
         MenuHiddenFolderList = "Hidden Folders";
@@ -362,7 +374,7 @@ public static class Strings
         MenuShowFolderIcons = "Show Folder Icons";
         MenuShowFileIcons = "Show File Icons";
         MenuHideTitleBarTitle = "Hide Title Bar Text";
-        MenuFavoritesAtBottom = "Show Favorites at Bottom";
+        MenuFavoritesAtBottom = "Show at Bottom";
         MenuDockOnRight = "Pin to Right Edge";
         MenuAutoHideCloseOnLeave = "Close on Mouse Leave";
         MenuAutoHideSliverWidth = "Auto-Hide Thickness";

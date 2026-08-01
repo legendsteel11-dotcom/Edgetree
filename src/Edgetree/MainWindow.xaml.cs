@@ -402,6 +402,11 @@ public partial class MainWindow : Window
         // Row sizing for the current favorite count/collapsed state was
         // already handled above by SetExpandedContentVisibility.
         FavoritesList.ItemsSource = _settings.Favorites;
+        BookmarkPanelList.ItemsSource = _bookmarkPanelRows;
+
+        // After both sources are attached: it decides which of the two is on
+        // screen, and builds the bookmark rows when that is the bookmark list.
+        ApplySidePanelMode();
 
         InitializeSearch();
 
@@ -2279,7 +2284,13 @@ public partial class MainWindow : Window
     {
         get
         {
-            if (FavoritesList.ItemContainerGenerator.ContainerFromIndex(0)
+            // The ACTIVE list, not always the favorites one: in bookmark mode
+            // FavoritesList is collapsed and has no realized rows at all, so
+            // this fell through to the estimate below every time - which is
+            // exactly the drift this property exists to avoid, and it showed as
+            // the bookmark panel's fit-to-content being short or leaving a gap
+            // (2026-08-02).
+            if (ActivePanelList.ItemContainerGenerator.ContainerFromIndex(0)
                 is ListBoxItem { ActualHeight: > 0 } firstRow)
             {
                 return firstRow.ActualHeight;
@@ -2318,7 +2329,13 @@ public partial class MainWindow : Window
     // control is on top and whichever is on bottom.
     private void ApplyFavoritesPosition()
     {
+        // BOTH panel lists move, not just the favorites one: they share the
+        // panel's row, and leaving the bookmark list behind in row 1 while the
+        // tree moved into it made the bookmark panel simply vanish under the
+        // tree (reported 2026-08-02, the first thing tried after the mode
+        // switch shipped).
         Grid.SetRow(FavoritesList, _settings.FavoritesAtBottom ? 3 : 1);
+        Grid.SetRow(BookmarkPanelList, _settings.FavoritesAtBottom ? 3 : 1);
         Grid.SetRow(ExplorerTree, _settings.FavoritesAtBottom ? 1 : 3);
 
         // The favorites-hosting row keeps whatever height the logic below
@@ -2344,6 +2361,52 @@ public partial class MainWindow : Window
     // handful of favorites don't get stretched across a tall leftover gap
     // (e.g. right after going from 0 to 1) but a manually-enlarged panel is
     // still respected once there are enough favorites to fill it.
+    // ----- 패널 모드 (즐겨찾기 / 북마크 / 표시 안 함) -------------------------
+    //
+    // The panel above (or below) the tree shows one of two lists, or nothing.
+    // The mode is compared rather than parsed into an enum so a value this
+    // build doesn't know - a newer build's, a hand-edited settings file - falls
+    // back to what the app has always done instead of refusing to load.
+    private bool IsBookmarkPanelMode
+        => string.Equals(_settings.SidePanelMode, "bookmarks", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsPanelHiddenMode
+        => string.Equals(_settings.SidePanelMode, "none", StringComparison.OrdinalIgnoreCase);
+
+    // Fully qualified: WinForms is referenced here too (Screen, for the work
+    // area of the monitor the window is on) and brings its own ListBox.
+    private System.Windows.Controls.ListBox ActivePanelList
+        => IsBookmarkPanelMode ? BookmarkPanelList : FavoritesList;
+
+    // What the panel's height is sized against. Zero in "none" mode, which is
+    // what collapses the row - the same path an empty favorites list already
+    // took, so there is only one way for the panel to be absent.
+    private int ActivePanelRowCount
+        => IsPanelHiddenMode
+            ? 0
+            : IsBookmarkPanelMode
+                ? _bookmarkPanelRows.Count
+                : _settings.Favorites.Count;
+
+    private void ApplySidePanelMode()
+    {
+        bool bookmarks = IsBookmarkPanelMode;
+        bool hidden = IsPanelHiddenMode;
+
+        FavoritesList.Visibility = !bookmarks && !hidden ? Visibility.Visible : Visibility.Collapsed;
+        BookmarkPanelList.Visibility = bookmarks && !hidden ? Visibility.Visible : Visibility.Collapsed;
+
+        // Built only while it is the one on screen: the rows carry an icon each,
+        // and resolving those asks the disk about every bookmarked path - work
+        // nobody asked for while the panel is showing something else.
+        if (bookmarks)
+        {
+            RebuildBookmarkPanelRows();
+        }
+
+        UpdateFavoritesPanelVisibility();
+    }
+
     private double ComputeFavoritesContentHeight()
     {
         // Both callers run right after ApplyLayoutMetrics has swapped the row
@@ -2351,9 +2414,9 @@ public partial class MainWindow : Window
         // their previous height - so force the pending pass through before
         // measuring, or every metric change would size the panel to the metric
         // before it.
-        FavoritesList.UpdateLayout();
+        ActivePanelList.UpdateLayout();
 
-        double height = _settings.Favorites.Count * FavoriteRowHeight
+        double height = ActivePanelRowCount * FavoriteRowHeight
             + FavoritesListChrome + FavoritesFitBottomPadding;
 
         // Rounded up because being a fraction of a pixel short is not a
@@ -2369,14 +2432,24 @@ public partial class MainWindow : Window
     // and the guess is what FavoriteRowHeight falls back to. Both are wanted -
     // but only the measurement should be allowed to stand.
     private bool HasRealizedFavoriteRow
-        => FavoritesList.ItemContainerGenerator.ContainerFromIndex(0) is ListBoxItem { ActualHeight: > 0 };
+        => ActivePanelList.ItemContainerGenerator.ContainerFromIndex(0) is ListBoxItem { ActualHeight: > 0 };
 
     private bool _favoritesHeightRecheckPending;
     private int _favoritesHeightRechecksLeft;
 
     private void UpdateFavoritesPanelVisibility()
     {
-        bool hasFavorites = _settings.Favorites.Count > 0;
+        bool hasFavorites = ActivePanelRowCount > 0;
+
+        // A floor for the splitter, so dragging it all the way up can't squeeze
+        // the panel down to a sliver (reported 2026-08-02: the divider ends up
+        // riding into the header). One row is the smallest height at which the
+        // panel is still a panel. Zero whenever it is meant to be absent -
+        // otherwise the row could not collapse at all.
+        FavoritesRowDef.MinHeight = hasFavorites
+            ? Math.Ceiling(FavoriteRowHeight + FavoritesListChrome)
+            : 0;
+
         if (hasFavorites)
         {
             bool measured = HasRealizedFavoriteRow;
@@ -2468,7 +2541,7 @@ public partial class MainWindow : Window
     // never hidden below a panel height sized for the previous, smaller count.
     private void FitFavoritesPanel()
     {
-        if (_settings.Favorites.Count == 0)
+        if (ActivePanelRowCount == 0)
         {
             return;
         }
@@ -2482,7 +2555,7 @@ public partial class MainWindow : Window
         // (e.g. the list had been scrolled down to reach a later favorite)
         // doesn't necessarily reset on its own, leaving the top item(s)
         // scrolled past. Scrolling the first item into view forces it back.
-        FavoritesList.ScrollIntoView(FavoritesList.Items[0]);
+        ActivePanelList.ScrollIntoView(ActivePanelList.Items[0]);
     }
 
     private void AddFavorite_Click(object sender, RoutedEventArgs e)
@@ -3713,7 +3786,6 @@ public partial class MainWindow : Window
             FindMenuItem(menu, "showFolderIcons") is { } showFolderIcons &&
             FindMenuItem(menu, "showFileIcons") is { } showFileIcons &&
             FindMenuItem(menu, "hideTitleBarTitle") is { } hideTitleBarTitle &&
-            FindMenuItem(menu, "favoritesAtBottom") is { } favoritesAtBottom &&
             FindMenuItem(menu, "dockOnRight") is { } dockOnRight &&
             FindMenuItem(menu, "autoHideCloseOnLeave") is { } autoHideCloseOnLeave &&
             FindMenuItem(menu, "bookmarkList") is { } bookmarkList &&
@@ -3723,6 +3795,7 @@ public partial class MainWindow : Window
             FindMenuItem(menu, "rowSpacingRow") is { } rowSpacingRow &&
             FindMenuItem(menu, "autoHideSliverWidthRow") is { } autoHideSliverWidthRow &&
             FindMenuItem(menu, "scrollBarThicknessRow") is { } scrollBarThicknessRow &&
+            FindMenuItem(menu, "sidePanel") is { } sidePanel &&
             FindMenuItem(menu, "sortMenu") is { } sortMenu &&
             FindMenuItem(menu, "iconStyleMenu") is { } iconStyleMenu &&
             FindMenuItem(menu, "languageMenu") is { } languageMenu)
@@ -3744,9 +3817,33 @@ public partial class MainWindow : Window
             showFolderIcons.IsChecked = _settings.ShowFolderIcons;
             showFileIcons.IsChecked = _settings.ShowFileIcons;
             hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
-            favoritesAtBottom.IsChecked = _settings.FavoritesAtBottom;
             dockOnRight.IsChecked = _settings.DockOnRight;
             autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
+
+            // FindMenuItem only looks at direct children, so everything in the
+            // 패널 표시 submenu - the three modes AND the position toggle that
+            // moved in with them - is looked up on that submenu rather than on
+            // the menu itself. Leaving favoritesAtBottom in the outer chain
+            // after it moved would have made the whole chain fail to match and
+            // taken every setting above it down silently: the exact shape of
+            // the v1.3.4/v1.4.0 menu breakages.
+            if (FindMenuItem(sidePanel, "sidePanelFavorites") is { } panelFavorites &&
+                FindMenuItem(sidePanel, "sidePanelBookmarks") is { } panelBookmarks &&
+                FindMenuItem(sidePanel, "sidePanelNone") is { } panelNone &&
+                FindMenuItem(sidePanel, "favoritesAtBottom") is { } favoritesAtBottom)
+            {
+                panelBookmarks.IsChecked = IsBookmarkPanelMode;
+                panelNone.IsChecked = IsPanelHiddenMode;
+                panelFavorites.IsChecked = !IsBookmarkPanelMode && !IsPanelHiddenMode;
+
+                // Nothing to place while the panel is off.
+                favoritesAtBottom.IsChecked = _settings.FavoritesAtBottom;
+                favoritesAtBottom.IsEnabled = !IsPanelHiddenMode;
+            }
+            else
+            {
+                LogClickLine("options menu: a 패널 표시 row is missing");
+            }
 
             if (sortMenu.Items is [MenuItem byName, MenuItem byDate, MenuItem byType, MenuItem bySize, _, MenuItem ascending, MenuItem descending])
             {
@@ -3796,6 +3893,36 @@ public partial class MainWindow : Window
     // FindTaggedMenuElement. Direct children only: every id here belongs to a
     // top-level row, and searching deeper would let a submenu's own row answer
     // for its parent.
+    private void SidePanelModeMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem item)
+        {
+            return;
+        }
+
+        string mode = System.Windows.Automation.AutomationProperties.GetAutomationId(item) switch
+        {
+            "sidePanelBookmarks" => "bookmarks",
+            "sidePanelNone" => "none",
+            _ => "favorites",
+        };
+
+        // A checkable row toggles itself on click, so clicking the mode that is
+        // already current would UNCHECK it and leave the group saying nothing
+        // is on for the moment before the menu closes. The re-check on open
+        // fixes it next time; this fixes it now.
+        item.IsChecked = true;
+
+        if (string.Equals(_settings.SidePanelMode, mode, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _settings.SidePanelMode = mode;
+        _settingsService.Save(_settings);
+        ApplySidePanelMode();
+    }
+
     private static MenuItem? FindMenuItem(ItemsControl menu, string id)
         => menu.Items.OfType<MenuItem>()
             .FirstOrDefault(item => System.Windows.Automation.AutomationProperties.GetAutomationId(item) == id);
@@ -4845,6 +4972,29 @@ public partial class MainWindow : Window
         // the pixel grid that UseLayoutRounding is trying to hold (see
         // MainWindow.xaml's header comment).
         Resources["IconSize"] = Math.Round(16.0 * scale);
+
+        // The bookmark panel row's leading number. A step below the row's own
+        // font, which is how this app marks something as secondary - fading it
+        // is not done here (a dimmed label went wrong twice on the bookmark
+        // menu). The column is wide enough for two digits at that size so the
+        // names below ten and above it still share one left edge; a third digit
+        // simply pushes the column, which is rarer than it is worth reserving
+        // room for.
+        double panelNumberFontSize = Math.Max(9.0, Math.Round(ExplorerTree.FontSize) - 2);
+        Resources["PanelNumberFontSize"] = panelNumberFontSize;
+
+        // Two digits' worth, so rows below ten and above it share one left
+        // edge. Not three: nobody keeps a thousand bookmarks, and reserving for
+        // a case that will not happen pushes every row right for nothing
+        // (user's point, 2026-08-02). A third digit simply widens the column
+        // when it does turn up.
+        Resources["PanelNumberWidth"] = Math.Round(panelNumberFontSize * 1.2);
+
+        // The marker's lane: the 3px bar plus a hair of air. Deliberately not
+        // the tree's indent width - see the row template's own comment. Fixed
+        // rather than scaled: the bar itself is 3px at every font size, so the
+        // gap beside it should be too.
+        Resources["PanelMarkerColumnWidth"] = new GridLength(5.0);
 
         // Grows past its base size once the font is zoomed above default, but
         // never shrinks below it while zoomed smaller - the sort-override
@@ -6576,6 +6726,14 @@ public partial class MainWindow : Window
                 : _settings.Favorites.FirstOrDefault(f =>
                     string.Equals(f.Path.TrimEnd('\\'), _selectedItem.FullPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
         }
+
+        // NOT behind the same guard: a bookmark jump runs the whole reveal walk
+        // with that flag set, and clearing it raises no further selection
+        // change - so gating this the way the favorites sync is gated would
+        // leave the panel blank after every Ctrl+Alt+L, which is the one case
+        // it most needs to answer. Re-marking the row it is already on costs
+        // nothing.
+        SyncBookmarkPanelToSelection();
     }
 
     private void RevealInExplorer_Click(object sender, RoutedEventArgs e)
@@ -7290,6 +7448,247 @@ public partial class MainWindow : Window
     // Where the Ctrl+Alt+L/J cycle currently stands in BookmarkPaths.
     private int _bookmarkCycleIndex = -1;
 
+    // ----- 북마크 패널 (SidePanelMode == "bookmarks") -------------------------
+    private readonly System.Collections.ObjectModel.ObservableCollection<BookmarkPanelRow> _bookmarkPanelRows = new();
+
+    // Rebuilt whole rather than patched. The numbers ARE positions, so removing
+    // one row renumbers every row under it regardless, and the list is small
+    // enough that there is nothing to save by being clever about it.
+    private void RebuildBookmarkPanelRows()
+    {
+        long startedAt = Environment.TickCount64;
+        _bookmarkPanelRows.Clear();
+
+        // ONE walk of the loaded tree for the whole list. It used to be one per
+        // row (ResolveBookmarkPanelRow called EnumerateLoadedItems itself), and
+        // that walk visits EVERY loaded item - so a rebuild cost bookmarks ×
+        // loaded rows, on the UI thread, and a rebuild runs on every add and
+        // every remove. On a deeply expanded tree with a handful of bookmarks
+        // that is seconds of frozen window.
+        var loadedKinds = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in EnumerateLoadedItems(_roots))
+        {
+            if (item is { IsPlaceholder: false, IsShowMore: false })
+            {
+                loadedKinds[item.FullPath] = item.IsDirectory;
+            }
+        }
+
+        int number = 1;
+        foreach (string path in _settings.BookmarkPaths)
+        {
+            var row = new BookmarkPanelRow(number++, path, BookmarkLeafName(path));
+            _bookmarkPanelRows.Add(row);
+
+            if (loadedKinds.TryGetValue(path, out bool isDirectory))
+            {
+                ApplyBookmarkPanelRowKind(row, isDirectory);
+            }
+            else
+            {
+                ResolveBookmarkPanelRowFromDisk(row);
+            }
+        }
+
+        SyncBookmarkPanelToSelection();
+        LogPanelLine($"bookmark panel rebuilt: {_bookmarkPanelRows.Count} rows, " +
+            $"{loadedKinds.Count} loaded items walked, {Environment.TickCount64 - startedAt}ms");
+    }
+
+    // Debug-only. The window was killed by Windows as "not responding" during a
+    // bookmark round on 2026-08-02 with no exception recorded anywhere, which
+    // means the UI thread was busy rather than broken - so what is wanted next
+    // time is how long this took and how big the walk was, not a stack.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogPanelLine(string line)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "panel.log"),
+                $"{DateTime.Now:HH:mm:ss.fff}  {line}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    // revealPath: a bookmark that was just ADDED, which should end up on screen
+    // even if the panel is shorter than the list. Same treatment favorites get
+    // (see AddFavorite_Click) and for the same reasons - the very first one
+    // sizes the panel because there is no height yet to disturb, and every one
+    // after that slides in at the bottom instead of growing the panel, since
+    // growing it shifts the whole tree under the cursor mid-click.
+    private void RefreshBookmarkPanelIfShowing(string? revealPath = null)
+    {
+        if (!IsBookmarkPanelMode)
+        {
+            return;
+        }
+
+        bool wasEmpty = _bookmarkPanelRows.Count == 0;
+        RebuildBookmarkPanelRows();
+
+        // The row count is what the panel's height is sized against, and a
+        // bookmark going or arriving changes it.
+        UpdateFavoritesPanelVisibility();
+
+        if (revealPath is null)
+        {
+            return;
+        }
+
+        var added = _bookmarkPanelRows.FirstOrDefault(r =>
+            string.Equals(r.Path, revealPath, StringComparison.OrdinalIgnoreCase));
+        if (added is null)
+        {
+            return;
+        }
+
+        if (wasEmpty)
+        {
+            FitFavoritesPanel();
+            return;
+        }
+
+        // One dispatcher hop so the ListBox has generated the new row before
+        // being asked to bring it on screen.
+        Dispatcher.BeginInvoke(() => BookmarkPanelList.ScrollIntoView(added),
+            System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    // Only for rows the tree could not answer for (see RebuildBookmarkPanelRows,
+    // which asks it once for the whole list). Off the UI thread, because a
+    // bookmark can sit on a network drive that has gone to sleep.
+    private async void ResolveBookmarkPanelRowFromDisk(BookmarkPanelRow row)
+    {
+        bool? isDirectory = await Task.Run<bool?>(() =>
+            FileSystemService.ProbeExists(row.Path, out bool directory) ? directory : null);
+
+        // The list can have been rebuilt out from under this while the probe
+        // ran - a toggle, a prune, a mode switch. Writing into an orphaned row
+        // would be harmless but pointless; writing into a REPLACED one would
+        // show nothing, which is the case actually worth guarding.
+        if (!_bookmarkPanelRows.Contains(row))
+        {
+            return;
+        }
+
+        if (isDirectory is { } known)
+        {
+            ApplyBookmarkPanelRowKind(row, known);
+            return;
+        }
+
+        // Nothing answered - the path is gone, or its drive is asleep. Either
+        // way the row still needs an icon: leaving it blank is what made a
+        // deleted file's leftover bookmark read as a rendering fault rather
+        // than as an entry (2026-08-02). Guessed from the name, since that is
+        // all there is to go on, and NOT pruned here - the rule for dropping a
+        // bookmark stays "only when the volume testifies", which a silent probe
+        // failure is not (see PruneMissingBookmarks, which does it properly at
+        // startup).
+        ApplyBookmarkPanelRowKind(row, isDirectory: !Path.HasExtension(row.Name));
+    }
+
+    private void ApplyBookmarkPanelRowKind(BookmarkPanelRow row, bool isDirectory)
+    {
+        row.IsDirectory = isDirectory;
+
+        // Follows the same two toggles the tree does - someone who turned icons
+        // off asked for that everywhere. The slot goes with the icon (the
+        // template collapses on a null source), so names sit where they would
+        // in the tree rather than behind an empty gap.
+        if (!(isDirectory ? _settings.ShowFolderIcons : _settings.ShowFileIcons))
+        {
+            row.Icon = null;
+            return;
+        }
+
+        if (isDirectory)
+        {
+            row.Icon = ShellIconService.GetFolderIcon(row.Name, isExpanded: false);
+            return;
+        }
+
+        // Generic icon for the extension at once, the file's own (an .exe's, a
+        // shortcut's) in the background - the callback is how that later
+        // arrival gets picked up, and the re-read passes none of its own so it
+        // can't queue another round.
+        row.Icon = ShellIconService.GetFileIcon(row.Name, row.Path,
+            () => row.Icon = ShellIconService.GetFileIcon(row.Name, row.Path, null));
+    }
+
+    // Marks the row the TREE is standing on, and selects it - the same contract
+    // the favorites list has always had, which is the one that reads right.
+    //
+    // It was the cycle's own index at first, and that was wrong in both
+    // directions (2026-08-02): selecting an ordinary file left the mark sitting
+    // on a bookmark the tree was nowhere near, and selecting a bookmarked row
+    // in the tree lit nothing, because the cycle had not moved. The cycle index
+    // still exists - it is what Ctrl+Alt+L/J counts from - but it is not what
+    // the panel shows.
+    private void SyncBookmarkPanelToSelection()
+    {
+        if (!IsBookmarkPanelMode)
+        {
+            return;
+        }
+
+        string? selectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath.TrimEnd('\\');
+        var match = selectedPath is null
+            ? null
+            : _bookmarkPanelRows.FirstOrDefault(r =>
+                string.Equals(r.Path.TrimEnd('\\'), selectedPath, StringComparison.OrdinalIgnoreCase));
+
+        foreach (var row in _bookmarkPanelRows)
+        {
+            row.IsCurrent = ReferenceEquals(row, match);
+        }
+
+        BookmarkPanelList.SelectedItem = match;
+    }
+
+    private void BookmarkPanelList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (ItemsControl.ContainerFromElement(BookmarkPanelList, (DependencyObject)e.OriginalSource)
+            is not ListBoxItem { Content: BookmarkPanelRow row })
+        {
+            return;
+        }
+
+        // The cycle moves to the row that was clicked, so the next Ctrl+Alt+L
+        // carries on from where the eye is instead of from wherever the cycle
+        // last landed on its own. The MARK is not set here - the jump below
+        // selects the row in the tree, and the mark follows that.
+        _bookmarkCycleIndex = row.Number - 1;
+        JumpToBookmarkPath(row.Path);
+    }
+
+    // So the context menu acts on the row under the cursor rather than on
+    // whatever was selected before - same reason the favorites list does it.
+    private void BookmarkPanelItem_PreviewMouseRightButtonDown(object sender, RoutedEventArgs e)
+    {
+        if (sender is ListBoxItem item)
+        {
+            item.IsSelected = true;
+        }
+    }
+
+    private void RemoveBookmarkFromPanel_Click(object sender, RoutedEventArgs e)
+    {
+        if (BookmarkPanelList.SelectedItem is not BookmarkPanelRow row)
+        {
+            return;
+        }
+
+        RemoveBookmark(row.Path);
+        RefreshBookmarkPanelIfShowing();
+    }
+
     // 없는 경로 정리. A bookmark on a path that no longer exists is dead weight:
     // the cycle skips it silently (see JumpToBookmark), so it never announces
     // itself, it just makes Ctrl+Alt+L feel like it missed a press.
@@ -7330,6 +7729,7 @@ public partial class MainWindow : Window
         // The cycle's position indexes into the list that just changed.
         _bookmarkCycleIndex = -1;
         _settingsService.Save(_settings);
+        RefreshBookmarkPanelIfShowing();
         LogBookmarkPrune(missing);
     }
 
@@ -8226,7 +8626,7 @@ public partial class MainWindow : Window
         });
 
         SetSearchViewActive(false);
-        NavigateToPath(path, source: "search-scope");
+        NavigateToPath(path, source: "bookmark-list");
     }
 
     private void RemoveBookmark(string path)
@@ -8246,6 +8646,7 @@ public partial class MainWindow : Window
         // The cycle's position indexes into the list that just changed.
         _bookmarkCycleIndex = -1;
         _settingsService.Save(_settings);
+        RefreshBookmarkPanelIfShowing();
     }
 
     private void ClearAllBookmarks_Click(object sender, RoutedEventArgs e)
@@ -8276,6 +8677,7 @@ public partial class MainWindow : Window
         FileSystemService.BookmarkedPaths.Clear();
         _bookmarkCycleIndex = -1;
         _settingsService.Save(_settings);
+        RefreshBookmarkPanelIfShowing();
     }
 
     // Rows that already exist in the tree, and only those - no lazy loading.
@@ -8396,22 +8798,26 @@ public partial class MainWindow : Window
 
     private void ToggleBookmark(FileSystemItem item)
     {
+        bool added;
         if (FileSystemService.BookmarkedPaths.Remove(item.FullPath))
         {
             item.IsBookmarked = false;
             _settings.BookmarkPaths.RemoveAll(p =>
                 string.Equals(p, item.FullPath, StringComparison.OrdinalIgnoreCase));
+            added = false;
         }
         else
         {
             FileSystemService.BookmarkedPaths.Add(item.FullPath);
             item.IsBookmarked = true;
             _settings.BookmarkPaths.Add(item.FullPath);
+            added = true;
         }
 
         // Saved immediately, same reasoning as the color settings: a bookmark
         // is a deliberate act whose whole point is persisting.
         _settingsService.Save(_settings);
+        RefreshBookmarkPanelIfShowing(added ? item.FullPath : null);
     }
 
     // +1 = next (Ctrl+Alt+L), -1 = previous (Ctrl+Alt+J), cycling in the
@@ -8444,6 +8850,7 @@ public partial class MainWindow : Window
         // the index is only meaningful against the list it was found in.
         _bookmarkCycleIndex = _settings.BookmarkPaths.FindIndex(p =>
             string.Equals(p, found.Path, StringComparison.OrdinalIgnoreCase));
+
 
         SetSearchViewActive(false);
 
@@ -9130,6 +9537,7 @@ public partial class MainWindow : Window
                 parentsToRefresh.Add(parent);
             }
             RemoveFavoritesUnder(item.FullPath);
+            RemoveBookmarksUnder(item.FullPath);
         }
 
         // Refresh each affected folder once, however many of its children
@@ -9174,6 +9582,57 @@ public partial class MainWindow : Window
             _settings.Favorites.Remove(entry);
         }
         UpdateFavoritesPanelVisibility();
+    }
+
+    // The bookmark half of the above, which was simply missing: deleting a
+    // bookmarked file left its bookmark behind, and the panel then drew it as a
+    // row with no icon at all (the kind probe has nothing to answer with), which
+    // reads as a rendering fault rather than as a dead entry. Reported
+    // 2026-08-02; favorites never showed it because they had this from the
+    // start.
+    //
+    // Removing on OUR OWN delete does not weaken the rule that a bookmark is
+    // only dropped when the volume can testify the path is gone (see
+    // PruneMissingBookmarks): this app just deleted it. That is the strongest
+    // testimony there is, not a guess about an unreachable drive.
+    private void RemoveBookmarksUnder(string deletedPath)
+    {
+        string trimmed = deletedPath.TrimEnd('\\');
+        string prefix = trimmed + '\\';
+
+        var stale = _settings.BookmarkPaths.Where(p =>
+            string.Equals(p.TrimEnd('\\'), trimmed, StringComparison.OrdinalIgnoreCase) ||
+            p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        if (stale.Count == 0)
+        {
+            return;
+        }
+
+        // Deliberately NOT a loop over RemoveBookmark: that one walks the whole
+        // loaded tree to clear a row's ribbon, and rebuilds the panel, on every
+        // call - so deleting a folder holding several bookmarks would pay both
+        // costs once per bookmark, on the UI thread. One pass over the tree and
+        // one rebuild for the batch instead.
+        var staleSet = new HashSet<string>(stale, StringComparer.OrdinalIgnoreCase);
+        foreach (string path in stale)
+        {
+            _settings.BookmarkPaths.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+            FileSystemService.BookmarkedPaths.Remove(path);
+        }
+
+        foreach (var item in EnumerateLoadedItems(_roots))
+        {
+            if (staleSet.Contains(item.FullPath))
+            {
+                item.IsBookmarked = false;
+            }
+        }
+
+        // The cycle's position indexes into the list that just changed.
+        _bookmarkCycleIndex = -1;
+        _settingsService.Save(_settings);
+        RefreshBookmarkPanelIfShowing();
     }
 
     // Packs the current selection into one zip beside the right-clicked row,
