@@ -321,6 +321,51 @@
         <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}"
                 Color="#FFCCCCCC"/>
 
+        <!-- How tall a menu may grow before it starts scrolling instead. Only a
+             placeholder here: ApplyMenuMaxHeight overwrites it with the CURRENT
+             monitor's work area minus the popup's own chrome, and keeps it in
+             step with monitor/DPI/zoom changes. Both menu templates below bind
+             their ScrollViewer's MaxHeight to it. -->
+        <system:Double x:Key="MenuMaxHeight">600</system:Double>
+
+        <!-- The scroll host both menu templates below wrap their items in.
+             Shared as a Style so the two can't drift apart.
+
+             The Padding trigger is the point of it: when the bar is actually
+             showing, the content gets a gap of its own before the bar's lane
+             starts. Without it a full-width row - the image thumbnail most
+             visibly - ends flush against the thumb (2026-08-02: "썸네일 hover가
+             스크롤바 썸에 딱 달라 붙어 있어요"). Keyed off
+             ComputedVerticalScrollBarVisibility rather than applied always, so
+             a short menu that never scrolls keeps exactly the symmetry it had
+             before any of this existed.
+
+             DynamicResource throughout: MinimalScrollViewerTemplate and the
+             metrics are declared further down this same dictionary, and a
+             StaticResource may only look backwards. -->
+        <Style x:Key="MenuScrollViewerStyle"
+                TargetType="ScrollViewer">
+            <Setter Property="Focusable"
+                    Value="False"/>
+            <Setter Property="MaxHeight"
+                    Value="{DynamicResource MenuMaxHeight}"/>
+            <Setter Property="Template"
+                    Value="{DynamicResource MinimalScrollViewerTemplate}"/>
+            <Setter Property="VerticalScrollBarVisibility"
+                    Value="Auto"/>
+            <Setter Property="HorizontalScrollBarVisibility"
+                    Value="Disabled"/>
+            <Setter Property="Padding"
+                    Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="ComputedVerticalScrollBarVisibility"
+                        Value="Visible">
+                    <Setter Property="Padding"
+                            Value="{DynamicResource MenuScrollGutterPadding}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- Dark ContextMenu/MenuItem/Separator chrome. The default templates
              don't respect a plain Background/Foreground Setter for these (same
              issue we hit with TreeViewItem), so - as before - the reliable fix
@@ -373,7 +418,20 @@
                                 CornerRadius="8"
                                 Effect="{DynamicResource MenuDropShadow}"
                                 SnapsToDevicePixels="True">
-                            <StackPanel IsItemsHost="True"/>
+                            <!-- WPF's stock ContextMenu template wraps the items
+                                 host in a ScrollViewer - that is where a menu's
+                                 scroll arrows come from. This replacement had
+                                 dropped it, so a menu taller than the screen was
+                                 simply CUT OFF at the bottom edge with no way to
+                                 reach the rest (reported 2026-08-02 with 65
+                                 hidden folders in the list; the bookmark list is
+                                 the same template and only ever needed the same
+                                 number of rows to do it). MaxHeight is what
+                                 makes it scroll rather than grow - a ScrollViewer
+                                 given unbounded height never scrolls at all. -->
+                            <ScrollViewer Style="{DynamicResource MenuScrollViewerStyle}">
+                                <StackPanel IsItemsHost="True"/>
+                            </ScrollViewer>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -536,7 +594,15 @@
                                         Margin="10"
                                         Effect="{DynamicResource MenuDropShadow}"
                                         SnapsToDevicePixels="True">
-                                    <StackPanel IsItemsHost="True"/>
+                                    <!-- Same omission, same fix as the
+                                         ContextMenu template above - and this is
+                                         the one that actually bit, since both
+                                         long lists (숨긴 폴더 목록, 북마크 목록)
+                                         are built as inline rows inside a
+                                         SUBMENU. -->
+                                    <ScrollViewer Style="{DynamicResource MenuScrollViewerStyle}">
+                                        <StackPanel IsItemsHost="True"/>
+                                    </ScrollViewer>
                                 </Border>
                             </Popup>
                         </Grid>

@@ -947,6 +947,11 @@ public partial class MainWindow : Window
         Left = _settings.DockOnRight ? workArea.Right - Width : workArea.Left;
         Top = workArea.Top;
         Height = workArea.Height;
+
+        // The menu cap is a fraction of this same work area, so it is stale the
+        // moment the window lands on a different monitor, the taskbar resizes,
+        // or the DPI changes - all of which come through here.
+        ApplyMenuMaxHeight();
     }
 
     // Work area (excludes the taskbar) of whichever monitor this window's
@@ -5011,6 +5016,13 @@ public partial class MainWindow : Window
         // 800px tall with a thumbnail showing. Squeezed together with the
         // separator margin (6 -> 5 in the XAML) and the thumbnail's growth
         // cap below.
+        //
+        // Tried at 7 and then 10 on 2026-08-02 and REVERTED to 5 by the user:
+        // the cramped feeling turned out not to be the row rhythm at all - it
+        // was the content sitting flush against the new scrollbar (the
+        // thumbnail's hover edge touching the thumb). That is fixed where it
+        // actually is, in MenuScrollViewerStyle's gutter padding, so this
+        // number goes back to the value two rounds of feedback settled on.
         double menuVerticalPadding = Math.Min(5.0, Math.Round(8.0 * menuVerticalScale));
 
         var appResources = Application.Current.Resources;
@@ -5099,9 +5111,64 @@ public partial class MainWindow : Window
         appResources["MenuItemPadding"] = new Thickness(
             Math.Round(15.0 * scale), menuVerticalPadding,
             Math.Round(15.0 * scale), menuVerticalPadding);
+        double menuHorizontalPadding = Math.Round(5.0 * scale);
         appResources["MenuPadding"] = new Thickness(
-            Math.Round(5.0 * scale), menuVerticalPadding,
-            Math.Round(5.0 * scale), menuVerticalPadding);
+            menuHorizontalPadding, menuVerticalPadding,
+            menuHorizontalPadding, menuVerticalPadding);
+
+        // Breathing room between a scrolling menu's content and the scrollbar's
+        // own lane - applied ONLY while the bar is showing (see
+        // MenuScrollViewerStyle). A full-width row, i.e. the image thumbnail,
+        // otherwise ends flush against the thumb.
+        //
+        // The SAME value as the menu's horizontal padding above, on purpose:
+        // that padding is what already sits to the RIGHT of the thumb (plus the
+        // thumb's own 1px margin), so reusing it puts equal air on both sides of
+        // the bar instead of a wider gap on one side (user's call, 2026-08-02).
+        appResources["MenuScrollGutterPadding"] = new Thickness(
+            0, 0, menuHorizontalPadding, 0);
+
+        // Padding just changed, and the cap subtracts it.
+        ApplyMenuMaxHeight();
+    }
+
+    // How tall a menu may grow before it scrolls instead. A menu lives in its
+    // own popup, so nothing bounds it the way the window bounds the tree: a
+    // list with 65 rows in it grew past the screen and had its tail CUT OFF
+    // with no way to reach it (reported 2026-08-02). Both menu templates now
+    // host their items in a ScrollViewer - but a ScrollViewer given unbounded
+    // height never scrolls, so this is the number that makes it work.
+    //
+    // Deliberately NOT the full work area (user's call): a menu that fills the
+    // screen edge to edge reads as broken, and the gap left above and below is
+    // also the cue that the list continues past what is shown.
+    //
+    // The fraction is generous on purpose. Hitting the cap is not free - the
+    // scrollbar takes a lane of its own out of the content (see
+    // MinimalScrollViewerTemplate), so an ORDINARY right-click menu that only
+    // just crosses the line loses visible width for nothing, which is exactly
+    // what got reported at 0.8 ("폭이 좀 많이 줄어든 느낌", 2026-08-02). The cap
+    // is here for the runaway list of 65 rows, not for menus that merely happen
+    // to be long.
+    private void ApplyMenuMaxHeight()
+    {
+        double workAreaHeight = GetCurrentMonitorWorkArea().Height;
+
+        // What the popup wraps around the scrollable part and therefore does
+        // not get to use: the shadow-bleed margin on both sides, the border,
+        // and the menu's own padding.
+        double chrome = 2 * 10 + 2;
+        if (Application.Current.Resources["MenuPadding"] is Thickness menuPadding)
+        {
+            chrome += menuPadding.Top + menuPadding.Bottom;
+        }
+
+        // The floor matters on a short work area (a low-resolution laptop with
+        // a large taskbar): a cap small enough to show two rows would be worse
+        // than the clipping this replaces.
+        double cap = Math.Max(240.0, workAreaHeight * 0.9 - chrome);
+        Application.Current.Resources["MenuMaxHeight"] = cap;
+        LogScrollLine($"menu   cap {cap:F0}  (work area {workAreaHeight:F0}, chrome {chrome:F0})");
     }
 
     private void ColorSettingsMenuItem_Click(object sender, RoutedEventArgs e)
