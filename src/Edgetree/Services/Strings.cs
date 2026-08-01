@@ -23,7 +23,6 @@ public static class Strings
     public static string MenuHiddenFolderList = "숨긴 폴더";
     public static string MenuHiddenFolderListEmpty = "숨긴 폴더 없음";
     public static string MenuUnhideFolder = "숨김 해제";
-    public static string MenuShowHiddenFolders = "숨긴 폴더 표시";
     // The button on every row of the bookmark / hidden-folder lists. One word
     // for both because the row it sits on already says what is being released.
     public static string MenuListRowRemove = "해제";
@@ -316,7 +315,6 @@ public static class Strings
         MenuHiddenFolderList = "Hidden Folders";
         MenuHiddenFolderListEmpty = "No hidden folders";
         MenuUnhideFolder = "Unhide";
-        MenuShowHiddenFolders = "Show Hidden Folders";
         MenuListRowRemove = "Remove";
         HiddenClearAllConfirmTitle = "Unhide All Folders";
         HiddenClearAllConfirmBody = "Show all {0} hidden folders again?";

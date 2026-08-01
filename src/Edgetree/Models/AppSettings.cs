@@ -252,10 +252,6 @@ public class AppSettings
     // and nothing to go wrong while a drive is briefly away.
     public List<string> HiddenFolderPaths { get; set; } = new();
 
-    // Shows the folders above in place (italic, recessed) without unhiding
-    // them - Explorer's "숨긴 항목" checkbox, same idea. Off by default: the
-    // point of hiding is that the tree is quieter afterwards.
-    public bool ShowHiddenFolders { get; set; } = false;
 
     // File-search feature (see Services/FileSearchService). The last folder
     // chosen via "폴더 찾기" is remembered so reopening search restores the same

@@ -64,7 +64,10 @@ public partial class MainWindow : Window
 
     private readonly SettingsService _settingsService = new();
     private AppSettings _settings = new();
-    private List<FileSystemItem> _roots = new();
+    // Observable so a drive can leave and come back without the tree being
+    // rebound - hiding a drive root removes it here and the view follows. It
+    // was a plain List while the set of roots only ever changed at startup.
+    private readonly System.Collections.ObjectModel.ObservableCollection<FileSystemItem> _roots = new();
     private bool _isDocked = true;
 
     // Remembers the floating window's own bounds across a dock -> undock
@@ -341,7 +344,6 @@ public partial class MainWindow : Window
         {
             FileSystemService.HiddenPaths.Add(FileSystemService.NormalizeHiddenPath(path));
         }
-        FileSystemService.ShowHiddenFolders = _settings.ShowHiddenFolders;
 
         FileSystemService.SortOverrides.Clear();
         foreach (var entry in _settings.FolderSortOverrides)
@@ -383,7 +385,7 @@ public partial class MainWindow : Window
             ? _settings.TreeFontSize
             : DefaultTreeFontSize;
 
-        _roots = FileSystemService.GetDriveRoots();
+        ReloadRoots();
         ExplorerTree.ItemsSource = _roots;
         StartDriveWatchers();
 
@@ -4008,7 +4010,7 @@ public partial class MainWindow : Window
     // pinSelectionToTop: the restored selection is normally put at the top, the
     // way a jump does. A DISPLAY change (the hidden-folder toggle) should not
     // move the view at all, so it asks for the quiet restore instead.
-    private void RefreshAllLoadedFolders(bool pinSelectionToTop = true)
+    private void RefreshAllLoadedFolders(bool pinSelectionToTop = true, bool reloadRoots = false)
     {
         // The rebuild below replaces every item instance, so whatever the
         // multi-selection held would keep only dead instances - flags lost,
@@ -4024,15 +4026,34 @@ public partial class MainWindow : Window
         var showingAllPaths = new List<string>();
         foreach (var root in _roots)
         {
+            if (root.IsExpanded)
+            {
+                // A root's own expanded state is not collected by the helper
+                // below (it only looks at an item's children), and it has to be
+                // when the roots themselves are about to be replaced.
+                expandedPaths.Add(root.FullPath);
+            }
             CollectExpandedPaths(root, expandedPaths, showingAllPaths);
         }
         string? selectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
 
-        foreach (var root in _roots)
+        if (reloadRoots)
         {
-            if (root.ChildrenLoaded)
+            // The drive rows themselves are what changed - a hidden drive
+            // leaving or coming back. Re-reading each root's CHILDREN, which is
+            // all this used to do, could never add or remove a root, so
+            // toggling "숨긴 폴더 표시" left hidden drives off the tree
+            // (reported 2026-08-02).
+            ReloadRoots();
+        }
+        else
+        {
+            foreach (var root in _roots)
             {
-                root.RefreshChildren();
+                if (root.ChildrenLoaded)
+                {
+                    root.RefreshChildren();
+                }
             }
         }
 
@@ -6448,14 +6469,12 @@ public partial class MainWindow : Window
             // The search scope is always a folder (see StartScopeScan).
             searchInFolderItem.IsEnabled = isFolder;
 
-            // Only folders can be hidden, and for now only folders UNDER a
-            // drive - a drive root has no parent listing to be filtered out of,
-            // so hiding one is its own presentation (greyed and inert in place)
-            // and is not built yet.
+            // Drive roots included: they hide exactly the way a folder does
+            // (2026-08-02) - an unused drive is the noisiest thing a tree of
+            // whole drives can carry, and the list is the way back for both.
             if (FindTaggedMenuElement<MenuItem>(menu, "hideFolder") is { } hideItem)
             {
-                hideItem.IsEnabled = !isMultiSelection && isFolder &&
-                    ExplorerTree.SelectedItem is FileSystemItem { Parent: not null };
+                hideItem.IsEnabled = !isMultiSelection && isFolder;
             }
 
             // Deliberately NOT greyed out when nothing is hidden. It was, and a
@@ -6635,6 +6654,14 @@ public partial class MainWindow : Window
     {
         foreach (var root in _roots)
         {
+            // Already watched - this runs again whenever the set of roots
+            // changes (a drive coming back from the hidden list), and a second
+            // watcher on the same drive would double every event.
+            if (_driveWatchers.Any(w => string.Equals(w.Path, root.FullPath, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
             try
             {
                 var watcher = new FileSystemWatcher(root.FullPath)
@@ -7431,66 +7458,32 @@ public partial class MainWindow : Window
     // 2026-08-02, with the user). The list below is not a nicety either: hiding
     // a folder removes the only row you could have right-clicked to get it
     // back, so the two ship together or not at all.
-    // Shows the hidden folders in place without unhiding them - so "어디로
-    //갔지" has an answer that costs the tree nothing while it is off. Every
-    // loaded folder has to be re-read, since the rows in question were never
-    // built; that is the same heavy refresh the sort and cap settings use, and
-    // like them this is a deliberate one-off click, not something that repeats.
-    private void ShowHiddenFoldersMenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        _settings.ShowHiddenFolders = !_settings.ShowHiddenFolders;
-        FileSystemService.ShowHiddenFolders = _settings.ShowHiddenFolders;
-        _settingsService.Save(_settings);
-
-        // Nothing hidden, so nothing on screen can change - and the refresh
-        // below is the heaviest thing in the app. Remember the setting and stop.
-        if (_settings.HiddenFolderPaths.Count == 0)
-        {
-            return;
-        }
-
-        // Turning the display OFF while the selection sits inside a folder it
-        // is about to hide: move up to the nearest ancestor that is staying.
-        // Otherwise the refresh below restores the selection by path, that
-        // restore counts as a deliberate navigation, and the navigation puts
-        // the folder straight back on screen - the row stayed selected and
-        // visible after being switched off (user, 2026-08-02).
-        if (!_settings.ShowHiddenFolders &&
-            ExplorerTree.SelectedItem is FileSystemItem selected &&
-            NearestVisibleAncestor(selected) is { } stays &&
-            !ReferenceEquals(stays, selected))
-        {
-            stays.IsSelected = true;
-        }
-
-        // Not pinned to the top: this is a display toggle, not a jump. Pinning
-        // threw the row the menu had been opened from to the top of the tree,
-        // which read as the view having moved somewhere (same report).
-        RefreshAllLoadedFolders(pinSelectionToTop: false);
-    }
-
-    // The first ancestor (or the item itself) that is not inside anything the
-    // user has hidden. Null only if the item is somehow not under a root.
-    private static FileSystemItem? NearestVisibleAncestor(FileSystemItem item)
-    {
-        var current = item;
-        while (current is not null &&
-               FileSystemService.HiddenPaths.Contains(FileSystemService.NormalizeHiddenPath(current.FullPath)))
-        {
-            current = current.Parent;
-        }
-
-        return current;
-    }
-
     private void HideFolder_Click(object sender, RoutedEventArgs e)
     {
-        if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsDirectory: true, Parent: not null } folder)
+        if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsDirectory: true } folder)
         {
             return;
         }
 
         HideFolder(folder);
+    }
+
+    // Rebuilds the drive rows, keeping whatever was expanded and selected -
+    // used when a hidden DRIVE comes back, where there is no parent listing to
+    // merge into the way an ordinary folder has. Roots are few and cheap to
+    // re-read; everything below them is replayed by path, the same two-pass
+    // trick RefreshAllLoadedFolders uses for the same reason.
+    private void ReloadRoots()
+    {
+        _roots.Clear();
+        foreach (var root in FileSystemService.GetDriveRoots())
+        {
+            _roots.Add(root);
+        }
+
+        // A drive that was hidden had no watcher (they are made per ROOT), so
+        // its live updates would otherwise stay dead until the next launch.
+        StartDriveWatchers();
     }
 
     private void HideFolder(FileSystemItem folder)
@@ -7503,24 +7496,16 @@ public partial class MainWindow : Window
 
         _settings.HiddenFolderPaths.Add(path);
 
-        // With "숨긴 폴더 표시" on, hiding must not make the row disappear -
-        // that is the one state where a hidden folder is supposed to stay on
-        // screen. It just starts saying so instead.
-        if (_settings.ShowHiddenFolders)
-        {
-            folder.IsHiddenFolderShown = true;
-            _settingsService.Save(_settings);
-            return;
-        }
-
         // A folder hidden while it is the current selection would leave the
         // tree selected on a row that no longer exists - and the favorites
         // panel syncing to it. Move up to its parent, which is where the eye
         // already is once the row goes.
+        bool selectionWasInside =
+            ExplorerTree.SelectedItem is FileSystemItem selected && IsSelfOrDescendant(selected, folder);
+
         if (folder.Parent is { } parent)
         {
-            if (ExplorerTree.SelectedItem is FileSystemItem selected &&
-                IsSelfOrDescendant(selected, folder))
+            if (selectionWasInside)
             {
                 parent.IsSelected = true;
             }
@@ -7531,6 +7516,18 @@ public partial class MainWindow : Window
             // (the defect found 2026-07-25 when every file operation still
             // rebuilt).
             parent.Children.Remove(folder);
+        }
+        else
+        {
+            // A drive root: no parent listing to take it out of, so it leaves
+            // the roots collection instead. Observable, so the tree follows on
+            // its own. Selection moves to whatever drive is left rather than
+            // staying on a row that no longer exists.
+            _roots.Remove(folder);
+            if (selectionWasInside && _roots.FirstOrDefault() is { } firstRoot)
+            {
+                firstRoot.IsSelected = true;
+            }
         }
 
         _settingsService.Save(_settings);
@@ -7562,11 +7559,20 @@ public partial class MainWindow : Window
 
         // Not on screen at all, so the row has to come back from disk. Merge
         // rather than rebuild, so the rest of the parent's open subtree stays.
-        if (System.IO.Path.GetDirectoryName(path) is { } parentPath &&
-            FindItemForPath(parentPath) is { ChildrenLoaded: true } parent)
+        if (System.IO.Path.GetDirectoryName(path) is { } parentPath)
         {
-            RefreshFolderPreservingState(parent);
+            if (FindItemForPath(parentPath) is { ChildrenLoaded: true } parent)
+            {
+                RefreshFolderPreservingState(parent);
+            }
+
+            return;
         }
+
+        // No parent path at all means a drive root - it belongs to the roots
+        // collection, so the whole set is rebuilt and everything that was open
+        // is replayed onto it.
+        RefreshAllLoadedFolders(pinSelectionToTop: false, reloadRoots: true);
     }
 
     // A jump has to be able to land inside a folder the user hid: a search
@@ -7662,33 +7668,19 @@ public partial class MainWindow : Window
     {
         submenu.Items.Clear();
 
-        // "숨긴 폴더 표시" leads the list rather than sitting as its own row in
-        // the menu outside. It was there first and read badly: a checkable row
-        // among unheckable ones does not line up, and it made an already long
-        // context menu longer for something reached rarely (user, 2026-08-02).
-        // Here it is one step further in, next to the folders it acts on, and
-        // fenced off from them by a separator.
-        var showAll = FollowMenuFont(new MenuItem
-        {
-            Header = Strings.MenuShowHiddenFolders,
-            IsCheckable = true,
-            IsChecked = _settings.ShowHiddenFolders,
-            // Nothing hidden, nothing to show: flipping it could only cost a
-            // full re-read of every open folder and the flicker that comes with
-            // it, for no visible change (user, 2026-08-02).
-            IsEnabled = _settings.HiddenFolderPaths.Count > 0,
-            StaysOpenOnClick = true,
-        });
-        showAll.Click += ShowHiddenFoldersMenuItem_Click;
-        submenu.Items.Add(showAll);
-        submenu.Items.Add(new Separator());
-
-        // This row also guarantees the submenu is never EMPTY. A MenuItem whose
-        // Items go to zero reports HasItems=false, WPF stops opening a popup for
-        // it at all, and SubmenuOpened - the only thing that could refill it -
-        // never fires again: the row goes dead until the app restarts.
-        // Releasing the last hidden folder used to leave it in exactly that
-        // state.
+        // A "숨긴 폴더 표시" toggle led this list for a while and was taken out
+        // again (2026-08-02, user's call): "숨겼는데 또 별도로 보여준다"의
+        // 개념이 애매하다 - hidden is hidden, and a persistent switch that
+        // un-hides everything without unhiding it is a third state to hold in
+        // your head. If it comes back it should be a LIVE peek - held down to
+        // reveal, gone on release - which is a different thing from a setting.
+        // "어디로 갔지"는 이 목록이 답한다.
+        //
+        // Keeping SOMETHING in here matters beyond looks: a MenuItem whose
+        // Items go to zero reports HasItems=false, WPF stops opening a popup
+        // for it at all, and SubmenuOpened - the only thing that could refill
+        // it - never fires again, so the row is dead until the app restarts.
+        // Releasing the last hidden folder used to leave exactly that.
         if (_settings.HiddenFolderPaths.Count == 0)
         {
             submenu.Items.Add(FollowMenuFont(new MenuItem

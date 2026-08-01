@@ -169,15 +169,9 @@ public static class FileSystemService
     public static string NormalizeHiddenPath(string path)
         => path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-    // "숨긴 폴더 표시" - Explorer's own "숨긴 항목" checkbox, in shape and in
-    // meaning: it shows them where they belong without unhiding anything, so
-    // there is a way to answer "did I hide something here" that costs the tree
-    // nothing while it is off. Mirrored from AppSettings.ShowHiddenFolders.
-    public static bool ShowHiddenFolders;
-
     public static bool IsHiddenByUser(string path)
     {
-        if (HiddenPaths.Count == 0 || ShowHiddenFolders)
+        if (HiddenPaths.Count == 0)
         {
             return false;
         }
@@ -198,6 +192,17 @@ public static class FileSystemService
 
         foreach (var drive in DriveInfo.GetDrives())
         {
+            // A hidden drive is dropped exactly like a hidden folder is - one
+            // rule rather than a second presentation of its own. A greyed,
+            // inert row that stayed in place was designed first and dropped by
+            // the user (2026-08-02): "어차피 목록에 들어가는데" - the list is
+            // the way back either way, so the special case bought nothing and
+            // would have collided with the offline-drive look besides.
+            if (IsHiddenByUser(drive.Name))
+            {
+                continue;
+            }
+
             bool isNetwork = drive.DriveType == DriveType.Network;
 
             // A mapped network drive KEEPS its place while the server is away.
