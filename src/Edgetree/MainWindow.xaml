@@ -871,21 +871,11 @@
                      real rows replace it on open (AppendHiddenFolderListTo). -->
                 <MenuItem Header=""/>
             </MenuItem>
-            <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
-                    Tag="newFolder"
-                    InputGestureText="F7"
-                    Click="NewFolder_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuRefresh}"
-                    Tag="refresh"
-                    InputGestureText="F5"
-                    Click="RefreshFolder_Click"/>
-            <!-- Grouped with the other "do something to this folder" actions
-                 rather than hidden behind the search view's own folder picker:
-                 the user is already looking at the folder they want to search,
-                 and reaching for the picker means browsing back to it. -->
-            <MenuItem Header="{x:Static services:Strings.MenuSearchInFolder}"
-                    Tag="searchInFolder"
-                    Click="SearchInFolder_Click"/>
+            <!-- Sort closes this group rather than sitting among the folder
+                 actions below: which order a folder's rows come in is a
+                 question about how this sidebar presents it, exactly like the
+                 four above (2026-08-02 regrouping - see the note at the top of
+                 this menu). -->
             <MenuItem Header="{x:Static services:Strings.MenuSort}" Tag="sort">
                 <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
                         IsCheckable="True"
@@ -936,6 +926,12 @@
             <MenuItem Header="{x:Static services:Strings.MenuPaste}"
                     InputGestureText="Ctrl+V"
                     Click="PasteItem_Click"/>
+            <!-- Next to paste, because both make something new in this folder.
+                 It used to lead the folder group further up. -->
+            <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
+                    Tag="newFolder"
+                    InputGestureText="F7"
+                    Click="NewFolder_Click"/>
             <!-- 압축 sits with paste rather than in a group of its own: it
                  makes a new file out of the selection, same as paste does, and
                  an extra separator costs every right-click height the menu was
@@ -956,7 +952,24 @@
             <MenuItem Header="{x:Static services:Strings.MenuDelete}"
                     InputGestureText="Del"
                     Click="DeleteItem_Click"/>
+            <!-- Closes the group that changes this folder: re-reading it from
+                 disk is what you reach for after doing any of the above (or
+                 after something outside the app did). It led the folder group
+                 up top until 2026-08-02. -->
+            <MenuItem Header="{x:Static services:Strings.MenuRefresh}"
+                    Tag="refresh"
+                    InputGestureText="F5"
+                    Click="RefreshFolder_Click"/>
             <Separator/>
+            <!-- Heads the "take this location somewhere else" group - the
+                 others hand it to the clipboard, a terminal, an editor or
+                 Explorer; this one hands it to the app's own search view. Its
+                 point is unchanged: the user is already looking at the folder
+                 they want to search, so reaching for the search view's own
+                 folder picker would mean browsing back to it. -->
+            <MenuItem Header="{x:Static services:Strings.MenuSearchInFolder}"
+                    Tag="searchInFolder"
+                    Click="SearchInFolder_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuCopyPath}"
                     Tag="copyPath"
                     InputGestureText="Ctrl+Shift+C"
