@@ -1357,6 +1357,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Same for a drag that is still running (a scrollbar being held, say):
+        // keep polling rather than closing under it. Restarted, not returned
+        // from, so the close still happens once the gesture ends out here.
+        if (IsPointerGestureFromInsideWindow)
+        {
+            _autoHideRehideTimer.Start();
+            return;
+        }
+
         // WPF's routed MouseEnter (which would normally have cancelled this
         // timer already) has been reported unreliable right at a monitor
         // boundary - docked at the edge of a secondary monitor adjacent to
@@ -1515,6 +1524,29 @@ public partial class MainWindow : Window
         double y = cursor.Y / dpi.DpiScaleY;
         return x >= Left && x <= Left + Width && y >= Top && y <= Top + Height;
     }
+
+    // A mouse gesture that STARTED in this window and is still under way, even
+    // though the pointer has since left the window's rectangle. Dragging a
+    // scrollbar is the everyday case: a docked sidebar is narrow, so holding
+    // the thumb and moving up or down drifts sideways out of the window almost
+    // immediately - and both auto-hide close paths read that as leaving.
+    // Mouse-leave asks only where the pointer is; click-outside asks whether a
+    // button is down while the pointer is outside, which a drag satisfies the
+    // whole time. So the sidebar shut itself, the collapse tore the captured
+    // ListBox out of the visual tree, and the drag died with it (reported
+    // 2026-08-02 against a long search result list, in BOTH modes; pinned was
+    // fine because nothing closes there).
+    //
+    // Capture is the honest question - it is what "a gesture owns the mouse"
+    // actually means, and it covers the resize thumb, the favorites splitter
+    // and text selection without naming any of them. Paired with a button
+    // actually being held so a capture that leaks can't wedge auto-hide open
+    // for good; the stuck-capture watchdog, which releases exactly that kind of
+    // leak, is a separate mechanism and doesn't depend on this one.
+    private bool IsPointerGestureFromInsideWindow
+        => System.Windows.Forms.Control.MouseButtons != System.Windows.Forms.MouseButtons.None &&
+           Mouse.Captured is DependencyObject captured &&
+           Window.GetWindow(captured) == this;
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern IntPtr GetCapture();
@@ -1700,6 +1732,14 @@ public partial class MainWindow : Window
         }
 
         if (IsCursorInsideWindow())
+        {
+            return;
+        }
+
+        // A held button outside the window is what this watch is looking for -
+        // unless the button has been held since before it left, which is a drag
+        // this window started, not a click somewhere else.
+        if (IsPointerGestureFromInsideWindow)
         {
             return;
         }
