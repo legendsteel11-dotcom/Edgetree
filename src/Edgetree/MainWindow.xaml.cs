@@ -4886,7 +4886,16 @@ public partial class MainWindow : Window
         // is exactly where they then go. App-level rather than window-level
         // resources: another Window can only see these here.
         appResources["DialogFontSize"] = ExplorerTree.FontSize;
-        appResources["DialogWidth"] = Math.Round(240.0 * scale);
+        // Widened from 240 when every colour row gained a hex field: at the old
+        // width the labels and the fields fought over the same pixels and the
+        // Korean ones lost (2026-08-02). The user gave up the width knowingly -
+        // this window is opened rarely and read carefully.
+        appResources["DialogWidth"] = Math.Round(330.0 * scale);
+        // The colour window's hex box and the line under it. Wide enough for
+        // "#RRGGBB" with room to spare, and the hint a step smaller - set apart
+        // by size, never by fading.
+        appResources["DialogHexInputWidth"] = Math.Round(70.0 * scale);
+        appResources["DialogHintFontSize"] = Math.Max(9.0, ExplorerTree.FontSize - 2.0);
         // Lines the title up with the body below it, which sits at 16 - it had
         // been at 10, close enough to look like a near-miss rather than a
         // choice.

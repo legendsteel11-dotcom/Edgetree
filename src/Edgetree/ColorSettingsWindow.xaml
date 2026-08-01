@@ -49,6 +49,11 @@
 
         <Style x:Key="ColorRowLabelStyle"
                 TargetType="TextBlock">
+            <!-- Trimmed rather than allowed to run under the hex box beside
+                 it: the label column is the one that gives way when a long
+                 Korean label meets a fixed-width field (2026-08-02). -->
+            <Setter Property="TextTrimming"
+                    Value="CharacterEllipsis"/>
             <Setter Property="Foreground"
                     Value="{DynamicResource DialogForeground}"/>
             <Setter Property="FontSize"
@@ -74,6 +79,57 @@
                     Value="3"/>
             <Setter Property="Cursor"
                     Value="Hand"/>
+        </Style>
+
+        <!-- The colour code beside each swatch. Requested by mail 2026-07-31:
+             Windows' own picker has three RGB number boxes and nowhere to paste
+             "#2E7D32" from a browser or a design tool, which is how colours
+             actually travel.
+             Standing in the row rather than behind a gesture. A right-click
+             popup was built first and thrown away for two reasons: the app's
+             own stuck-capture watchdog releases any popup that holds capture
+             without a menu being open, so it closed itself after a second
+             (capture-watchdog.log, "released stuck capture: WPF(PopupRoot)"),
+             and the user had pictured the field simply BEING there - "팔레트
+             우측이나 좌측에 이 입력칸이 나와 있는 형태". Width was the reason
+             it wasn't there to begin with; the user gave that up.
+             Every box is wired through this one style: it carries the handlers
+             and each row only names the swatch it belongs to, so a colour added
+             later needs one Tag and nothing else. -->
+        <Style x:Key="ColorHexBoxStyle"
+                TargetType="TextBox">
+            <Setter Property="Width"
+                    Value="{DynamicResource DialogHexInputWidth}"/>
+            <Setter Property="FontSize"
+                    Value="{DynamicResource DialogHintFontSize}"/>
+            <Setter Property="VerticalAlignment"
+                    Value="Center"/>
+            <Setter Property="VerticalContentAlignment"
+                    Value="Center"/>
+            <Setter Property="TextAlignment"
+                    Value="Center"/>
+            <Setter Property="Margin"
+                    Value="0,0,14,0"/>
+            <Setter Property="Padding"
+                    Value="1,1"/>
+            <Setter Property="Background"
+                    Value="{DynamicResource ControlBackground}"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource DialogForeground}"/>
+            <Setter Property="CaretBrush"
+                    Value="{DynamicResource DialogForeground}"/>
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource ControlBorder}"/>
+            <Setter Property="BorderThickness"
+                    Value="1"/>
+            <Setter Property="ToolTip"
+                    Value="{x:Static services:Strings.ColorHexInputHint}"/>
+            <EventSetter Event="Loaded"
+                    Handler="HexBox_Loaded"/>
+            <EventSetter Event="KeyDown"
+                    Handler="HexBox_KeyDown"/>
+            <EventSetter Event="LostKeyboardFocus"
+                    Handler="HexBox_LostKeyboardFocus"/>
         </Style>
 
         <!-- Plain Button defaults to the OS theme's white/light chrome, which
@@ -203,83 +259,118 @@
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelFolderNameFont}"
                         Style="{StaticResource ColorRowLabelStyle}"/>
-                <Border x:Name="FolderNameFontSwatch"
-                        Grid.Row="0"
+                <StackPanel Grid.Row="0"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        MouseLeftButtonUp="FolderNameFontSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                    <TextBox Tag="FolderNameFontSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="FolderNameFontSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="FolderNameFontSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="1"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelFolderNameHighlightFont}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="FolderNameHighlightFontSwatch"
-                        Grid.Row="1"
+                <StackPanel Grid.Row="1"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="FolderNameHighlightFontSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="FolderNameHighlightFontSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="FolderNameHighlightFontSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="FolderNameHighlightFontSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="2"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelFolderNameHoverFont}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="FolderNameHoverFontSwatch"
-                        Grid.Row="2"
+                <StackPanel Grid.Row="2"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="FolderNameHoverFontSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="FolderNameHoverFontSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="FolderNameHoverFontSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="FolderNameHoverFontSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="3"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelFileNameFont}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="FileNameFontSwatch"
-                        Grid.Row="3"
+                <StackPanel Grid.Row="3"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="FileNameFontSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="FileNameFontSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="FileNameFontSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="FileNameFontSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="4"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelFileNameHighlightFont}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="FileNameHighlightFontSwatch"
-                        Grid.Row="4"
+                <StackPanel Grid.Row="4"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="FileNameHighlightFontSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="FileNameHighlightFontSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="FileNameHighlightFontSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="FileNameHighlightFontSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="5"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelFileNameHoverFont}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="FileNameHoverFontSwatch"
-                        Grid.Row="5"
+                <StackPanel Grid.Row="5"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="FileNameHoverFontSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="FileNameHoverFontSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="FileNameHoverFontSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="FileNameHoverFontSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="6"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelShowMore}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="ShowMoreFontSwatch"
-                        Grid.Row="6"
+                <StackPanel Grid.Row="6"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="ShowMoreFontSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="ShowMoreFontSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="ShowMoreFontSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="ShowMoreFontSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <!-- Faint divider between the folder/file name colors above
                      and the general app colors below. -->
@@ -294,95 +385,135 @@
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelHeader}"
                         Style="{StaticResource ColorRowLabelStyle}"/>
-                <Border x:Name="HeaderSwatch"
-                        Grid.Row="8"
+                <StackPanel Grid.Row="8"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        MouseLeftButtonUp="HeaderSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                    <TextBox Tag="HeaderSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="HeaderSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="HeaderSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="9"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelHistory}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="HistorySwatch"
-                        Grid.Row="9"
+                <StackPanel Grid.Row="9"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="HistorySwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="HistorySwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="HistorySwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="HistorySwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="10"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelBackground}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="BackgroundSwatch"
-                        Grid.Row="10"
+                <StackPanel Grid.Row="10"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="BackgroundSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="BackgroundSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="BackgroundSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="BackgroundSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="11"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelSelection}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="SelectionSwatch"
-                        Grid.Row="11"
+                <StackPanel Grid.Row="11"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="SelectionSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="SelectionSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="SelectionSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="SelectionSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="12"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelHoverBackground}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="HoverBackgroundSwatch"
-                        Grid.Row="12"
+                <StackPanel Grid.Row="12"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="HoverBackgroundSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="HoverBackgroundSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="HoverBackgroundSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="HoverBackgroundSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="13"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelGuideLine}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="GuideLineSwatch"
-                        Grid.Row="13"
+                <StackPanel Grid.Row="13"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="GuideLineSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="GuideLineSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="GuideLineSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="GuideLineSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="14"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelGuideLineActive}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="GuideLineActiveSwatch"
-                        Grid.Row="14"
+                <StackPanel Grid.Row="14"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="GuideLineActiveSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="GuideLineActiveSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="GuideLineActiveSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="GuideLineActiveSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <TextBlock Grid.Row="15"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelPanelDivider}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <Border x:Name="PanelDividerSwatch"
-                        Grid.Row="15"
+                <StackPanel Grid.Row="15"
                         Grid.Column="1"
-                        Style="{StaticResource ColorSwatchStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"
-                        MouseLeftButtonUp="PanelDividerSwatch_MouseLeftButtonUp"/>
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="PanelDividerSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="PanelDividerSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="PanelDividerSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
 
                 <StackPanel Grid.Row="16"
                         Grid.Column="0"

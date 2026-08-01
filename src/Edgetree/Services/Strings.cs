@@ -68,6 +68,10 @@ public static class Strings
     public static string MenuAutoHideCloseOnLeave = "마우스 이탈 시 닫기";
     public static string MenuAutoHideSliverWidth = "숨김 시 막대 두께";
     public static string MenuColorSettings = "색상 설정";
+    // On every swatch in the colour window. The right-click gesture has to be
+    // stated somewhere the hand is already resting, or it may as well not exist.
+    public static string ColorSwatchTooltip = "클릭: 색 선택기 · 우클릭: 색상 코드 입력";
+    public static string ColorHexInputHint = "#RRGGBB · Enter 적용, Esc 취소";
     public static string MenuAbout = "앱 정보";
 
     // Fixed, deliberately not switched by Initialize() below - shown the same
@@ -358,6 +362,8 @@ public static class Strings
         MenuAutoHideCloseOnLeave = "Close on Mouse Leave";
         MenuAutoHideSliverWidth = "Auto-Hide Thickness";
         MenuColorSettings = "Color Settings";
+        ColorSwatchTooltip = "Click: color picker · Right-click: enter a color code";
+        ColorHexInputHint = "#RRGGBB · Enter to apply, Esc to cancel";
         MenuAbout = "About";
         MenuIconStyle = "Icon Style";
         MenuIconStyleDefault = "Default";
