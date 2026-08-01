@@ -153,13 +153,21 @@ Either way, the resulting `.exe` is in
 
 ### v1.4.1 (2026-08-02)
 
+- **Bookmarks in the side panel**: options menu → "Side Panel" picks what the
+  panel shows - bookmarks, favorites, or nothing. Bookmark rows are numbered
+  from the top (which is also how many `Ctrl+Alt+L` presses away they are), and
+  the one the tree is standing on is marked in blue. "Hidden" folds the panel
+  away without deleting anything
 - **Hide several folders at once**: pick them with Ctrl/Shift, then right-click →
   "Hide Selected Folders", and clear away everything you never open in one go
 - **Long menus scroll**: a menu with more entries than the screen can hold now
   scrolls to the end instead of running off it - the hidden-folder list and the
   bookmark list included
+- **Folder copy fixed**: pasting a folder into itself never finished copying.
+  It is refused on the spot now
 - **Bookmark jumps fixed**: fixed an issue that could occur when jumping to a
   bookmark
+- Deleting a file now clears its bookmark too
 - Making several new folders in a row now leaves the name box open on the last
   one only
 

@@ -22,14 +22,16 @@ export const changelog: ChangelogEntry[] = [
   {
     version: 'v1.4.1',
     ko: [
+      '왼쪽 패널에 즐겨찾기 대신 북마크를 표시',
       '여러 폴더를 한 번에 골라서 숨기기',
       '항목이 많은 메뉴를 스크롤해서 볼 수 있음',
-      '북마크로 이동할 때 생기던 문제 수정',
+      '폴더 복사와 북마크 이동에서 생기던 문제 수정',
     ],
     en: [
+      'Show bookmarks in the side panel instead of favorites',
       'Hide several folders in one go',
       'Long menus scroll instead of running off the screen',
-      'Fixed an issue when jumping to a bookmark',
+      'Fixed issues in folder copy and bookmark jumps',
     ],
   },
   {
