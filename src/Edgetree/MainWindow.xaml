@@ -1987,6 +1987,42 @@
             </Setter>
         </Style>
 
+        <!-- Every tree row's full path, on hover. Requested by a user
+             2026-07-31 (together with a horizontal scrollbar; only this half
+             was taken) for names the sidebar's width cuts to "긴폴더이름...",
+             and shown on EVERY row rather than only the cut ones - the trimmed-
+             only version was built first and rejected: a tooltip that appears
+             on some rows and not others reads as broken, and the path is worth
+             having either way. This supersedes the older reasoning in the
+             favorites style below ("the tree needs no path tooltip, its rows
+             sit under their own parents"); favorites and tree now say the same
+             kind of thing on hover.
+
+             The full PATH, not just the name that got cut - the path contains
+             the name anyway, so nothing is lost by it. Binds
+             FileSystemItem.FullPath, so this style belongs to tree rows;
+             another item type needs its own tooltip rather than this one,
+             which would silently come up blank.
+
+             FontSize is bound through the placement target: a tooltip is its
+             own window, outside the tree's visual tree, so it inherits nothing
+             and would otherwise ignore Ctrl +/-. The delay is the favorites'
+             900ms, not WPF's default - brushing past a row on the way
+             somewhere else shouldn't pop anything up. -->
+        <Style x:Key="RowPathTooltip"
+                TargetType="TextBlock">
+            <Setter Property="ToolTipService.InitialShowDelay"
+                    Value="900"/>
+            <Setter Property="ToolTipService.ShowDuration"
+                    Value="20000"/>
+            <Setter Property="ToolTip">
+                <Setter.Value>
+                    <ToolTip Content="{Binding FullPath}"
+                            FontSize="{Binding PlacementTarget.FontSize, RelativeSource={RelativeSource Self}}"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <HierarchicalDataTemplate DataType="{x:Type models:FileSystemItem}"
                 ItemsSource="{Binding Children}">
             <!-- A horizontal StackPanel measures children with infinite available
@@ -2041,6 +2077,7 @@
                            Grid.Column="1"
                            Text="{Binding Name}"
                            VerticalAlignment="Center"
+                        Style="{StaticResource RowPathTooltip}"
                         TextTrimming="CharacterEllipsis"/>
                 <!-- VS Code-style inline rename: swapped in for NameText while
                      IsEditing (see the DataTrigger below) instead of opening a
