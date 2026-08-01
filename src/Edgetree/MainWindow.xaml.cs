@@ -2777,12 +2777,16 @@ public partial class MainWindow : Window
     // but not for RefreshFolderPreservingState's own quiet reselect after a
     // resort/background change, where the user's current scroll position
     // should stay put; defaults to true so every existing caller keeps its
-    // current behavior unless it opts out. pinParentToTop pins the target's
-    // PARENT folder to the top instead of the target itself, while still
-    // selecting the target - used by search-result navigation so a found file
-    // lands in the context of its folder (folder at top, file selected below)
-    // rather than glued to the very top with its folder scrolled off.
-    private void NavigateToPath(string targetPath, bool pinToTop = true, bool pinParentToTop = false)
+    // current behavior unless it opts out.
+    //
+    // Files used to be an exception: they pinned their PARENT folder and were
+    // selected below it, so a search hit landed in its folder's context. That
+    // is gone (2026-08-02, user's call) - every jump now puts its own target at
+    // the top, whatever it is. The context it was buying stopped being worth a
+    // rule of its own once every row gained a full-path tooltip, and the
+    // exception cost more than it paid in a folder of hundreds, where the
+    // parent at the top left the file itself far below the bottom edge.
+    private void NavigateToPath(string targetPath, bool pinToTop = true)
     {
         // Bumped here (not just when a navigation finishes and selects
         // something) so a second favorite clicked while RevealChainStep is
@@ -2838,7 +2842,7 @@ public partial class MainWindow : Window
             current = next;
         }
 
-        RevealChain(chain, myToken, pinToTop, pinParentToTop);
+        RevealChain(chain, myToken, pinToTop);
     }
 
     // Walks the loaded tree returning every fully-revealed ("더 보기" expanded)
@@ -2869,12 +2873,12 @@ public partial class MainWindow : Window
     // items, so each level has to be brought into view and laid out before
     // its own children's containers can be looked up. Starts the (possibly
     // asynchronous - see RevealChainStep) walk down the chain from the root.
-    private void RevealChain(List<FileSystemItem> chain, int token, bool pinToTop = true, bool pinParentToTop = false)
+    private void RevealChain(List<FileSystemItem> chain, int token, bool pinToTop = true)
     {
         // Overflow re-capping already ran up-front in NavigateToPath, so the
         // walk starts over a light tree; this only expands the path down to
         // the target and doesn't touch any other folder's expanded state.
-        RevealChainStep(chain, 0, ExplorerTree, token, pinToTop: pinToTop, pinParentToTop: pinParentToTop);
+        RevealChainStep(chain, 0, ExplorerTree, token, pinToTop: pinToTop);
     }
 
     // A container not being found isn't necessarily "it'll never exist" - a
@@ -2886,7 +2890,11 @@ public partial class MainWindow : Window
     // second click once whatever was in flight had finished on its own in the
     // meantime. Yielding via the dispatcher and trying again gives that
     // pending work an actual chance to complete first instead.
-    private void RevealChainStep(List<FileSystemItem> chain, int index, ItemsControl container, int token, int attempt = 0, bool pinToTop = true, bool pinParentToTop = false)
+    // settled says the walk has so far found every container it needed right
+    // away. Once any step has had to yield and retry, the tree is still
+    // realizing rows and nothing measured at the end of the walk can be
+    // trusted yet - see FinishReveal, which is what actually reads it.
+    private void RevealChainStep(List<FileSystemItem> chain, int index, ItemsControl container, int token, int attempt = 0, bool pinToTop = true, bool settled = true)
     {
         // A newer favorite click superseded this walk while it was waiting on a
         // container - stop rather than risking two walks interleaving their
@@ -2934,7 +2942,7 @@ public partial class MainWindow : Window
                 return;
             }
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
-                new Action(() => RevealChainStep(chain, index, container, token, attempt + 1, pinToTop, pinParentToTop)));
+                new Action(() => RevealChainStep(chain, index, container, token, attempt + 1, pinToTop, settled: false)));
             return;
         }
 
@@ -2949,27 +2957,19 @@ public partial class MainWindow : Window
 
         if (index == chain.Count - 1)
         {
-            // pinParentToTop anchors the scroll on the parent folder (this
-            // step's `container`, the folder whose child we just revealed)
-            // while still selecting the target - so a searched file lands
-            // inside its folder's context. `container` is always a realized
-            // TreeViewItem for any target nested under a drive root; the
-            // fallback keeps the target as anchor otherwise.
-            var anchor = pinParentToTop && container is TreeViewItem parentItem ? parentItem : treeViewItem;
-            FinishReveal(treeViewItem, anchor, token, pinToTop);
+            FinishReveal(treeViewItem, token, pinToTop, settled);
         }
         else
         {
-            RevealChainStep(chain, index + 1, treeViewItem, token, pinToTop: pinToTop, pinParentToTop: pinParentToTop);
+            RevealChainStep(chain, index + 1, treeViewItem, token, pinToTop: pinToTop, settled: settled);
         }
     }
 
-    // `selected` is the row that gets selected/focused; `anchor` is the row
-    // pinned to the top of the viewport when pinToTop is set. They're the same
-    // for a normal favorite navigation, but differ for a search-result jump
-    // (select the file, pin its parent folder) - see NavigateToPath's
-    // pinParentToTop.
-    private void FinishReveal(TreeViewItem selected, TreeViewItem anchor, int token, bool pinToTop = true)
+    // `selected` is the row that gets selected, focused and - when pinToTop is
+    // set - pinned to the top of the viewport. One row for all three: the
+    // separate anchor this used to take, so a file could be selected while its
+    // parent folder held the top, is gone (see NavigateToPath).
+    private void FinishReveal(TreeViewItem selected, int token, bool pinToTop = true, bool settled = true)
     {
         // Still guarded while this fires: setting IsSelected raises
         // SelectedItemChanged synchronously, and the guard keeps that from
@@ -3020,8 +3020,20 @@ public partial class MainWindow : Window
         // rather than deferred to the next one - a deferred scroll is a second
         // scroll, and the frame drawn between the two is the flash. The
         // dispatcher pass below stays as a correction, not as the scroll.
-        ExplorerTree.UpdateLayout();
-        PinRevealedRow(selected, anchor);
+        //
+        // Unless the walk had to wait on a container somewhere: then rows above
+        // the target are still being realized and this measurement would be
+        // wrong, so pinning here scrolls somewhere arbitrary and the correction
+        // below has to haul the view back - which is what F5 did, since it
+        // rebuilds the whole tree before restoring the selection through this
+        // same machinery (reported 2026-08-02, "F5만 한번 다른 데 갔다가 오네요").
+        // Skipping straight to the deferred pin there is the pre-existing
+        // behaviour, and it was never the flashing case.
+        if (settled)
+        {
+            ExplorerTree.UpdateLayout();
+            PinRowToTop(selected);
+        }
 
         // The walk's last step can leave layout still settling (the target's own
         // expand loads its children), and anything that lands after the pin
@@ -3034,37 +3046,8 @@ public partial class MainWindow : Window
             {
                 return;
             }
-            PinRevealedRow(selected, anchor);
+            PinRowToTop(selected);
         }));
-    }
-
-    // Pins `anchor` to the top of the viewport - but hands the job to `selected`
-    // when pinning the anchor would push the selected row off the bottom.
-    //
-    // That case is the whole reason bookmarks and search results felt like they
-    // "went somewhere else" (2026-07-30): for a FILE they anchor on its parent
-    // folder, so the folder lands at the top and the file is selected below it -
-    // which reads well in a folder of ten entries and not at all in a folder of
-    // four hundred, where the file ends up far below the bottom edge. The rule
-    // is asked as a question about the actual viewport rather than settled by a
-    // flag, so the good case keeps the folder's context and only the case that
-    // would have hidden the target gives it up.
-    private void PinRevealedRow(TreeViewItem selected, TreeViewItem anchor)
-    {
-        if (FindTreeScrollViewer() is not { } scrollViewer)
-        {
-            return;
-        }
-
-        if (!ReferenceEquals(selected, anchor) &&
-            ContentTopOf(anchor, scrollViewer) is { } anchorTop &&
-            ContentTopOf(selected, scrollViewer) is { } selectedTop &&
-            selectedTop + selected.ActualHeight > anchorTop + scrollViewer.ViewportHeight)
-        {
-            anchor = selected;
-        }
-
-        PinRowToTop(anchor, scrollViewer);
     }
 
     // Shared by the end of a reveal walk and by re-clicking a favorite that is
@@ -7446,7 +7429,7 @@ public partial class MainWindow : Window
         });
 
         SetSearchViewActive(false);
-        NavigateToPath(path, pinParentToTop: !isDirectory);
+        NavigateToPath(path);
     }
 
     private void RemoveBookmark(string path)
@@ -7670,7 +7653,7 @@ public partial class MainWindow : Window
         // Same route a search-result click takes for files (handles rows past
         // a folder's "더 보기" cap); folders take the favorites-style walk with
         // its usual pin-to-top.
-        NavigateToPath(found.Path, pinParentToTop: !found.IsDirectory);
+        NavigateToPath(found.Path);
     }
 
     private static (string Path, bool IsDirectory)? FindNextReachableBookmark(List<string> paths, int startIndex,
@@ -9839,9 +9822,8 @@ public partial class MainWindow : Window
 
     // Return to the explorer view and reveal the picked file there, reusing the
     // exact same reveal-and-select machinery favorites navigation uses (which
-    // already handles files past a folder's "더 보기" cap). pinParentToTop lands
-    // the file inside its folder's context (folder at the top, file selected
-    // below) rather than gluing the file itself to the very top.
+    // already handles files past a folder's "더 보기" cap). The found file goes
+    // to the top of the viewport itself, like every other jump.
     private void ActivateSearchResult(FileSearchService.SearchEntry entry)
     {
         // A result can now outlive the file it names: the index may have been
@@ -9883,7 +9865,7 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(() =>
         {
             SetSearchViewActive(false);
-            NavigateToPath(entry.FullPath, pinParentToTop: true);
+            NavigateToPath(entry.FullPath);
         }, System.Windows.Threading.DispatcherPriority.Input);
     }
 
