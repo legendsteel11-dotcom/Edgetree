@@ -2976,7 +2976,15 @@ public partial class MainWindow : Window
         // re-syncing (and possibly clearing) the favorites list. Cleared right
         // after, so subsequent user-driven selections sync normally again.
         selected.IsSelected = true;
-        selected.BringIntoView();
+
+        // Only when nothing is about to be pinned. A pin computes its own final
+        // offset, and this call scrolling somewhere else first is exactly what
+        // drew the intermediate frame reported as "이동할 때 화면이 한 번 번쩍임"
+        // (2026-07-28): the two scrolls used to be a whole rendered frame apart.
+        if (!pinToTop)
+        {
+            selected.BringIntoView();
+        }
 
         // Taking focus dismisses whatever menu the navigation was started from
         // - which is how a bookmark picked out of the 북마크 목록 submenu shut
@@ -3008,32 +3016,116 @@ public partial class MainWindow : Window
         }
 
         // Requirement (b): land the favorite at the top of the tree, not just
-        // somewhere on screen. Deferred one layout pass (so the chain's final
-        // expand has settled) and token-guarded (so a newer navigation cancels
-        // it). Bringing a viewport-tall rectangle anchored at the row's own
-        // top into view pins that row to the top edge. Safe to force now that
-        // capping keeps the tree light - the flakiness this kind of forced
-        // scroll used to cause came from doing it across thousands of realized
-        // rows, which no folder ever has anymore.
+        // somewhere on screen. Done HERE, in the pass that revealed the chain,
+        // rather than deferred to the next one - a deferred scroll is a second
+        // scroll, and the frame drawn between the two is the flash. The
+        // dispatcher pass below stays as a correction, not as the scroll.
+        ExplorerTree.UpdateLayout();
+        PinRevealedRow(selected, anchor);
+
+        // The walk's last step can leave layout still settling (the target's own
+        // expand loads its children), and anything that lands after the pin
+        // moves the row out from under it. Re-running the same routine settles
+        // that; it scrolls only if the target has actually moved, so in the
+        // ordinary case this pass does nothing at all and nothing is redrawn.
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
         {
             if (token != _navigationToken)
             {
                 return;
             }
-            PinRowToTop(anchor);
+            PinRevealedRow(selected, anchor);
         }));
     }
 
-    // Bringing a viewport-tall rectangle anchored at the row's own top into
-    // view is what pins that row to the top edge rather than merely somewhere
-    // on screen. Shared by the end of a reveal walk and by re-clicking a
-    // favorite that is already selected (which skips the walk entirely).
+    // Pins `anchor` to the top of the viewport - but hands the job to `selected`
+    // when pinning the anchor would push the selected row off the bottom.
+    //
+    // That case is the whole reason bookmarks and search results felt like they
+    // "went somewhere else" (2026-07-30): for a FILE they anchor on its parent
+    // folder, so the folder lands at the top and the file is selected below it -
+    // which reads well in a folder of ten entries and not at all in a folder of
+    // four hundred, where the file ends up far below the bottom edge. The rule
+    // is asked as a question about the actual viewport rather than settled by a
+    // flag, so the good case keeps the folder's context and only the case that
+    // would have hidden the target gives it up.
+    private void PinRevealedRow(TreeViewItem selected, TreeViewItem anchor)
+    {
+        if (FindTreeScrollViewer() is not { } scrollViewer)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(selected, anchor) &&
+            ContentTopOf(anchor, scrollViewer) is { } anchorTop &&
+            ContentTopOf(selected, scrollViewer) is { } selectedTop &&
+            selectedTop + selected.ActualHeight > anchorTop + scrollViewer.ViewportHeight)
+        {
+            anchor = selected;
+        }
+
+        PinRowToTop(anchor, scrollViewer);
+    }
+
+    // Shared by the end of a reveal walk and by re-clicking a favorite that is
+    // already selected (which skips the walk entirely).
     private void PinRowToTop(TreeViewItem anchor)
     {
         if (FindTreeScrollViewer() is { } scrollViewer)
         {
-            anchor.BringIntoView(new Rect(0, 0, anchor.ActualWidth, scrollViewer.ActualHeight));
+            PinRowToTop(anchor, scrollViewer);
+        }
+    }
+
+    // Scrolled to a computed offset rather than by asking BringIntoView for a
+    // viewport-tall rectangle. Two reasons: BringIntoView is a request that WPF
+    // may satisfy on a later dispatcher pass (another frame, another flash),
+    // and it only ever scrolls as far as it has to - so a second call for a row
+    // already at the top has to be a no-op, which is what lets the correction
+    // pass above be free. The offset itself is exact because the tree scrolls
+    // in PIXELS (VirtualizingPanel.ScrollUnit="Pixel", see MainWindow.xaml);
+    // under the default Item unit this arithmetic would be meaningless.
+    private static void PinRowToTop(TreeViewItem anchor, ScrollViewer scrollViewer)
+    {
+        if (ContentTopOf(anchor, scrollViewer) is not { } top)
+        {
+            return;
+        }
+
+        // ScrollToVerticalOffset clamps to the scrollable range on its own, so
+        // a row near the end of the tree still stops short of the top edge -
+        // there is nothing below it to scroll into view. That shortfall is the
+        // open "아래 여백" item, not something this call can decide.
+        if (Math.Abs(scrollViewer.VerticalOffset - top) > 0.5)
+        {
+            scrollViewer.ScrollToVerticalOffset(top);
+        }
+    }
+
+    // Where a realized row sits inside the scrolled content: its position
+    // relative to the viewport, plus how far the viewport has already been
+    // scrolled. Null when the row isn't in the ScrollViewer's visual tree
+    // (virtualized away between the walk and this call).
+    //
+    // Measured against the ScrollViewer itself, which matches the viewport's
+    // top edge because the tree's padding is 4,0,4,4 - no top inset. A top
+    // padding would have to be subtracted here.
+    private static double? ContentTopOf(TreeViewItem row, ScrollViewer scrollViewer)
+    {
+        if (!row.IsVisible)
+        {
+            return null;
+        }
+
+        try
+        {
+            double fromViewportTop = row.TransformToAncestor(scrollViewer)
+                .Transform(default(System.Windows.Point)).Y;
+            return scrollViewer.VerticalOffset + fromViewportTop;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
         }
     }
 
