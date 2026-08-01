@@ -1,4 +1,4 @@
-# Edgetree v1.3.5
+# Edgetree v1.4.0
 
 [한국어 안내](README-ko.md)
 
@@ -60,6 +60,9 @@ Either way, it's one `.exe` — no installer, just run it.
   folder from its right-click menu.
 - **Bookmarks** (`Ctrl+Alt+K`): mark rows you keep coming back to and cycle
   through them with `Ctrl+Alt+L` / `Ctrl+Alt+J`.
+- **Hide what you don't use.** Right-click a folder — or a whole drive — and
+  take it out of the tree. Hidden ones collect in a list right below, to be
+  brought back one at a time or all at once. Search still reaches inside them.
 - **Live updates**: changes made outside the app (new, renamed, or deleted
   files) show up in the tree on their own.
 
@@ -92,7 +95,8 @@ Either way, it's one `.exe` — no installer, just run it.
 - **Two icon styles**: the same icons Windows Explorer shows (default), or
   the bundled [Material Icon Theme](THIRD-PARTY-NOTICES.md) set.
 - **15 customizable colors**, with separate dark and light palettes and a
-  one-click reset.
+  one-click reset. Each one takes a `#RRGGBB` code, so a colour copied from a
+  browser or a design tool can be pasted straight in.
 - **Font size** (`Ctrl` `+`/`-`, 9–20pt), indent width, row spacing, and
   scrollbar width are all adjustable — icons and menus scale along.
 - **Sharp at any display scale** (125%, 150%, 200%…): rendered at the
@@ -146,6 +150,30 @@ Either way, the resulting `.exe` is in
 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
 
 ## Changelog
+
+### v1.4.0 (2026-08-02)
+
+- **Hide a folder**: right-click → "Hide This Folder" takes it out of the tree,
+  and a drive can go the same way. Whatever you hide collects in the "Hidden
+  Folders" list right below it, where you can bring back one or all of them.
+  Search still finds what is inside a hidden folder, and going in there from a
+  result or a bookmark shows it in the tree for as long as you stay
+- **Type a colour code**: every colour in the settings window now carries a
+  `#RRGGBB` field, so a code copied from a browser or a design tool can simply
+  be pasted in
+- **Jumps land at the top**: a favorite, bookmark or search result now arrives at
+  the top of the tree - room is made for it even at the very end, and a file
+  lands there itself. The move happens in one step, with no intermediate
+  position on the way
+- **Full path on hover**: hovering a tree row shows its full path, including the
+  rows whose names are too long to fit
+- **Right-click menu regrouped**: items are gathered by what they do. Refresh
+  moved down to the file commands, and Search in This Folder to the group that
+  hands the location elsewhere
+- Also: the bookmark list is available from the right-click menu too, and a
+  search that finds nothing says how old its index is. Fixed: clicking the first
+  row of the search results, dragging a scrollbar out of an auto-hidden sidebar,
+  and the Insert key interfering with Korean input
 
 ### v1.3.5 (2026-07-30)
 

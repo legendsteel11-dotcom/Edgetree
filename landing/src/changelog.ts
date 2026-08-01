@@ -18,6 +18,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: 'v1.4.0',
+    ko: [
+      '안 쓰는 폴더·드라이브를 트리에서 숨기기',
+      '색상 설정에 색상 코드(#RRGGBB) 직접 입력',
+      '즐겨찾기·북마크·검색 결과로 이동하면 대상이 맨 위로',
+    ],
+    en: [
+      'Hide folders and drives you never use',
+      'Type a colour code (#RRGGBB) in the colour settings',
+      'Favorites, bookmarks and search results land at the top',
+    ],
+  },
+  {
     version: 'v1.3.5',
     ko: [
       '잘라내기 추가 — Ctrl+X로 옮기기, 탐색기와 함께 사용 가능',
