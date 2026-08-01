@@ -2906,9 +2906,27 @@ public partial class MainWindow : Window
     // folder to its capped state. Recaps a folder before recursing into it, so
     // a folder holding thousands of revealed rows is trimmed to ~25 first and
     // the recursion only ever visits those - it never iterates the full list.
+    // Both loops walk a SNAPSHOT, and that is not defensive habit - this walk
+    // crashed the app (2026-08-02, exit.log "UNHANDLED (ui thread):
+    // InvalidOperationException: Collection was modified" under JumpToBookmark
+    // -> NavigateToPath -> here). The re-entrancy is entirely single-threaded:
+    //
+    //   RecollapseOverflow() drops the overflow rows -> if the SELECTED row was
+    //   one of them, WPF moves TreeView.SelectedItem there and then ->
+    //   ExplorerTree_SelectedItemChanged runs SYNCHRONOUSLY ->
+    //   ReHideFoldersLeftBehind does parent.Children.Remove(...) ->
+    //   the collection this method is mid-foreach over is now modified.
+    //
+    // It needs hidden folders to bite, which is why it took until someone had
+    // 65 of them: NavigateToPath calls RevealHiddenFoldersOnPathTo a few lines
+    // earlier, so TemporarilyVisiblePaths is freshly non-empty and the re-hide
+    // actually removes rows instead of returning at its first line.
+    //
+    // Recapping an item that has since left the tree is harmless (it only
+    // touches its own Children), so a snapshot loses nothing.
     private void RecapAllOverflow()
     {
-        foreach (var root in _roots)
+        foreach (var root in _roots.ToList())
         {
             RecapOverflowRecursive(root);
         }
@@ -2917,7 +2935,7 @@ public partial class MainWindow : Window
     private static void RecapOverflowRecursive(FileSystemItem item)
     {
         item.RecollapseOverflow();
-        foreach (var child in item.Children)
+        foreach (var child in item.Children.ToList())
         {
             if (!child.IsPlaceholder && !child.IsShowMore && child.IsDirectory)
             {
