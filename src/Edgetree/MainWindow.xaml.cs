@@ -6973,7 +6973,11 @@ public partial class MainWindow : Window
     // removing one long name visibly shrinks the whole popup, so the list
     // appears to move under the cursor mid-cleanup. The full path is the
     // tooltip.
-    private MenuItem BuildBookmarkListRow(string path)
+    // trackWidth applies only to the options menu's copy, whose rows are
+    // stretched to that menu's width when it opens. The tree row menu's copy
+    // sizes to its own content - it hangs off a submenu with nothing to line up
+    // with, and the names are capped anyway.
+    private MenuItem BuildBookmarkListRow(string path, bool trackWidth = true)
     {
         var row = FollowMenuFont(new MenuItem
         {
@@ -6984,7 +6988,10 @@ public partial class MainWindow : Window
             StaysOpenOnClick = true,
         });
 
-        _bookmarkWidthTargets.Add(row);
+        if (trackWidth)
+        {
+            _bookmarkWidthTargets.Add(row);
+        }
 
         var grid = new Grid();
         // icon | name | remove | bookmark glyph
@@ -7149,13 +7156,31 @@ public partial class MainWindow : Window
 
     private void DropBookmarkListRow(MenuItem row)
     {
-        _bookmarkListMenuItem?.Items.Remove(row);
+        // Whichever menu this row actually belongs to - the list is built into
+        // the options menu AND into the tree row menu's 북마크 submenu, and
+        // removing it from a hardcoded host quietly did nothing in the other
+        // one: the bookmark went, the row stayed, and "−" looked broken
+        // (2026-07-31).
+        if (ItemsControl.ItemsControlFromItemContainer(row) is { } host)
+        {
+            host.Items.Remove(row);
+        }
+        else
+        {
+            _bookmarkListMenuItem?.Items.Remove(row);
+        }
 
         // Nothing left but the separator and "전체 해제", which now have
         // nothing to act on.
         if (_settings.BookmarkPaths.Count == 0)
         {
             RebuildBookmarkListMenu();
+            if (_bookmarkRowSubmenu is { } submenu)
+            {
+                // Strips the separator this list left behind - it takes the
+                // tagged rows out and adds nothing back while the list is empty.
+                AppendBookmarkListTo(submenu);
+            }
         }
     }
 
@@ -7266,8 +7291,21 @@ public partial class MainWindow : Window
     // rows that were already bookmarked (2026-07-30).
     private void BookmarkRowSubmenu_Opened(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { Items: [MenuItem toggle, MenuItem prev, MenuItem next] })
+        if (sender is not MenuItem submenu)
         {
+            return;
+        }
+
+        // By tag, not by position - the list appended below adds rows to this
+        // very submenu, so a positional match would break the moment a bookmark
+        // exists. (Addressing menu rows by position is what killed the whole
+        // context-menu setup block a day earlier.)
+        var toggle = FindTaggedMenuElement<MenuItem>(submenu, "bookmarkToggle");
+        var prev = FindTaggedMenuElement<MenuItem>(submenu, "bookmarkPrev");
+        var next = FindTaggedMenuElement<MenuItem>(submenu, "bookmarkNext");
+        if (toggle is null || prev is null || next is null)
+        {
+            LogClickLine("bookmark submenu: a tagged item is missing");
             return;
         }
 
@@ -7282,7 +7320,49 @@ public partial class MainWindow : Window
         bool hasBookmarks = _settings.BookmarkPaths.Count > 0;
         prev.IsEnabled = hasBookmarks;
         next.IsEnabled = hasBookmarks;
+
+        _bookmarkRowSubmenu = submenu;
+        AppendBookmarkListTo(submenu);
     }
+
+    // The tree row menu's 북마크 submenu, once it has been opened - so removing
+    // the last bookmark from it can also take away the separator that list left
+    // behind. Null until then.
+    private MenuItem? _bookmarkRowSubmenu;
+
+    // The list, inline under the three actions rather than behind a further
+    // submenu of its own: a third level means crossing two popup boundaries
+    // with the mouse, and this list is meant to be kept open while several
+    // entries are checked in a row. The MAIN context menu doesn't grow from
+    // this - only the submenu someone deliberately opened does.
+    private void AppendBookmarkListTo(MenuItem submenu)
+    {
+        // Last time's list, identified by its tag rather than by counting from
+        // the end - so adding a fourth action row later can't start deleting
+        // actions instead.
+        for (int i = submenu.Items.Count - 1; i >= 0; i--)
+        {
+            if (submenu.Items[i] is FrameworkElement { Tag: BookmarkListRowTag })
+            {
+                submenu.Items.RemoveAt(i);
+            }
+        }
+
+        if (_settings.BookmarkPaths.Count == 0)
+        {
+            return;
+        }
+
+        submenu.Items.Add(new Separator { Tag = BookmarkListRowTag });
+        foreach (string path in _settings.BookmarkPaths.ToList())
+        {
+            var row = BuildBookmarkListRow(path, trackWidth: false);
+            row.Tag = BookmarkListRowTag;
+            submenu.Items.Add(row);
+        }
+    }
+
+    private const string BookmarkListRowTag = "bookmarkListRow";
 
     // The two jumps, from the context menu's 북마크 submenu - the same calls
     // Ctrl+Alt+L / Ctrl+Alt+J make, so both routes behave identically.
