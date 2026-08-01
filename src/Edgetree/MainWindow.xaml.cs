@@ -389,6 +389,16 @@ public partial class MainWindow : Window
         ExplorerTree.ItemsSource = _roots;
         StartDriveWatchers();
 
+        // Deferred one pass: the tree's own ScrollViewer only exists once the
+        // template has been applied and laid out, and this must be attached
+        // before the user can reach the tree - the reported jump happens during
+        // ordinary browsing, not at startup. Debug-only, see AttachScrollJumpWatch.
+        // Called through a lambda, not as a method group: a [Conditional] method
+        // cannot be turned into a delegate (CS1618). This way the CALL vanishes
+        // in Release and the lambda is simply empty.
+        Dispatcher.BeginInvoke(new Action(() => AttachScrollJumpWatch()),
+            System.Windows.Threading.DispatcherPriority.Loaded);
+
         // Row sizing for the current favorite count/collapsed state was
         // already handled above by SetExpandedContentVisibility.
         FavoritesList.ItemsSource = _settings.Favorites;
@@ -572,7 +582,7 @@ public partial class MainWindow : Window
         }
         if (_settings.LastSelectedPath is { } lastSelectedPath)
         {
-            NavigateToPath(lastSelectedPath);
+            NavigateToPath(lastSelectedPath, source: "restore");
         }
 
         // Nothing restored expanded means the title bar's collapse toggle has
@@ -2599,7 +2609,7 @@ public partial class MainWindow : Window
             // synchronous call - clearing it here would drop the guard while the
             // walk is still running and let an intermediate selection change
             // clear the favorite we just clicked.
-            NavigateToPath(entry.Path);
+            NavigateToPath(entry.Path, source: "favorite");
         }
     }
 
@@ -2838,8 +2848,15 @@ public partial class MainWindow : Window
     // rule of its own once every row gained a full-path tooltip, and the
     // exception cost more than it paid in a folder of hundreds, where the
     // parent at the top left the file itself far below the bottom edge.
-    private void NavigateToPath(string targetPath, bool pinToTop = true)
+    private void NavigateToPath(string targetPath, bool pinToTop = true, string source = "nav")
     {
+        // A jump moving the tree a long way is CORRECT here - that is what a
+        // bookmark/favorite click is for. The scroll-jump instrument has no way
+        // to tell that apart from the tree moving on its own, so it is told
+        // (see scrolljump.log's nav= field); without this every deliberate jump
+        // would read as a suspect.
+        NoteNavigationForScrollWatch(source, targetPath);
+
         // Bumped here (not just when a navigation finishes and selects
         // something) so a second favorite clicked while RevealChainStep is
         // still waiting on a container from the first supersedes it right
@@ -3198,6 +3215,15 @@ public partial class MainWindow : Window
     {
         gap = Math.Max(0, gap);
 
+        // Same file as the scroll-jump watch so the two line up by timestamp -
+        // a jump with a "gap cleared" beside it points straight at this code.
+        if (Math.Abs(gap - _bottomGapSize) > 0.5)
+        {
+            LogScrollLine(
+                $"gap    {(gap > 0.5 ? $"set {gap:F0}" : "cleared")}  (was {_bottomGapSize:F0})  " +
+                $"offset {scrollViewer.VerticalOffset:F0}  extent {scrollViewer.ExtentHeight:F0}");
+        }
+
         // Whatever carried the last gap gives it up first: the last root can
         // change under us (a drive appearing, a refresh regenerating
         // containers), and a margin left behind on a row that is no longer last
@@ -3319,6 +3345,103 @@ public partial class MainWindow : Window
     {
         ExplorerTree.ApplyTemplate();
         return ExplorerTree.Template.FindName("PART_TreeScrollViewer", ExplorerTree) as ScrollViewer;
+    }
+
+    // ----- 스크롤 점프 계측기 (Debug 전용) ------------------------------------
+    //
+    // 2026-08-02 신고: 폴더 하나를 펼쳤을 뿐인데 트리가 최상단(C:)으로 확
+    // 뛰어버림. 재현이 안 되고, 기존 로그는 스크롤 위치를 한 줄도 남기지 않아
+    // 판정할 근거 자체가 없었음 (click.log는 클릭과 토글만 안다).
+    //
+    // 원인 후보를 하나씩 막는 대신 현상 자체를 잡는다: ScrollViewer에 상시
+    // 붙어 있다가, 한 번의 변화로 화면 절반 이상 움직였거나 전체 높이가 한
+    // 화면 넘게 흔들린 순간만 남긴다. 어느 경로가 범인이든 - 가상화 높이 추정
+    // 붕괴, 트리 끝 여백 회수, 아직 생각하지 못한 것 - 전부 여기를 지나간다.
+    // 평소 휠 스크롤(노치당 ~48px)은 문턱을 못 넘으므로 조용하다.
+    //
+    // 다음에 한 번만 재현되면 아래 규칙으로 판정이 끝난다:
+    //  · extent가 viewport 근처까지 폭삭 줄었다 → 가상화 높이 추정이 무너진 것
+    //    (2026-08-02 실측: 200행 패널에서 300px 여백이 1034px로 계산됐음)
+    //  · extent는 그대로인데 offset만 0         → 오프셋을 리셋한 범인이 따로 있음
+    //  · 같은 시각에 gap 줄이 있다              → 트리 끝 여백 회수(v1.4.0 신규 코드)
+    //  · sinceGesture가 "-"                     → 직전 클릭과 무관한 경로에서 온 것
+    private bool _scrollWatchAttached;
+
+    // 직전 트리 클릭이 무엇이었는지 - 점프 줄에 붙여, 그 펼치기가 방아쇠였는지
+    // 아니면 아무 입력 없이 혼자 뛴 것인지 한 줄에서 읽히게 한다.
+    private string _lastTreePressLabel = "-";
+
+    // 직전 "의도된 이동"(북마크·즐겨찾기·검색 결과·복원)이 무엇이었는지.
+    // 이것이 붙어 있는 점프는 정상이고, `nav=-`인 점프만 설명이 필요하다.
+    private string _lastNavLabel = "-";
+    private long _lastNavTicks = long.MinValue / 2;
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void NoteNavigationForScrollWatch(string source, string targetPath)
+    {
+        _lastNavLabel = $"{source}:{targetPath}";
+        _lastNavTicks = Environment.TickCount64;
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void AttachScrollJumpWatch()
+    {
+        if (_scrollWatchAttached || FindTreeScrollViewer() is not { } scrollViewer)
+        {
+            return;
+        }
+
+        _scrollWatchAttached = true;
+
+        // 여백 회수용 TreeScrollViewer_ScrollChanged와는 다른 핸들러라 서로
+        // 붙었다 떨어졌다 하는 그쪽 구독에 영향을 주지 않는다. 이쪽은 앱이
+        // 사는 동안 한 번 붙고 끝.
+        scrollViewer.ScrollChanged += ScrollJumpWatch_ScrollChanged;
+    }
+
+    private void ScrollJumpWatch_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        double viewport = e.ViewportHeight;
+        bool bigJump = Math.Abs(e.VerticalChange) > Math.Max(viewport / 2, 200);
+        bool bigExtentSwing = Math.Abs(e.ExtentHeightChange) > Math.Max(viewport, 200);
+        if (!bigJump && !bigExtentSwing)
+        {
+            return;
+        }
+
+        double offsetBefore = e.VerticalOffset - e.VerticalChange;
+        double extentBefore = e.ExtentHeight - e.ExtentHeightChange;
+        long sinceGesture = Environment.TickCount64 - _lastTreeUserInputTicks;
+
+        LogScrollLine(
+            $"{(bigJump ? "JUMP  " : "EXTENT")}  " +
+            $"offset {offsetBefore:F0} -> {e.VerticalOffset:F0} ({e.VerticalChange:+0;-0;0})  " +
+            $"extent {extentBefore:F0} -> {e.ExtentHeight:F0} ({e.ExtentHeightChange:+0;-0;0})  " +
+            $"viewport {viewport:F0}  " +
+            $"toZero={(e.VerticalOffset <= 0.5 ? "yes" : "no")}  " +
+            $"wasAtEnd={(offsetBefore + viewport >= extentBefore - 1 ? "yes" : "no")}  " +
+            $"sinceGesture={(sinceGesture is < 0 or > 60000 ? "-" : sinceGesture + "ms")}  " +
+            $"nav={(Environment.TickCount64 - _lastNavTicks is < 0 or > 3000 ? "-" : _lastNavLabel)}  " +
+            $"lastPress={_lastTreePressLabel}  " +
+            $"gap={_bottomGapSize:F0}  " +
+            $"selected={(ExplorerTree.SelectedItem as FileSystemItem)?.FullPath ?? "-"}");
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogScrollLine(string line)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "scrolljump.log"),
+                $"{DateTime.Now:HH:mm:ss.fff}  {line}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     // Ctrl+wheel: accelerated scrolling, about five times the ordinary wheel
@@ -4115,7 +4238,7 @@ public partial class MainWindow : Window
         // caused the bug above.
         if (selectedPath is not null)
         {
-            NavigateToPath(selectedPath, pinToTop: pinSelectionToTop);
+            NavigateToPath(selectedPath, pinToTop: pinSelectionToTop, source: "refresh");
         }
     }
 
@@ -6328,6 +6451,19 @@ public partial class MainWindow : Window
 
         ReHideFoldersLeftBehind(e.NewValue as FileSystemItem);
 
+        // Landing on a ROOT is the signature of the 2026-08-02 report ("C: went
+        // to the top and got selected"): nothing the user does down in a subtree
+        // should ever move the selection up to a drive row. Rare enough to log
+        // unconditionally, and it shares scrolljump.log so it lines up with the
+        // jump it came with.
+        if (e.NewValue is FileSystemItem { Parent: null } root)
+        {
+            LogScrollLine(
+                $"select root  {root.FullPath}  " +
+                $"from={(e.OldValue as FileSystemItem)?.FullPath ?? "-"}  " +
+                $"lastPress={_lastTreePressLabel}");
+        }
+
         // The navigation token is deliberately NOT bumped here. A favorites
         // walk expands folders as it goes, and with auto-collapse on that
         // collapses the previously-open drive - which makes WPF move the tree
@@ -7981,7 +8117,7 @@ public partial class MainWindow : Window
         });
 
         SetSearchViewActive(false);
-        NavigateToPath(path);
+        NavigateToPath(path, source: "search-scope");
     }
 
     private void RemoveBookmark(string path)
@@ -8205,7 +8341,7 @@ public partial class MainWindow : Window
         // Same route a search-result click takes for files (handles rows past
         // a folder's "더 보기" cap); folders take the favorites-style walk with
         // its usual pin-to-top.
-        NavigateToPath(found.Path);
+        NavigateToPath(found.Path, source: "bookmark");
     }
 
     private static (string Path, bool IsDirectory)? FindNextReachableBookmark(List<string> paths, int startIndex,
@@ -10212,6 +10348,12 @@ public partial class MainWindow : Window
         long gap = _lastTreePressTicks == 0 ? -1 : now - _lastTreePressTicks;
         _lastTreePressTicks = now;
 
+        // Carried over to the scroll-jump watch (scrolljump.log), which needs to
+        // say WHAT was clicked just before a jump - the reported case was a
+        // plain expand on a folder nowhere near the top.
+        _lastTreePressLabel =
+            $"{item?.Name ?? "(none)"}/{(item?.IsExpanded == true ? "collapse" : "expand")}";
+
         LogClickLine(
             $"tree press: gap={(gap < 0 ? "-" : gap + "ms")} click={clickCount} " +
             $"expander={(onExpander ? "yes" : "no")} " +
@@ -10417,7 +10559,7 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(() =>
         {
             SetSearchViewActive(false);
-            NavigateToPath(entry.FullPath);
+            NavigateToPath(entry.FullPath, source: "search-result");
         }, System.Windows.Threading.DispatcherPriority.Input);
     }
 
