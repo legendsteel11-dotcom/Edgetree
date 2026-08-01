@@ -8725,6 +8725,13 @@ public partial class MainWindow : Window
     // first drive root, so it's never simply a no-op.
     private void NewFolder_Click(object sender, RoutedEventArgs e)
     {
+        // Before anything is created, not just before the new row goes into
+        // edit mode: if a name really was typed into the open box, it has to
+        // land - and its parent finish merging - while this folder's own name
+        // is still only a name on disk. Doing it afterwards would have the
+        // merge run over the row this is about to hand to BeginInlineRename.
+        FinishOpenInlineRename();
+
         FileSystemItem? target = ExplorerTree.SelectedItem switch
         {
             FileSystemItem { IsPlaceholder: false, IsDirectory: true } folder => folder,
@@ -8905,8 +8912,28 @@ public partial class MainWindow : Window
             System.Windows.Threading.DispatcherPriority.Input);
     }
 
+    // Whatever edit box is currently open is finished off. Nothing used to do
+    // this: BeginInlineRename simply overwrote _inlineRenameItem, leaving the
+    // previous row with IsEditing = true and nothing tracking it - so making
+    // three folders in a row with F7, without renaming any of them, left three
+    // edit boxes open at once (reported 2026-08-02).
+    //
+    // Committed rather than reverted, which is what clicking another row inside
+    // the app already does (leaving the app is the case that reverts - see
+    // OnDeactivated). A new folder whose default name was never touched commits
+    // to itself, so the F7-F7-F7 flow above is a no-op either way.
+    private void FinishOpenInlineRename(FileSystemItem? except = null)
+    {
+        if (_inlineRenameItem is { IsEditing: true } open && !ReferenceEquals(open, except))
+        {
+            CommitInlineRename(open);
+        }
+    }
+
     private void BeginInlineRename(FileSystemItem item)
     {
+        FinishOpenInlineRename(except: item);
+
         item.EditingName = item.Name;
         item.IsEditing = true;
         _inlineRenameItem = item;
