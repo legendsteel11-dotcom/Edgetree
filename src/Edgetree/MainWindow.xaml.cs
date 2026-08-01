@@ -6702,9 +6702,20 @@ public partial class MainWindow : Window
             // Drive roots included: they hide exactly the way a folder does
             // (2026-08-02) - an unused drive is the noisiest thing a tree of
             // whole drives can carry, and the list is the way back for both.
+            // Works on a MULTI-selection too since 2026-08-02 - it used to be
+            // greyed out there. The way this feature actually gets used is
+            // "clear away everything I never open", and one right-click per
+            // folder was the entire cost of doing that. Files in the selection
+            // are skipped, so the row only needs SOME folder to act on, and the
+            // label says which it is - "이 폴더" is a lie with five rows picked.
             if (FindTaggedMenuElement<MenuItem>(menu, "hideFolder") is { } hideItem)
             {
-                hideItem.IsEnabled = !isMultiSelection && isFolder;
+                bool anyFolderSelected = _multiSelection
+                    .Any(i => i is { IsPlaceholder: false, IsShowMore: false, IsDirectory: true });
+                hideItem.IsEnabled = isMultiSelection ? anyFolderSelected : isFolder;
+                hideItem.Header = isMultiSelection
+                    ? Strings.MenuHideSelectedFolders
+                    : Strings.MenuHideFolder;
             }
 
             // Deliberately NOT greyed out when nothing is hidden. It was, and a
@@ -7688,14 +7699,40 @@ public partial class MainWindow : Window
     // 2026-08-02, with the user). The list below is not a nicety either: hiding
     // a folder removes the only row you could have right-clicked to get it
     // back, so the two ship together or not at all.
+    // Hides everything selected, not just the row that was right-clicked. The
+    // way this feature is actually used is "hide all the folders I never open
+    // and keep the few I do" (2026-08-02), and doing that one right-click at a
+    // time is the whole cost of it - a tree ends up with dozens hidden. Every
+    // other row operation already works off GetEffectiveSelection; this was the
+    // only one still reading the single native selection.
     private void HideFolder_Click(object sender, RoutedEventArgs e)
     {
-        if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsDirectory: true } folder)
+        var folders = GetEffectiveSelection()
+            .Where(i => i is { IsPlaceholder: false, IsShowMore: false, IsDirectory: true })
+            .ToList();
+
+        // A folder whose ancestor is going as well would only add a list entry
+        // that hides nothing - its rows are already leaving with the ancestor,
+        // and the user would then have to clear two entries to get one folder
+        // back.
+        var covered = folders
+            .Where(f => folders.Any(other => !ReferenceEquals(other, f) && IsSelfOrDescendant(f, other)))
+            .ToHashSet();
+
+        foreach (var folder in folders)
         {
-            return;
+            if (!covered.Contains(folder))
+            {
+                HideFolder(folder, save: false);
+            }
         }
 
-        HideFolder(folder);
+        // Once, not per folder: hiding 30 rows wrote settings.json 30 times.
+        _settingsService.Save(_settings);
+
+        // The set refers to rows that are gone now, so leaving it would keep a
+        // selection nobody can see - and the next operation would run on it.
+        ClearMultiSelection();
     }
 
     // Rebuilds the drive rows, keeping whatever was expanded and selected -
@@ -7716,7 +7753,9 @@ public partial class MainWindow : Window
         StartDriveWatchers();
     }
 
-    private void HideFolder(FileSystemItem folder)
+    // save: false lets a batch (HideFolder_Click) write settings once at the end
+    // instead of once per folder.
+    private void HideFolder(FileSystemItem folder, bool save = true)
     {
         string path = FileSystemService.NormalizeHiddenPath(folder.FullPath);
         if (!FileSystemService.HiddenPaths.Add(path))
@@ -7760,7 +7799,10 @@ public partial class MainWindow : Window
             }
         }
 
-        _settingsService.Save(_settings);
+        if (save)
+        {
+            _settingsService.Save(_settings);
+        }
     }
 
     private void UnhideFolder(string path)

@@ -20,6 +20,9 @@ public static class Strings
     // and a bare verb next to 잘라내기/삭제 reads like it might mean the
     // selection or the whole view.
     public static string MenuHideFolder = "이 폴더 숨기기";
+    // Replaces the line above while several rows are picked. Files among them
+    // are skipped, so it names folders rather than "선택 항목".
+    public static string MenuHideSelectedFolders = "선택한 폴더 숨기기";
     public static string MenuHiddenFolderList = "숨긴 폴더";
     public static string MenuHiddenFolderListEmpty = "숨긴 폴더 없음";
     public static string MenuUnhideFolder = "숨김 해제";
@@ -316,6 +319,7 @@ public static class Strings
         MenuBookmarkList = "Bookmarks";
         MenuBookmarkListEmpty = "No bookmarks";
         MenuHideFolder = "Hide This Folder";
+        MenuHideSelectedFolders = "Hide Selected Folders";
         MenuHiddenFolderList = "Hidden Folders";
         MenuHiddenFolderListEmpty = "No hidden folders";
         MenuUnhideFolder = "Unhide";
