@@ -3,7 +3,9 @@
 // Kept here rather than fetched from the GitHub release body on purpose: those
 // notes run several paragraphs per item in two languages, which is the wrong
 // shape for a card someone glances at on the way to the download button. Three
-// short lines per version is the whole point.
+// short lines per version is the shape to aim for; a release that genuinely
+// carries a fourth thing worth stopping for can take a fourth line (v1.4.0,
+// the user's call). It is a glance, not a list - don't let it grow past that.
 //
 // One rule when releasing: add an entry here in the same pass that bumps the
 // csproj. If this list falls behind, the card notices - the section only shows
@@ -23,11 +25,13 @@ export const changelog: ChangelogEntry[] = [
       '안 쓰는 폴더·드라이브를 트리에서 숨기기',
       '색상 설정에 색상 코드(#RRGGBB) 직접 입력',
       '즐겨찾기·북마크·검색 결과로 이동하면 대상이 맨 위로',
+      '트리 행에 커서를 올리면 전체 경로 표시',
     ],
     en: [
       'Hide folders and drives you never use',
       'Type a colour code (#RRGGBB) in the colour settings',
       'Favorites, bookmarks and search results land at the top',
+      'Hover a tree row to see its full path',
     ],
   },
   {
