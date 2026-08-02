@@ -320,9 +320,6 @@ public partial class MainWindow : Window
 
     private void MainWindow_Loaded(object? sender, RoutedEventArgs e)
     {
-        string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
-        VersionFooterText.Text = $"Edgetree v{version}";
-
         _settings = _settingsService.Load();
         FileSystemService.SortField = ReadSortField(_settings.SortField, _settings.SortByDate);
         FileSystemService.SortDescending = _settings.SortDescending;
@@ -417,7 +414,8 @@ public partial class MainWindow : Window
         ApplySidePanelMode();
         ApplyTreeFontWeight();
 
-        UpdateFileFilterIndicator();
+        // Builds the footer's filter chips and marks the saved state on them.
+        BuildFooterFilterChips();
 
         InitializeSearch();
 
@@ -695,6 +693,25 @@ public partial class MainWindow : Window
         UpdateSelectionBrushForActivation();
         SetBrushColor("FavoritesBackground", light ? _settings.LightHistoryBackgroundColorHex : _settings.HistoryBackgroundColorHex);
         SetBrushColor("TreeRowHoverBackground", light ? _settings.LightHoverBackgroundColorHex : _settings.HoverBackgroundColorHex);
+
+        // The footer's lit file-kind chip. Fixed per theme rather than taken
+        // from the tree's selection colour, which is the user's to set and is
+        // often a strong blue - that put a shout in a strip meant to be read at
+        // a glance (2026-08-02).
+        //
+        // The two themes do NOT get the same treatment, and that is the point.
+        // On dark, grey with white on it is enough to lift the chip off the
+        // seven quiet ones. On light, grey had nothing to push against - the
+        // whole strip is already pale - so it takes a blue instead.
+        //
+        // That blue is the bookmark ribbon's own #4A90E2, arrived at by trying
+        // a deeper one first: a saturated navy filled the chip with more weight
+        // than a footer wants ("배경이 좀 쎄다"), while the lighter blue reads
+        // as a mark rather than a block. Keeping it the SAME blue the app
+        // already draws with is the part worth holding on to - one accent, used
+        // in both places, rather than a second one invented for this strip.
+        SetBrushColor("FooterChipCheckedBackground", light ? "#4A90E2" : "#5A5A5A");
+        SetBrushColor("FooterChipCheckedForeground", "#FFFFFF");
         SetBrushColor("FolderNameHoverForeground", light ? _settings.LightFolderNameHoverColorHex : _settings.FolderNameHoverColorHex);
         SetBrushColor("FileNameHoverForeground", light ? _settings.LightFileNameHoverColorHex : _settings.FileNameHoverColorHex);
         SetBrushColor("ShowMoreForeground", light ? _settings.LightShowMoreColorHex : _settings.ShowMoreColorHex);
@@ -1869,7 +1886,10 @@ public partial class MainWindow : Window
         else
         {
             UpdateFavoritesPanelVisibility();
-            VersionFooterRow.Height = new GridLength(20);
+            // Auto rather than the old fixed 20 - the footer's filter toggles
+            // wrap to a second line on a narrow window, and a fixed height
+            // would hide it.
+            VersionFooterRow.Height = GridLength.Auto;
         }
 
         UpdateResizeThumbVisibility();
@@ -4138,32 +4158,80 @@ public partial class MainWindow : Window
     // with a list you can see and clear; this answers it in the footer, which
     // is already on screen, costs no layout, and says nothing at all while
     // nothing is filtered.
-    private void UpdateFileFilterIndicator()
+    // The footer's filter chips. Built once, then only their IsChecked moves -
+    // rebuilding a row of eight on every toggle would take the pressed one out
+    // from under the cursor mid-click.
+    private readonly List<ToggleButton> _footerFilterChips = new();
+
+    private void BuildFooterFilterChips()
     {
-        string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
-        if (_settings.FileFilterCategories.Count == 0)
+        // 전체 first and set apart by a wider gap: it is not one of the kinds,
+        // it is the empty selection - the same asymmetry the menu draws with a
+        // separator, which a single row has no room for.
+        AddFooterFilterChip(Strings.MenuFileFilterAll, FileFilterAllTag, new Thickness(0, 0, 8, 0));
+        foreach (var (category, label) in FileFilterRows)
         {
-            VersionFooterText.Text = $"Edgetree v{version}";
-            return;
+            AddFooterFilterChip(
+                category == FileTypeFilter.Executable ? Strings.FilterChipExecutable : label(),
+                category,
+                new Thickness(0, 0, 2, 0));
         }
 
-        var names = _settings.FileFilterCategories
-            .Select(FileFilterDisplayName)
-            .Where(n => n is not null);
-        VersionFooterText.Text = $"Edgetree v{version}  ·  {Strings.FooterFileFilter}: {string.Join(", ", names)}";
+        UpdateFileFilterIndicator();
     }
 
-    private static string? FileFilterDisplayName(string category) => category switch
+    private void AddFooterFilterChip(string label, string category, Thickness margin)
     {
-        FileTypeFilter.Code => Strings.MenuFileFilterCode,
-        FileTypeFilter.Image => Strings.MenuFileFilterImage,
-        FileTypeFilter.Document => Strings.MenuFileFilterDocument,
-        FileTypeFilter.Media => Strings.MenuFileFilterMedia,
-        FileTypeFilter.Archive => Strings.MenuFileFilterArchive,
-        FileTypeFilter.Executable => Strings.MenuFileFilterExecutable,
-        FileTypeFilter.Other => Strings.MenuFileFilterOther,
-        _ => null,
-    };
+        var chip = new ToggleButton
+        {
+            Content = label,
+            Tag = category,
+            Style = (Style)FindResource("FooterFilterChipStyle"),
+            Margin = margin,
+        };
+
+        chip.Click += (_, _) =>
+        {
+            if (category.Length == 0)
+            {
+                _settings.FileFilterCategories.Clear();
+            }
+            else if (chip.IsChecked == true)
+            {
+                if (!_settings.FileFilterCategories.Contains(category))
+                {
+                    _settings.FileFilterCategories.Add(category);
+                }
+            }
+            else
+            {
+                _settings.FileFilterCategories.Remove(category);
+            }
+
+            ApplyFileFilter();
+        };
+
+        _footerFilterChips.Add(chip);
+        VersionFooterPanel.Children.Add(chip);
+    }
+
+    // A filter that hides files SILENTLY is a filter you forget you turned on,
+    // and then the app looks like it lost your files. The footer answers that,
+    // and since 2026-08-02 it also FIXES it: the strip where a filter announces
+    // itself is where the hand already is when it needs changing, so each kind
+    // is a toggle rather than a word. 전체 is lit exactly when nothing else is.
+    //
+    // The app name and version used to sit at the head of this strip and were
+    // dropped when the toggles arrived (user's call): a row of controls is not
+    // a place for a label nobody acts on, and the version is still in 앱 정보,
+    // which is where someone actually goes looking for it.
+    private void UpdateFileFilterIndicator()
+    {
+        foreach (var chip in _footerFilterChips)
+        {
+            chip.IsChecked = chip.Tag is string category && IsFileFilterRowChecked(category);
+        }
+    }
 
     private void FontWeightMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -5578,14 +5646,22 @@ public partial class MainWindow : Window
         // (plus the thumb's own 1px margin), so reusing it puts equal air on
         // both sides of the bar rather than a wider gap on one side.
         //
-        // Top and bottom: a band of its own for each "more this way" chevron.
-        // They were drawn straight over the first and last row, which put an
-        // arrow on top of a row's text - the row and the arrow each made the
-        // other harder to read (2026-08-02). Reserved on BOTH edges the whole
-        // time the menu scrolls, not only on the side currently showing an
-        // arrow: sizing it per-arrow would shift every row down the moment you
-        // scrolled off the top.
-        double menuScrollBand = Math.Round(12.0 * scale);
+        // Top and bottom: room for the "more this way" chevrons, which were
+        // otherwise drawn straight over the first and last row's text.
+        // Reserved on BOTH edges the whole time the menu scrolls, not only on
+        // the side currently showing an arrow - sizing it per-arrow would shift
+        // every row down the moment you scrolled off the top.
+        //
+        // Small on purpose. It was 12, and that made a SCROLLING menu visibly
+        // taller-topped than every menu that fits, which reads as two different
+        // kinds of menu (2026-08-02). At 4 the chevron still clears the text,
+        // because it also has the row's own vertical padding to sit in, and the
+        // scrolling menu now looks like the rest. The honest fix if this is
+        // still off is to move the chevrons out of the scroll area entirely,
+        // into the blank the menu's own padding already leaves - which means
+        // teaching both menu templates about them rather than one scroll
+        // template.
+        double menuScrollBand = Math.Round(4.0 * scale);
         appResources["MenuScrollContentPadding"] = new Thickness(
             0, menuScrollBand, menuHorizontalPadding, menuScrollBand);
 

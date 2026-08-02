@@ -2193,7 +2193,7 @@
                         StrokeEndLineCap="Round"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Top"
-                        Margin="0,4,0,0"
+                        Margin="0,1,0,0"
                         IsHitTestVisible="False"
                         Visibility="Collapsed"/>
                 <Path x:Name="MoreBelowGlyph"
@@ -2206,7 +2206,7 @@
                         StrokeEndLineCap="Round"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Bottom"
-                        Margin="0,0,0,4"
+                        Margin="0,0,0,1"
                         IsHitTestVisible="False"
                         Visibility="Collapsed"/>
             </Grid>
@@ -2348,6 +2348,65 @@
                                 SnapsToDevicePixels="True">
                             <ContentPresenter/>
                         </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- One file-kind toggle in the version footer. Deliberately quiet when
+             off - text only, no border - so a strip of eight reads as a line of
+             labels rather than as eight buttons; the one that is ON is the only
+             thing meant to catch the eye. -->
+        <Style x:Key="FooterFilterChipStyle"
+                TargetType="ToggleButton">
+            <Setter Property="FontSize"
+                    Value="11"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource ForegroundText}"/>
+            <Setter Property="Opacity"
+                    Value="0.65"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="Focusable"
+                    Value="False"/>
+            <Setter Property="Margin"
+                    Value="0,0,2,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd"
+                                Background="Transparent"
+                                CornerRadius="3"
+                                Padding="5,1"
+                                SnapsToDevicePixels="True">
+                            <TextBlock Text="{TemplateBinding Content}"
+                                    VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowHoverBackground}"/>
+                                <Setter Property="Opacity"
+                                        Value="1"/>
+                            </Trigger>
+                            <!-- Grey, not the tree's selection colour and not an
+                                 accent: the lit chip has to stand out from the
+                                 seven quiet ones without shouting across the
+                                 strip. What carries it is the full-strength
+                                 text, not the fill (2026-08-02). -->
+                            <Trigger Property="IsChecked"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource FooterChipCheckedBackground}"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource FooterChipCheckedForeground}"/>
+                                <Setter Property="Opacity"
+                                        Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -3289,8 +3348,11 @@
                         Height="0"/>
                 <RowDefinition x:Name="Row3"
                         Height="*"/>
+                <!-- Auto, not the fixed 20 it was: the footer carries the file
+                     -kind toggles now, and on a narrow window they wrap to a
+                     second line. A fixed height would cut that line off. -->
                 <RowDefinition x:Name="VersionFooterRow"
-                        Height="20"/>
+                        Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- Header. Also doubles as the drag handle: while docked, dragging it
@@ -3715,12 +3777,19 @@
                     Grid.Row="4"
                     BorderThickness="0,1,0,0"
                     BorderBrush="{DynamicResource PanelDividerBrush}">
-                <TextBlock x:Name="VersionFooterText"
-                        Foreground="{DynamicResource ForegroundText}"
-                        Opacity="0.65"
-                        FontSize="11"
-                        VerticalAlignment="Center"
-                        Margin="8,0,0,4"/>
+                <!-- The version, and then one toggle per file-kind filter
+                     (built in code from the same table the menus use - see
+                     RebuildFooterFilterChips). Putting them here rather than
+                     only in the menus is the point: this strip is where a
+                     filter announces itself, so it is where the hand already
+                     is when it needs changing.
+
+                     WrapPanel, so a narrow window costs a second line instead
+                     of cutting chips off the end. -->
+                <WrapPanel x:Name="VersionFooterPanel"
+                        Orientation="Horizontal"
+                        Margin="8,1,4,3">
+                </WrapPanel>
             </Border>
 
             <!-- File-search view. Overlays the whole content area below the

@@ -24,8 +24,10 @@ public static class Strings
     // "파일 종류"로 시작했다가 바꿈 - 그것만으로는 무엇을 하는 줄인지 안 읽힘.
     // 라벨이 그 자리에서 동작을 말해야 함(설명은 아무도 안 읽으므로).
     public static string MenuFileFilter = "표시할 파일 종류";
-    // 푸터는 짧아야 해서 따로 둠 - 거기서는 "무엇이 켜져 있나"만 답하면 됨.
-    public static string FooterFileFilter = "필터";
+    // 푸터 칩은 여덟 개가 한 줄에 서야 해서 가장 긴 라벨만 줄여 씀. 나머지는
+    // 메뉴와 같은 말을 그대로 쓴다 - 두 곳이 다른 이름을 부르면 같은 것인지
+    // 알 수 없으므로.
+    public static string FilterChipExecutable = "실행";
     public static string MenuFileFilterAll = "전체";
     public static string MenuFileFilterCode = "코드";
     public static string MenuFileFilterImage = "이미지";
@@ -350,7 +352,7 @@ public static class Strings
         MenuBookmarkList = "Bookmarks";
         MenuBookmarkListEmpty = "No bookmarks";
         MenuFileFilter = "Show File Types";
-        FooterFileFilter = "Filter";
+        FilterChipExecutable = "Programs";
         MenuFileFilterAll = "All";
         MenuFileFilterCode = "Code";
         MenuFileFilterImage = "Images";
