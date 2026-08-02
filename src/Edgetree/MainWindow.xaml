@@ -2175,6 +2175,48 @@
              and would otherwise ignore Ctrl +/-. The delay is the favorites'
              900ms, not WPF's default - brushing past a row on the way
              somewhere else shouldn't pop anything up. -->
+        <!-- Implicit, so all three of the app's tooltips (tree row, favorites
+             row, bookmark panel row) take it without being told. They set only
+             Content and FontSize, which left the surface itself at WPF's stock
+             chrome - a pale background with black text, in a dark-themed window
+             (2026-08-02). It follows the theme now, using the same three
+             brushes the menus do.
+
+             Defined ABOVE its first use on purpose: the ToolTip objects below
+             live inside Setter values, and a style they cannot find yet is a
+             style they never get. -->
+        <Style TargetType="ToolTip">
+            <Setter Property="Background"
+                    Value="{DynamicResource PanelBackground}"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource MenuForeground}"/>
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource PanelBorder}"/>
+            <Setter Property="BorderThickness"
+                    Value="1"/>
+            <Setter Property="Padding"
+                    Value="8,4"/>
+            <!-- No MaxWidth, no wrapping. Both were tried on 2026-08-02 and
+                 taken straight back out: a path broken across two lines reads
+                 worse than a long one - it splits at whatever space happens to
+                 fall near the limit, in the middle of a name. A path is one
+                 string and belongs on one line. -->
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                CornerRadius="6"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="RowPathTooltip"
                 TargetType="TextBlock">
             <Setter Property="ToolTipService.InitialShowDelay"
