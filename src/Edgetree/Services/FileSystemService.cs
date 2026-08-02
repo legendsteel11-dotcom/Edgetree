@@ -516,7 +516,11 @@ public static class FileSystemService
             foreach (var file in files)
             {
                 var name = Path.GetFileName(file);
-                if (!string.IsNullOrEmpty(name))
+                // The file-kind filter applies HERE and only here: folders are
+                // listed above untouched (they are the way through the tree),
+                // and the search scan has its own enumeration, so it keeps
+                // finding everything - the same rule hidden folders follow.
+                if (!string.IsNullOrEmpty(name) && FileTypeFilter.ShouldShowFile(name))
                 {
                     result.Add(new FileSystemItem(name, file, isDirectory: false, parent));
                 }

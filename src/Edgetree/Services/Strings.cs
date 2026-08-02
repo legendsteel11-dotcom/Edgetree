@@ -19,6 +19,27 @@ public static class Strings
     // "이 폴더" rather than just "숨기기": the row under the cursor is what goes,
     // and a bare verb next to 잘라내기/삭제 reads like it might mean the
     // selection or the whole view.
+    // File-kind filter. "전체" is deliberately worded as a state, not a
+    // category - picking it clears the rest.
+    // "파일 종류"로 시작했다가 바꿈 - 그것만으로는 무엇을 하는 줄인지 안 읽힘.
+    // 라벨이 그 자리에서 동작을 말해야 함(설명은 아무도 안 읽으므로).
+    public static string MenuFileFilter = "표시할 파일 종류";
+    // 푸터는 짧아야 해서 따로 둠 - 거기서는 "무엇이 켜져 있나"만 답하면 됨.
+    public static string FooterFileFilter = "필터";
+    public static string MenuFileFilterAll = "전체";
+    public static string MenuFileFilterCode = "코드";
+    public static string MenuFileFilterImage = "이미지";
+    public static string MenuFileFilterDocument = "문서";
+    public static string MenuFileFilterMedia = "미디어";
+    public static string MenuFileFilterArchive = "압축";
+    public static string MenuFileFilterExecutable = "실행 파일 · 바로가기";
+    public static string MenuFileFilterOther = "기타";
+
+    public static string MenuFontWeight = "글꼴 굵기";
+    public static string MenuFontWeightNormal = "보통";
+    public static string MenuFontWeightBold = "굵게";
+    public static string MenuFontWeightFoldersOnly = "폴더만 굵게";
+
     // The panel beside the tree: which list it shows, or none at all.
     public static string MenuSidePanel = "패널 표시";
     public static string MenuSidePanelFavorites = "즐겨찾기";
@@ -327,6 +348,20 @@ public static class Strings
         MenuBookmarkRemove = "Remove Bookmark";
         MenuBookmarkList = "Bookmarks";
         MenuBookmarkListEmpty = "No bookmarks";
+        MenuFileFilter = "Show File Types";
+        FooterFileFilter = "Filter";
+        MenuFileFilterAll = "All";
+        MenuFileFilterCode = "Code";
+        MenuFileFilterImage = "Images";
+        MenuFileFilterDocument = "Documents";
+        MenuFileFilterMedia = "Media";
+        MenuFileFilterArchive = "Archives";
+        MenuFileFilterExecutable = "Programs & Shortcuts";
+        MenuFileFilterOther = "Other";
+        MenuFontWeight = "Font Weight";
+        MenuFontWeightNormal = "Normal";
+        MenuFontWeightBold = "Bold";
+        MenuFontWeightFoldersOnly = "Bold Folders Only";
         MenuSidePanel = "Side Panel";
         MenuSidePanelFavorites = "Favorites";
         MenuSidePanelBookmarks = "Bookmarks";

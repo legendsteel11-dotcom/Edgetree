@@ -328,6 +328,14 @@ public partial class MainWindow : Window
         FileSystemService.SortDescending = _settings.SortDescending;
         FileSystemItem.DisplayCap = Math.Clamp(_settings.MaxItemsPerFolder, 1, 50);
 
+        // Alongside the other listing rules, and for the same reason: a saved
+        // filter has to be in force for the FIRST folder read, not from the
+        // first time it is changed.
+        foreach (string category in _settings.FileFilterCategories)
+        {
+            FileTypeFilter.SelectedCategories.Add(category);
+        }
+
         // Must be set before the tree/favorites below ever read an icon, same
         // as the sort/display statics above.
         ShellIconService.UseShellIcons = _settings.UseShellIcons;
@@ -407,6 +415,9 @@ public partial class MainWindow : Window
         // After both sources are attached: it decides which of the two is on
         // screen, and builds the bookmark rows when that is the bookmark list.
         ApplySidePanelMode();
+        ApplyTreeFontWeight();
+
+        UpdateFileFilterIndicator();
 
         InitializeSearch();
 
@@ -3796,6 +3807,7 @@ public partial class MainWindow : Window
             FindMenuItem(menu, "autoHideSliverWidthRow") is { } autoHideSliverWidthRow &&
             FindMenuItem(menu, "scrollBarThicknessRow") is { } scrollBarThicknessRow &&
             FindMenuItem(menu, "sidePanel") is { } sidePanel &&
+            FindMenuItem(menu, "fontWeight") is { } fontWeight &&
             FindMenuItem(menu, "sortMenu") is { } sortMenu &&
             FindMenuItem(menu, "iconStyleMenu") is { } iconStyleMenu &&
             FindMenuItem(menu, "languageMenu") is { } languageMenu)
@@ -3843,6 +3855,21 @@ public partial class MainWindow : Window
             else
             {
                 LogClickLine("options menu: a 패널 표시 row is missing");
+            }
+
+            if (FindMenuItem(fontWeight, "fontWeightNormal") is { } weightNormal &&
+                FindMenuItem(fontWeight, "fontWeightBold") is { } weightBold &&
+                FindMenuItem(fontWeight, "fontWeightFolders") is { } weightFolders)
+            {
+                bool isBold = string.Equals(_settings.TreeFontWeight, "bold", StringComparison.OrdinalIgnoreCase);
+                bool isFolders = string.Equals(_settings.TreeFontWeight, "folders", StringComparison.OrdinalIgnoreCase);
+                weightBold.IsChecked = isBold;
+                weightFolders.IsChecked = isFolders;
+                weightNormal.IsChecked = !isBold && !isFolders;
+            }
+            else
+            {
+                LogClickLine("options menu: a 글꼴 굵기 row is missing");
             }
 
             if (sortMenu.Items is [MenuItem byName, MenuItem byDate, MenuItem byType, MenuItem bySize, _, MenuItem ascending, MenuItem descending])
@@ -3893,6 +3920,177 @@ public partial class MainWindow : Window
     // FindTaggedMenuElement. Direct children only: every id here belongs to a
     // top-level row, and searching deeper would let a submenu's own row answer
     // for its parent.
+    // Two resources rather than one, so "folders only" needs no special case
+    // anywhere: folder rows inherit FolderNameFontWeight from the TreeViewItem
+    // style and file rows override it with FileNameFontWeight in the same
+    // trigger that already gives them their own colour. The favorites and
+    // bookmark panel rows read the same pair.
+    private void ApplyTreeFontWeight()
+    {
+        bool bold = string.Equals(_settings.TreeFontWeight, "bold", StringComparison.OrdinalIgnoreCase);
+        bool foldersOnly = string.Equals(_settings.TreeFontWeight, "folders", StringComparison.OrdinalIgnoreCase);
+
+        Resources["FolderNameFontWeight"] = bold || foldersOnly ? FontWeights.Bold : FontWeights.Normal;
+        Resources["FileNameFontWeight"] = bold ? FontWeights.Bold : FontWeights.Normal;
+    }
+
+    // ----- 파일 종류 필터 -----------------------------------------------------
+    //
+    // "전체" is not a category, it is the empty selection - so it behaves like a
+    // radio against the rest (picking it clears them; picking any of them
+    // clears it) while the others multi-select freely. That asymmetry is the
+    // user's own specification, and it falls out of the storage rather than
+    // being enforced on top of it: an empty list means no filter.
+    private void ApplyFileFilter()
+    {
+        FileTypeFilter.SelectedCategories.Clear();
+        foreach (string category in _settings.FileFilterCategories)
+        {
+            FileTypeFilter.SelectedCategories.Add(category);
+        }
+
+        _settingsService.Save(_settings);
+        UpdateFileFilterIndicator();
+
+        // Every folder already on screen re-reads, the same way a sort or a
+        // per-folder cap change does - a filter that only took effect on
+        // folders opened afterwards would be worse than no filter.
+        RefreshAllLoadedFolders();
+    }
+
+    private void FileFilterMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem item)
+        {
+            return;
+        }
+
+        string id = System.Windows.Automation.AutomationProperties.GetAutomationId(item);
+        if (string.Equals(id, "fileFilterAll", StringComparison.Ordinal))
+        {
+            _settings.FileFilterCategories.Clear();
+        }
+        else if (FileFilterCategoryFor(id) is { } category)
+        {
+            // IsChecked has already flipped by the time this runs - a checkable
+            // menu item toggles itself - so it reads as the user's intent.
+            if (item.IsChecked)
+            {
+                if (!_settings.FileFilterCategories.Contains(category))
+                {
+                    _settings.FileFilterCategories.Add(category);
+                }
+            }
+            else
+            {
+                _settings.FileFilterCategories.Remove(category);
+            }
+        }
+
+        ApplyFileFilter();
+
+        // The whole group is re-marked, not just the row that was clicked:
+        // turning the last category off falls back to 전체, and 전체 turns the
+        // others off. Found from the row's own host rather than a remembered
+        // one - this submenu is built into two different menus.
+        if (ItemsControl.ItemsControlFromItemContainer(item) is MenuItem submenu)
+        {
+            SyncFileFilterMenu(submenu);
+        }
+    }
+
+    private static string? FileFilterCategoryFor(string automationId) => automationId switch
+    {
+        "fileFilterCode" => FileTypeFilter.Code,
+        "fileFilterImage" => FileTypeFilter.Image,
+        "fileFilterDocument" => FileTypeFilter.Document,
+        "fileFilterMedia" => FileTypeFilter.Media,
+        "fileFilterArchive" => FileTypeFilter.Archive,
+        "fileFilterExecutable" => FileTypeFilter.Executable,
+        "fileFilterOther" => FileTypeFilter.Other,
+        _ => null,
+    };
+
+    private void SyncFileFilterMenu(MenuItem submenu)
+    {
+        foreach (var row in submenu.Items.OfType<MenuItem>())
+        {
+            string id = System.Windows.Automation.AutomationProperties.GetAutomationId(row);
+            row.IsChecked = string.Equals(id, "fileFilterAll", StringComparison.Ordinal)
+                ? _settings.FileFilterCategories.Count == 0
+                : FileFilterCategoryFor(id) is { } category
+                    && _settings.FileFilterCategories.Contains(category);
+        }
+    }
+
+    private void FileFilterSubmenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem submenu)
+        {
+            SyncFileFilterMenu(submenu);
+        }
+    }
+
+    // A filter that hides files SILENTLY is a filter you forget you turned on,
+    // and then the app looks like it lost your files. 숨긴 폴더 answers this
+    // with a list you can see and clear; this answers it in the footer, which
+    // is already on screen, costs no layout, and says nothing at all while
+    // nothing is filtered.
+    private void UpdateFileFilterIndicator()
+    {
+        string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+        if (_settings.FileFilterCategories.Count == 0)
+        {
+            VersionFooterText.Text = $"Edgetree v{version}";
+            return;
+        }
+
+        var names = _settings.FileFilterCategories
+            .Select(FileFilterDisplayName)
+            .Where(n => n is not null);
+        VersionFooterText.Text = $"Edgetree v{version}  ·  {Strings.FooterFileFilter}: {string.Join(", ", names)}";
+    }
+
+    private static string? FileFilterDisplayName(string category) => category switch
+    {
+        FileTypeFilter.Code => Strings.MenuFileFilterCode,
+        FileTypeFilter.Image => Strings.MenuFileFilterImage,
+        FileTypeFilter.Document => Strings.MenuFileFilterDocument,
+        FileTypeFilter.Media => Strings.MenuFileFilterMedia,
+        FileTypeFilter.Archive => Strings.MenuFileFilterArchive,
+        FileTypeFilter.Executable => Strings.MenuFileFilterExecutable,
+        FileTypeFilter.Other => Strings.MenuFileFilterOther,
+        _ => null,
+    };
+
+    private void FontWeightMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem item)
+        {
+            return;
+        }
+
+        string weight = System.Windows.Automation.AutomationProperties.GetAutomationId(item) switch
+        {
+            "fontWeightBold" => "bold",
+            "fontWeightFolders" => "folders",
+            _ => "normal",
+        };
+
+        // A checkable row toggles itself on click, so re-picking the current
+        // one would uncheck it and leave the group reading as "none".
+        item.IsChecked = true;
+
+        if (string.Equals(_settings.TreeFontWeight, weight, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _settings.TreeFontWeight = weight;
+        _settingsService.Save(_settings);
+        ApplyTreeFontWeight();
+    }
+
     private void SidePanelModeMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem item)

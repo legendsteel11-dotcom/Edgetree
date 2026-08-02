@@ -252,6 +252,16 @@ public class AppSettings
     // 1080p screen, paid in data.
     public string SidePanelMode { get; set; } = "favorites";
 
+    // Tree text weight: "normal", "bold", or "folders" (folders bold, files
+    // normal - the structure reads without every file name thickening with it).
+    public string TreeFontWeight { get; set; } = "normal";
+
+    // Which file kinds the tree lists (FileTypeFilter's category keys). EMPTY
+    // MEANS EVERYTHING: "전체" is the absence of a filter, not an entry of its
+    // own, so a fresh install and a cleared filter are the same state and
+    // neither needs a migration.
+    public List<string> FileFilterCategories { get; set; } = new();
+
     // Folders the user has taken out of the tree ("이 폴더 숨기기"). Only the
     // tree hides them - the file search still finds what is inside, because a
     // search is a deliberate act of looking and "분명 있는데 검색이 안 된다" is

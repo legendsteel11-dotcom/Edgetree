@@ -1313,6 +1313,57 @@
                     SubmenuOpened="HiddenFolderSubmenu_Opened">
                 <MenuItem Header=""/>
             </MenuItem>
+            <!-- Which file kinds the tree lists. "전체" sits apart above the
+                 separator because it is not a category - it is the empty
+                 selection, so it reads as a radio against the rest while the
+                 rest multi-select. StaysOpenOnClick throughout: picking three
+                 kinds should be three clicks, not three trips back into the
+                 menu. -->
+            <MenuItem Header="{x:Static services:Strings.MenuFileFilter}"
+                    AutomationProperties.AutomationId="fileFilter"
+                    SubmenuOpened="FileFilterSubmenu_Opened">
+                <MenuItem Header="{x:Static services:Strings.MenuFileFilterAll}"
+                        IsCheckable="True"
+                        StaysOpenOnClick="True"
+                        AutomationProperties.AutomationId="fileFilterAll"
+                        Click="FileFilterMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="{x:Static services:Strings.MenuFileFilterCode}"
+                        IsCheckable="True"
+                        StaysOpenOnClick="True"
+                        AutomationProperties.AutomationId="fileFilterCode"
+                        Click="FileFilterMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuFileFilterImage}"
+                        IsCheckable="True"
+                        StaysOpenOnClick="True"
+                        AutomationProperties.AutomationId="fileFilterImage"
+                        Click="FileFilterMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuFileFilterDocument}"
+                        IsCheckable="True"
+                        StaysOpenOnClick="True"
+                        AutomationProperties.AutomationId="fileFilterDocument"
+                        Click="FileFilterMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuFileFilterMedia}"
+                        IsCheckable="True"
+                        StaysOpenOnClick="True"
+                        AutomationProperties.AutomationId="fileFilterMedia"
+                        Click="FileFilterMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuFileFilterArchive}"
+                        IsCheckable="True"
+                        StaysOpenOnClick="True"
+                        AutomationProperties.AutomationId="fileFilterArchive"
+                        Click="FileFilterMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuFileFilterExecutable}"
+                        IsCheckable="True"
+                        StaysOpenOnClick="True"
+                        AutomationProperties.AutomationId="fileFilterExecutable"
+                        Click="FileFilterMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuFileFilterOther}"
+                        IsCheckable="True"
+                        StaysOpenOnClick="True"
+                        AutomationProperties.AutomationId="fileFilterOther"
+                        Click="FileFilterMenuItem_Click"/>
+            </MenuItem>
             <Separator/>
             <!-- Fenced off by separators on both sides: it opens a window,
                  unlike everything around it, so it belongs to neither the
@@ -1320,6 +1371,34 @@
             <MenuItem Header="{x:Static services:Strings.MenuColorSettings}"
                     Click="ColorSettingsMenuItem_Click"/>
             <Separator/>
+            <!-- Directly above the font SIZE row, not off on its own among the
+                 checkboxes (user's call, 2026-08-02): the two are the same
+                 question asked twice, and a reader looking for one will look
+                 where the other is.
+
+                 "폴더만 굵게" earns its place as more than a compromise - it
+                 makes the structure readable without thickening every file name
+                 in the tree. -->
+            <!-- No "reserve-check-column" here, unlike 패널 표시 up among the
+                 checkboxes: this row's neighbours are the steppers and the
+                 plain submenus (색상 설정, 북마크 목록), none of which reserve
+                 that column - so claiming it left this one label alone,
+                 indented past every row around it. -->
+            <MenuItem Header="{x:Static services:Strings.MenuFontWeight}"
+                    AutomationProperties.AutomationId="fontWeight">
+                <MenuItem Header="{x:Static services:Strings.MenuFontWeightNormal}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="fontWeightNormal"
+                        Click="FontWeightMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuFontWeightBold}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="fontWeightBold"
+                        Click="FontWeightMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuFontWeightFoldersOnly}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="fontWeightFolders"
+                        Click="FontWeightMenuItem_Click"/>
+            </MenuItem>
             <!-- Font size leads the stepper group deliberately: it was
                  keyboard-only (Ctrl +/-) until a user with presbyopia asked for
                  "a way to change the font size" while row/indent spacing were
@@ -1699,6 +1778,11 @@
                     Value="Transparent"/>
             <Setter Property="Foreground"
                     Value="{DynamicResource FolderNameForeground}"/>
+            <!-- Inherited down to NameText, exactly like Foreground above. File
+                 rows override both in their own trigger, which is what makes
+                 "폴더만 굵게" a single resource rather than a special case. -->
+            <Setter Property="FontWeight"
+                    Value="{DynamicResource FolderNameFontWeight}"/>
             <Setter Property="HorizontalContentAlignment"
                     Value="Stretch"/>
             <Setter Property="Cursor"
@@ -2510,6 +2594,9 @@
                     <Setter TargetName="NameEditBox"
                             Property="Margin"
                             Value="{DynamicResource FileNameMargin}"/>
+                    <Setter TargetName="NameText"
+                            Property="FontWeight"
+                            Value="{DynamicResource FileNameFontWeight}"/>
                 </DataTrigger>
                 <!-- File rows get their own text color instead of inheriting
                      ForegroundText/HighlightForeground from the TreeViewItem
@@ -2780,6 +2867,7 @@
                                         Grid.Column="2"
                                         Text="{Binding DisplayName}"
                                         Foreground="{DynamicResource FolderNameForeground}"
+                                        FontWeight="{DynamicResource FolderNameFontWeight}"
                                         VerticalAlignment="Center"
                                         TextTrimming="CharacterEllipsis"/>
                             </Grid>
@@ -2922,6 +3010,7 @@
                                         Grid.Column="3"
                                         Text="{Binding Name}"
                                         Foreground="{DynamicResource FolderNameForeground}"
+                                        FontWeight="{DynamicResource FolderNameFontWeight}"
                                         VerticalAlignment="Center"
                                         TextTrimming="CharacterEllipsis"/>
                             </Grid>
@@ -2932,6 +3021,9 @@
                                 <Setter TargetName="BookmarkNameText"
                                         Property="Foreground"
                                         Value="{DynamicResource FileNameForeground}"/>
+                                <Setter TargetName="BookmarkNameText"
+                                        Property="FontWeight"
+                                        Value="{DynamicResource FileNameFontWeight}"/>
                             </DataTrigger>
                             <DataTrigger Binding="{Binding IsCurrent}"
                                     Value="True">
