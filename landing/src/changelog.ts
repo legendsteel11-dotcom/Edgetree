@@ -20,6 +20,21 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: 'v1.4.2',
+    ko: [
+      '하단 바에서 파일 종류를 눌러 걸러 보기 — 코드 · 이미지 · 문서 · 미디어',
+      '글꼴 굵기 — 보통 / 굵게 / 폴더만 / 파일만',
+      '검색 결과에 커서를 올리면 전체 경로 표시',
+      '들여쓰기를 잘못 눌러 폴더가 접히던 문제 수정',
+    ],
+    en: [
+      'Filter by file type from the bottom bar — code, images, documents, media',
+      'Font weight — normal, bold, folders only, files only',
+      'Hover a search result to see its full path',
+      'Fixed folders collapsing when the indent was clicked by mistake',
+    ],
+  },
+  {
     version: 'v1.4.1',
     ko: [
       '왼쪽 패널 표시 옵션 — 북마크 / 즐겨찾기 / 표시 안 함',

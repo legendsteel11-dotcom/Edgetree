@@ -1,4 +1,4 @@
-# Edgetree v1.4.1
+# Edgetree v1.4.2
 
 [한국어 안내](README-ko.md)
 
@@ -150,6 +150,21 @@ Either way, the resulting `.exe` is in
 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
 
 ## Changelog
+
+### v1.4.2 (2026-08-03)
+
+- **Show file types**: pick what the tree lists from the bottom bar - code,
+  images, documents, media, archives, programs, other - any number at once, and
+  "All" to clear it. The options menu and the right-click menus offer the same
+  list. Folders are never filtered, and search still finds everything
+- **Font weight**: normal, bold, bold folders only, or bold files only
+- **Tooltips follow the theme**, and hovering a search result shows its full path
+- **Long menus say which way there is more**, with an arrow at either end
+- **Right-clicking empty space** now reaches bookmark jumps, the hidden-folder
+  list and the file-type filter
+- **Indent click fixed**: clicking the empty space to the left of a row no longer
+  collapses the folder, so a stray click on a drive root no longer folds the
+  whole drive and throws the view upward
 
 ### v1.4.1 (2026-08-02)
 
