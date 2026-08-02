@@ -6264,6 +6264,61 @@ public partial class MainWindow : Window
         treeViewItem.Focus();
     }
 
+    // Where the row's own content starts, measured from the row's left edge -
+    // everything before it is indent. The icon when it is showing, the name
+    // otherwise (icons can be turned off, and then the name IS the left edge).
+    // Null means "could not tell", and the caller treats that as "not indent"
+    // so an unanswerable case never silently disables the toggle.
+    private static double? RowContentLeftEdge(TreeViewItem row)
+    {
+        var anchor = FindRowPart(row, "RowIcon") is { IsVisible: true, ActualWidth: > 0 } icon
+            ? icon
+            : FindRowPart(row, "NameText");
+
+        if (anchor is not { IsVisible: true })
+        {
+            return null;
+        }
+
+        try
+        {
+            // Fully qualified: WinForms is referenced here too and brings its
+            // own Point.
+            return anchor.TransformToAncestor(row).Transform(new System.Windows.Point(0, 0)).X;
+        }
+        catch (InvalidOperationException)
+        {
+            // Not connected to the row's visual tree at this instant.
+            return null;
+        }
+    }
+
+    // Stops at any nested TreeViewItem: without that, a collapsed-but-realized
+    // child row's icon could answer for its parent and put the boundary far to
+    // the right, which would turn most of the parent row into "indent".
+    private static FrameworkElement? FindRowPart(DependencyObject root, string name)
+    {
+        int count = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is TreeViewItem)
+            {
+                continue;
+            }
+            if (child is FrameworkElement element && element.Name == name)
+            {
+                return element;
+            }
+            if (FindRowPart(child, name) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
     private void TreeViewItem_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not TreeViewItem treeViewItem)
@@ -6437,7 +6492,24 @@ public partial class MainWindow : Window
         // logged a collapse and an expand one millisecond apart). Stepping
         // aside on the second press leaves the built-in behaviour to do the one
         // toggle, so each click still registers.
-        if (!clickedOnExpander && e.ClickCount == 1 &&
+        // A click in the INDENT - the guide-line strip to the left of the row's
+        // icon - selects the row but no longer toggles it (2026-08-02). That
+        // strip is empty space as far as the eye is concerned, and with the
+        // guides set narrow and faint it is easy to land in by accident; the
+        // cost of doing so was not small. A misclick on a DRIVE ROOT collapsed
+        // the whole drive, every other root jumped up to fill the space, and
+        // the selection went with it - which is almost certainly the "tree
+        // suddenly flew to the top at C:" report that scrolljump.log was added
+        // to catch. The user worked that out from the gesture, not the log.
+        //
+        // Only the indent is excluded, not the rest of the row: clicking a
+        // folder's name to open it is how this tree has always worked, and
+        // VS Code's fixed, non-clickable indent is exactly the shape this now
+        // borrows.
+        bool clickedInIndent = RowContentLeftEdge(treeViewItem) is { } contentLeft
+            && e.GetPosition(treeViewItem).X < contentLeft;
+
+        if (!clickedOnExpander && !clickedInIndent && e.ClickCount == 1 &&
             treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsDirectory: true, IsEditing: false } item)
         {
             treeViewItem.IsSelected = true;
