@@ -357,11 +357,16 @@
                     Value="Disabled"/>
             <Setter Property="Padding"
                     Value="0"/>
+            <!-- What turns MinimalScrollViewerTemplate's two "more this way"
+                 chevrons on. Only menus attach this, which is what keeps those
+                 glyphs invisible in the tree and the lists. -->
+            <EventSetter Event="ScrollChanged"
+                    Handler="MenuScrollViewer_ScrollChanged"/>
             <Style.Triggers>
                 <Trigger Property="ComputedVerticalScrollBarVisibility"
                         Value="Visible">
                     <Setter Property="Padding"
-                            Value="{DynamicResource MenuScrollGutterPadding}"/>
+                            Value="{DynamicResource MenuScrollContentPadding}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -793,6 +798,28 @@
             <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
                     InputGestureText="F7"
                     Click="NewFolder_Click"/>
+            <Separator/>
+            <!-- The three view lists, reachable without a row to right-click -
+                 which is the whole point of this menu (2026-08-02). 북마크 has no
+                 "add" here: adding bookmarks the row under the cursor, and out
+                 here there is no row. The jumps and the two lists need none.
+
+                 All three are built on open by the same handlers the options
+                 menu and the row menu use, so there is one implementation of
+                 each no matter which menu it was opened from. -->
+            <MenuItem Header="{x:Static services:Strings.MenuBookmark}"
+                    AutomationProperties.AutomationId="emptyBookmark"
+                    SubmenuOpened="EmptySpaceBookmarkSubmenu_Opened">
+                <MenuItem Header=""/>
+            </MenuItem>
+            <MenuItem Header="{x:Static services:Strings.MenuHiddenFolderList}"
+                    SubmenuOpened="HiddenFolderSubmenu_Opened">
+                <MenuItem Header=""/>
+            </MenuItem>
+            <MenuItem Header="{x:Static services:Strings.MenuFileFilter}"
+                    SubmenuOpened="FileFilterSubmenu_Opened">
+                <MenuItem Header=""/>
+            </MenuItem>
         </ContextMenu>
 
         <ContextMenu x:Key="ExplorerItemContextMenu"
@@ -935,6 +962,15 @@
                     SubmenuOpened="HiddenFolderSubmenu_Opened">
                 <!-- Placeholder so WPF gives this item a submenu at all; the
                      real rows replace it on open (AppendHiddenFolderListTo). -->
+                <MenuItem Header=""/>
+            </MenuItem>
+            <!-- Global, not about the row under the cursor - but this is the
+                 menu the hand is already in when a folder turns out to be full
+                 of files you did not want to see (user's request, 2026-08-02).
+                 Same submenu the options menu and the empty-space menu open. -->
+            <MenuItem Header="{x:Static services:Strings.MenuFileFilter}"
+                    Tag="fileFilter"
+                    SubmenuOpened="FileFilterSubmenu_Opened">
                 <MenuItem Header=""/>
             </MenuItem>
             <!-- Sort closes this group rather than sitting among the folder
@@ -1322,47 +1358,11 @@
             <MenuItem Header="{x:Static services:Strings.MenuFileFilter}"
                     AutomationProperties.AutomationId="fileFilter"
                     SubmenuOpened="FileFilterSubmenu_Opened">
-                <MenuItem Header="{x:Static services:Strings.MenuFileFilterAll}"
-                        IsCheckable="True"
-                        StaysOpenOnClick="True"
-                        AutomationProperties.AutomationId="fileFilterAll"
-                        Click="FileFilterMenuItem_Click"/>
-                <Separator/>
-                <MenuItem Header="{x:Static services:Strings.MenuFileFilterCode}"
-                        IsCheckable="True"
-                        StaysOpenOnClick="True"
-                        AutomationProperties.AutomationId="fileFilterCode"
-                        Click="FileFilterMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuFileFilterImage}"
-                        IsCheckable="True"
-                        StaysOpenOnClick="True"
-                        AutomationProperties.AutomationId="fileFilterImage"
-                        Click="FileFilterMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuFileFilterDocument}"
-                        IsCheckable="True"
-                        StaysOpenOnClick="True"
-                        AutomationProperties.AutomationId="fileFilterDocument"
-                        Click="FileFilterMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuFileFilterMedia}"
-                        IsCheckable="True"
-                        StaysOpenOnClick="True"
-                        AutomationProperties.AutomationId="fileFilterMedia"
-                        Click="FileFilterMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuFileFilterArchive}"
-                        IsCheckable="True"
-                        StaysOpenOnClick="True"
-                        AutomationProperties.AutomationId="fileFilterArchive"
-                        Click="FileFilterMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuFileFilterExecutable}"
-                        IsCheckable="True"
-                        StaysOpenOnClick="True"
-                        AutomationProperties.AutomationId="fileFilterExecutable"
-                        Click="FileFilterMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuFileFilterOther}"
-                        IsCheckable="True"
-                        StaysOpenOnClick="True"
-                        AutomationProperties.AutomationId="fileFilterOther"
-                        Click="FileFilterMenuItem_Click"/>
+                <!-- Placeholder so WPF gives this item a submenu at all; the
+                     real rows replace it on open (FileFilterSubmenu_Opened).
+                     Built rather than declared because the same submenu hangs
+                     off three different menus - see that handler. -->
+                <MenuItem Header=""/>
             </MenuItem>
             <Separator/>
             <!-- Fenced off by separators on both sides: it opens a window,
@@ -1397,6 +1397,10 @@
                 <MenuItem Header="{x:Static services:Strings.MenuFontWeightFoldersOnly}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="fontWeightFolders"
+                        Click="FontWeightMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuFontWeightFilesOnly}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="fontWeightFiles"
                         Click="FontWeightMenuItem_Click"/>
             </MenuItem>
             <!-- Font size leads the stepper group deliberately: it was
@@ -2157,6 +2161,54 @@
                            Maximum="{TemplateBinding ScrollableWidth}"
                            ViewportSize="{TemplateBinding ViewportWidth}"
                            Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"/>
+
+                <!-- "There is more this way", for MENUS only. Declared here
+                     rather than in a duplicated menu template, and Collapsed
+                     for everyone: the only thing that ever shows them is
+                     MenuScrollViewer_ScrollChanged, and the only style that
+                     attaches that handler is MenuScrollViewerStyle. The tree,
+                     the favorites list and the search results carry these two
+                     Paths and never light them.
+
+                     A menu needs them because its scrollbar is hidden at rest
+                     like the tree's - so until the pointer went looking along
+                     the edge, the fact that a menu scrolled at all was
+                     invisible. Static, never blinking: a menu is a surface the
+                     user is already reading, and motion there takes the eye by
+                     force rather than informing it (agreed 2026-08-02). One
+                     look is all this has to survive. -->
+                <!-- Column 0 only, NOT spanning the gutter: centred over the
+                     rows, which is what the eye reads as the middle of the
+                     menu. Spanning both columns pushed it half the scrollbar's
+                     width off from the text it belongs to. The gutter column
+                     is 0 wide until there is something to scroll, so this is
+                     the true centre either way. -->
+                <Path x:Name="MoreAboveGlyph"
+                        Grid.Column="0"
+                        Data="M0,4 L4,0 L8,4"
+                        Stroke="{DynamicResource MenuForeground}"
+                        StrokeThickness="1.4"
+                        StrokeLineJoin="Round"
+                        StrokeStartLineCap="Round"
+                        StrokeEndLineCap="Round"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Top"
+                        Margin="0,4,0,0"
+                        IsHitTestVisible="False"
+                        Visibility="Collapsed"/>
+                <Path x:Name="MoreBelowGlyph"
+                        Grid.Column="0"
+                        Data="M0,0 L4,4 L8,0"
+                        Stroke="{DynamicResource MenuForeground}"
+                        StrokeThickness="1.4"
+                        StrokeLineJoin="Round"
+                        StrokeStartLineCap="Round"
+                        StrokeEndLineCap="Round"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,0,4"
+                        IsHitTestVisible="False"
+                        Visibility="Collapsed"/>
             </Grid>
             <ControlTemplate.Triggers>
                 <!-- The user-set bar thickness plus the 1px divider - both

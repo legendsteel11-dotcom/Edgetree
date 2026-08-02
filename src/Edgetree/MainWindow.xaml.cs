@@ -3859,13 +3859,16 @@ public partial class MainWindow : Window
 
             if (FindMenuItem(fontWeight, "fontWeightNormal") is { } weightNormal &&
                 FindMenuItem(fontWeight, "fontWeightBold") is { } weightBold &&
-                FindMenuItem(fontWeight, "fontWeightFolders") is { } weightFolders)
+                FindMenuItem(fontWeight, "fontWeightFolders") is { } weightFolders &&
+                FindMenuItem(fontWeight, "fontWeightFiles") is { } weightFiles)
             {
                 bool isBold = string.Equals(_settings.TreeFontWeight, "bold", StringComparison.OrdinalIgnoreCase);
                 bool isFolders = string.Equals(_settings.TreeFontWeight, "folders", StringComparison.OrdinalIgnoreCase);
+                bool isFiles = string.Equals(_settings.TreeFontWeight, "files", StringComparison.OrdinalIgnoreCase);
                 weightBold.IsChecked = isBold;
                 weightFolders.IsChecked = isFolders;
-                weightNormal.IsChecked = !isBold && !isFolders;
+                weightFiles.IsChecked = isFiles;
+                weightNormal.IsChecked = !isBold && !isFolders && !isFiles;
             }
             else
             {
@@ -3929,9 +3932,44 @@ public partial class MainWindow : Window
     {
         bool bold = string.Equals(_settings.TreeFontWeight, "bold", StringComparison.OrdinalIgnoreCase);
         bool foldersOnly = string.Equals(_settings.TreeFontWeight, "folders", StringComparison.OrdinalIgnoreCase);
+        bool filesOnly = string.Equals(_settings.TreeFontWeight, "files", StringComparison.OrdinalIgnoreCase);
 
         Resources["FolderNameFontWeight"] = bold || foldersOnly ? FontWeights.Bold : FontWeights.Normal;
-        Resources["FileNameFontWeight"] = bold ? FontWeights.Bold : FontWeights.Normal;
+        Resources["FileNameFontWeight"] = bold || filesOnly ? FontWeights.Bold : FontWeights.Normal;
+    }
+
+    // Shows the chevron for whichever direction still has menu rows in it.
+    // Driven from code rather than a trigger because the question - "is the
+    // offset short of the end" - compares two properties, and a Trigger can
+    // only test one against a constant.
+    //
+    // Runs on every scroll of every menu, so it stays arithmetic and property
+    // writes only. The half-pixel slack absorbs the fractional offsets that
+    // fall out of row heights at non-integer font scales; without it the
+    // bottom chevron can survive a scroll all the way down by a rounding
+    // error, which reads as the menu lying about having more.
+    private void MenuScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (sender is not ScrollViewer viewer)
+        {
+            return;
+        }
+
+        bool scrolls = viewer.ScrollableHeight > 0.5;
+
+        if (viewer.Template.FindName("MoreAboveGlyph", viewer) is UIElement above)
+        {
+            above.Visibility = scrolls && viewer.VerticalOffset > 0.5
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        if (viewer.Template.FindName("MoreBelowGlyph", viewer) is UIElement below)
+        {
+            below.Visibility = scrolls && viewer.VerticalOffset < viewer.ScrollableHeight - 0.5
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
     }
 
     // ----- 파일 종류 필터 -----------------------------------------------------
@@ -3958,23 +3996,101 @@ public partial class MainWindow : Window
         RefreshAllLoadedFolders();
     }
 
-    private void FileFilterMenuItem_Click(object sender, RoutedEventArgs e)
+    // The empty-space menu's 북마크 submenu. Deliberately NOT the row menu's:
+    // that one leads with 북마크 추가/해제, which acts on the row under the
+    // cursor, and out in the empty space there is no row - so the toggle is
+    // left out entirely rather than shown greyed. What remains still works from
+    // nowhere in particular: the two jumps, and the list.
+    private void EmptySpaceBookmarkSubmenu_Opened(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem item)
+        if (sender is not MenuItem submenu)
         {
             return;
         }
 
-        string id = System.Windows.Automation.AutomationProperties.GetAutomationId(item);
-        if (string.Equals(id, "fileFilterAll", StringComparison.Ordinal))
+        submenu.Items.Clear();
+
+        bool hasBookmarks = _settings.BookmarkPaths.Count > 0;
+        var prev = FollowMenuFont(new MenuItem
         {
-            _settings.FileFilterCategories.Clear();
+            Header = Strings.BookmarkShortcutPrev,
+            InputGestureText = "Ctrl+Alt+J",
+            IsEnabled = hasBookmarks,
+        });
+        prev.Click += (_, _) => JumpToBookmark(-1);
+        submenu.Items.Add(prev);
+
+        var next = FollowMenuFont(new MenuItem
+        {
+            Header = Strings.BookmarkShortcutNext,
+            InputGestureText = "Ctrl+Alt+L",
+            IsEnabled = hasBookmarks,
+        });
+        next.Click += (_, _) => JumpToBookmark(1);
+        submenu.Items.Add(next);
+
+        // The same list the row menu and the options menu build.
+        AppendBookmarkListTo(submenu);
+    }
+
+    // Category per row, carried on the row itself. Empty string = 전체, which is
+    // the absence of a filter rather than a category - see AppSettings.
+    private const string FileFilterAllTag = "";
+
+    private static readonly (string Category, Func<string> Label)[] FileFilterRows =
+    {
+        (FileTypeFilter.Code, () => Strings.MenuFileFilterCode),
+        (FileTypeFilter.Image, () => Strings.MenuFileFilterImage),
+        (FileTypeFilter.Document, () => Strings.MenuFileFilterDocument),
+        (FileTypeFilter.Media, () => Strings.MenuFileFilterMedia),
+        (FileTypeFilter.Archive, () => Strings.MenuFileFilterArchive),
+        (FileTypeFilter.Executable, () => Strings.MenuFileFilterExecutable),
+        (FileTypeFilter.Other, () => Strings.MenuFileFilterOther),
+    };
+
+    // Built in code, not declared three times in XAML. This submenu now hangs
+    // off the options menu, the row menu AND the empty-space menu, and three
+    // copies of fifty lines is three places for them to drift apart - the same
+    // reason the bookmark and hidden-folder lists are built rather than
+    // declared. The labels are read at build time so a language switch lands.
+    private void FileFilterSubmenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem submenu)
+        {
+            return;
         }
-        else if (FileFilterCategoryFor(id) is { } category)
+
+        submenu.Items.Clear();
+        submenu.Items.Add(BuildFileFilterRow(Strings.MenuFileFilterAll, FileFilterAllTag));
+        submenu.Items.Add(new Separator());
+        foreach (var (category, label) in FileFilterRows)
         {
-            // IsChecked has already flipped by the time this runs - a checkable
-            // menu item toggles itself - so it reads as the user's intent.
-            if (item.IsChecked)
+            submenu.Items.Add(BuildFileFilterRow(label(), category));
+        }
+    }
+
+    private MenuItem BuildFileFilterRow(string header, string category)
+    {
+        var row = FollowMenuFont(new MenuItem
+        {
+            Header = header,
+            Tag = category,
+            IsCheckable = true,
+            // Picking three kinds should be three clicks, not three trips back
+            // into the menu.
+            StaysOpenOnClick = true,
+        });
+        row.IsChecked = IsFileFilterRowChecked(category);
+
+        row.Click += (_, args) =>
+        {
+            args.Handled = true;
+
+            if (category.Length == 0)
+            {
+                _settings.FileFilterCategories.Clear();
+            }
+            else if (row.IsChecked)
             {
                 if (!_settings.FileFilterCategories.Contains(category))
                 {
@@ -3985,49 +4101,35 @@ public partial class MainWindow : Window
             {
                 _settings.FileFilterCategories.Remove(category);
             }
-        }
 
-        ApplyFileFilter();
+            ApplyFileFilter();
 
-        // The whole group is re-marked, not just the row that was clicked:
-        // turning the last category off falls back to 전체, and 전체 turns the
-        // others off. Found from the row's own host rather than a remembered
-        // one - this submenu is built into two different menus.
-        if (ItemsControl.ItemsControlFromItemContainer(item) is MenuItem submenu)
-        {
-            SyncFileFilterMenu(submenu);
-        }
+            // The whole group is re-marked, not just the row clicked: turning
+            // the last category off falls back to 전체, and 전체 turns the rest
+            // off. Found from the row's own host, since this submenu lives in
+            // three different menus.
+            if (ItemsControl.ItemsControlFromItemContainer(row) is MenuItem host)
+            {
+                SyncFileFilterMenu(host);
+            }
+        };
+
+        return row;
     }
 
-    private static string? FileFilterCategoryFor(string automationId) => automationId switch
-    {
-        "fileFilterCode" => FileTypeFilter.Code,
-        "fileFilterImage" => FileTypeFilter.Image,
-        "fileFilterDocument" => FileTypeFilter.Document,
-        "fileFilterMedia" => FileTypeFilter.Media,
-        "fileFilterArchive" => FileTypeFilter.Archive,
-        "fileFilterExecutable" => FileTypeFilter.Executable,
-        "fileFilterOther" => FileTypeFilter.Other,
-        _ => null,
-    };
+    private bool IsFileFilterRowChecked(string category)
+        => category.Length == 0
+            ? _settings.FileFilterCategories.Count == 0
+            : _settings.FileFilterCategories.Contains(category);
 
     private void SyncFileFilterMenu(MenuItem submenu)
     {
         foreach (var row in submenu.Items.OfType<MenuItem>())
         {
-            string id = System.Windows.Automation.AutomationProperties.GetAutomationId(row);
-            row.IsChecked = string.Equals(id, "fileFilterAll", StringComparison.Ordinal)
-                ? _settings.FileFilterCategories.Count == 0
-                : FileFilterCategoryFor(id) is { } category
-                    && _settings.FileFilterCategories.Contains(category);
-        }
-    }
-
-    private void FileFilterSubmenu_Opened(object sender, RoutedEventArgs e)
-    {
-        if (sender is MenuItem submenu)
-        {
-            SyncFileFilterMenu(submenu);
+            if (row.Tag is string category)
+            {
+                row.IsChecked = IsFileFilterRowChecked(category);
+            }
         }
     }
 
@@ -4074,6 +4176,7 @@ public partial class MainWindow : Window
         {
             "fontWeightBold" => "bold",
             "fontWeightFolders" => "folders",
+            "fontWeightFiles" => "files",
             _ => "normal",
         };
 
@@ -5210,37 +5313,39 @@ public partial class MainWindow : Window
         double bookmarkMarkerHeight = Math.Round(9.0 * growOnlyScale);
         Resources["BookmarkMarkerHeight"] = bookmarkMarkerHeight;
 
-        // Slid toward the scrollbar by 80% of its own width (user's call,
-        // 2026-07-28) - the marker reads better tucked against the edge than
-        // floating in the middle of its column. The column's total width is
-        // unchanged, so the name still gives up exactly what it did before:
-        // what moves is the glyph inside that space, not the space.
-        // The ribbon's own aspect is 480:672 in its native grid.
-        double markerShift = Math.Round(Math.Round(bookmarkMarkerHeight * 0.714) * 0.8);
-        // Left is the gap to whatever sits before it (the sort icon); right is
-        // what keeps it off the very edge. Only the right one decides where the
-        // ribbon lands, so the left can be spent on closing that gap without
-        // moving the marker itself.
-        Resources["BookmarkMarkerMargin"] =
-            new Thickness(3 + markerShift, 0, Math.Max(0, 7 - markerShift), 0);
-
-        // The sort icon follows the marker by the same amount, so the two stay
-        // in one line down the right edge instead of one sitting further in
-        // than the other. Left and right move together, so the column keeps its
-        // width and nothing beside it shifts.
+        // ONE vertical line for both right-edge marks (user's call,
+        // 2026-08-02). A row carrying only a sort icon and a row carrying only
+        // a bookmark used to sit 4.5px apart - the icon centred 9.5px in from
+        // the right edge, the ribbon 5px - which reads as a wobble down the
+        // edge rather than as two different marks.
         //
-        // What this spends is the icon's clearance from the overlay scrollbar,
-        // which hit-tests even while invisible - the reason that right margin
-        // was 6 in the first place. See the note on SortOverrideIconBorder.
-        Resources["SortOverrideIconMargin"] =
-            new Thickness(4 + markerShift, 0, Math.Max(0, 6 - markerShift), 0);
+        // The shared line is NOT simply where the ribbon already was. The
+        // ribbon does not take clicks; the sort icon does, and the overlay
+        // scrollbar hit-tests a 5px strip along that edge even at Opacity 0
+        // (see MinimalScrollBarStyle). Centring the icon at 5px would put the
+        // middle of its target inside that strip - aim at the icon, hit the
+        // scrollbar. So the line sits just outside the strip and the RIBBON
+        // comes in to meet it, which costs nothing because nothing aims at the
+        // ribbon. It gives back a little of the "tucked against the edge" the
+        // marker was given on 2026-07-28; one line for both was judged worth
+        // those two pixels.
+        double glyphCenterFromRight = Math.Round(8.0 * growOnlyScale);
 
-        // Asymmetric on purpose. The padding is click area, not spacing, and
-        // most of the room it buys was on the side facing the bookmark ribbon -
-        // which is where the two needed to close up. The left half keeps its
-        // width, so the target stays easy to hit from the direction the cursor
-        // actually arrives from.
-        Resources["SortOverrideIconPadding"] = new Thickness(10, 0, 4, 0);
+        // The ribbon's own aspect is 480:672 in its native grid.
+        double ribbonWidth = Math.Round(bookmarkMarkerHeight * 0.714);
+        // Left is only the gap to whatever sits before it; the RIGHT margin is
+        // what decides where the ribbon actually lands.
+        Resources["BookmarkMarkerMargin"] = new Thickness(
+            3, 0, Math.Max(0, glyphCenterFromRight - ribbonWidth / 2), 0);
+
+        // Padding here is click area, not spacing, and the left half is the
+        // side the cursor arrives from - so what gives to reach the shared line
+        // is the right margin, not the target.
+        const double SortIconPaddingRight = 2;
+        double sortIconWidth = Math.Round(9.0 * growOnlyScale);
+        Resources["SortOverrideIconMargin"] = new Thickness(
+            4, 0, Math.Max(0, glyphCenterFromRight - sortIconWidth / 2 - SortIconPaddingRight), 0);
+        Resources["SortOverrideIconPadding"] = new Thickness(10, 0, SortIconPaddingRight, 0);
 
         // Row vertical padding: the font-size-scaled base (was
         // Converters/FontSizeToRowPaddingConverter's whole job, now folded in
@@ -5464,17 +5569,25 @@ public partial class MainWindow : Window
             menuHorizontalPadding, menuVerticalPadding,
             menuHorizontalPadding, menuVerticalPadding);
 
-        // Breathing room between a scrolling menu's content and the scrollbar's
-        // own lane - applied ONLY while the bar is showing (see
-        // MenuScrollViewerStyle). A full-width row, i.e. the image thumbnail,
-        // otherwise ends flush against the thumb.
+        // What a SCROLLING menu keeps clear around its rows - applied only
+        // while the bar is showing (see MenuScrollViewerStyle), so a menu that
+        // fits is untouched.
         //
-        // The SAME value as the menu's horizontal padding above, on purpose:
-        // that padding is what already sits to the RIGHT of the thumb (plus the
-        // thumb's own 1px margin), so reusing it puts equal air on both sides of
-        // the bar instead of a wider gap on one side (user's call, 2026-08-02).
-        appResources["MenuScrollGutterPadding"] = new Thickness(
-            0, 0, menuHorizontalPadding, 0);
+        // Right: the same value as the menu's own horizontal padding above, on
+        // purpose. That padding is what already sits to the RIGHT of the thumb
+        // (plus the thumb's own 1px margin), so reusing it puts equal air on
+        // both sides of the bar rather than a wider gap on one side.
+        //
+        // Top and bottom: a band of its own for each "more this way" chevron.
+        // They were drawn straight over the first and last row, which put an
+        // arrow on top of a row's text - the row and the arrow each made the
+        // other harder to read (2026-08-02). Reserved on BOTH edges the whole
+        // time the menu scrolls, not only on the side currently showing an
+        // arrow: sizing it per-arrow would shift every row down the moment you
+        // scrolled off the top.
+        double menuScrollBand = Math.Round(12.0 * scale);
+        appResources["MenuScrollContentPadding"] = new Thickness(
+            0, menuScrollBand, menuHorizontalPadding, menuScrollBand);
 
         // Padding just changed, and the cap subtracts it.
         ApplyMenuMaxHeight();

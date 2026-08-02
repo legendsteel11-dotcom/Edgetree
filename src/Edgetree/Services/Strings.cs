@@ -39,6 +39,7 @@ public static class Strings
     public static string MenuFontWeightNormal = "보통";
     public static string MenuFontWeightBold = "굵게";
     public static string MenuFontWeightFoldersOnly = "폴더만 굵게";
+    public static string MenuFontWeightFilesOnly = "파일만 굵게";
 
     // The panel beside the tree: which list it shows, or none at all.
     public static string MenuSidePanel = "패널 표시";
@@ -362,6 +363,7 @@ public static class Strings
         MenuFontWeightNormal = "Normal";
         MenuFontWeightBold = "Bold";
         MenuFontWeightFoldersOnly = "Bold Folders Only";
+        MenuFontWeightFilesOnly = "Bold Files Only";
         MenuSidePanel = "Side Panel";
         MenuSidePanelFavorites = "Favorites";
         MenuSidePanelBookmarks = "Bookmarks";
