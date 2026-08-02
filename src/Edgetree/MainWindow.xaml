@@ -3159,6 +3159,21 @@
                     Value="Stretch"/>
             <Setter Property="ContextMenu"
                     Value="{StaticResource SearchResultContextMenu}"/>
+            <!-- Same hover contract as the tree rows and the panel lists: the
+                 delay is long enough that brushing past on the way somewhere
+                 else pops nothing up, and the font follows the placement target
+                 because a tooltip is its own window and inherits nothing. The
+                 surface itself comes from the implicit ToolTip style. -->
+            <Setter Property="ToolTipService.InitialShowDelay"
+                    Value="900"/>
+            <Setter Property="ToolTipService.ShowDuration"
+                    Value="20000"/>
+            <Setter Property="ToolTip">
+                <Setter.Value>
+                    <ToolTip Content="{Binding TooltipPath}"
+                            FontSize="{Binding PlacementTarget.FontSize, RelativeSource={RelativeSource Self}}"/>
+                </Setter.Value>
+            </Setter>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
@@ -3187,6 +3202,14 @@
                 </Setter.Value>
             </Setter>
             <Style.Triggers>
+                <!-- The synthetic "… 더 보기 (N개)" row stands for no path at
+                     all, so it gets no tooltip - a blank one popping up over it
+                     would read as a fault. -->
+                <DataTrigger Binding="{Binding IsShowMore}"
+                        Value="True">
+                    <Setter Property="ToolTipService.IsEnabled"
+                            Value="False"/>
+                </DataTrigger>
                 <!-- Folder header rows are labels, not targets: no hand cursor,
                      no hover/selection highlight (IsHitTestVisible=False also
                      lets a click land through to nothing rather than selecting

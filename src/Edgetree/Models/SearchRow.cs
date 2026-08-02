@@ -28,6 +28,16 @@ public sealed class SearchRow : INotifyPropertyChanged
 
     public string DirectoryPath { get; init; } = string.Empty;
     public string FileName { get; init; } = string.Empty;
+
+    // What the row's tooltip says. The tree and both panel lists already answer
+    // "which one is this" on hover, and the results list needed it at least as
+    // much: a header path is trimmed with an ellipsis the moment the panel is
+    // narrow, and a file row shows nothing but a name, so two results with the
+    // same name are indistinguishable on screen. A file row has to have its
+    // folder put back; a header row already is one.
+    public string TooltipPath => IsHeader
+        ? DirectoryPath
+        : System.IO.Path.Combine(DirectoryPath, FileName);
     public FileSearchService.SearchEntry? Entry { get; init; }
 
     // Mode-aware (PNG set vs. Windows shell icons - same switch as the tree,
