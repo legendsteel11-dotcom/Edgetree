@@ -9597,7 +9597,8 @@ public partial class MainWindow : Window
     // Right-click on empty tree space (see ExplorerEmptySpaceContextMenu) has
     // no clicked-on item to anchor to, unlike every other file operation here.
     // Falls back through: selected folder -> selected file's parent -> the
-    // first drive root, so it's never simply a no-op.
+    // multi-selection's last row -> the first drive root, so it's never simply
+    // a no-op.
     private void NewFolder_Click(object sender, RoutedEventArgs e)
     {
         // Before anything is created, not just before the new row goes into
@@ -9611,7 +9612,18 @@ public partial class MainWindow : Window
         {
             FileSystemItem { IsPlaceholder: false, IsDirectory: true } folder => folder,
             FileSystemItem { IsPlaceholder: false, IsDirectory: false } file => file.Parent,
-            _ => _roots.FirstOrDefault()
+
+            // Ctrl+clicking the natively-selected row back off drops the
+            // native selection on purpose while the set keeps its rows painted
+            // as selected (see ExplorerTree_SelectedItemChanged). Creating in
+            // the first drive root at that moment would contradict what the
+            // tree is plainly showing, so the set is asked before the roots.
+            _ => _multiSelection.LastOrDefault() switch
+            {
+                { IsPlaceholder: false, IsDirectory: true } folder => folder,
+                { IsPlaceholder: false, IsDirectory: false } file => file.Parent,
+                _ => null
+            } ?? _roots.FirstOrDefault()
         };
 
         if (target is null)
