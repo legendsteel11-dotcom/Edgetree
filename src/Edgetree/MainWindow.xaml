@@ -3742,6 +3742,7 @@
                       VirtualizingPanel.CacheLength="1000,1000"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                       MouseDoubleClick="ExplorerTree_MouseDoubleClick"
+                      PreviewMouseLeftButtonDown="ExplorerTree_PreviewMouseLeftButtonDown"
                       TreeViewItem.Expanded="ExplorerTree_ItemExpandedOrCollapsed"
                       TreeViewItem.Collapsed="ExplorerTree_ItemExpandedOrCollapsed"
                       SelectedItemChanged="ExplorerTree_SelectedItemChanged"

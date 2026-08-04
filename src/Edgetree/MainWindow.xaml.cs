@@ -6228,6 +6228,34 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, command);
     }
 
+    // A press on the tree's own background - below the last row, or in the
+    // strip left of the scrollbar - lands on no TreeViewItem, so none of the
+    // row handlers run and keyboard focus has nowhere to move. With an inline
+    // rename open that read as the click being swallowed: the name is
+    // committed by RenameTextBox_LostFocus, and LostFocus cannot fire while
+    // focus stays put. So the commit is made here instead, which is the same
+    // "click away to confirm" that clicking another row already gives.
+    //
+    // Deliberately nothing else. Clearing the selection here would look
+    // tidier and cost more than it looks: it is what the next launch restores
+    // to (SaveCurrentWidth), and it is what keeps a temporarily-visible
+    // hidden folder on screen (ReHideFoldersLeftBehind).
+    private void ExplorerTree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var source = e.OriginalSource as DependencyObject;
+
+        // The scrollbar is part of the tree's own template, and dragging it is
+        // not clicking away from anything - the row being renamed is still
+        // there, just moved.
+        if (source?.FindAncestor<TreeViewItem>() is not null ||
+            source?.FindAncestor<System.Windows.Controls.Primitives.ScrollBar>() is not null)
+        {
+            return;
+        }
+
+        FinishOpenInlineRename();
+    }
+
     private void ExplorerTree_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         // WPF raises MouseDoubleClick for the RIGHT button too, and this
