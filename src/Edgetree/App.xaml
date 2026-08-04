@@ -24,6 +24,11 @@
              background (#282A2C) and so came out invisible there - the tree's
              hover is the standard to match, not the dialog's. -->
         <SolidColorBrush x:Key="MenuHighlightBackground" Color="#FF3A3D41"/>
+        <!-- The colour picker's own panel. A step darker than the dialog it
+             floats over, which is how it sets itself apart now that nothing
+             dims behind it - shading the window was separating the panel at
+             the cost of the colours being judged through it. -->
+        <SolidColorBrush x:Key="PickerPanelBackground" Color="#FF141415"/>
         <SolidColorBrush x:Key="SecondaryForeground" Color="#FF9A9A9A"/>
         <SolidColorBrush x:Key="PanelBackground" Color="#FF282828"/>
         <SolidColorBrush x:Key="PanelBorder" Color="#FF454545"/>

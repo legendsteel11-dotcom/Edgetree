@@ -221,6 +221,9 @@ public partial class App : Application
             SetChromeBrush("DialogBackground", "#FFFFFFFF");
             SetChromeBrush("DialogHeaderBackground", "#FFF3F3F3");
             SetChromeBrush("DialogForeground", "#FF1E1E1E");
+            // Darker here too, not lighter: on white there is nothing above to
+            // go to, so "set apart" means pressed down in both themes.
+            SetChromeBrush("PickerPanelBackground", "#FFDCDCDC");
             SetChromeBrush("AccentForeground", "#FF0969DA");
         }
         else
@@ -250,6 +253,7 @@ public partial class App : Application
             SetChromeBrush("DialogBackground", "#FF252526");
             SetChromeBrush("DialogHeaderBackground", "#FF2D2D2D");
             SetChromeBrush("DialogForeground", "#FFCCCCCC");
+            SetChromeBrush("PickerPanelBackground", "#FF141415");
             SetChromeBrush("AccentForeground", "#FF4FA8FF");
         }
     }

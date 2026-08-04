@@ -581,22 +581,22 @@
                  suppress.
 
                  The layer under the panel is what closes it: a click anywhere
-                 outside the panel lands there. It is dimmed rather than merely
-                 transparent, which is also what sets the panel apart from the
-                 window it floats over - the two share a background colour, so
-                 an edge alone left them reading as one surface. Doing it with
-                 shade instead of a brighter border keeps this working in both
-                 themes without a sixteenth colour to set and maintain. -->
+                 outside the panel lands there. Transparent, not dimmed - it
+                 was shaded for a while so the panel would stand apart, and
+                 that shade fell across the swatches and the labels being
+                 judged, which is the one thing this window exists to show
+                 truthfully. The panel carries its own darker background
+                 instead, so the separation costs nothing behind it. -->
             <Canvas x:Name="PickerLayer"
                     Grid.Row="0"
                     Grid.RowSpan="3"
                     Panel.ZIndex="10"
-                    Background="#66000000"
+                    Background="Transparent"
                     Visibility="Collapsed"
                     MouseLeftButtonDown="PickerLayer_MouseLeftButtonDown">
                 <Border x:Name="PickerPanel"
                         Width="250"
-                        Background="{DynamicResource DialogBackground}"
+                        Background="{DynamicResource PickerPanelBackground}"
                         BorderBrush="{DynamicResource PanelBorder}"
                         BorderThickness="1"
                         CornerRadius="4"
