@@ -203,7 +203,7 @@
         <Thickness x:Key="FileRowIconMargin">0,0,6,0</Thickness>
         <Thickness x:Key="FileNameMargin">0,0,0,0</Thickness>
 
-        <!-- The "탭간격" (tab spacing) family - see MainWindow.xaml.cs's
+        <!-- The "들여쓰기 간격" (indent width) family - see MainWindow.xaml.cs's
              ApplyLayoutMetrics for how these three are actually computed
              from AppSettings.TabSpacing (user-adjustable 4~24 from the "..."
              options menu); the values here are just defaults matching the
@@ -2900,7 +2900,7 @@
                  beneath it, so it mirrors ExplorerTreeViewItemStyle's metrics
                  by sharing the very same resources rather than restating their
                  default values: RowPadding (Ctrl+/- zoom and "행 간격"),
-                 TabSpacingWidth for the expander stand-in column ("탭 간격"),
+                 TabSpacingWidth for the expander stand-in column ("들여쓰기 간격"),
                  and IconSize/FolderRowIconMargin for the folder icon. Those
                  last three used to be hardcoded here at their defaults (16 /
                  16 / 6), which held only while the user left every metric
@@ -2962,7 +2962,7 @@
                                          its expander) instead of collapsing flush left with
                                          everything else in it. Shares ExpanderColumn's
                                          TabSpacingWidth rather than hardcoding its default
-                                         width, so the "탭 간격" option moves favorites and
+                                         width, so the "들여쓰기 간격" option moves favorites and
                                          tree rows together. -->
                                     <ColumnDefinition Width="{DynamicResource TabSpacingWidth}"/>
                                     <ColumnDefinition Width="Auto"/>

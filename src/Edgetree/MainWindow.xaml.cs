@@ -5308,7 +5308,7 @@ public partial class MainWindow : Window
     // padding, so icons and their surrounding gaps grow/shrink along with
     // Ctrl+/- zoom instead of staying a fixed size that looks increasingly
     // mismatched against the text around them. Also computes everything
-    // driven by "탭간격" (AppSettings.TabSpacing, user-adjustable 4~24 from
+    // driven by "들여쓰기 간격" (AppSettings.TabSpacing, user-adjustable 4~24 from
     // the "..." options menu) - the arrow column width and the guide line's
     // margin/padding are deliberately NOT zoom-scaled here, matching how
     // they were fixed literals before TabSpacing existed; only the icon/name

@@ -174,7 +174,7 @@ public class AppSettings
     // Default lowered from 25 to 20 (2026-07-17).
     public int MaxItemsPerFolder { get; set; } = 20;
 
-    // "탭간격" in the options menu - the per-nesting-level indent width in
+    // "들여쓰기 간격" in the options menu - the per-nesting-level indent width in
     // pixels (also drives the expand arrow's column width and the guide
     // line's position beneath it, and the file icon/name alignment shift -
     // see MainWindow.xaml.cs's ApplyLayoutMetrics). User-adjustable 4~24;

@@ -169,7 +169,7 @@ public static class Strings
     // the row itself).
     public static string MenuFontSize = "글꼴 크기 (Ctrl +/-)";
     public static string MenuMaxItemsPerFolder = "한 번에 표시할 개수";
-    public static string MenuTabSpacing = "탭 간격";
+    public static string MenuTabSpacing = "들여쓰기 간격";
     public static string MenuRowSpacing = "행 간격";
     public static string MenuScrollBarThickness = "스크롤바 두께";
     public static string MenuExportSettings = "설정 내보내기...";
@@ -249,18 +249,20 @@ public static class Strings
     // Color settings window
     public static string ColorSettingsTitle = "색상 설정";
     public static string ColorLabelBackground = "탐색기 배경";
-    public static string ColorLabelFolderNameFont = "폴더명";
-    public static string ColorLabelFolderNameHighlightFont = "폴더명 하이라이트";
-    public static string ColorLabelFileNameFont = "파일명";
-    public static string ColorLabelFileNameHighlightFont = "파일명 하이라이트";
+    // "폴더 이름"/"파일 이름", not "폴더명"/"파일명": the row menu already says
+    // "이름 바꾸기", and one thing called two names reads as two things.
+    public static string ColorLabelFolderNameFont = "폴더 이름";
+    public static string ColorLabelFolderNameHighlightFont = "폴더 이름 강조";
+    public static string ColorLabelFileNameFont = "파일 이름";
+    public static string ColorLabelFileNameHighlightFont = "파일 이름 강조";
     public static string ColorLabelSelection = "선택된 항목";
     public static string ColorLabelHistory = "즐겨찾기 배경";
-    public static string ColorLabelHoverBackground = "마우스 hover";
-    public static string ColorLabelFolderNameHoverFont = "폴더명 마우스 hover";
-    public static string ColorLabelFileNameHoverFont = "파일명 마우스 hover";
+    public static string ColorLabelHoverBackground = "마우스 오버";
+    public static string ColorLabelFolderNameHoverFont = "폴더 이름 마우스 오버";
+    public static string ColorLabelFileNameHoverFont = "파일 이름 마우스 오버";
     public static string ColorLabelShowMore = "더 보기";
-    public static string ColorLabelGuideLine = "탭 구분선";
-    public static string ColorLabelGuideLineActive = "탭 구분선 하이라이트";
+    public static string ColorLabelGuideLine = "들여쓰기 안내선";
+    public static string ColorLabelGuideLineActive = "들여쓰기 안내선 강조";
     public static string ColorLabelHeader = "제목 표시줄 배경";
     public static string ColorLabelPanelDivider = "영역 구분선";
     public static string ButtonDefaults = "기본값";
