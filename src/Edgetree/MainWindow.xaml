@@ -1848,14 +1848,30 @@
                                  (TabSpacingWidth) split around the fixed 1px BorderThickness -
                                  see ApplyLayoutMetrics - so the line stays centered under the
                                  arrow above regardless of the current spacing. -->
-                            <Border x:Name="ItemsHost"
-                                    Visibility="Collapsed"
-                                    Margin="{DynamicResource TabSpacingGuideMargin}"
-                                    BorderThickness="1,0,0,0"
-                                    BorderBrush="{DynamicResource TreeGuideLineBrush}"
-                                    Padding="{DynamicResource TabSpacingGuidePadding}">
-                                <ItemsPresenter/>
-                            </Border>
+                            <Grid x:Name="ItemsHost"
+                                    Visibility="Collapsed">
+                                <!-- BorderThickness with no brush: the 1px is still reserved,
+                                     so every metric ApplyLayoutMetrics splits around it stays
+                                     exactly as it was. The line is only PAINTED elsewhere. -->
+                                <Border Margin="{DynamicResource TabSpacingGuideMargin}"
+                                        BorderThickness="1,0,0,0"
+                                        Padding="{DynamicResource TabSpacingGuidePadding}">
+                                    <ItemsPresenter/>
+                                </Border>
+                                <!-- The line drawn over that reserved pixel rather than by it,
+                                     because a Border hit-tests wherever it PAINTS: the line was
+                                     clickable (the empty strip either side of it never was), and
+                                     clicking it selected the ancestor that owns it. Halfway down
+                                     a long subtree there is no way to tell which folder a 1px
+                                     line belongs to, so it stopped being a target - it shows
+                                     depth, and how far a folder reaches, and nothing else. -->
+                                <Border x:Name="GuideLine"
+                                        Margin="{DynamicResource TabSpacingGuideMargin}"
+                                        HorizontalAlignment="Left"
+                                        Width="1"
+                                        IsHitTestVisible="False"
+                                        Background="{DynamicResource TreeGuideLineBrush}"/>
+                            </Grid>
                         </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsExpanded"
@@ -1883,8 +1899,8 @@
                                  down to the active selection is easy to trace. -->
                             <DataTrigger Binding="{Binding IsAncestorOfSelection}"
                                     Value="True">
-                                <Setter TargetName="ItemsHost"
-                                        Property="BorderBrush"
+                                <Setter TargetName="GuideLine"
+                                        Property="Background"
                                         Value="{DynamicResource TreeGuideLineActiveBrush}"/>
                             </DataTrigger>
                             <!-- SourceName="RowBorder" (not plain Property="IsMouseOver", which
