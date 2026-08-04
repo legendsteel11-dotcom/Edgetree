@@ -137,14 +137,11 @@ internal static class ExitLog
             string detail = $"pid {parts[0]}, last alive {alive:yyyy-MM-dd HH:mm:ss}, "
                 + $"up {(int)(alive - start).TotalMinutes}m";
 
-            Record(LastLine() switch
+            Record(PreviousSessionEnding() switch
             {
-                string s when s.Contains(BuildKillMarker) =>
-                    $"previous session: killed for a build, signed - {detail}",
-                string s when s.Contains("UNHANDLED") =>
-                    $"previous session: crashed, exception above - {detail}",
-                _ =>
-                    $"previous session: VANISHED with no record - {detail}",
+                Ending.BuildKill => $"previous session: killed for a build, signed - {detail}",
+                Ending.Crash => $"previous session: crashed, exception above - {detail}",
+                _ => $"previous session: VANISHED with no record - {detail}",
             });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -152,23 +149,58 @@ internal static class ExitLog
         }
     }
 
-    private static string LastLine()
+    private enum Ending
+    {
+        Unexplained,
+        BuildKill,
+        Crash,
+    }
+
+    // How the previous session ended, read out of its own stretch of the log.
+    //
+    // This used to look at the LAST LINE only, and that was wrong in exactly
+    // the case the instrument exists for: an unhandled exception writes
+    // "UNHANDLED ..." and then its stack trace, dozens of lines of it, so the
+    // last line is always a stack frame and never the word being searched for.
+    // Every crash there has ever been was therefore filed as VANISHED - which
+    // is the one verdict that says "nobody can explain this", printed over the
+    // top of a full explanation sitting a few lines above. Two of the recorded
+    // disappearances are provably this (2026-07-28's XamlParseException,
+    // 2026-08-02's collection-modified), and it was caught only because a
+    // crash was deliberately caused on 2026-08-04 and mislabelled in front of
+    // us.
+    //
+    // So the whole of the previous session is read instead: backwards to its
+    // "--- started" line, taking the latest marker found. A safeguard that
+    // reports the wrong cause is worse than one that reports nothing, because
+    // the wrong cause gets believed.
+    private static Ending PreviousSessionEnding()
     {
         try
         {
             if (!File.Exists(LogPath))
             {
-                return string.Empty;
+                return Ending.Unexplained;
             }
 
-            // The log is a few KB and only read once per launch, so there is
-            // no reason to seek from the end.
+            // A few KB, read once per launch.
             string[] lines = File.ReadAllLines(LogPath);
             for (int i = lines.Length - 1; i >= 0; i--)
             {
-                if (!string.IsNullOrWhiteSpace(lines[i]))
+                string line = lines[i];
+                if (line.Contains(BuildKillMarker))
                 {
-                    return lines[i];
+                    return Ending.BuildKill;
+                }
+                if (line.Contains("UNHANDLED"))
+                {
+                    return Ending.Crash;
+                }
+                // The previous session's own opening line: anything above it
+                // belongs to a session that has already been accounted for.
+                if (line.Contains("--- started"))
+                {
+                    return Ending.Unexplained;
                 }
             }
         }
@@ -176,6 +208,6 @@ internal static class ExitLog
         {
         }
 
-        return string.Empty;
+        return Ending.Unexplained;
     }
 }
