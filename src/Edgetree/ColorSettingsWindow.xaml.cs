@@ -37,11 +37,17 @@ public partial class ColorSettingsWindow : Window
 
     // Nudges attention back to this dialog if the user clicks outside the
     // whole app while it's open (ShowDialog only blocks its owner, not other
-    // applications, so that's still possible). Nothing in this window opens a
-    // second window any more - the picker is a layer inside this one - so
-    // there is no in-app case to exclude.
+    // applications, so that's still possible). The picker is a layer inside
+    // this window and takes no activation; the export/import file dialogs do,
+    // and flashing at those would be scolding the user for a button this
+    // window itself put there.
     private void Window_Deactivated(object? sender, EventArgs e)
     {
+        if (_isFileDialogOpen)
+        {
+            return;
+        }
+
         var flashBrush = new SolidColorBrush(((SolidColorBrush)RootBorder.BorderBrush).Color);
         RootBorder.BorderBrush = flashBrush;
         flashBrush.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation
@@ -305,6 +311,138 @@ public partial class ColorSettingsWindow : Window
     // ResetDefaultsButton is disabled whenever there'd be nothing to reset
     // (see UpdateResetButtonEnabled), so reaching this handler at all means a
     // real change is about to happen - hence the confirmation.
+    // ----- 색상만 내보내기/불러오기 -------------------------------------------
+    //
+    // settings.json carries far more than colours - hidden folders, bookmarks,
+    // favorites, the last selected path - and all of those name folders that
+    // exist on one machine and not the next. Copying the file across is how
+    // someone finds that out (user, 2026-08-04). So the palette travels on its
+    // own.
+    //
+    // Every colour, both themes, in one file: a theme is the pair, and
+    // exporting only the half currently showing would leave the other half of
+    // the destination untouched and mismatched. The properties are found by
+    // name rather than listed, so a colour added later travels without anyone
+    // remembering this code exists.
+    private static IEnumerable<System.Reflection.PropertyInfo> ColorProperties()
+        => typeof(AppSettings).GetProperties()
+            .Where(p => p.PropertyType == typeof(string)
+                && p.CanRead && p.CanWrite
+                && p.Name.EndsWith("ColorHex", StringComparison.Ordinal));
+
+    // The native file dialogs take activation the way the old colour dialog
+    // did, and this window reads that as "the user left the app" (see
+    // Window_Deactivated). True for exactly as long as one is up.
+    private bool _isFileDialogOpen;
+
+    private void ExportColors_Click(object sender, RoutedEventArgs e)
+    {
+        ClosePicker(keep: true);
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            FileName = Strings.ColorFileDefaultName,
+            Filter = Strings.ColorFileFilter,
+            AddExtension = true,
+            DefaultExt = ".json"
+        };
+
+        if (!ShowFileDialog(dialog))
+        {
+            return;
+        }
+
+        var colors = ColorProperties().ToDictionary(
+            p => p.Name,
+            p => (string?)p.GetValue(_settings) ?? string.Empty);
+
+        try
+        {
+            System.IO.File.WriteAllText(
+                dialog.FileName,
+                System.Text.Json.JsonSerializer.Serialize(
+                    colors, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            System.Windows.MessageBox.Show(this, ex.Message, Strings.ColorImportFailedTitle,
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void ImportColors_Click(object sender, RoutedEventArgs e)
+    {
+        ClosePicker(keep: true);
+
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            FileName = Strings.ColorFileDefaultName,
+            Filter = Strings.ColorFileFilter,
+            CheckFileExists = true
+        };
+
+        if (!ShowFileDialog(dialog))
+        {
+            return;
+        }
+
+        Dictionary<string, string>? colors = null;
+        try
+        {
+            colors = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(
+                System.IO.File.ReadAllText(dialog.FileName));
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException
+            or System.IO.IOException
+            or UnauthorizedAccessException
+            or NotSupportedException)
+        {
+            // Nothing usable in it, which the count below reports the same way
+            // a valid-but-empty file would - the user's question is "did my
+            // colours arrive", not which kind of unreadable this was.
+        }
+
+        int applied = 0;
+        if (colors is not null)
+        {
+            foreach (var property in ColorProperties())
+            {
+                // Each value is parsed before it is stored. A file that names a
+                // real colour badly must not be able to put a string into
+                // settings that every ColorConverter call afterwards throws on.
+                if (colors.TryGetValue(property.Name, out string? hex) &&
+                    ParseHex(hex, Colors.Black) is { } color)
+                {
+                    property.SetValue(_settings, $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}");
+                    applied++;
+                }
+            }
+        }
+
+        if (applied == 0)
+        {
+            System.Windows.MessageBox.Show(this, Strings.ColorImportFailedBody,
+                Strings.ColorImportFailedTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        RefreshSwatches();
+        _onChanged();
+    }
+
+    private bool ShowFileDialog(Microsoft.Win32.CommonDialog dialog)
+    {
+        _isFileDialogOpen = true;
+        try
+        {
+            return dialog.ShowDialog(this) == true;
+        }
+        finally
+        {
+            _isFileDialogOpen = false;
+        }
+    }
+
     private void ResetDefaults_Click(object sender, RoutedEventArgs e)
     {
         string modeLabel = _settings.IsLightMode ? Strings.ColorThemeLightLabel : Strings.ColorThemeDarkLabel;
@@ -701,13 +839,25 @@ public partial class ColorSettingsWindow : Window
 
     private void ColorSettingsWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        // Handled here, ahead of 닫기's IsCancel - one Esc should put back the
-        // colour being picked, not close the whole window with it applied.
-        if (e.Key == Key.Escape && PickerLayer.Visibility == Visibility.Visible)
+        if (e.Key != Key.Escape)
+        {
+            return;
+        }
+
+        // The picker gets first refusal: one Esc should put back the colour
+        // being picked, not close the whole window with it applied. A second
+        // Esc then closes, as it always did - that used to be the 닫기 button's
+        // IsCancel, and the button is gone.
+        if (PickerLayer.Visibility == Visibility.Visible)
         {
             ClosePicker(keep: false);
-            e.Handled = true;
         }
+        else
+        {
+            Close();
+        }
+
+        e.Handled = true;
     }
 
     private void PickerLayer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

@@ -267,6 +267,15 @@ public static class Strings
     public static string ColorLabelPanelDivider = "영역 구분선";
     public static string ButtonDefaults = "기본값";
     public static string ButtonClose = "닫기";
+    // Colours travel between machines; the rest of settings.json does not -
+    // hidden folders, bookmarks and last-selected paths all name folders the
+    // other PC may not have (user, 2026-08-04).
+    public static string ButtonExportColors = "내보내기";
+    public static string ButtonImportColors = "불러오기";
+    public static string ColorFileFilter = "Edgetree 색상 (*.json)|*.json";
+    public static string ColorFileDefaultName = "edgetree-colors.json";
+    public static string ColorImportFailedTitle = "색상 불러오기";
+    public static string ColorImportFailedBody = "이 파일에는 색상이 없습니다.";
     public static string ColorThemeDarkMode = "🌙 다크 모드";
     public static string ColorThemeLightMode = "☀️ 라이트 모드";
     // Plain (no emoji) versions for use inside a sentence - see
@@ -512,6 +521,12 @@ public static class Strings
         ColorLabelPanelDivider = "Panel Divider";
         ButtonDefaults = "Defaults";
         ButtonClose = "Close";
+        ButtonExportColors = "Export";
+        ButtonImportColors = "Import";
+        ColorFileFilter = "Edgetree colours (*.json)|*.json";
+        ColorFileDefaultName = "edgetree-colors.json";
+        ColorImportFailedTitle = "Import Colours";
+        ColorImportFailedBody = "That file holds no colours.";
         ColorThemeDarkMode = "🌙 Dark Mode";
         ColorThemeLightMode = "☀️ Light Mode";
         ColorThemeDarkLabel = "Dark Mode";

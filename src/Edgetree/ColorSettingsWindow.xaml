@@ -152,10 +152,15 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
+                        <!-- Padding is bound so a button can size to its own
+                             words instead of the fixed width - the export and
+                             import pair share a row with 기본값 and would not
+                             all fit at 70 each. -->
                         <Border x:Name="Bd"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
                                 CornerRadius="4">
                             <ContentPresenter HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
@@ -533,18 +538,33 @@
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0">
-                    <Button x:Name="ResetDefaultsButton"
-                            Content="{x:Static services:Strings.ButtonDefaults}"
-                            Style="{StaticResource DialogButtonStyle}"
-                            Width="{DynamicResource DialogButtonWidth}"
-                            HorizontalAlignment="Left"
-                            Click="ResetDefaults_Click"/>
-                    <Button Content="{x:Static services:Strings.ButtonClose}"
-                            Style="{StaticResource DialogButtonStyle}"
-                            Width="{DynamicResource DialogButtonWidth}"
-                            HorizontalAlignment="Right"
-                            IsCancel="True"
-                            Click="CloseButton_Click"/>
+                    <!-- 내보내기/불러오기 stand with 기본값 rather than beside
+                         닫기: all three act on the whole palette, and none of
+                         them is what someone reaches for on the way out. -->
+                    <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Left">
+                        <Button x:Name="ResetDefaultsButton"
+                                Content="{x:Static services:Strings.ButtonDefaults}"
+                                Style="{StaticResource DialogButtonStyle}"
+                                Width="{DynamicResource DialogButtonWidth}"
+                                Click="ResetDefaults_Click"/>
+                        <Button Content="{x:Static services:Strings.ButtonExportColors}"
+                                Style="{StaticResource DialogButtonStyle}"
+                                Padding="10,0"
+                                Margin="6,0,0,0"
+                                Click="ExportColors_Click"/>
+                        <Button Content="{x:Static services:Strings.ButtonImportColors}"
+                                Style="{StaticResource DialogButtonStyle}"
+                                Padding="10,0"
+                                Margin="6,0,0,0"
+                                Click="ImportColors_Click"/>
+                    </StackPanel>
+                    <!-- No 닫기 here. The title bar already carries an X, and a
+                         second way out was crowding the three buttons that do
+                         the actual work of this window. Esc still closes it -
+                         that used to come from this button's IsCancel and now
+                         lives in ColorSettingsWindow_PreviewKeyDown, which
+                         gives the picker first refusal on the key. -->
                 </Grid>
             </Grid>
 
