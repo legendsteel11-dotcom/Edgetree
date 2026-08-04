@@ -19,6 +19,11 @@
         <SolidColorBrush x:Key="ForegroundText" Color="#FFA8AAAE"/>
         <SolidColorBrush x:Key="HighlightForeground" Color="#FFF0F2F6"/>
         <SolidColorBrush x:Key="HoverBackground" Color="#FF2A2D2E"/>
+        <!-- The bar under the pointer in a menu. Its own brush rather than
+             HoverBackground, which sits within two points of the menu's
+             background (#282A2C) and so came out invisible there - the tree's
+             hover is the standard to match, not the dialog's. -->
+        <SolidColorBrush x:Key="MenuHighlightBackground" Color="#FF3A3D41"/>
         <SolidColorBrush x:Key="SecondaryForeground" Color="#FF9A9A9A"/>
         <SolidColorBrush x:Key="PanelBackground" Color="#FF282828"/>
         <SolidColorBrush x:Key="PanelBorder" Color="#FF454545"/>

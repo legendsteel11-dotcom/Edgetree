@@ -487,9 +487,20 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
+                        <!-- Outlined and filled with the same chrome brushes the
+                             dialog buttons use (ControlBorder / HoverBackground /
+                             ControlHoverBorder), so every button in the app that
+                             is a button rather than a row reads as one family.
+                             The border used to be MenuDisabledForeground and the
+                             hover fill the user's own TreeRowHoverBackground -
+                             which made this chip drift with a colour meant for
+                             the tree's rows, and left it a shade apart from the
+                             buttons in Color Settings. Size stays smaller than a
+                             dialog button's on purpose (see above); only the
+                             colours are shared. -->
                         <Border x:Name="Chip"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="{DynamicResource MenuDisabledForeground}"
+                                BorderBrush="{DynamicResource ControlBorder}"
                                 BorderThickness="1"
                                 CornerRadius="3"
                                 Padding="{TemplateBinding Padding}">
@@ -501,7 +512,10 @@
                                     Value="True">
                                 <Setter TargetName="Chip"
                                         Property="Background"
-                                        Value="{DynamicResource TreeRowHoverBackground}"/>
+                                        Value="{DynamicResource HoverBackground}"/>
+                                <Setter TargetName="Chip"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource ControlHoverBorder}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -612,11 +626,24 @@
                             </Popup>
                         </Grid>
                         <ControlTemplate.Triggers>
+                            <!-- The chrome hover, not the tree's own selection
+                                 colour. A menu draws its background and its
+                                 text from the theme rather than the palette,
+                                 and the bar under the pointer was the one part
+                                 of it that followed the user's colours - so a
+                                 vivid 선택된 항목 turned up in a place nothing
+                                 else had answered to it, which read as a
+                                 mistake rather than a setting (2026-08-04).
+                                 The line is now drawn where it was already:
+                                 menus are chrome, the tree is the palette.
+                                 Its own brush, not the shared HoverBackground:
+                                 that one is two points off the menu's own
+                                 background and disappeared against it. -->
                             <Trigger Property="IsHighlighted"
                                     Value="True">
                                 <Setter TargetName="Bd"
                                         Property="Background"
-                                        Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
+                                        Value="{DynamicResource MenuHighlightBackground}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled"
                                     Value="False">

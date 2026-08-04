@@ -206,6 +206,10 @@ public partial class App : Application
             SetChromeBrush("MenuDisabledForeground", "#FF5F5F5F");
             SetChromeBrush("HighlightForeground", "#FF000000");
             SetChromeBrush("HoverBackground", "#FFE8E8E8");
+            // A step past HoverBackground, because a menu's background is the
+            // panel white behind it rather than the dialog grey - see the dark
+            // value below for the case that forced this brush to exist.
+            SetChromeBrush("MenuHighlightBackground", "#FFDCDCDC");
             SetChromeBrush("SecondaryForeground", "#FF6E6E6E");
             SetChromeBrush("PanelBackground", "#FFFFFFFF");
             SetChromeBrush("PanelBorder", "#FFD4D4D4");
@@ -228,6 +232,11 @@ public partial class App : Application
             SetChromeBrush("MenuDisabledForeground", "#FF757575");
             SetChromeBrush("HighlightForeground", "#FFF0F2F6");
             SetChromeBrush("HoverBackground", "#FF2A2D2E");
+            // HoverBackground is two points off the menu background below
+            // (#282A2C) and vanished against it once menus stopped borrowing
+            // the tree's selection colour. Matched instead to how plainly a
+            // tree row answers the pointer.
+            SetChromeBrush("MenuHighlightBackground", "#FF3A3D41");
             SetChromeBrush("SecondaryForeground", "#FF9A9A9A");
             // RGB 40/42/44 (user-picked 2026-07-21, was a flat #282828): a
             // hint of blue-grey so menus separate from the tree behind them.
