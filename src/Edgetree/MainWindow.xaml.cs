@@ -4013,7 +4013,12 @@ public partial class MainWindow : Window
         // Every folder already on screen re-reads, the same way a sort or a
         // per-folder cap change does - a filter that only took effect on
         // folders opened afterwards would be worse than no filter.
-        RefreshAllLoadedFolders();
+        //
+        // Quietly, though: a filter is a display change like the hidden-folder
+        // toggle, so it has no business moving the view. The footer toggles put
+        // it under the hand, and having the tree jump to the top on every click
+        // reads as the app losing the user's place rather than filtering.
+        RefreshAllLoadedFolders(pinSelectionToTop: false);
     }
 
     // The empty-space menu's 북마크 submenu. Deliberately NOT the row menu's:
@@ -4354,7 +4359,11 @@ public partial class MainWindow : Window
     private void MaxItemsRefreshTimer_Tick(object? sender, EventArgs e)
     {
         _maxItemsRefreshTimer!.Stop();
-        RefreshAllLoadedFolders();
+
+        // Same reasoning as the file-kind filter: how many rows a folder shows
+        // is a display change, and the stepper is held down while watching the
+        // tree - the one moment the view must not slide out from under it.
+        RefreshAllLoadedFolders(pinSelectionToTop: false);
     }
 
     private void TabSpacingDecrement_Click(object sender, RoutedEventArgs e)
