@@ -20,6 +20,21 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: 'v1.5.0',
+    ko: [
+      '색상 피커 — 선택하는 대로 사이드바에 바로 적용',
+      '색상만 따로 내보내고 불러오기 — 다른 PC에서도 같은 색으로',
+      '북마크 표시를 눌러 바로 해제',
+      '파일 종류나 표시 개수를 바꿔도 보던 자리 그대로',
+    ],
+    en: [
+      'A colour picker that applies to the sidebar as you drag it',
+      'Export and import the colours on their own — same palette on another PC',
+      "Click a bookmark's ribbon to release it",
+      'Changing the file filter or the row count keeps your place in the tree',
+    ],
+  },
+  {
     version: 'v1.4.2',
     ko: [
       '하단 바에서 파일 종류를 눌러 걸러 보기 — 코드 · 이미지 · 문서 · 미디어',
@@ -38,7 +53,7 @@ export const changelog: ChangelogEntry[] = [
     version: 'v1.4.1',
     ko: [
       '왼쪽 패널 표시 옵션 — 북마크 / 즐겨찾기 / 표시 안 함',
-      '여러 폴더를 한 번에 골라서 숨기기',
+      '여러 폴더를 한 번에 선택해서 숨기기',
       '항목이 많은 메뉴를 스크롤해서 볼 수 있음',
       '폴더 복사와 북마크 이동에서 생기던 문제 수정',
     ],
@@ -81,7 +96,7 @@ export const changelog: ChangelogEntry[] = [
     version: 'v1.3.3',
     ko: [
       '북마크 목록을 옵션 메뉴에서 한눈에',
-      '검색 정렬을 메뉴에서 고르기',
+      '검색 정렬을 메뉴에서 선택',
       '색상 설정·앱 정보 창이 글꼴 크기를 따라감',
     ],
     en: [
