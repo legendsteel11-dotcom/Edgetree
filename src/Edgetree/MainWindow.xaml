@@ -523,6 +523,34 @@
             </Setter>
         </Style>
 
+        <!-- A menu row that HOLDS a button instead of being one. The lists'
+             전체 해제 sits here.
+             It needs the menu's own padding, so its right edge lands on the
+             same line as the 해제 chips above it - a hand-picked margin was
+             out by a few pixels and the column read as crooked. And it needs
+             none of a menu item's behaviour: WPF wraps any non-MenuItem in a
+             MenuItem container, so the whole row lit up on hover and promised
+             a click that only the button actually accepts. -->
+        <Style x:Key="MenuButtonRowStyle"
+                TargetType="MenuItem">
+            <Setter Property="Padding"
+                    Value="{DynamicResource MenuItemPadding}"/>
+            <Setter Property="Focusable"
+                    Value="False"/>
+            <Setter Property="StaysOpenOnClick"
+                    Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border Background="Transparent"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="MenuItem">
             <!-- Follows the tree's font zoom (see ApplyLayoutMetrics), with a
                  roomier vertical base than the fixed 14,4 it replaces. That

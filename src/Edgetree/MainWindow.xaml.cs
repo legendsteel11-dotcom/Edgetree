@@ -8460,19 +8460,86 @@ public partial class MainWindow : Window
         menu.Items.Add(BuildBookmarkShortcutHint());
         menu.Items.Add(new Separator());
 
-        // Pushed to the right end, away from the rows' own text: it acts on all
-        // of them at once and can't be undone, so it shouldn't sit directly
-        // under the column the cursor has been travelling down.
-        var clearAllText = new TextBlock
+        menu.Items.Add(BuildListClearAllButton(
+            Strings.MenuBookmarkClearAll,
+            () => ClearAllBookmarks_Click(this, new RoutedEventArgs()),
+            reserveMarkerColumn: true));
+    }
+
+    // 전체 해제 as a BUTTON rather than another row in the list.
+    //
+    // It never was one: every other entry in these menus is a place to go or a
+    // single thing to release, and this is a one-shot that empties the whole
+    // list. As a row it also sat in the very column the cursor travels down
+    // while looking for one bookmark to drop (user, 2026-08-04). It takes the
+    // chip style the per-row 해제 already uses, so a list has one button family
+    // rather than two, and it keeps to the right end away from that column.
+    //
+    // The menu is closed BEFORE the confirmation appears. A menu holds the
+    // mouse for as long as it is up, and standing a modal dialog on top of
+    // that is the exact shape this app keeps a capture watchdog for - same
+    // close-then-run order the context menu's keyboard shortcuts use.
+    // reserveMarkerColumn: a bookmark row ends in the blue ribbon, not in its
+    // 해제 chip, so the chips stop one glyph short of the right edge. The
+    // ribbon's width follows the font (BookmarkMarkerHeight, stretched
+    // uniformly), which is why a button simply pinned to the right edge sat
+    // level at one zoom and drifted at the next. An invisible copy of the very
+    // same glyph holds the very same space, so the two stay level at every
+    // step without a number anywhere. The hidden-folder list has no such
+    // column and asks for none.
+    private MenuItem BuildListClearAllButton(string text, Action clear, bool reserveMarkerColumn = false)
+    {
+        var button = new Button
         {
-            Text = Strings.MenuBookmarkClearAll,
-            TextAlignment = TextAlignment.Right,
+            Content = text,
+            Style = (Style)FindResource("MenuRowActionButtonStyle"),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Margin = new Thickness(0, 4, 0, 4),
         };
-        clearAllText.SetResourceReference(TextBlock.ForegroundProperty, "MenuForeground");
-        var clearAll = FollowMenuFont(new MenuItem { Header = clearAllText });
-        _bookmarkWidthTargets.Add(clearAll);
-        clearAll.Click += ClearAllBookmarks_Click;
-        menu.Items.Add(clearAll);
+
+        button.Click += (_, _) =>
+        {
+            foreach (var open in _openMenus.ToList())
+            {
+                open.IsOpen = false;
+            }
+
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, clear);
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(button, 1);
+        grid.Children.Add(button);
+
+        if (reserveMarkerColumn)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            // Hidden, not Collapsed: the point of it is the space it takes.
+            var spacer = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("F1 M240-144v-672h480v672l-240-96-240 96Z"),
+                Stretch = Stretch.Uniform,
+                Margin = new Thickness(8, 0, 0, 0),
+                Visibility = Visibility.Hidden,
+            };
+            spacer.SetResourceReference(HeightProperty, "BookmarkMarkerHeight");
+            Grid.SetColumn(spacer, 2);
+            grid.Children.Add(spacer);
+        }
+
+        // Carried in a row of its own (MenuButtonRowStyle) rather than handed
+        // to the menu bare: WPF would wrap it in an ordinary MenuItem, and
+        // that row highlights under the pointer as though all of it were the
+        // target. The row also supplies the menu's padding, which is what puts
+        // this column on the same grid as the rows above it.
+        return new MenuItem
+        {
+            Header = grid,
+            Style = (Style)FindResource("MenuButtonRowStyle"),
+        };
     }
 
     // The shortcuts are the fast way to work with bookmarks, and this list is
@@ -8990,21 +9057,9 @@ public partial class MainWindow : Window
         // you. Right-aligned and asked about (with the count) exactly like that
         // one - a per-row 해제 undoes something you are looking straight at,
         // while this throws away a list that may have taken a while to build.
-        var clearAllText = FollowMenuFont(new MenuItem
-        {
-            Header = new TextBlock
-            {
-                Text = Strings.MenuBookmarkClearAll,
-                TextAlignment = TextAlignment.Right,
-            },
-        });
-        if (clearAllText.Header is TextBlock clearLabel)
-        {
-            clearLabel.SetResourceReference(TextBlock.ForegroundProperty, "MenuForeground");
-        }
-        clearAllText.Click += ClearAllHiddenFolders_Click;
         submenu.Items.Add(new Separator());
-        submenu.Items.Add(clearAllText);
+        submenu.Items.Add(BuildListClearAllButton(
+            Strings.MenuBookmarkClearAll, () => ClearAllHiddenFolders_Click(this, new RoutedEventArgs())));
     }
 
     private void ClearAllHiddenFolders_Click(object sender, RoutedEventArgs e)
@@ -9393,6 +9448,19 @@ public partial class MainWindow : Window
             row.Tag = BookmarkListRowTag;
             submenu.Items.Add(row);
         }
+
+        // The same 전체 해제 the options menu's copy of this list carries. It
+        // was missing here alone, which made the two routes to the same list
+        // disagree about what could be done with it - and the hidden-folder
+        // list, whose one builder serves both menus, never had that problem
+        // (user, 2026-08-04). Tagged like the rows so the next open clears it
+        // instead of stacking a second one.
+        var clearAll = BuildListClearAllButton(
+            Strings.MenuBookmarkClearAll,
+            () => ClearAllBookmarks_Click(this, new RoutedEventArgs()),
+            reserveMarkerColumn: true);
+        clearAll.Tag = BookmarkListRowTag;
+        submenu.Items.Add(clearAll);
     }
 
     private const string BookmarkListRowTag = "bookmarkListRow";
