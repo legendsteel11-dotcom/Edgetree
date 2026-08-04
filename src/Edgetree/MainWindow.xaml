@@ -1359,6 +1359,19 @@
                  giving that row back to the tree meant deleting entries.
                  Checkable so exactly one mode reads as current;
                  OptionsMenu_Opened sets which. -->
+            <MenuItem Header="{x:Static services:Strings.MenuDockOnRight}"
+                    IsCheckable="True"
+                    AutomationProperties.AutomationId="dockOnRight"
+                    Click="DockOnRightMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuAutoHideCloseOnLeave}"
+                    IsCheckable="True"
+                    AutomationProperties.AutomationId="autoHideCloseOnLeave"
+                    Click="AutoHideCloseOnLeaveMenuItem_Click"/>
+            <!-- Last in the group, and directly above the separator: what
+                 follows it is the bookmark and hidden-folder lists, which is
+                 where someone lands next after choosing what the panel shows
+                 (user's call, 2026-08-04). Above the two window toggles it had
+                 the same neighbours in the wrong order. -->
             <MenuItem Header="{x:Static services:Strings.MenuSidePanel}"
                     AutomationProperties.AutomationId="sidePanel"
                     Tag="reserve-check-column">
@@ -1380,14 +1393,6 @@
                         AutomationProperties.AutomationId="favoritesAtBottom"
                         Click="FavoritesAtBottomMenuItem_Click"/>
             </MenuItem>
-            <MenuItem Header="{x:Static services:Strings.MenuDockOnRight}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="dockOnRight"
-                    Click="DockOnRightMenuItem_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuAutoHideCloseOnLeave}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="autoHideCloseOnLeave"
-                    Click="AutoHideCloseOnLeaveMenuItem_Click"/>
             <Separator/>
             <!-- Contents are built in code on every open (RebuildBookmarkListMenu)
                  - the list is the user's own bookmarks, so there is nothing to
@@ -3833,8 +3838,13 @@
                  and everything below. Position-mode flipping of that border
                  is gone too: the line IS the boundary now, same on either
                  side. -->
+            <!-- 2px, not 1: this line separates two lists that look alike, and
+                 a hairline between them read as a gap rather than a boundary
+                 (2026-08-04). The splitter's grab zone is unaffected - it
+                 floats over this row at a fixed 9px and simply centres on
+                 whatever height the line takes. -->
             <Border Grid.Row="2"
-                    Height="1"
+                    Height="2"
                     Background="{DynamicResource PanelDividerBrush}"/>
             <!-- Functionality unchanged (drag-resize, double-click fit); only
                  WHERE the grab zone lives did: negative margins float it over
