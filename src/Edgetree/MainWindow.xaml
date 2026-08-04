@@ -2632,16 +2632,32 @@
                      ends both: the star column now measures against what is
                      actually left, so the name trims before the ribbon instead
                      of behind it, and there is nothing left to clip. -->
-                <Path x:Name="BookmarkMarker"
+                <!-- Clicking the ribbon releases the bookmark (2026-08-04). It
+                     is where the eye already is when the answer is "not this
+                     one any more", and the two routes that existed - Ctrl+Alt+K
+                     and the row menu - both ask the user to name a row that is
+                     already marked in front of them.
+                     The Border is the target rather than the glyph: a ribbon is
+                     a few pixels of filled path, and a shape only takes a hit
+                     where it paints. The transparent box around it is what
+                     makes this the size of a thing meant to be clicked - the
+                     same complaint the list rows' "−" lost to in August. -->
+                <Border x:Name="BookmarkMarkerBorder"
                         Grid.Column="3"
-                        Data="F1 M240-144v-672h480v672l-240-96-240 96Z"
-                        Fill="#FF4A90E2"
-                        Stretch="Uniform"
-                        Height="{DynamicResource BookmarkMarkerHeight}"
+                        Background="Transparent"
                         Margin="{DynamicResource BookmarkMarkerMargin}"
-                        VerticalAlignment="Center"
-                        IsHitTestVisible="False"
-                        Visibility="Collapsed"/>
+                        Padding="2,0"
+                        Cursor="Hand"
+                        ToolTip="{x:Static services:Strings.MenuBookmarkRemove}"
+                        VerticalAlignment="Stretch"
+                        Visibility="Collapsed">
+                    <Path x:Name="BookmarkMarker"
+                            Data="F1 M240-144v-672h480v672l-240-96-240 96Z"
+                            Fill="#FF4A90E2"
+                            Stretch="Uniform"
+                            Height="{DynamicResource BookmarkMarkerHeight}"
+                            VerticalAlignment="Center"/>
+                </Border>
             </Grid>
             <HierarchicalDataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsEditing}"
@@ -2709,7 +2725,7 @@
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsBookmarked}"
                         Value="True">
-                    <Setter TargetName="BookmarkMarker"
+                    <Setter TargetName="BookmarkMarkerBorder"
                             Property="Visibility"
                             Value="Visible"/>
                 </DataTrigger>

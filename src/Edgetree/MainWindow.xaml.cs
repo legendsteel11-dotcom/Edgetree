@@ -6688,6 +6688,23 @@ public partial class MainWindow : Window
             return;
         }
 
+        // The bookmark ribbon releases the bookmark instead of selecting the
+        // row - matched by name for the same reason as the sort icon below.
+        // Handled, so the press never reaches the row: a click that both
+        // unmarks and selects would leave the user unsure which one they
+        // asked for.
+        if ((e.OriginalSource as DependencyObject)?.FindAncestor<Border>() is { Name: "BookmarkMarkerBorder" } &&
+            treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsShowMore: false } bookmarkedItem)
+        {
+            ToggleBookmark(bookmarkedItem);
+
+            // Same stale-drag reset as the sort icon's early return below.
+            _itemDragStart = null;
+            _itemDragCandidate = null;
+            e.Handled = true;
+            return;
+        }
+
         // The small sort icon (see FileSystemItem.HasSortOverride) opens this
         // folder's sort menu instead of the row's normal click behavior
         // (select + toggle expand/collapse) below - matched by name rather
