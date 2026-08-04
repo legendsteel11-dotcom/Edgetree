@@ -3044,6 +3044,15 @@
                                 <Setter TargetName="Bd"
                                         Property="Background"
                                         Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
+                                <!-- The name follows too, as it does in the
+                                     tree. "폴더 이름 강조" says nothing about
+                                     only applying to one of the two places a
+                                     folder name is shown. Same targeting note
+                                     as the hover setter above: the TextBlock's
+                                     own Foreground would beat inheritance. -->
+                                <Setter TargetName="FavoriteNameText"
+                                        Property="Foreground"
+                                        Value="{DynamicResource FolderNameHighlightForeground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -3163,18 +3172,94 @@
                                 <TextBlock x:Name="BookmarkNameText"
                                         Grid.Column="3"
                                         Text="{Binding Name}"
-                                        Foreground="{DynamicResource FolderNameForeground}"
                                         FontWeight="{DynamicResource FolderNameFontWeight}"
                                         VerticalAlignment="Center"
-                                        TextTrimming="CharacterEllipsis"/>
+                                        TextTrimming="CharacterEllipsis">
+                                    <!-- The name's COLOUR is decided here, on
+                                         the element itself, rather than in the
+                                         template's triggers below. It depends
+                                         on the row's state and on what the row
+                                         holds at once, and only a binding that
+                                         starts from an element can reach the
+                                         row: a Condition in
+                                         ControlTemplate.Triggers has nothing to
+                                         walk up from, and the TemplatedParent
+                                         form of it simply never fires - which
+                                         looks exactly like a colour nobody
+                                         wired, since a trigger that cannot bind
+                                         fails in silence (2026-08-04).
+                                         From here, FindAncestor reaches the
+                                         ListBoxItem the same way every other
+                                         binding in this template reaches its
+                                         data. Order is base, then file, then
+                                         hover, then selection: the last match
+                                         wins, so a selected row keeps its
+                                         colour while the pointer crosses it. -->
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource FolderNameForeground}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsDirectory}"
+                                                        Value="False">
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource FileNameForeground}"/>
+                                                </DataTrigger>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                                Value="True"/>
+                                                        <Condition Binding="{Binding IsDirectory}"
+                                                                Value="True"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource FolderNameHoverForeground}"/>
+                                                </MultiDataTrigger>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                                Value="True"/>
+                                                        <Condition Binding="{Binding IsDirectory}"
+                                                                Value="False"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource FileNameHoverForeground}"/>
+                                                </MultiDataTrigger>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                                Value="True"/>
+                                                        <Condition Binding="{Binding IsDirectory}"
+                                                                Value="True"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource FolderNameHighlightForeground}"/>
+                                                </MultiDataTrigger>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                                Value="True"/>
+                                                        <Condition Binding="{Binding IsDirectory}"
+                                                                Value="False"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource FileNameHighlightForeground}"/>
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <!-- Weight only. The colour moved to the element's
+                                 own style (see BookmarkNameText above) and must
+                                 not also be set from here: a template trigger
+                                 outranks a style trigger, so leaving this in
+                                 would pin the file colour on and the hover and
+                                 selection colours would never show. -->
                             <DataTrigger Binding="{Binding IsDirectory}"
                                     Value="False">
-                                <Setter TargetName="BookmarkNameText"
-                                        Property="Foreground"
-                                        Value="{DynamicResource FileNameForeground}"/>
                                 <Setter TargetName="BookmarkNameText"
                                         Property="FontWeight"
                                         Value="{DynamicResource FileNameFontWeight}"/>
