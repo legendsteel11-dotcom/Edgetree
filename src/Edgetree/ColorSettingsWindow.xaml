@@ -515,24 +515,29 @@
                             MouseLeftButtonUp="PanelDividerSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="16"
+                <!-- 기본값 sits at the far left, away from 닫기. It throws away
+                     every colour on this page and the two used to be neighbours,
+                     one button-width apart - the kind of miss that costs the
+                     whole palette. Opposite ends of the row is the usual place
+                     for a discard action, and the confirm prompt stays either
+                     way. -->
+                <Grid Grid.Row="16"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Right"
                         Margin="0,18,0,0">
                     <Button x:Name="ResetDefaultsButton"
                             Content="{x:Static services:Strings.ButtonDefaults}"
                             Style="{StaticResource DialogButtonStyle}"
                             Width="{DynamicResource DialogButtonWidth}"
-                            Margin="0,0,8,0"
+                            HorizontalAlignment="Left"
                             Click="ResetDefaults_Click"/>
                     <Button Content="{x:Static services:Strings.ButtonClose}"
                             Style="{StaticResource DialogButtonStyle}"
                             Width="{DynamicResource DialogButtonWidth}"
+                            HorizontalAlignment="Right"
                             IsCancel="True"
                             Click="CloseButton_Click"/>
-                </StackPanel>
+                </Grid>
             </Grid>
         </Grid>
     </Border>
