@@ -827,6 +827,9 @@ public partial class ColorSettingsWindow : Window
             RememberRecentColor(CurrentPickerHex());
         }
 
+        _pickerApplyTimer?.Stop();
+        _pickerDirty = false;
+
         PickerLayer.Visibility = Visibility.Collapsed;
         _pickerSwatch = null;
         _pickerSet = null;
@@ -885,7 +888,10 @@ public partial class ColorSettingsWindow : Window
     }
 
     private void FieldHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        => FieldHost.ReleaseMouseCapture();
+    {
+        FieldHost.ReleaseMouseCapture();
+        FinishPickerDrag();
+    }
 
     private void HueHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -902,15 +908,23 @@ public partial class ColorSettingsWindow : Window
     }
 
     private void HueHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        => HueHost.ReleaseMouseCapture();
+    {
+        HueHost.ReleaseMouseCapture();
+        FinishPickerDrag();
+    }
 
     private void TrackField(System.Windows.Input.MouseEventArgs e)
     {
         var point = e.GetPosition(FieldHost);
         _pickerSat = Clamp01(point.X / Math.Max(1, FieldHost.ActualWidth));
         _pickerVal = 1 - Clamp01(point.Y / Math.Max(1, FieldHost.ActualHeight));
+
+        // The handle follows every single move; only the colour going out to
+        // the app is throttled. Moving these two together made the handle
+        // itself run at the throttle's rate, which reads exactly like a 30Hz
+        // screen (user, 2026-08-04) - and it was never the expensive half.
         UpdatePickerVisuals();
-        ApplyPickedColor(CurrentPickerHex());
+        QueuePickerUpdate();
     }
 
     private void TrackHue(System.Windows.Input.MouseEventArgs e)
@@ -918,7 +932,74 @@ public partial class ColorSettingsWindow : Window
         var point = e.GetPosition(HueHost);
         _pickerHue = Clamp01(point.X / Math.Max(1, HueHost.ActualWidth)) * 360.0;
         UpdatePickerVisuals();
+        QueuePickerUpdate();
+    }
+
+    private System.Windows.Threading.DispatcherTimer? _pickerApplyTimer;
+    private bool _pickerDirty;
+
+    // A mouse sends 125 to 1000 positions a second. Acting on each one repeats
+    // the same work dozens of times for a single visible result, and that work
+    // reaches the whole app: the sidebar behind this window redraws every
+    // element that uses the colour being changed, which is why it is felt most
+    // with a lot of rows on screen (user, 2026-08-04).
+    //
+    // Thirty a second is the rate here. Sixty - one per frame - was tried
+    // first and was still enough to spin the fans up; half of them is under
+    // what the eye picks out on a colour sliding through neighbouring shades,
+    // and it halves everything downstream.
+    //
+    // Whatever the throttle drops, the release puts back: FinishPickerDrag
+    // applies the exact colour the handle was left on, so the value that
+    // lands is never the one from a frame or two earlier.
+    private const int PickerApplyIntervalMs = 33;
+
+    private void QueuePickerUpdate()
+    {
+        _pickerDirty = true;
+
+        if (_pickerApplyTimer is null)
+        {
+            _pickerApplyTimer = new System.Windows.Threading.DispatcherTimer(
+                System.Windows.Threading.DispatcherPriority.Render)
+            {
+                Interval = TimeSpan.FromMilliseconds(PickerApplyIntervalMs),
+            };
+            _pickerApplyTimer.Tick += (_, _) => FlushPickerUpdate();
+        }
+
+        _pickerApplyTimer.Start();
+    }
+
+    private void FlushPickerUpdate()
+    {
+        if (!_pickerDirty)
+        {
+            return;
+        }
+
+        _pickerDirty = false;
+
+        // The drag may have ended, or moved to another row, since the tick was
+        // scheduled.
+        if (PickerLayer.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        // The handle has already moved (see TrackField). This is only the
+        // expensive half: the colour reaching the app behind the window.
         ApplyPickedColor(CurrentPickerHex());
+    }
+
+    // Called when the button comes up: stops the throttle and lands the exact
+    // colour under the handle, so nothing rests on which tick happened to be
+    // last.
+    private void FinishPickerDrag()
+    {
+        _pickerApplyTimer?.Stop();
+        _pickerDirty = true;
+        FlushPickerUpdate();
     }
 
     private void UpdatePickerVisuals()

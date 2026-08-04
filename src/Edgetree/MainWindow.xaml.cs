@@ -616,34 +616,50 @@ public partial class MainWindow : Window
     // to these five keys uses DynamicResource (not StaticResource) precisely
     // so replacing the dictionary entry here is picked up live. Called once
     // at startup and again by ColorSettingsWindow after each pick/reset.
+    // The theme this last ran under. Everything gated on it below depends on
+    // the theme ALONE, never on which colours are in it - and the colour
+    // picker now calls this on every frame of a drag, where the theme cannot
+    // have changed. Doing that work anyway meant walking the whole tree and
+    // rebuilding the chrome sixty times a second to arrive at what was
+    // already on screen, which is what the picker's stutter turned out to be
+    // (2026-08-04).
+    private bool? _lastAppliedTheme;
+
     public void ApplyColorSettings()
     {
         bool light = _settings.IsLightMode;
+        bool themeChanged = _lastAppliedTheme != light;
+        _lastAppliedTheme = light;
 
-        // Not for the icon any more - that became a path taking the row's own
-        // brush, so a theme flip recolours it for free. The walk stays for the
-        // TOOLTIP, which is a cached string built from the folder's state.
-        foreach (var root in _roots)
+        if (themeChanged)
         {
-            RefreshSortOverrideIconForTheme(root);
+            // Not for the icon any more - that became a path taking the row's
+            // own brush, so a theme flip recolours it for free. The walk stays
+            // for the TOOLTIP, which is a cached string built from the folder's
+            // state.
+            foreach (var root in _roots)
+            {
+                RefreshSortOverrideIconForTheme(root);
+            }
+
+            // Menus/context menus/the Color Settings and About dialogs/header
+            // icons - general chrome, not part of the 15 colors below.
+            (Application.Current as App)?.ApplyChromeTheme(light);
+
+            // Menu/context-menu drop shadow (see MenuDropShadow's own comment
+            // in the XAML) - the same dark, fairly strong shadow read as too
+            // heavy against a light-mode menu's white background, so light mode
+            // gets a softer one (lower opacity) instead of just reusing the
+            // dark value.
+            Resources["MenuDropShadow"] = new DropShadowEffect
+            {
+                Color = Colors.Black,
+                Direction = 270,
+                ShadowDepth = 2,
+                BlurRadius = 8,
+                Opacity = light ? 0.15 : 0.4
+            };
         }
-
-        // Menus/context menus/the Color Settings and About dialogs/header
-        // icons - general chrome, not part of the 15 colors below.
-        (Application.Current as App)?.ApplyChromeTheme(light);
-
-        // Menu/context-menu drop shadow (see MenuDropShadow's own comment in
-        // the XAML) - the same dark, fairly strong shadow read as too heavy
-        // against a light-mode menu's white background, so light mode gets a
-        // softer one (lower opacity) instead of just reusing the dark value.
-        Resources["MenuDropShadow"] = new DropShadowEffect
-        {
-            Color = Colors.Black,
-            Direction = 270,
-            ShadowDepth = 2,
-            BlurRadius = 8,
-            Opacity = light ? 0.15 : 0.4
-        };
 
         SetBrushColor("SidebarBackground", light ? _settings.LightBackgroundColorHex : _settings.BackgroundColorHex);
         SetBrushColor("FolderNameForeground", light ? _settings.LightFolderNameColorHex : _settings.FolderNameColorHex);
@@ -660,13 +676,13 @@ public partial class MainWindow : Window
         if (ColorConverter.ConvertFromString(
                 light ? _settings.LightFolderNameColorHex : _settings.FolderNameColorHex) is Color folderColor)
         {
-            Resources["MutedFolderNameForeground"] = new SolidColorBrush(
+            SetBrushColor("MutedFolderNameForeground",
                 MoveTowardsBackground(folderColor, light, MutedNameBlend));
         }
         if (ColorConverter.ConvertFromString(
                 light ? _settings.LightFileNameColorHex : _settings.FileNameColorHex) is Color fileColor)
         {
-            Resources["MutedFileNameForeground"] = new SolidColorBrush(
+            SetBrushColor("MutedFileNameForeground",
                 MoveTowardsBackground(fileColor, light, MutedNameBlend));
         }
         SetBrushColor("FileNameForeground", light ? _settings.LightFileNameColorHex : _settings.FileNameColorHex);
@@ -686,9 +702,28 @@ public partial class MainWindow : Window
         string selectionHex = light ? _settings.LightSelectionColorHex : _settings.SelectionColorHex;
         if (ColorConverter.ConvertFromString(selectionHex) is Color selectionColor)
         {
-            _selectionActiveBrush = new SolidColorBrush(selectionColor);
-            selectionColor.A = (byte)Math.Round(selectionColor.A * 0.4);
-            _selectionInactiveBrush = new SolidColorBrush(selectionColor);
+            var inactiveColor = selectionColor;
+            inactiveColor.A = (byte)Math.Round(selectionColor.A * 0.4);
+
+            // Recoloured rather than rebuilt, for the reason SetBrushColor
+            // gives: these two are handed to the dictionary below, and a new
+            // pair every frame is a new dictionary entry every frame.
+            //
+            // The IsFrozen test is not a formality - it was left out and the
+            // app died on the first drag (2026-08-04): once a brush has been
+            // through the dictionary WPF may have frozen it, and a frozen
+            // Freezable throws on assignment rather than refusing quietly.
+            if (_selectionActiveBrush is { IsFrozen: false } activeBrush &&
+                _selectionInactiveBrush is { IsFrozen: false } inactiveBrush)
+            {
+                activeBrush.Color = selectionColor;
+                inactiveBrush.Color = inactiveColor;
+            }
+            else
+            {
+                _selectionActiveBrush = new SolidColorBrush(selectionColor);
+                _selectionInactiveBrush = new SolidColorBrush(inactiveColor);
+            }
         }
         UpdateSelectionBrushForActivation();
         SetBrushColor("FavoritesBackground", light ? _settings.LightHistoryBackgroundColorHex : _settings.HistoryBackgroundColorHex);
@@ -724,7 +759,10 @@ public partial class MainWindow : Window
         // as the folder override icon) - re-resolve it now that IsLightMode
         // above reflects the current theme. ApplyColorSettings only ever runs
         // from Loaded onward (after InitializeComponent), so the element exists.
-        UpdateSearchSortIcon();
+        if (themeChanged)
+        {
+            UpdateSearchSortIcon();
+        }
     }
 
     private SolidColorBrush? _selectionActiveBrush;
@@ -744,14 +782,80 @@ public partial class MainWindow : Window
             return;
         }
         bool anyAppWindowActive = Application.Current.Windows.OfType<Window>().Any(w => w.IsActive);
-        Resources["TreeRowSelectedActiveBackground"] = anyAppWindowActive ? _selectionActiveBrush : _selectionInactiveBrush;
+        var wanted = anyAppWindowActive ? _selectionActiveBrush : _selectionInactiveBrush;
+
+        // Only when it actually changes hands. The two brushes keep their
+        // identity now and are recoloured in place, so re-assigning the same
+        // object would be a dictionary write - and a tree-wide invalidation -
+        // for nothing.
+        if (!ReferenceEquals(Resources["TreeRowSelectedActiveBackground"], wanted))
+        {
+            Resources["TreeRowSelectedActiveBackground"] = wanted;
+        }
     }
 
     private void SetBrushColor(string resourceKey, string hex)
     {
         if (ColorConverter.ConvertFromString(hex) is Color color)
         {
-            Resources[resourceKey] = new SolidColorBrush(color);
+            SetBrushColor(resourceKey, color);
+        }
+    }
+
+    // Recolours the brush that is already there, and only replaces the entry
+    // when it cannot.
+    //
+    // The difference is not small. REPLACING a dictionary entry makes WPF walk
+    // the tree invalidating every element that resolves that key; changing the
+    // Colour of a brush those elements already hold just redraws them. Twenty
+    // replacements per frame during a picker drag is twenty such walks, and
+    // that is what the stutter was made of.
+    //
+    // The fallback matters too: brushes declared in XAML are frozen once a
+    // Style that reaches them is sealed (see ApplyColorSettings' own note), so
+    // the FIRST call for those keys still has to replace. What it puts there
+    // is an ordinary unfrozen brush, so every call after it takes the cheap
+    // path.
+    private void SetBrushColor(string resourceKey, Color color)
+    {
+        if (Resources[resourceKey] is SolidColorBrush { IsFrozen: false } existing)
+        {
+            if (existing.Color != color)
+            {
+                existing.Color = color;
+            }
+            return;
+        }
+
+        LogFrozenBrush(resourceKey);
+        Resources[resourceKey] = new SolidColorBrush(color);
+    }
+
+    private readonly HashSet<string> _frozenBrushKeysLogged = new();
+
+    // Which keys never get the cheap path, said once each. Whether the recolour
+    // above actually applies depends on WPF's own freezing, which is not
+    // something to assume from the outside: if a key shows up here on every
+    // session it is still being replaced, and the drag is still paying for it.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogFrozenBrush(string resourceKey)
+    {
+        if (!_frozenBrushKeysLogged.Add(resourceKey))
+        {
+            return;
+        }
+
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "colorperf.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  frozen, replaced: {resourceKey}{Environment.NewLine}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
         }
     }
 
