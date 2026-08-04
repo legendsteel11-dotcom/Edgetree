@@ -539,6 +539,156 @@
                             Click="CloseButton_Click"/>
                 </Grid>
             </Grid>
+
+            <!-- The picker, and why it is a layer inside this window rather
+                 than a Popup. A Popup that closes on an outside click does so
+                 by holding the mouse with no button down, and the app's own
+                 stuck-capture watchdog collects exactly that after three
+                 seconds - which is how the earlier right-click popup shut
+                 itself (capture-watchdog.log, "released stuck capture:
+                 WPF(PopupRoot)"). Dragging here captures the mouse too, but
+                 only with the button held, and the watchdog stands down for
+                 the whole time any button is down. So this never meets it.
+                 It also means no second HWND, so no activation flash to
+                 suppress.
+
+                 The layer under the panel is what closes it: a click anywhere
+                 outside the panel lands there. It is dimmed rather than merely
+                 transparent, which is also what sets the panel apart from the
+                 window it floats over - the two share a background colour, so
+                 an edge alone left them reading as one surface. Doing it with
+                 shade instead of a brighter border keeps this working in both
+                 themes without a sixteenth colour to set and maintain. -->
+            <Canvas x:Name="PickerLayer"
+                    Grid.Row="0"
+                    Grid.RowSpan="3"
+                    Panel.ZIndex="10"
+                    Background="#66000000"
+                    Visibility="Collapsed"
+                    MouseLeftButtonDown="PickerLayer_MouseLeftButtonDown">
+                <Border x:Name="PickerPanel"
+                        Width="250"
+                        Background="{DynamicResource DialogBackground}"
+                        BorderBrush="{DynamicResource PanelBorder}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="10">
+                    <StackPanel>
+                        <!-- Saturation across, brightness down, over a fill of
+                             the pure hue - the arrangement every picker uses,
+                             so nobody has to be told how it works. -->
+                        <Border x:Name="FieldHost"
+                                Height="140"
+                                CornerRadius="3"
+                                ClipToBounds="True"
+                                Cursor="Cross"
+                                MouseLeftButtonDown="FieldHost_MouseLeftButtonDown"
+                                MouseMove="FieldHost_MouseMove"
+                                MouseLeftButtonUp="FieldHost_MouseLeftButtonUp">
+                            <Grid>
+                                <Rectangle x:Name="FieldHueFill"/>
+                                <Rectangle>
+                                    <Rectangle.Fill>
+                                        <LinearGradientBrush StartPoint="0,0"
+                                                EndPoint="1,0">
+                                            <GradientStop Offset="0"
+                                                    Color="#FFFFFFFF"/>
+                                            <GradientStop Offset="1"
+                                                    Color="#00FFFFFF"/>
+                                        </LinearGradientBrush>
+                                    </Rectangle.Fill>
+                                </Rectangle>
+                                <Rectangle>
+                                    <Rectangle.Fill>
+                                        <LinearGradientBrush StartPoint="0,0"
+                                                EndPoint="0,1">
+                                            <GradientStop Offset="0"
+                                                    Color="#00000000"/>
+                                            <GradientStop Offset="1"
+                                                    Color="#FF000000"/>
+                                        </LinearGradientBrush>
+                                    </Rectangle.Fill>
+                                </Rectangle>
+                                <!-- Two rings, light over dark: one ring alone
+                                     disappears against the half of the field
+                                     that matches it. -->
+                                <Canvas IsHitTestVisible="False">
+                                    <Ellipse x:Name="FieldThumbOuter"
+                                            Width="13"
+                                            Height="13"
+                                            Stroke="#B0000000"
+                                            StrokeThickness="3"/>
+                                    <Ellipse x:Name="FieldThumbInner"
+                                            Width="13"
+                                            Height="13"
+                                            Stroke="White"
+                                            StrokeThickness="1.5"/>
+                                </Canvas>
+                            </Grid>
+                        </Border>
+
+                        <Border x:Name="HueHost"
+                                Height="14"
+                                Margin="0,8,0,0"
+                                CornerRadius="3"
+                                ClipToBounds="True"
+                                Cursor="Cross"
+                                MouseLeftButtonDown="HueHost_MouseLeftButtonDown"
+                                MouseMove="HueHost_MouseMove"
+                                MouseLeftButtonUp="HueHost_MouseLeftButtonUp">
+                            <Grid>
+                                <Rectangle>
+                                    <Rectangle.Fill>
+                                        <LinearGradientBrush StartPoint="0,0"
+                                                EndPoint="1,0">
+                                            <GradientStop Offset="0"
+                                                    Color="#FFFF0000"/>
+                                            <GradientStop Offset="0.167"
+                                                    Color="#FFFFFF00"/>
+                                            <GradientStop Offset="0.333"
+                                                    Color="#FF00FF00"/>
+                                            <GradientStop Offset="0.5"
+                                                    Color="#FF00FFFF"/>
+                                            <GradientStop Offset="0.667"
+                                                    Color="#FF0000FF"/>
+                                            <GradientStop Offset="0.833"
+                                                    Color="#FFFF00FF"/>
+                                            <GradientStop Offset="1"
+                                                    Color="#FFFF0000"/>
+                                        </LinearGradientBrush>
+                                    </Rectangle.Fill>
+                                </Rectangle>
+                                <Canvas IsHitTestVisible="False">
+                                    <Border x:Name="HueThumb"
+                                            Width="5"
+                                            Height="14"
+                                            CornerRadius="2"
+                                            BorderBrush="White"
+                                            BorderThickness="2">
+                                        <Border BorderBrush="#B0000000"
+                                                BorderThickness="1"/>
+                                    </Border>
+                                </Canvas>
+                            </Grid>
+                        </Border>
+
+                        <!-- The value in the same form it is pasted in, next to
+                             the colours picked earlier this session: the native
+                             dialog's custom-colour row is gone with it, and a
+                             palette that forgets between two rows is worse than
+                             none. -->
+                        <Grid Margin="0,8,0,0">
+                            <TextBlock x:Name="PickerHexText"
+                                    Foreground="{DynamicResource DialogForeground}"
+                                    FontSize="{DynamicResource DialogHintFontSize}"
+                                    VerticalAlignment="Center"/>
+                            <StackPanel x:Name="PickerRecent"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Canvas>
         </Grid>
     </Border>
 </Window>

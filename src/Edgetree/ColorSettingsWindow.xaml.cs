@@ -11,6 +11,10 @@ using TextBox = System.Windows.Controls.TextBox;
 using Key = System.Windows.Input.Key;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
+// WinForms is referenced for the tray icon and Recycle Bin, and brings its own
+// Point/Brush - the picker below is the first code in this file to use either.
+using Point = System.Windows.Point;
+using Brush = System.Windows.Media.Brush;
 
 namespace SidebarExplorer.App;
 
@@ -19,12 +23,6 @@ public partial class ColorSettingsWindow : Window
     private readonly AppSettings _settings;
     private readonly Action _onChanged;
 
-    // Set around the native ColorDialog's own ShowDialog (see PickColor) -
-    // that dialog takes activation away from this window too, which would
-    // otherwise trigger the same "clicked outside the app" flash below for a
-    // completely ordinary in-app interaction (picking a color).
-    private bool _isPickingColor;
-
     public ColorSettingsWindow(AppSettings settings, Action onChanged)
     {
         InitializeComponent();
@@ -32,19 +30,17 @@ public partial class ColorSettingsWindow : Window
         _onChanged = onChanged;
         RefreshSwatches();
         Deactivated += Window_Deactivated;
+        PreviewKeyDown += ColorSettingsWindow_PreviewKeyDown;
+        Closing += (_, _) => ClosePicker(keep: true);
     }
 
     // Nudges attention back to this dialog if the user clicks outside the
     // whole app while it's open (ShowDialog only blocks its owner, not other
-    // applications, so that's still possible) - see _isPickingColor above for
-    // the one in-app interaction this deliberately ignores.
+    // applications, so that's still possible). Nothing in this window opens a
+    // second window any more - the picker is a layer inside this one - so
+    // there is no in-app case to exclude.
     private void Window_Deactivated(object? sender, EventArgs e)
     {
-        if (_isPickingColor)
-        {
-            return;
-        }
-
         var flashBrush = new SolidColorBrush(((SolidColorBrush)RootBorder.BorderBrush).Color);
         RootBorder.BorderBrush = flashBrush;
         flashBrush.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation
@@ -493,66 +489,244 @@ public partial class ColorSettingsWindow : Window
         };
     }
 
-    // Shared across every PickColor call (and, being static, across every time
-    // this window is reopened within the same app run) - a fresh
-    // System.Windows.Forms.ColorDialog only remembers custom palette colors
-    // for as long as that ONE dialog instance is open, so a color added while
-    // picking one row's color used to vanish the moment the dialog closed
-    // and a different row's picker opened a brand-new instance.
-    private static int[]? _customColors;
-
-    // Windows' own color picker (System.Windows.Forms.ColorDialog, already
-    // available - the project already references WinForms elsewhere for the
-    // tray icon and Recycle Bin support) rather than building a custom one.
+    // ----- 색상 피커 ---------------------------------------------------------
     //
-    // Every swatch calls this from MouseLeftButtonUP, never Down, and that
-    // matters more than it looks. This opens a NATIVE modal dialog, which runs
-    // its own message loop: opening it from the down event means the dialog
-    // appears while the button is still physically held, and the release that
-    // follows is consumed by that loop instead of reaching WPF. WPF is then
-    // left believing the left button is still down, and every drag gesture in
-    // the app begins with exactly one test - `e.LeftButton == Pressed`. With
-    // that stuck true, merely moving the cursor over the tree afterwards starts
-    // a drag nobody asked for, which takes the mouse capture and has no button
-    // release coming to end it - the app keeps receiving all mouse input while
-    // every other window stops responding. Reported after a long session in
-    // which colors had just been changed. Waiting for the release keeps the
-    // gesture WPF sees complete before the native loop takes over.
+    // Windows' own ColorDialog was here until 2026-08-04, and the reason it
+    // went is the OK button: a colour is judged against the actual sidebar,
+    // not a 40px sample, and the native dialog only hands the value over once
+    // it closes. So every attempt cost open-pick-confirm-look-reopen. This one
+    // writes through on every movement of the handle, and the tree behind the
+    // window repaints as it goes.
+    //
+    // What that costs per mouse-move is one ApplyColorSettings: about twenty
+    // SolidColorBrush allocations dropped into the resource dictionary. No
+    // layout, no folder re-read, no disk. It stays a full apply rather than
+    // touching only the edited brush BECAUSE several brushes are derived from
+    // the picked ones (the quieted name variants, the inactive selection) -
+    // updating one alone would leave those disagreeing with it mid-drag.
+    private Border? _pickerSwatch;
+    private Action<string>? _pickerSet;
+    private string? _pickerOriginalHex;
+
+    // Hue is kept here rather than recomputed from the current colour, because
+    // it cannot be: at zero saturation every hue is the same grey, so a handle
+    // dragged into the white or black corner would come back red on the next
+    // move. Saturation and brightness have no such trouble.
+    private double _pickerHue;
+    private double _pickerSat;
+    private double _pickerVal;
+
+    // The alpha the row already had. No control for it: every colour this app
+    // ships is opaque, and the hex box takes 8 digits for anyone who needs
+    // otherwise - so the picker preserves what it was given instead of
+    // silently flattening it.
+    private byte _pickerAlpha = 0xFF;
+
+    // Static, so the colours picked while setting one row are still offered
+    // while setting the next - and after this window is closed and reopened.
+    // This replaces the native dialog's custom-colour palette, which had the
+    // same lifetime for the same reason.
+    private static readonly List<string> _recentColors = new();
+
+    private const int RecentColorLimit = 8;
+
     private void PickColor(Border swatch, Func<string> getHex, Action<string> setHex)
     {
-        var current = (Color)ColorConverter.ConvertFromString(getHex());
+        // Whatever was open is left as it stands - the values are already
+        // applied, so there is nothing to confirm.
+        ClosePicker(keep: true);
 
-        using var dialog = new System.Windows.Forms.ColorDialog
-        {
-            Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B),
-            FullOpen = true,
-            CustomColors = _customColors ?? Array.Empty<int>()
-        };
-
-        var owner = new Win32Window(new System.Windows.Interop.WindowInteropHelper(this).Handle);
-        _isPickingColor = true;
-        bool accepted = dialog.ShowDialog(owner) == System.Windows.Forms.DialogResult.OK;
-        _isPickingColor = false;
-
-        // Kept even on Cancel - a custom color added to the palette before
-        // backing out of that particular pick should still be there next time.
-        _customColors = dialog.CustomColors;
-
-        if (!accepted)
+        if (ColorConverter.ConvertFromString(getHex()) is not Color current)
         {
             return;
         }
 
-        var picked = dialog.Color;
-        string hex = $"#{picked.A:X2}{picked.R:X2}{picked.G:X2}{picked.B:X2}";
-        setHex(hex);
-        swatch.Background = new SolidColorBrush(Color.FromArgb(picked.A, picked.R, picked.G, picked.B));
+        _pickerSwatch = swatch;
+        _pickerSet = setHex;
+        _pickerOriginalHex = getHex();
+        _pickerAlpha = current.A;
+        (_pickerHue, _pickerSat, _pickerVal) = ToHsv(current);
 
-        // The code beside the swatch has to follow, or the two disagree the
-        // moment a colour is picked with the dialog rather than typed - which
-        // reads as the field being stale or broken (2026-08-02). All of them
-        // rather than hunting for the one: fifteen string formats cost nothing
-        // next to the dialog that just closed.
+        BuildRecentColors();
+
+        // Shown first, then laid out, and only then measured and drawn into: a
+        // Collapsed element has no size at all, so both the panel's placement
+        // and the handles' positions would be computed against zeros.
+        PickerLayer.Visibility = Visibility.Visible;
+        PickerLayer.UpdateLayout();
+        PositionPickerPanel(swatch);
+        UpdatePickerVisuals();
+    }
+
+    // Anchored under the swatch it belongs to, and pulled back inside the
+    // window when there is no room below - the rows near the bottom of a
+    // seventeen-row list are exactly the ones that would otherwise open a
+    // panel half off the window.
+    private void PositionPickerPanel(Border swatch)
+    {
+        double panelWidth = PickerPanel.ActualWidth;
+        double panelHeight = PickerPanel.ActualHeight;
+
+        // Both measured against the WINDOW and subtracted, rather than the
+        // swatch against the layer directly: the layer is the swatch's sibling
+        // in the outer grid, not its ancestor, and TransformToAncestor throws
+        // on anything else (it did - 2026-08-04, on the first open).
+        var swatchOrigin = swatch.TransformToAncestor(this).Transform(new Point(0, 0));
+        var layerOrigin = PickerLayer.TransformToAncestor(this).Transform(new Point(0, 0));
+        var origin = new Point(swatchOrigin.X - layerOrigin.X, swatchOrigin.Y - layerOrigin.Y);
+
+        double left = origin.X + swatch.ActualWidth - panelWidth;
+        double top = origin.Y + swatch.ActualHeight + 4;
+
+        if (top + panelHeight > PickerLayer.ActualHeight)
+        {
+            top = origin.Y - panelHeight - 4;
+        }
+
+        Canvas.SetLeft(PickerPanel, Math.Max(6, Math.Min(left, PickerLayer.ActualWidth - panelWidth - 6)));
+        Canvas.SetTop(PickerPanel, Math.Max(6, top));
+    }
+
+    // keep: leave the colour where the handle left it (the ordinary ending -
+    // an outside click, or moving on to another row). Esc instead asks for the
+    // colour this row had when the panel opened, which is the only undo a
+    // window that applies as you go can offer.
+    private void ClosePicker(bool keep)
+    {
+        if (PickerLayer.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        if (!keep && _pickerOriginalHex is { } original && _pickerSet is { } setHex)
+        {
+            setHex(original);
+            ApplyPickedColor(original);
+        }
+        else if (_pickerSwatch is not null)
+        {
+            RememberRecentColor(CurrentPickerHex());
+        }
+
+        PickerLayer.Visibility = Visibility.Collapsed;
+        _pickerSwatch = null;
+        _pickerSet = null;
+        _pickerOriginalHex = null;
+    }
+
+    private void ColorSettingsWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        // Handled here, ahead of 닫기's IsCancel - one Esc should put back the
+        // colour being picked, not close the whole window with it applied.
+        if (e.Key == Key.Escape && PickerLayer.Visibility == Visibility.Visible)
+        {
+            ClosePicker(keep: false);
+            e.Handled = true;
+        }
+    }
+
+    private void PickerLayer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        // Only the layer itself: a press that reached the panel is a press on
+        // the picker, and bubbles up here afterwards.
+        if (ReferenceEquals(e.OriginalSource, PickerLayer))
+        {
+            ClosePicker(keep: true);
+        }
+    }
+
+    private void FieldHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        FieldHost.CaptureMouse();
+        TrackField(e);
+    }
+
+    private void FieldHost_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (FieldHost.IsMouseCaptured)
+        {
+            TrackField(e);
+        }
+    }
+
+    private void FieldHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => FieldHost.ReleaseMouseCapture();
+
+    private void HueHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        HueHost.CaptureMouse();
+        TrackHue(e);
+    }
+
+    private void HueHost_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (HueHost.IsMouseCaptured)
+        {
+            TrackHue(e);
+        }
+    }
+
+    private void HueHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => HueHost.ReleaseMouseCapture();
+
+    private void TrackField(System.Windows.Input.MouseEventArgs e)
+    {
+        var point = e.GetPosition(FieldHost);
+        _pickerSat = Clamp01(point.X / Math.Max(1, FieldHost.ActualWidth));
+        _pickerVal = 1 - Clamp01(point.Y / Math.Max(1, FieldHost.ActualHeight));
+        UpdatePickerVisuals();
+        ApplyPickedColor(CurrentPickerHex());
+    }
+
+    private void TrackHue(System.Windows.Input.MouseEventArgs e)
+    {
+        var point = e.GetPosition(HueHost);
+        _pickerHue = Clamp01(point.X / Math.Max(1, HueHost.ActualWidth)) * 360.0;
+        UpdatePickerVisuals();
+        ApplyPickedColor(CurrentPickerHex());
+    }
+
+    private void UpdatePickerVisuals()
+    {
+        FieldHueFill.Fill = new SolidColorBrush(FromHsv(_pickerHue, 1, 1, 0xFF));
+
+        double fieldX = _pickerSat * FieldHost.ActualWidth;
+        double fieldY = (1 - _pickerVal) * FieldHost.ActualHeight;
+        foreach (var thumb in new[] { FieldThumbOuter, FieldThumbInner })
+        {
+            Canvas.SetLeft(thumb, fieldX - thumb.Width / 2);
+            Canvas.SetTop(thumb, fieldY - thumb.Height / 2);
+        }
+
+        Canvas.SetLeft(HueThumb, _pickerHue / 360.0 * HueHost.ActualWidth - HueThumb.Width / 2);
+
+        var current = FromHsv(_pickerHue, _pickerSat, _pickerVal, _pickerAlpha);
+        PickerHexText.Text = $"#{current.R:X2}{current.G:X2}{current.B:X2}";
+    }
+
+    private string CurrentPickerHex()
+    {
+        var color = FromHsv(_pickerHue, _pickerSat, _pickerVal, _pickerAlpha);
+        return $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}";
+    }
+
+    // Writes the colour everywhere it shows at once: the setting, this row's
+    // swatch, every hex box (they would otherwise disagree with the swatch
+    // beside them - 2026-08-02), the reset button's enabled state, and the app
+    // behind this window.
+    private void ApplyPickedColor(string hex)
+    {
+        if (_pickerSet is not { } setHex || _pickerSwatch is not { } swatch)
+        {
+            return;
+        }
+
+        setHex(hex);
+        if (ColorConverter.ConvertFromString(hex) is Color color)
+        {
+            swatch.Background = new SolidColorBrush(color);
+        }
+
         foreach (var box in _hexBoxes)
         {
             RefreshHexBox(box);
@@ -562,8 +736,103 @@ public partial class ColorSettingsWindow : Window
         _onChanged();
     }
 
-    private sealed class Win32Window(IntPtr handle) : System.Windows.Forms.IWin32Window
+    private void RememberRecentColor(string hex)
     {
-        public IntPtr Handle { get; } = handle;
+        _recentColors.RemoveAll(existing => string.Equals(existing, hex, StringComparison.OrdinalIgnoreCase));
+        _recentColors.Insert(0, hex);
+        while (_recentColors.Count > RecentColorLimit)
+        {
+            _recentColors.RemoveAt(_recentColors.Count - 1);
+        }
+    }
+
+    private void BuildRecentColors()
+    {
+        PickerRecent.Children.Clear();
+        foreach (string hex in _recentColors)
+        {
+            if (ColorConverter.ConvertFromString(hex) is not Color color)
+            {
+                continue;
+            }
+
+            var chip = new Border
+            {
+                Width = 14,
+                Height = 14,
+                Margin = new Thickness(3, 0, 0, 0),
+                CornerRadius = new CornerRadius(2),
+                BorderThickness = new Thickness(1),
+                BorderBrush = (Brush)FindResource("ControlBorder"),
+                Background = new SolidColorBrush(color),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = hex
+            };
+            chip.MouseLeftButtonUp += (_, _) =>
+            {
+                _pickerAlpha = color.A;
+                (_pickerHue, _pickerSat, _pickerVal) = ToHsv(color);
+                UpdatePickerVisuals();
+                ApplyPickedColor(CurrentPickerHex());
+            };
+            PickerRecent.Children.Add(chip);
+        }
+    }
+
+    private static double Clamp01(double value) => Math.Max(0, Math.Min(1, value));
+
+    private static (double Hue, double Sat, double Val) ToHsv(Color color)
+    {
+        double r = color.R / 255.0, g = color.G / 255.0, b = color.B / 255.0;
+        double max = Math.Max(r, Math.Max(g, b));
+        double min = Math.Min(r, Math.Min(g, b));
+        double delta = max - min;
+
+        double hue = 0;
+        if (delta > 0)
+        {
+            if (max == r)
+            {
+                hue = 60 * (((g - b) / delta) % 6);
+            }
+            else if (max == g)
+            {
+                hue = 60 * (((b - r) / delta) + 2);
+            }
+            else
+            {
+                hue = 60 * (((r - g) / delta) + 4);
+            }
+        }
+
+        if (hue < 0)
+        {
+            hue += 360;
+        }
+
+        return (hue, max <= 0 ? 0 : delta / max, max);
+    }
+
+    private static Color FromHsv(double hue, double sat, double val, byte alpha)
+    {
+        double c = val * sat;
+        double x = c * (1 - Math.Abs(((hue / 60.0) % 2) - 1));
+        double m = val - c;
+
+        (double r, double g, double b) = (hue % 360) switch
+        {
+            < 60 => (c, x, 0.0),
+            < 120 => (x, c, 0.0),
+            < 180 => (0.0, c, x),
+            < 240 => (0.0, x, c),
+            < 300 => (x, 0.0, c),
+            _ => (c, 0.0, x),
+        };
+
+        return Color.FromArgb(
+            alpha,
+            (byte)Math.Round((r + m) * 255),
+            (byte)Math.Round((g + m) * 255),
+            (byte)Math.Round((b + m) * 255));
     }
 }
