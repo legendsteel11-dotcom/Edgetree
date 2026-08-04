@@ -257,6 +257,7 @@
 
                 <TextBlock Grid.Row="0"
                         Grid.Column="0"
+                        x:Name="LabelFolderName"
                         Text="{x:Static services:Strings.ColorLabelFolderNameFont}"
                         Style="{StaticResource ColorRowLabelStyle}"/>
                 <StackPanel Grid.Row="0"
@@ -272,6 +273,7 @@
 
                 <TextBlock Grid.Row="1"
                         Grid.Column="0"
+                        x:Name="LabelFolderNameHighlight"
                         Text="{x:Static services:Strings.ColorLabelFolderNameHighlightFont}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
@@ -289,6 +291,7 @@
 
                 <TextBlock Grid.Row="2"
                         Grid.Column="0"
+                        x:Name="LabelFolderNameHover"
                         Text="{x:Static services:Strings.ColorLabelFolderNameHoverFont}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
@@ -306,6 +309,7 @@
 
                 <TextBlock Grid.Row="3"
                         Grid.Column="0"
+                        x:Name="LabelFileName"
                         Text="{x:Static services:Strings.ColorLabelFileNameFont}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
@@ -323,6 +327,7 @@
 
                 <TextBlock Grid.Row="4"
                         Grid.Column="0"
+                        x:Name="LabelFileNameHighlight"
                         Text="{x:Static services:Strings.ColorLabelFileNameHighlightFont}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
@@ -340,6 +345,7 @@
 
                 <TextBlock Grid.Row="5"
                         Grid.Column="0"
+                        x:Name="LabelFileNameHover"
                         Text="{x:Static services:Strings.ColorLabelFileNameHoverFont}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
@@ -357,6 +363,7 @@
 
                 <TextBlock Grid.Row="6"
                         Grid.Column="0"
+                        x:Name="LabelShowMore"
                         Text="{x:Static services:Strings.ColorLabelShowMore}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
@@ -449,6 +456,7 @@
 
                 <TextBlock Grid.Row="12"
                         Grid.Column="0"
+                        x:Name="LabelHoverBackground"
                         Text="{x:Static services:Strings.ColorLabelHoverBackground}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>

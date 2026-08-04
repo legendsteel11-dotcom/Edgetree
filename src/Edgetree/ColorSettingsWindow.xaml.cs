@@ -28,6 +28,7 @@ public partial class ColorSettingsWindow : Window
         InitializeComponent();
         _settings = settings;
         _onChanged = onChanged;
+        WireLabelHoverPreviews();
         RefreshSwatches();
         Deactivated += Window_Deactivated;
         PreviewKeyDown += ColorSettingsWindow_PreviewKeyDown;
@@ -82,7 +83,87 @@ public partial class ColorSettingsWindow : Window
         // currently active - "☀️ 라이트 모드" while in dark mode reads as "click
         // to go light", which is clearer than restating the current state.
         ThemeToggleButton.Content = _settings.IsLightMode ? Strings.ColorThemeDarkMode : Strings.ColorThemeLightMode;
+        RefreshLabelPreviews();
         UpdateResetButtonEnabled();
+    }
+
+    // ----- 라벨이 자기 색을 입는다 -------------------------------------------
+    //
+    // Several of these cannot be checked against the app at all: 더 보기 only
+    // appears once a folder runs past its display cap, 강조 needs a selected
+    // row, and a hover colour needs the pointer to be somewhere other than
+    // here. Setting one of them showed nothing until the situation that
+    // reveals it happened to come round - so the label is drawn in the colour
+    // it names, being the one thing certain to be on screen while that colour
+    // is being chosen.
+    //
+    // Text colours only. A background colour painted onto letters says nothing
+    // true about the pairing it will really form, and a guide line is a line
+    // rather than a word - both stay with the swatch, which is what a swatch
+    // is for.
+    private void RefreshLabelPreviews()
+    {
+        LabelFolderName.Foreground = ParseBrush(CurrentFolderNameColorHex);
+        LabelFolderNameHighlight.Foreground = ParseBrush(CurrentFolderNameHighlightColorHex);
+        LabelFileName.Foreground = ParseBrush(CurrentFileNameColorHex);
+        LabelFileNameHighlight.Foreground = ParseBrush(CurrentFileNameHighlightColorHex);
+        LabelShowMore.Foreground = ParseBrush(CurrentShowMoreColorHex);
+
+        // The three hover rows demonstrate rather than state, and they do it
+        // TOGETHER: in the tree, pointing at a row changes its background and
+        // its name colour in the same instant, so a label showing one third of
+        // that would be honest about the setting and misleading about the
+        // result. At rest they look ordinary - pointing at one is the whole of
+        // the difference, which is what a hover colour is.
+        //
+        // While any of the three is being picked they all hold the hovered
+        // look, because a colour being dragged has to be visible without also
+        // keeping the pointer somewhere else.
+        bool pickingHover =
+            ReferenceEquals(_pickerSwatch, FolderNameHoverFontSwatch) ||
+            ReferenceEquals(_pickerSwatch, FileNameHoverFontSwatch) ||
+            ReferenceEquals(_pickerSwatch, HoverBackgroundSwatch);
+
+        if (pickingHover)
+        {
+            ShowHovered(LabelFolderNameHover, CurrentFolderNameHoverColorHex);
+            ShowHovered(LabelFileNameHover, CurrentFileNameHoverColorHex);
+            ShowHovered(LabelHoverBackground, CurrentFolderNameHoverColorHex);
+            return;
+        }
+
+        ShowAtRest(LabelFolderNameHover, CurrentFolderNameColorHex);
+        ShowAtRest(LabelFileNameHover, CurrentFileNameColorHex);
+        LabelHoverBackground.Background = System.Windows.Media.Brushes.Transparent;
+        LabelHoverBackground.Foreground = (Brush)FindResource("DialogForeground");
+    }
+
+    private void ShowHovered(TextBlock label, string fontHex)
+    {
+        label.Background = ParseBrush(CurrentHoverBackgroundColorHex);
+        label.Foreground = ParseBrush(fontHex);
+    }
+
+    private void ShowAtRest(TextBlock label, string fontHex)
+    {
+        label.Background = System.Windows.Media.Brushes.Transparent;
+        label.Foreground = ParseBrush(fontHex);
+    }
+
+    // Transparent rather than unset, so the whole label cell answers the
+    // pointer instead of only the glyphs it happens to contain.
+    private void WireLabelHoverPreviews()
+    {
+        WireHoverPreview(LabelFolderNameHover, () => CurrentFolderNameHoverColorHex);
+        WireHoverPreview(LabelFileNameHover, () => CurrentFileNameHoverColorHex);
+        WireHoverPreview(LabelHoverBackground, () => CurrentFolderNameHoverColorHex);
+    }
+
+    private void WireHoverPreview(TextBlock label, Func<string> fontHex)
+    {
+        label.Background = System.Windows.Media.Brushes.Transparent;
+        label.MouseEnter += (_, _) => ShowHovered(label, fontHex());
+        label.MouseLeave += (_, _) => RefreshLabelPreviews();
     }
 
     private static SolidColorBrush ParseBrush(string hex)
@@ -612,6 +693,10 @@ public partial class ColorSettingsWindow : Window
         _pickerSwatch = null;
         _pickerSet = null;
         _pickerOriginalHex = null;
+
+        // Cleared last: the hover rows hold the hovered look only while one of
+        // them is being picked, and that is no longer true as of this line.
+        RefreshLabelPreviews();
     }
 
     private void ColorSettingsWindow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -732,6 +817,7 @@ public partial class ColorSettingsWindow : Window
             RefreshHexBox(box);
         }
 
+        RefreshLabelPreviews();
         UpdateResetButtonEnabled();
         _onChanged();
     }
