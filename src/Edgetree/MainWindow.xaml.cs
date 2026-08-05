@@ -2817,6 +2817,25 @@ public partial class MainWindow : Window
         // is still one click away via the pin button; undocking is still a
         // header drag (HeaderGrid_MouseMove) - both cover their direction on
         // their own, so this doesn't need its own third shortcut.
+        //
+        // What the comment above assumed still worked, however, did not: the
+        // double-click that restores a window Windows has snapped to maximized
+        // is the OS's own CAPTION double-click, and this header is not caption
+        // - IsHitTestVisibleInChrome claims the whole of it for us, so that
+        // click never reached Windows to begin with (2026-08-05, reported after
+        // Win+Up left the window stuck full-screen with only a drag to get it
+        // back). Restoring is therefore done here, explicitly.
+        //
+        // Restore ONLY. A double-click on a window that is not maximized still
+        // does nothing, so this cannot bring back the mis-operation the dock
+        // toggle was removed for.
+        if (e.ClickCount == 2 && WindowState == WindowState.Maximized)
+        {
+            WindowState = WindowState.Normal;
+            e.Handled = true;
+            return;
+        }
+
         _headerDragStart = e.GetPosition(this);
         (sender as UIElement)?.CaptureMouse();
     }
@@ -2977,6 +2996,9 @@ public partial class MainWindow : Window
         ResizeMode = ResizeMode.CanResize;
         ChromeSettings.CaptionHeight = HeaderHeight;
         ChromeSettings.ResizeBorderThickness = new Thickness(FloatingResizeBorder);
+        // Only meaningful now that there is a resize border to expose - see the
+        // strip's own comment in XAML.
+        TopResizeStrip.Visibility = Visibility.Visible;
 
         // A window styled entirely through WindowChrome (WindowStyle="None")
         // loses the OS's own drop shadow along with the rest of its native
@@ -3093,6 +3115,9 @@ public partial class MainWindow : Window
         ChromeSettings.CaptionHeight = 0;
         ChromeSettings.ResizeBorderThickness = new Thickness(0);
         ChromeSettings.GlassFrameThickness = new Thickness(0);
+        // Nothing to expose while docked, and left showing it would only take
+        // the top of the header away from the header's own handlers.
+        TopResizeStrip.Visibility = Visibility.Collapsed;
 
         var hwnd = new WindowInteropHelper(this).Handle;
         NativeMethods.MakeToolWindow(hwnd);

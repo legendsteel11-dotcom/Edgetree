@@ -4453,5 +4453,27 @@
                 Cursor="SizeWE"
                DragDelta="ResizeThumb_DragDelta"
                MouseDoubleClick="ResizeThumb_MouseDoubleClick"/>
+
+        <!-- Hands the window's top edge back to Windows so a floating window can
+             be resized upwards.
+
+             HeaderGrid sits flush against that edge and carries
+             IsHitTestVisibleInChrome="True", which tells WindowChrome the area
+             is ours rather than frame - and that claim swallows the top resize
+             border along with everything else. The flag has to stay: without it
+             the header's own double-click never runs and Windows maximizes the
+             window instead (see HeaderGrid's comment). So the top few pixels are
+             covered by a strip that makes no such claim, and WindowChrome reads
+             it as frame again.
+
+             Last child, so it sits above the header in z-order, and only shown
+             while floating: docked, ResizeBorderThickness is 0 and this would do
+             nothing but eat the top of the header's own mouse handling.
+             Height matches MainWindow.FloatingResizeBorder. -->
+        <Border x:Name="TopResizeStrip"
+                VerticalAlignment="Top"
+                Height="6"
+                Background="Transparent"
+                Visibility="Collapsed"/>
     </Grid>
 </Window>
