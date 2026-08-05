@@ -1376,6 +1376,10 @@
                     IsCheckable="True"
                     AutomationProperties.AutomationId="autoHideUseHandle"
                     Click="AutoHideUseHandleMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.MenuAutoHideSlide}"
+                    IsCheckable="True"
+                    AutomationProperties.AutomationId="autoHideSlide"
+                    Click="AutoHideSlideMenuItem_Click"/>
             <!-- Last in the group, and directly above the separator: what
                  follows it is the bookmark and hidden-folder lists, which is
                  where someone lands next after choosing what the panel shows
@@ -3531,7 +3535,18 @@
          so the sidebar's real content never reached the window's true right
          edge. The Thumb below now overlays the content instead, the same fix
          already applied to the scrollbars for the same reason. -->
-    <Grid>
+    <Grid x:Name="RootContent">
+        <!-- The auto-hide peek slides by moving THIS, not the window. A window
+             positioned off the screen edge is not drawn out there, so sliding
+             one in makes Windows hand the app a freshly exposed strip to paint
+             on every frame - which is what showed up as an unfinished, smearing
+             sidebar (2026-08-05). Translating content inside a window that is
+             already fully on screen is a composition-thread matrix change: the
+             tree is rendered once and then simply shown at a different offset.
+             See MainWindow.SlideContentTo. -->
+        <Grid.RenderTransform>
+            <TranslateTransform x:Name="ContentSlide"/>
+        </Grid.RenderTransform>
         <Grid Background="{DynamicResource SidebarBackground}">
             <!-- Row1/Row3 are deliberately neutral names, not "FavoritesRow"/
                  "TreeRow": which one actually hosts the favorites panel vs the

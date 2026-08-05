@@ -184,6 +184,32 @@ internal static class NativeMethods
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
 
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    private const int VK_LBUTTON = 0x01;
+    private const int VK_RBUTTON = 0x02;
+
+    // Whether a mouse button has been pressed since the LAST call to this
+    // method - GetAsyncKeyState's low bit, which latches a press and clears on
+    // read. Asking "is a button down right now" instead misses any click that
+    // began and ended between two polls, and a poll running on the UI thread
+    // gets pushed around by whatever else that thread is doing: during the
+    // auto-hide slide the gap between polls stretches well past the length of
+    // an ordinary click, which is how clicks outside the sidebar were being
+    // swallowed (2026-08-05, confirmed by the watch never even logging a
+    // decision).
+    //
+    // Both buttons are polled every time, not short-circuited, so a press on
+    // one cannot sit latched waiting to be reported on some later call that
+    // happened to ask about the other.
+    public static bool ConsumeMouseButtonPress()
+    {
+        bool left = (GetAsyncKeyState(VK_LBUTTON) & 0x0001) != 0;
+        bool right = (GetAsyncKeyState(VK_RBUTTON) & 0x0001) != 0;
+        return left || right;
+    }
+
     [DllImport("gdi32.dll")]
     private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
 

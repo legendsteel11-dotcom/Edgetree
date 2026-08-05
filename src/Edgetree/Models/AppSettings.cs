@@ -41,6 +41,16 @@ public class AppSettings
     // Off by default: the full sliver is easier to find, and someone who never
     // hits this should not have their reveal target quietly shrink.
     public bool AutoHideUseHandle { get; set; } = false;
+
+    // Whether the peek slides in and out or simply appears.
+    //
+    // Worth an option rather than a decision: auto-hide is one of this app's
+    // defining behaviours, so the motion is on screen constantly, and how it
+    // reads depends on the display it is read on - clean on a 144Hz panel,
+    // noticeably less so at 60Hz. It is also switched off automatically where
+    // sliding would carry the window across a neighbouring monitor, so the
+    // instant path has to stay a first-class one either way.
+    public bool AutoHideSlide { get; set; } = true;
     public double TreeFontSize { get; set; } = 12;
     public ObservableCollection<FavoriteEntry> Favorites { get; set; } = new();
     public double FavoritesPanelHeight { get; set; } = 100;

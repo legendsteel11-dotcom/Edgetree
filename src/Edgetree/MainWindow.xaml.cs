@@ -92,6 +92,11 @@ public partial class MainWindow : Window
     // (no MouseLeave arrives during a drag to do it).
     private System.Windows.Threading.DispatcherTimer? _dragRevealTimer;
     private System.Windows.Threading.DispatcherTimer? _hoverRevealTimer;
+    private bool _slideInFlight;
+    private Action? _slideCompletion;
+    private System.Windows.Threading.DispatcherTimer? _collapsedWatchTimer;
+    private bool _collapsedZoneArmed;
+    private int _slideToken;
     private bool _revealedByDrag;
 
     // Non-null while "Collapse All" has collapsed the tree via
@@ -1079,11 +1084,27 @@ public partial class MainWindow : Window
 
     // dpiScale is passed only from the DPI-change path, where the window's own
     // reported scale can still be the old one - see OnDpiChanged.
-    private void PositionToWorkArea(DpiScale? dpiScale = null)
+    // keepLeft: the caller has already parked the window somewhere deliberate
+    // (off the screen edge, before growing it) and does not want it pulled
+    // back to the dock. Everything else here still applies.
+    private void PositionToWorkArea(DpiScale? dpiScale = null, bool keepLeft = false)
     {
-        var workArea = GetCurrentMonitorWorkArea(dpiScale);
-        Left = _settings.DockOnRight ? workArea.Right - Width : workArea.Left;
+        // Before anything writes Left below - an animation still holding that
+        // property would swallow the assignment (see StopSlide).
+        StopSlide();
 
+        var workArea = GetCurrentMonitorWorkArea(dpiScale);
+
+        // Vertical first, horizontal last, and that order is load-bearing.
+        // Each of Left/Top/Height is written straight through to the real
+        // window, so the states in between are composited and visible. Setting
+        // Left first meant a window arriving from off the edge landed there
+        // still at its full height and only then shrank to the handle - one
+        // frame of a full-height bar at the screen edge, seen as a blink on
+        // every hide and as the handle "jumping up and back" at startup
+        // (2026-08-05). Sized first, the window is already the right shape by
+        // the time it becomes visible.
+        //
         // The one place the collapsed shape is decided, which is why the handle
         // is handled HERE and nowhere else: startup, docking, DPI changes,
         // monitor changes and taskbar changes all recompute through this
@@ -1097,6 +1118,11 @@ public partial class MainWindow : Window
         {
             Top = workArea.Top;
             Height = workArea.Height;
+        }
+
+        if (!keepLeft)
+        {
+            Left = _settings.DockOnRight ? workArea.Right - Width : workArea.Left;
         }
 
         // Rides along here for the same reason the handle's own geometry does:
@@ -1220,8 +1246,12 @@ public partial class MainWindow : Window
     //
     // A transform-based slide (window snaps, content glides via
     // TranslateTransform - ghost-free by construction) was ALSO built and
-    // tried the same day, and the user still preferred instant. Both
-    // alternatives are settled questions: don't re-propose an animation here.
+    // tried the same day, and the user still preferred instant.
+    //
+    // 2026-08-05: asked for again, and granted a THIRD way that neither
+    // earlier attempt tried - see SlideTo below. The width still changes in
+    // one step here; what moves is the window. Do not bring the width
+    // animation back: that one has a confirmed defect, not a taste problem.
     private void AnimateWidth(double targetWidth, Action? onCompleted = null)
     {
         double targetLeft = Left + (Width - targetWidth);
@@ -1234,6 +1264,261 @@ public partial class MainWindow : Window
         }
         onCompleted?.Invoke();
     }
+
+    // ----- 슬라이드 (2026-08-05) --------------------------------------------
+    //
+    // The peek open and its close slide in and out by MOVING the window at its
+    // final size, rather than growing and shrinking it.
+    //
+    // This is the one thing the 2026-07-21 round did not try. The defect it
+    // found was specific: an animated WIDTH resizes the native window on every
+    // tick, and a resize is a re-layout plus a fresh surface for DWM to
+    // compose, which is where the irregular ghosting came from. Moving is
+    // neither - the same already-rendered surface changes position, so there
+    // is nothing per-frame for the app to redraw. The transform slide built
+    // that day avoided the defect too, but only the CONTENT glided; the window
+    // outline still appeared all at once, which is most likely why it lost to
+    // an instant transition.
+    //
+    // Timed by DISTANCE, not by a fixed duration. A fixed 130ms covered a
+    // 250px sidebar and a 1200px one at wildly different speeds, and the
+    // narrow case read as a flicker rather than a movement while the wide one
+    // read as smooth (2026-08-05: "폭이 커서 애니메이션 공간이 충분하면 부드럽고,
+    // 납작하게 하면 너무 빨라 깜빡이는 것 같다"). Roughly constant velocity with
+    // both ends clamped: long enough to be seen at any width, short enough that
+    // a wide sidebar never feels like it is being waited on.
+    // Slowed a long way from the first attempt (which floored at 95ms): on a
+    // 60Hz display a fast slide only gets a handful of frames to cross the
+    // distance, so the steps between them are visible as shake - the same
+    // motion was clean on a 144Hz panel. More time means more frames for the
+    // same distance, which is the direct fix. Frame-rate capping is NOT - that
+    // was tried in an earlier round and made the steps more visible, not less.
+    // Coming in is slower than going out. They are not the same event to
+    // watch: arriving is the thing being looked AT, so it can take its time,
+    // while leaving is over as far as the user is concerned the moment they
+    // have moved on. Making both slow enough to read left the exit feeling
+    // like it was dragging its feet.
+    private double SlideDurationMs(double distance, bool arriving)
+        // Retimed for the short offset above - the old numbers were scaled to a
+        // journey the width of the window and would now spend most of a second
+        // covering a hundred pixels.
+        => Math.Clamp(360 + (distance * 0.60), 520, 1200);
+
+    // A slide moves the window in from beyond the docked edge - which, with a
+    // second display sitting there, means it comes in ACROSS that display
+    // (2026-08-05). The motion is correct and the user read it as such, but a
+    // sidebar sweeping over the neighbouring monitor is worse than no
+    // animation, so that case simply doesn't slide.
+    private bool HasScreenBeyondDockedEdge()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var current = System.Windows.Forms.Screen.FromHandle(hwnd);
+        foreach (var screen in System.Windows.Forms.Screen.AllScreens)
+        {
+            if (screen.Equals(current))
+            {
+                continue;
+            }
+
+            // Only a display the window would actually travel over: one that
+            // shares some vertical span with this monitor and lies on the side
+            // the sidebar slides in from.
+            bool overlapsVertically =
+                screen.Bounds.Bottom > current.Bounds.Top &&
+                screen.Bounds.Top < current.Bounds.Bottom;
+            if (!overlapsVertically)
+            {
+                continue;
+            }
+
+            bool isBeyondEdge = _settings.DockOnRight
+                ? screen.Bounds.Left >= current.Bounds.Right
+                : screen.Bounds.Right <= current.Bounds.Left;
+            if (isBeyondEdge)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // The window's parked position: one full width beyond the docked edge.
+    //
+    // Back to moving the WINDOW rather than its contents. Translating the
+    // contents can never look like a sidebar arriving, because the window's own
+    // rectangle is opaque and already there - whatever slides inside it merely
+    // uncovers that rectangle, and shortening the travel until the uncovered
+    // strip stops being distracting also shortens it until the motion stops
+    // being visible at all (2026-08-05: "그냥 애니메이션 없을 때와 별 차이가
+    // 없네요"). There is no useful setting in between.
+    //
+    // The earlier attempt at this was abandoned over an explanation that was
+    // wrong: that a window off the screen edge is not drawn out there. It is -
+    // DWM holds a surface per window, which is why dragging a window half off
+    // the screen and back does not repaint it. What actually went out blank was
+    // a window that had not finished rendering YET, because the slide was
+    // started after a layout pass rather than after a frame (see AfterNextFrame).
+    private double SlideAwayLeft(double dockedLeft)
+        => _settings.DockOnRight ? dockedLeft + Width : dockedLeft - Width;
+
+    // Waits for the compositor to actually put a frame up, which a dispatcher
+    // hop at Loaded priority does not: that only means layout has run. With a
+    // virtualizing tree and icons arriving from a background thread, the gap
+    // between "measured and arranged" and "there is something to look at" is
+    // several frames wide, and starting the slide inside that gap is what sent
+    // an empty sidebar across the screen.
+    private void AfterNextFrame(Action action)
+    {
+        int frames = 0;
+        EventHandler? onRendering = null;
+        onRendering = (_, _) =>
+        {
+            // The first Rendering after this is queued still precedes the frame
+            // that includes our layout; the second one follows it.
+            if (++frames < 2)
+            {
+                return;
+            }
+
+            CompositionTarget.Rendering -= onRendering;
+            action();
+        };
+
+        CompositionTarget.Rendering += onRendering;
+    }
+
+    // The animation is on a TranslateTransform, not on the window - see the
+    // RootContent comment in XAML. Same teardown discipline as before: the
+    // animated value outranks a plain assignment until it is removed.
+    // runPendingCompletion: a slide carries work to do once it is out of sight
+    // (collapsing to the handle). Abandoning the animation must not abandon
+    // that too - a window left full-size while the rest of the app believes it
+    // is hidden is exactly the state the intermittent "sometimes it just snaps"
+    // and "the click outside gets eaten" reports came from. The one case that
+    // legitimately drops it is a hide being turned back into a reveal, which
+    // says so explicitly.
+    private void StopSlide(bool runPendingCompletion = true)
+    {
+        if (!_slideInFlight)
+        {
+            _slideCompletion = null;
+            return;
+        }
+
+        LogAutoHide($"slide    STOPPED runPending={runPendingCompletion}");
+
+        // Invalidates the running slide's completion handler. Removing the
+        // animation with BeginAnimation(..., null) does NOT reliably stop that
+        // handler from firing afterwards, and when it did it wrote its own
+        // target - a position off the screen edge - over whatever had just been
+        // decided. That is what took the sidebar out of reach: a hide turned
+        // back into a reveal put the window home, and the abandoned slide then
+        // shoved it back out (2026-08-05, caught in autohide.log at left=-503
+        // after a reveal had returned it to 0).
+        _slideToken++;
+
+        double current = Left;
+        BeginAnimation(LeftProperty, null);
+        Left = current;
+        _slideInFlight = false;
+
+        var pending = _slideCompletion;
+        _slideCompletion = null;
+        if (runPendingCompletion)
+        {
+            pending?.Invoke();
+        }
+    }
+
+    // arriving: eased so the window settles as it lands. Leaving takes the
+    // opposite curve - a slide out that decelerates spends its last frames
+    // crawling the final few pixels, which showed as a thin bar hesitating at
+    // the edge before it vanished, read as a bounce (2026-08-05: "20px 두께
+    // 정도로 검은 바가 살짝 나타났다 사라져 바운스 되는 느낌"). Accelerating away
+    // has nothing to linger over.
+    private void SlideTo(double targetLeft, bool arriving, Action? onCompleted = null)
+    {
+        StopSlide();
+
+        var slide = new System.Windows.Media.Animation.DoubleAnimation
+        {
+            To = targetLeft,
+            Duration = TimeSpan.FromMilliseconds(
+                SlideDurationMs(Math.Abs(targetLeft - Left), arriving)),
+            // Arriving and leaving get different curves, not mirrored ones.
+            //
+            // Leaving keeps a cubic EaseIn - it starts gently and accelerates
+            // away, which is the half that has read well throughout.
+            //
+            // Arriving had the mirror of that, a cubic EaseOut, and it covered
+            // most of the distance in the first third: the sidebar appeared to
+            // pop into place and then creep the last few pixels, which is the
+            // "팟 하고 뜬다" that survived every change to the duration - the
+            // problem was never how long it took. A power of 1.3 is barely more
+            // than linear, just enough to settle at the end.
+            EasingFunction = arriving
+                ? new System.Windows.Media.Animation.PowerEase
+                {
+                    Power = 1.3,
+                    EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut
+                }
+                : new System.Windows.Media.Animation.CubicEase
+                {
+                    EasingMode = System.Windows.Media.Animation.EasingMode.EaseIn
+                },
+            // HoldEnd, not Stop. With Stop the property drops back to its base
+            // value the instant the animation ends and only picks up the final
+            // one when the handler below runs - one frame with the window back
+            // at the docked edge, full height, contents already hidden. That
+            // frame was visible as a pale full-height bar flashing in and out
+            // as the sidebar finished hiding (2026-08-05: "흰색 긴 바와 같이...
+            // 좀 깜빡이는 걸로 보입니다").
+            FillBehavior = System.Windows.Media.Animation.FillBehavior.HoldEnd
+        };
+
+        int token = ++_slideToken;
+        slide.Completed += (_, _) =>
+        {
+            // Anything that stopped or replaced this slide has moved the token
+            // on; this handler no longer speaks for the window.
+            if (token != _slideToken)
+            {
+                return;
+            }
+
+            // Base value first, then release the hold: written in this order
+            // the held value and the base value are already the same when the
+            // animation lets go, so there is no frame in between showing
+            // anything else.
+            Left = targetLeft;
+            BeginAnimation(LeftProperty, null);
+            _slideInFlight = false;
+
+            var pending = _slideCompletion;
+            _slideCompletion = null;
+            pending?.Invoke();
+        };
+
+        _slideInFlight = true;
+        _slideCompletion = onCompleted;
+        BeginAnimation(LeftProperty, slide);
+    }
+
+    // Whether the window may travel beyond the docked edge at all. Checked by
+    // the callers BEFORE they move anything: declining the slide has to mean
+    // the window never leaves, not that it jumps there instantly. Moving it
+    // out and back was enough to relocate the sidebar entirely - the window
+    // landed on the neighbouring display, and PositionToWorkArea, which asks
+    // which monitor the window is currently on, then docked it to that one
+    // (2026-08-05: "아직도 왼쪽 모니터로 넘어가는데요").
+    private bool CanSlide => _settings.AutoHideSlide && !HasScreenBeyondDockedEdge();
+
 
     // Clamped defensively at the point of use (like MaxItemsPerFolder/
     // TabSpacing elsewhere) rather than trusting a hand-edited settings file.
@@ -1312,12 +1597,23 @@ public partial class MainWindow : Window
     {
         _settings.IsAutoHidden = true;
         StopHoverReveal();
-        SetExpandedContentVisibility(Visibility.Collapsed);
-        AnimateWidth(CollapsedWidth);
+
         // After IsAutoHidden is set, never before - PositionToWorkArea reads it
         // through IsCollapsedToHandle to decide whether this is a handle or a
         // full-height sliver. Same ordering rule at all three transitions.
-        PositionToWorkArea();
+        // Entering auto-hide slides out the same way a peek closing does. It
+        // is the same thing happening as far as the eye is concerned, and
+        // having one of them animate and the other snap made the app look like
+        // it had two different ways of hiding.
+        if (CanSlide)
+        {
+            SlideTo(SlideAwayLeft(Left), arriving: false, CollapseAfterSlide);
+        }
+        else
+        {
+            CollapseAfterSlide();
+        }
+
         UpdatePinButtonVisibility();
         ApplyTopmostState("enter");
     }
@@ -1406,6 +1702,8 @@ public partial class MainWindow : Window
         StopAutoHideOutsideClickWatch();
         StopDragReveal();
         StopHoverReveal();
+        StopCollapsedWatch();
+        StopSlide();
         _settings.IsAutoHidden = false;
         _isAutoHideRevealed = false;
         _revealedByDrag = false;
@@ -1510,18 +1808,62 @@ public partial class MainWindow : Window
     {
         _autoHideRehideTimer?.Stop();
         StopHoverReveal();
+        StopCollapsedWatch();
+        LogAutoHide("reveal   enter");
+
+        // A hide caught part-way out is put straight back, not re-opened from
+        // scratch: the window is still full size with its content up, so all
+        // it needs is its position. Rebuilding it instead re-sized and
+        // re-filled it at the dock first, which was visible as a double flash.
+        if (_slideInFlight && !_isAutoHideRevealed)
+        {
+            _isAutoHideRevealed = true;
+            // The collapse this hide was going to do is no longer wanted - the
+            // window is staying. Only this path may drop it.
+            StopSlide(runPendingCompletion: false);
+            PositionToWorkArea();
+            UpdatePinButtonVisibility();
+            ApplyTopmostState("reveal");
+
+            if (!_settings.AutoHideCloseOnMouseLeave)
+            {
+                StartAutoHideOutsideClickWatch();
+            }
+            return;
+        }
+
         _isAutoHideRevealed = true;
-        // Full height back before the width animation, not after: the flag
-        // above has already been set, so this restores the whole edge, and the
-        // widening then happens at the final height. Called the other way round
-        // the sidebar would open at handle height and grow into place.
+
+        double expandedWidth = ClampExpandedWidth(_settings.ExpandedWidth);
+
+        // Revealing never slides, and that asymmetry is the whole finding of
+        // 2026-08-05. A window has no pixels where it is off the screen, so one
+        // sliding IN hands the app a freshly exposed strip to draw on every
+        // frame - the sidebar visibly builds itself as it arrives, at any
+        // speed, at any width, however early the content is prepared. Tried
+        // three ways round; the smear is the drawing, not the moving.
+        //
+        // Sliding OUT has no such problem: everything is already drawn and
+        // simply leaves. That half is kept below (see CloseAutoHideReveal),
+        // and it is the half worth having anyway - arriving happens under a
+        // cursor that is already there waiting to use it, while leaving
+        // happens after the eye has moved on.
+        //
+        // Do not "fix" this by animating the reveal again without a way to
+        // keep the off-screen pixels. Moving the CONTENT instead was also
+        // tried: no smear, but the window's own rectangle still appears all at
+        // once, so a long travel exposes an empty panel and a short one is
+        // indistinguishable from no animation at all.
+        // Full height back before the width change, not after: the flag above
+        // has already been set, so this restores the whole edge, and the
+        // widening then happens at the final height.
         PositionToWorkArea();
-        // Width first, content after: the one full tree/favorites layout pass
-        // this costs happens at the final width, not at the sliver's.
-        AnimateWidth(ClampExpandedWidth(_settings.ExpandedWidth), onCompleted: () =>
+
+        AnimateWidth(expandedWidth, onCompleted: () =>
         {
             SetExpandedContentVisibility(Visibility.Visible);
         });
+
         UpdatePinButtonVisibility();
 
         // Growing the window doesn't change its z-order, so a sliver that had
@@ -1599,6 +1941,39 @@ public partial class MainWindow : Window
         LogDragReveal("revealed by drag dwell");
         _revealedByDrag = true;
         RevealFromAutoHide();
+    }
+
+    // ----- 자동 숨김 상태 전이 계측 (2026-08-05) ----------------------------
+    //
+    // NOT Conditional("DEBUG") - unlike LogDragReveal below, because the thing
+    // it is chasing only shows up in the Release build being tested by hand,
+    // roughly twice in ten open/close cycles: a click outside gets eaten, and
+    // the hide that follows skips its animation. Two guesses have already been
+    // spent on it. One line per transition is cheap enough to leave running
+    // until it is caught.
+    //
+    // What to read: every reveal should be followed by exactly one rehide, and
+    // slide=True on both. A rehide with slide=False, or two of anything in a
+    // row, is the fault.
+    private void LogAutoHide(string what)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "autohide.log"),
+                $"{DateTime.Now:HH:mm:ss.fff}  {what}  " +
+                $"revealed={_isAutoHideRevealed} sliding={_slideInFlight} " +
+                $"pending={_slideCompletion is not null} " +
+                $"hidden={_settings.IsAutoHidden} docked={_isDocked} " +
+                $"canSlide={CanSlide} left={Left:F0} width={Width:F0} height={Height:F0}" +
+                Environment.NewLine);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     [System.Diagnostics.Conditional("DEBUG")]
@@ -1756,13 +2131,184 @@ public partial class MainWindow : Window
 
     private void CloseAutoHideReveal()
     {
-        _isAutoHideRevealed = false;
         _revealedByDrag = false;
+        LogAutoHide("rehide   enter");
+
+        // A reveal caught mid-flight does NOT get turned around with a second
+        // animation. That was tried, and it stranded the window: the reversing
+        // slide ended after 91ms of its 452 (2026-08-05 log), leaving the
+        // sidebar parked off the screen edge with no handle to reach it by -
+        // indistinguishable from a crash from the outside. Starting an
+        // animation on a property another animation is still holding is not
+        // worth the picture it buys. Stop where it is and collapse.
+        if (_slideInFlight)
+        {
+            _isAutoHideRevealed = false;
+            StopSlide(runPendingCompletion: false);
+            CollapseAfterSlide();
+            UpdatePinButtonVisibility();
+            ApplyTopmostState("rehide");
+            return;
+        }
+
+        _isAutoHideRevealed = false;
+
+        // Content stays visible and the window stays full-width for the whole
+        // way out - that IS the slide. Collapsing to the handle happens once
+        // the window is already off the edge, where there is nothing to see it
+        // happen. The reverse order (collapse, then move) is just the old
+        // instant transition with a delay in front of it.
+        //
+        // Armed before the slide, not after it lands: the gap it covers - an
+        // edge with nothing on it to hover - IS the slide.
+        StartCollapsedWatch();
+
+        if (CanSlide)
+        {
+            SlideTo(SlideAwayLeft(Left), arriving: false, CollapseAfterSlide);
+        }
+        else
+        {
+            CollapseAfterSlide();
+        }
+
+        UpdatePinButtonVisibility();
+        ApplyTopmostState("rehide");
+    }
+
+    // The work that has to happen once the window is out of sight, wherever
+    // the hide was started from. A named method rather than a local function
+    // because two paths through CloseAutoHideReveal and one through
+    // EnterAutoHide all register it, and a slide that gets reversed hands it
+    // to the reversal (see StopSlide) rather than dropping it - an abandoned
+    // collapse leaves the window full-size while everything else believes it
+    // is hidden, which is where the "sometimes it just snaps, sometimes the
+    // click outside does nothing" reports came from.
+    private void CollapseAfterSlide()
+    {
+        LogAutoHide("collapse run");
         SetExpandedContentVisibility(Visibility.Collapsed);
         AnimateWidth(CollapsedWidth);
         PositionToWorkArea();
-        UpdatePinButtonVisibility();
-        ApplyTopmostState("rehide");
+        VerifyCollapsedPosition("collapse");
+        StartCollapsedWatch();
+    }
+
+    // Runs while the sidebar is hidden OR on its way there, which is exactly
+    // when nothing else is watching: no mouse events arrive at a window that
+    // has left the edge, so neither a stranded sidebar nor a hover aimed at
+    // where the handle is about to be has any other way of being noticed.
+    //
+    // The interval is set by the second job, not the first: a rescue could
+    // afford to be a second late, but answering a hover cannot.
+    private void StartCollapsedWatch()
+    {
+        // Disarmed at the start of every hide: whether this counts as a hover
+        // is decided by where the cursor goes from here, not where it already
+        // is.
+        _collapsedZoneArmed = false;
+
+        _collapsedWatchTimer ??= new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(120)
+        };
+        _collapsedWatchTimer.Tick -= CollapsedWatchTimer_Tick;
+        _collapsedWatchTimer.Tick += CollapsedWatchTimer_Tick;
+        _collapsedWatchTimer.Start();
+    }
+
+    private void StopCollapsedWatch() => _collapsedWatchTimer?.Stop();
+
+    private void CollapsedWatchTimer_Tick(object? sender, EventArgs e)
+    {
+        if (!_isDocked || !_settings.IsAutoHidden || _isAutoHideRevealed)
+        {
+            StopCollapsedWatch();
+            return;
+        }
+
+        VerifyCollapsedPosition("watch");
+
+        // While the sidebar is sliding out there is nothing at the screen edge
+        // yet - the window has left and the handle is not drawn until it lands.
+        // Moving back to the edge during those few hundred milliseconds hit
+        // nothing at all, so the reveal was simply lost and the handle seemed
+        // to stay away far longer than it had (2026-08-05). The zone answers
+        // for it in the meantime: invisible, but there.
+        if (!_slideInFlight)
+        {
+            return;
+        }
+
+        // ENTERING the zone, not merely being in it. A cursor already sitting
+        // there when the hide began has not asked for anything - it is where
+        // the sidebar just was. Treating that as a hover reopened the sidebar
+        // the instant it was dismissed, and with "close on mouse leave" off it
+        // then stayed open until something else was clicked (2026-08-05, fully
+        // reproducible). So the zone arms only once the cursor has been seen
+        // outside it.
+        if (!IsCursorInCollapsedZone())
+        {
+            _collapsedZoneArmed = true;
+            return;
+        }
+
+        if (_collapsedZoneArmed)
+        {
+            _collapsedZoneArmed = false;
+            RevealFromAutoHide();
+        }
+    }
+
+    // The rectangle the collapsed sidebar occupies - or is about to, while it
+    // is still on its way out. Computed from the work area rather than from the
+    // window, precisely because the window is not there yet.
+    private bool IsCursorInCollapsedZone()
+    {
+        var workArea = GetCurrentMonitorWorkArea();
+        double width = CollapsedWidth;
+        double height = _settings.AutoHideUseHandle
+            ? AutoHideHandleHeight(workArea)
+            : workArea.Height;
+        double top = _settings.AutoHideUseHandle
+            ? workArea.Top + ((workArea.Height - height) / 2)
+            : workArea.Top;
+        double left = _settings.DockOnRight ? workArea.Right - width : workArea.Left;
+
+        var cursor = System.Windows.Forms.Cursor.Position;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double x = cursor.X / dpi.DpiScaleX;
+        double y = cursor.Y / dpi.DpiScaleY;
+
+        return x >= left && x <= left + width && y >= top && y <= top + height;
+    }
+
+    // A collapsed sidebar that is not at its screen edge cannot be reached at
+    // all - there is no handle to hover, no window to click, and from outside
+    // it is indistinguishable from the app having died (2026-08-05, exactly
+    // that report). Every route into the collapsed state is meant to end at the
+    // edge; this asserts it rather than trusting it, because the cost of being
+    // wrong is the whole app becoming unusable until it is restarted.
+    //
+    // Deliberately checks the invariant itself rather than any particular way
+    // of breaking it - the paths that could strand the window are the ones
+    // nobody has thought of yet.
+    private void VerifyCollapsedPosition(string reason)
+    {
+        if (!_isDocked || !_settings.IsAutoHidden || _isAutoHideRevealed || _slideInFlight)
+        {
+            return;
+        }
+
+        var workArea = GetCurrentMonitorWorkArea();
+        double expected = _settings.DockOnRight ? workArea.Right - Width : workArea.Left;
+        if (Math.Abs(Left - expected) < 1)
+        {
+            return;
+        }
+
+        LogAutoHide($"STRANDED at {reason} - expected left={expected:F0}, forcing back");
+        PositionToWorkArea();
     }
 
     // Alternative to the default AutoHideRehideTimer/MouseLeave close: instead
@@ -2080,6 +2626,13 @@ public partial class MainWindow : Window
             return;
         }
 
+
+        // Read on every tick, including the ones that go on to ignore it, so
+        // the latch never carries a press across into a later tick that has
+        // nothing to do with it - a click that dismissed a menu must not
+        // dismiss the sidebar one tick later.
+        bool pressedSinceLastTick = NativeMethods.ConsumeMouseButtonPress();
+
         // Clicking a menu item, or anywhere in the Color Settings window, is a
         // click outside the sidebar's own rectangle - which is exactly what
         // this watch is looking for. Stand down while either is up, or picking
@@ -2090,7 +2643,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (System.Windows.Forms.Control.MouseButtons == System.Windows.Forms.MouseButtons.None)
+        // Either a button held right now, or one that came and went since the
+        // last tick. The second half is what stops a quick click from falling
+        // through the gap between polls (see ConsumeMouseButtonPress).
+        if (!pressedSinceLastTick &&
+            System.Windows.Forms.Control.MouseButtons == System.Windows.Forms.MouseButtons.None)
         {
             return;
         }
@@ -2108,6 +2665,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        LogAutoHide("outside  CLOSING");
         StopAutoHideOutsideClickWatch();
         CloseAutoHideReveal();
     }
@@ -2466,7 +3024,17 @@ public partial class MainWindow : Window
         // do with where the cursor currently is mid-drag.
         if (offsetFromCorner)
         {
-            if (_floatingLeft.HasValue && _floatingTop.HasValue)
+            // Only when that remembered spot is on the monitor the window is
+            // actually docked to. Undocking on a second display used to throw
+            // the window back to wherever it last floated - typically the
+            // primary monitor - which reads as the sidebar running away
+            // (2026-08-05 report; predates that day's slide work). Restoring a
+            // position is meant to preserve where you left it, and on a
+            // different monitor it does the opposite.
+            if (_floatingLeft.HasValue && _floatingTop.HasValue &&
+                GetCurrentMonitorWorkArea() is { } monitor &&
+                _floatingLeft.Value + (Width / 2) >= monitor.Left &&
+                _floatingLeft.Value + (Width / 2) <= monitor.Right)
             {
                 // Restore exactly where it was the last time this app
                 // instance floated, rather than nudging away from the corner
@@ -4084,6 +4652,7 @@ public partial class MainWindow : Window
             FindMenuItem(menu, "dockOnRight") is { } dockOnRight &&
             FindMenuItem(menu, "autoHideCloseOnLeave") is { } autoHideCloseOnLeave &&
             FindMenuItem(menu, "autoHideUseHandle") is { } autoHideUseHandle &&
+            FindMenuItem(menu, "autoHideSlide") is { } autoHideSlide &&
             FindMenuItem(menu, "bookmarkList") is { } bookmarkList &&
             FindMenuItem(menu, "fontSizeRow") is { } fontSizeRow &&
             FindMenuItem(menu, "maxItemsRow") is { } maxItemsRow &&
@@ -4117,6 +4686,7 @@ public partial class MainWindow : Window
             dockOnRight.IsChecked = _settings.DockOnRight;
             autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
             autoHideUseHandle.IsChecked = _settings.AutoHideUseHandle;
+            autoHideSlide.IsChecked = _settings.AutoHideSlide;
 
             // FindMenuItem only looks at direct children, so everything in the
             // 패널 표시 submenu - the three modes AND the position toggle that
@@ -5475,6 +6045,15 @@ public partial class MainWindow : Window
             }
 
             PositionToWorkArea();
+        }
+    }
+
+    private void AutoHideSlideMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.AutoHideSlide = menuItem.IsChecked;
+            _settingsService.Save(_settings);
         }
     }
 
