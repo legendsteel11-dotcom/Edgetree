@@ -28,6 +28,19 @@ public class AppSettings
     // original hardcoded value, so existing users see no change until they
     // customize it.
     public double AutoHideSliverWidth { get; set; } = 3;
+
+    // Collapse to a short handle at the middle of the screen edge instead of a
+    // sliver running its whole height.
+    //
+    // The sliver IS the trigger - it opens wherever the pointer touches it - so
+    // a full-height one claims the entire edge. That edge is also the route to
+    // whatever sits in the screen corners, and a drag passing through it opens
+    // the sidebar mid-drag (2026-08-05: dragging files out of the desktop's
+    // top-left corner). A handle leaves the rest of the edge alone.
+    //
+    // Off by default: the full sliver is easier to find, and someone who never
+    // hits this should not have their reveal target quietly shrink.
+    public bool AutoHideUseHandle { get; set; } = false;
     public double TreeFontSize { get; set; } = 12;
     public ObservableCollection<FavoriteEntry> Favorites { get; set; } = new();
     public double FavoritesPanelHeight { get; set; } = 100;

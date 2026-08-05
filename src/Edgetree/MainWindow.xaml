@@ -1367,6 +1367,15 @@
                     IsCheckable="True"
                     AutomationProperties.AutomationId="autoHideCloseOnLeave"
                     Click="AutoHideCloseOnLeaveMenuItem_Click"/>
+            <!-- Next to the other auto-hide toggle rather than beside the
+                 thickness stepper: both of these answer "how does the hidden
+                 sidebar behave", while the stepper sits with the other steppers
+                 because a menu is read by shape first (see that row's own
+                 comment). -->
+            <MenuItem Header="{x:Static services:Strings.MenuAutoHideUseHandle}"
+                    IsCheckable="True"
+                    AutomationProperties.AutomationId="autoHideUseHandle"
+                    Click="AutoHideUseHandleMenuItem_Click"/>
             <!-- Last in the group, and directly above the separator: what
                  follows it is the bookmark and hidden-folder lists, which is
                  where someone lands next after choosing what the panel shows

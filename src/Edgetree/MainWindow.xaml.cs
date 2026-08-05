@@ -380,7 +380,7 @@ public partial class MainWindow : Window
         // just left at their XAML-default (top) positions.
         ApplyFavoritesPosition();
 
-        Width = _settings.IsAutoHidden ? AutoHideSliverWidth : ClampExpandedWidth(_settings.ExpandedWidth);
+        Width = _settings.IsAutoHidden ? CollapsedWidth : ClampExpandedWidth(_settings.ExpandedWidth);
         ApplyHeaderMetrics();
         SetExpandedContentVisibility(_settings.IsAutoHidden ? Visibility.Collapsed : Visibility.Visible);
         PositionToWorkArea();
@@ -1082,8 +1082,21 @@ public partial class MainWindow : Window
     {
         var workArea = GetCurrentMonitorWorkArea(dpiScale);
         Left = _settings.DockOnRight ? workArea.Right - Width : workArea.Left;
-        Top = workArea.Top;
-        Height = workArea.Height;
+
+        // The one place the collapsed shape is decided, which is why the handle
+        // is handled HERE and nowhere else: startup, docking, DPI changes,
+        // monitor changes and taskbar changes all recompute through this
+        // method, so they all follow the handle for free.
+        if (IsCollapsedToHandle)
+        {
+            Height = AutoHideHandleHeight(workArea);
+            Top = workArea.Top + ((workArea.Height - Height) / 2);
+        }
+        else
+        {
+            Top = workArea.Top;
+            Height = workArea.Height;
+        }
 
         // The menu cap is a fraction of this same work area, so it is stale the
         // moment the window lands on a different monitor, the taskbar resizes,
@@ -1219,6 +1232,26 @@ public partial class MainWindow : Window
     // TabSpacing elsewhere) rather than trusting a hand-edited settings file.
     private double AutoHideSliverWidth => Math.Clamp(_settings.AutoHideSliverWidth, 3, 8);
 
+    // True exactly while the window is standing in as the handle - docked,
+    // auto-hidden, not currently peeked open, and the option on. Everything
+    // about the handle keys off this one expression so the shape can never
+    // disagree with itself.
+    private bool IsCollapsedToHandle =>
+        _isDocked && _settings.IsAutoHidden && !_isAutoHideRevealed && _settings.AutoHideUseHandle;
+
+    // Same width the sliver uses, but with a floor: at the 3px end a handle
+    // stops being a handle. The thickness stepper still applies above that.
+    private double CollapsedWidth => _settings.AutoHideUseHandle
+        ? Math.Max(AutoHideSliverWidth, 6)
+        : AutoHideSliverWidth;
+
+    // A share of the screen rather than a fixed number of pixels, bounded at
+    // both ends: 12% of a 43-inch display is still a sensible grab target,
+    // while a fixed 120px would be a stripe on one screen and a speck on
+    // another. The clamps are what stop either extreme.
+    private static double AutoHideHandleHeight(Rect workArea)
+        => Math.Clamp(workArea.Height * 0.12, 60, 160);
+
     // Entered by clicking the app icon while docked and expanded - shrinks
     // to a bare AutoHideSliverWidth sliver at the screen edge, which
     // MainWindow_MouseEnter/Leave then peek open/closed as the mouse crosses
@@ -1236,7 +1269,11 @@ public partial class MainWindow : Window
     {
         _settings.IsAutoHidden = true;
         SetExpandedContentVisibility(Visibility.Collapsed);
-        AnimateWidth(AutoHideSliverWidth);
+        AnimateWidth(CollapsedWidth);
+        // After IsAutoHidden is set, never before - PositionToWorkArea reads it
+        // through IsCollapsedToHandle to decide whether this is a handle or a
+        // full-height sliver. Same ordering rule at all three transitions.
+        PositionToWorkArea();
         UpdatePinButtonVisibility();
         ApplyTopmostState("enter");
     }
@@ -1363,6 +1400,11 @@ public partial class MainWindow : Window
     {
         _autoHideRehideTimer?.Stop();
         _isAutoHideRevealed = true;
+        // Full height back before the width animation, not after: the flag
+        // above has already been set, so this restores the whole edge, and the
+        // widening then happens at the final height. Called the other way round
+        // the sidebar would open at handle height and grow into place.
+        PositionToWorkArea();
         // Width first, content after: the one full tree/favorites layout pass
         // this costs happens at the final width, not at the sliver's.
         AnimateWidth(ClampExpandedWidth(_settings.ExpandedWidth), onCompleted: () =>
@@ -1600,7 +1642,8 @@ public partial class MainWindow : Window
         _isAutoHideRevealed = false;
         _revealedByDrag = false;
         SetExpandedContentVisibility(Visibility.Collapsed);
-        AnimateWidth(AutoHideSliverWidth);
+        AnimateWidth(CollapsedWidth);
+        PositionToWorkArea();
         UpdatePinButtonVisibility();
         ApplyTopmostState("rehide");
     }
@@ -3923,6 +3966,7 @@ public partial class MainWindow : Window
             FindMenuItem(menu, "hideTitleBarTitle") is { } hideTitleBarTitle &&
             FindMenuItem(menu, "dockOnRight") is { } dockOnRight &&
             FindMenuItem(menu, "autoHideCloseOnLeave") is { } autoHideCloseOnLeave &&
+            FindMenuItem(menu, "autoHideUseHandle") is { } autoHideUseHandle &&
             FindMenuItem(menu, "bookmarkList") is { } bookmarkList &&
             FindMenuItem(menu, "fontSizeRow") is { } fontSizeRow &&
             FindMenuItem(menu, "maxItemsRow") is { } maxItemsRow &&
@@ -3955,6 +3999,7 @@ public partial class MainWindow : Window
             hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
             dockOnRight.IsChecked = _settings.DockOnRight;
             autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
+            autoHideUseHandle.IsChecked = _settings.AutoHideUseHandle;
 
             // FindMenuItem only looks at direct children, so everything in the
             // 패널 표시 submenu - the three modes AND the position toggle that
@@ -5291,6 +5336,28 @@ public partial class MainWindow : Window
             {
                 PositionToWorkArea();
             }
+        }
+    }
+
+    // Applied live, unlike the thickness stepper next to it: this one changes
+    // where the reveal target IS, and someone who just turned it on needs to
+    // see where their handle went. The menu is open over the revealed sidebar
+    // at this moment, so the shape only actually changes when it re-hides -
+    // PositionToWorkArea is still called so the case of toggling it while
+    // already collapsed (possible via the tray menu) lands correctly too.
+    private void AutoHideUseHandleMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.AutoHideUseHandle = menuItem.IsChecked;
+            _settingsService.Save(_settings);
+
+            if (_isDocked && _settings.IsAutoHidden && !_isAutoHideRevealed)
+            {
+                Width = CollapsedWidth;
+            }
+
+            PositionToWorkArea();
         }
     }
 
