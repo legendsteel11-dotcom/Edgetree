@@ -6896,6 +6896,15 @@ public partial class MainWindow : Window
 
     private void TreeViewItem_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        // Last line of defence for the drop-target mark. Drop, DragLeave and
+        // the drag-out's own finally all clear it, but a drag that STARTED in
+        // another application and was cancelled with Esc while the cursor sat
+        // over the tree gives this app no event at all - nothing tells us the
+        // drag is over. Plain mouse movement can't happen during a drag (the
+        // OLE loop raises Drag* events instead of Mouse*), so the first move
+        // after one is proof it has ended.
+        SetDropTarget(null);
+
         if (_itemDragCandidate is not { } item || _itemDragStart is not { } start)
         {
             return;
@@ -6983,6 +6992,12 @@ public partial class MainWindow : Window
             {
                 Mouse.Capture(null);
             }
+
+            // Wherever this drag ended, it ended - so nothing is "about to be
+            // dropped here" any more. TreeViewItem_Drop and ExplorerTree_
+            // DragLeave each clear the mark on their own path; this covers the
+            // rest, including a drag abandoned over the tree itself.
+            SetDropTarget(null);
         }
     }
 
@@ -7006,34 +7021,77 @@ public partial class MainWindow : Window
     {
         e.Handled = true;
 
-        if (sender is not TreeViewItem { DataContext: FileSystemItem row } treeViewItem ||
+        if (sender is not TreeViewItem { DataContext: FileSystemItem row } ||
             !e.Data.GetDataPresent(DataFormats.FileDrop) ||
-            ResolveDropTargetFolder(row) is null)
+            ResolveDropTargetFolder(row) is not { } target)
         {
             e.Effects = DragDropEffects.None;
+            SetDropTarget(null);
             return;
         }
 
         e.Effects = DragDropEffects.Copy;
 
-        // Reuses the tree's existing selection highlight as drop-target
-        // feedback instead of a separate visual, so there's no ambiguity
-        // about which folder a drop would land in. Over a FILE row that means
-        // highlighting the row ABOVE the cursor - its parent folder, the one
+        // Marked with the same brushes the selection uses, so there's no
+        // ambiguity about which folder a drop would land in - but as a state of
+        // its own, NOT by moving the selection there (see
+        // FileSystemItem.IsDropTarget for what that cost). Over a FILE row the
+        // mark goes on the row ABOVE the cursor - its parent folder, the one
         // actually receiving the files - rather than the file being hovered,
         // which would read as "something happens to this file".
-        var highlight = row.IsDirectory
-            ? treeViewItem
-            : ItemsControl.ItemsControlFromItemContainer(treeViewItem) as TreeViewItem;
-        if (highlight is not null)
+        SetDropTarget(target);
+    }
+
+    // Row-to-row movement inside the tree raises DragLeave too (it bubbles up
+    // from the row being left), and clearing on that would drop the mark for
+    // the instant before the next DragOver puts it back - a flicker on every
+    // row crossed. So the mark only comes off when the cursor is genuinely
+    // outside the tree, which is the case this handler exists for: a drag that
+    // wanders off to another window, or out of the app entirely.
+    private void ExplorerTree_DragLeave(object sender, DragEventArgs e)
+    {
+        var position = e.GetPosition(ExplorerTree);
+        bool stillInside =
+            position.X >= 0 && position.X <= ExplorerTree.ActualWidth &&
+            position.Y >= 0 && position.Y <= ExplorerTree.ActualHeight;
+
+        if (!stillInside)
         {
-            highlight.IsSelected = true;
+            SetDropTarget(null);
+        }
+    }
+
+    // The one row currently marked as "a drop lands here". Held as a field
+    // rather than searched for on each change because the mark has to come off
+    // reliably: the row can be scrolled out and de-realized mid-drag, and a
+    // mark left behind after the drag ends is a row that claims to be selected
+    // and answers nothing.
+    private FileSystemItem? _dropTargetItem;
+
+    private void SetDropTarget(FileSystemItem? target)
+    {
+        if (ReferenceEquals(_dropTargetItem, target))
+        {
+            return;
+        }
+
+        if (_dropTargetItem is not null)
+        {
+            _dropTargetItem.IsDropTarget = false;
+        }
+
+        _dropTargetItem = target;
+
+        if (target is not null)
+        {
+            target.IsDropTarget = true;
         }
     }
 
     private void TreeViewItem_Drop(object sender, DragEventArgs e)
     {
         e.Handled = true;
+        SetDropTarget(null);
 
         if (sender is not TreeViewItem { DataContext: FileSystemItem row } ||
             e.Data.GetData(DataFormats.FileDrop) is not string[] droppedPaths ||

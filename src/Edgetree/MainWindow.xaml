@@ -2004,6 +2004,24 @@
                                 <Setter Property="Foreground"
                                         Value="{DynamicResource FolderNameHighlightForeground}"/>
                             </DataTrigger>
+                            <!-- "A drop lands here": the same brushes again, for
+                                 the same reason the multi-selection uses them -
+                                 one mark, learned once. It is a state of its own
+                                 rather than the native selection (which is what
+                                 used to be moved here) so that picking a row up
+                                 and dragging it out no longer takes the mark off
+                                 that row and hands it back on release. Only ever
+                                 true on a FOLDER row - ResolveDropTargetFolder
+                                 resolves a hovered file to its parent - so file
+                                 rows need no matching trigger of their own. -->
+                            <DataTrigger Binding="{Binding IsDropTarget}"
+                                    Value="True">
+                                <Setter TargetName="RowBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource FolderNameHighlightForeground}"/>
+                            </DataTrigger>
                             <!-- Selected background no longer varies with
                                  Selector.IsSelectionActive: that state flips to False any time
                                  keyboard focus leaves the tree's focus scope - including while
@@ -3928,6 +3946,7 @@
                       TreeViewItem.Expanded="ExplorerTree_ItemExpandedOrCollapsed"
                       TreeViewItem.Collapsed="ExplorerTree_ItemExpandedOrCollapsed"
                       SelectedItemChanged="ExplorerTree_SelectedItemChanged"
+                      DragLeave="ExplorerTree_DragLeave"
                       KeyDown="ExplorerTree_KeyDown"
                       PreviewKeyDown="ExplorerTree_PreviewKeyDown"
                       PreviewMouseWheel="ExplorerTree_PreviewMouseWheel"/>

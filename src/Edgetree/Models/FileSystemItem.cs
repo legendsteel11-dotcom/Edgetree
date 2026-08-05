@@ -11,6 +11,7 @@ public class FileSystemItem : INotifyPropertyChanged
     private bool _isExpanded;
     private bool _isSelected;
     private bool _isMultiSelected;
+    private bool _isDropTarget;
     private bool _isAncestorOfSelection;
     private bool _childrenLoaded;
     private bool _isEditing;
@@ -95,6 +96,23 @@ public class FileSystemItem : INotifyPropertyChanged
     {
         get => _isMultiSelected;
         set => SetField(ref _isMultiSelected, value);
+    }
+
+    // The folder a drop would land in right now, while a drag is over the
+    // tree. It used to be marked by moving the native selection there, which
+    // meant a drag started inside the tree pulled the selection off the very
+    // row the user had picked up and only handed it back on release - two
+    // visible jumps for one gesture (user, 2026-08-05: "부모폴더가 선택되고
+    // 클릭을 떼야 다시 선택한 파일로 돌아가서 오해의 소지가 좀 있어서요").
+    // A flag of its own lets the drop target and the selection be true at the
+    // same time, the way Explorer shows it. Painted with the SAME brushes as
+    // selection - a deliberate choice, so the mark reads as one thing and no
+    // new colour has to be invented or configured. Maintained externally by
+    // MainWindow, same pattern as IsMultiSelected above.
+    public bool IsDropTarget
+    {
+        get => _isDropTarget;
+        set => SetField(ref _isDropTarget, value);
     }
 
     // True for every ancestor folder of the currently selected item, so its
