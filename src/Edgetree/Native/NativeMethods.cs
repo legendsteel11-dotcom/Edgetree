@@ -184,6 +184,84 @@ internal static class NativeMethods
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
 
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+
+    [DllImport("gdi32.dll")]
+    private static extern int CombineRgn(IntPtr dest, IntPtr src1, IntPtr src2, int mode);
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool redraw);
+
+    private const int RGN_OR = 2;
+
+    // Rounds the two corners on ONE side of a window by clipping its shape at
+    // the OS level.
+    //
+    // Why a region and not the two obvious alternatives: DWM's corner
+    // preference rounds all four corners and offers two fixed radii, and a WPF
+    // Border with CornerRadius would need AllowsTransparency to show through -
+    // which turns off hardware acceleration for the whole window (and takes
+    // ClearType and inline IME with it).
+    //
+    // The shape is a round-rect OR'd with a plain rect covering the flat side,
+    // which squares those two corners back off. Regions are not anti-aliased,
+    // so the curve is stepped - fine at the small radius this is for, and the
+    // reason not to reach for it at larger ones.
+    //
+    // hRgn ownership passes to the window on success, so it must not be freed
+    // here; on failure it must be. Pass roundLeftSide: false to round the
+    // right-hand corners.
+    public static void SetRoundedSideRegion(IntPtr hWnd, int width, int height, int radius, bool roundLeftSide)
+    {
+        if (hWnd == IntPtr.Zero || width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        radius = Math.Max(0, Math.Min(radius, Math.Min(width, height) / 2));
+        if (radius == 0)
+        {
+            ClearWindowRegion(hWnd);
+            return;
+        }
+
+        // CreateRoundRectRgn's right/bottom are exclusive, hence the +1s.
+        IntPtr rounded = CreateRoundRectRgn(0, 0, width + 1, height + 1, radius * 2, radius * 2);
+        IntPtr flatSide = roundLeftSide
+            ? CreateRectRgn(radius, 0, width + 1, height + 1)
+            : CreateRectRgn(0, 0, width - radius + 1, height + 1);
+
+        if (rounded == IntPtr.Zero || flatSide == IntPtr.Zero)
+        {
+            DeleteObject(rounded);
+            DeleteObject(flatSide);
+            return;
+        }
+
+        CombineRgn(rounded, rounded, flatSide, RGN_OR);
+        DeleteObject(flatSide);
+
+        if (SetWindowRgn(hWnd, rounded, true) == 0)
+        {
+            DeleteObject(rounded);
+        }
+    }
+
+    public static void ClearWindowRegion(IntPtr hWnd)
+    {
+        if (hWnd != IntPtr.Zero)
+        {
+            SetWindowRgn(hWnd, IntPtr.Zero, true);
+        }
+    }
+
     public static void MakeToolWindow(IntPtr hWnd)
     {
         var exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);

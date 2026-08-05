@@ -91,6 +91,7 @@ public partial class MainWindow : Window
     // the window, since a drag leaving again has to close what it opened
     // (no MouseLeave arrives during a drag to do it).
     private System.Windows.Threading.DispatcherTimer? _dragRevealTimer;
+    private System.Windows.Threading.DispatcherTimer? _hoverRevealTimer;
     private bool _revealedByDrag;
 
     // Non-null while "Collapse All" has collapsed the tree via
@@ -1098,6 +1099,12 @@ public partial class MainWindow : Window
             Height = workArea.Height;
         }
 
+        // Rides along here for the same reason the handle's own geometry does:
+        // the corner clipping is sized in this window's pixels, so it is stale
+        // whenever the size or the DPI it was cut for changes - and every one
+        // of those changes already arrives at this method.
+        ApplyHandleCornerRegion();
+
         // The menu cap is a fraction of this same work area, so it is stale the
         // moment the window lands on a different monitor, the taskbar resizes,
         // or the DPI changes - all of which come through here.
@@ -1252,6 +1259,42 @@ public partial class MainWindow : Window
     private static double AutoHideHandleHeight(Rect workArea)
         => Math.Clamp(workArea.Height * 0.12, 60, 160);
 
+    // Only the two corners facing AWAY from the screen edge - the pair against
+    // the edge has nothing to show a curve against. Rounding both pairs (which
+    // is all DWM can do) would cut a notch out of the screen edge itself.
+    private const double AutoHideHandleCornerRadius = 4;
+
+    // Applied and cleared by the same method so the two can't drift apart: a
+    // region left behind after the sidebar expands would clip the tree to a
+    // handle's shape. Called from PositionToWorkArea, which every path that can
+    // change the window's size, edge or DPI already goes through.
+    private void ApplyHandleCornerRegion()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        if (!IsCollapsedToHandle)
+        {
+            NativeMethods.ClearWindowRegion(hwnd);
+            return;
+        }
+
+        // The sizes it SHOULD have, not ActualWidth/ActualHeight: the latter
+        // lag a layout pass behind PositionToWorkArea, and this runs right
+        // after it.
+        // Regions are in physical pixels; everything above is in DIPs.
+        var dpi = VisualTreeHelper.GetDpi(this);
+        NativeMethods.SetRoundedSideRegion(
+            hwnd,
+            (int)Math.Round(CollapsedWidth * dpi.DpiScaleX),
+            (int)Math.Round(Height * dpi.DpiScaleY),
+            (int)Math.Round(AutoHideHandleCornerRadius * dpi.DpiScaleX),
+            roundLeftSide: _settings.DockOnRight);
+    }
+
     // Entered by clicking the app icon while docked and expanded - shrinks
     // to a bare AutoHideSliverWidth sliver at the screen edge, which
     // MainWindow_MouseEnter/Leave then peek open/closed as the mouse crosses
@@ -1268,6 +1311,7 @@ public partial class MainWindow : Window
     private void EnterAutoHide()
     {
         _settings.IsAutoHidden = true;
+        StopHoverReveal();
         SetExpandedContentVisibility(Visibility.Collapsed);
         AnimateWidth(CollapsedWidth);
         // After IsAutoHidden is set, never before - PositionToWorkArea reads it
@@ -1361,9 +1405,11 @@ public partial class MainWindow : Window
         _autoHideRehideTimer?.Stop();
         StopAutoHideOutsideClickWatch();
         StopDragReveal();
+        StopHoverReveal();
         _settings.IsAutoHidden = false;
         _isAutoHideRevealed = false;
         _revealedByDrag = false;
+        ApplyHandleCornerRegion();
         ApplyTopmostState("exit");
         UpdatePinButtonVisibility();
 
@@ -1390,7 +1436,71 @@ public partial class MainWindow : Window
             return;
         }
 
+        StartHoverReveal();
+    }
+
+    // A short dwell before the sidebar comes out, so brushing the edge on the
+    // way somewhere else doesn't summon it (2026-08-05 request). The drag path
+    // has had this since v1.3.3 at 400ms; the pointer path never did, because
+    // opening the instant the mouse arrives IS what makes an auto-hidden
+    // sidebar feel immediate - the cost of a delay is paid on every deliberate
+    // reveal too. Hence a much shorter dwell here than for drags.
+    //
+    // Modelled on the drag countdown deliberately, including its hard-won part:
+    // the timer verifies the pointer is STILL here rather than trusting
+    // MouseLeave to have cancelled it. MouseLeave doesn't reliably arrive for a
+    // fast brush past a few-pixel target, and a cancel that can be missed is no
+    // cancel - that was the 2026-07-27 "flash" where the window opened after
+    // the pointer was long gone and then shut itself again.
+    private const int AutoHideHoverRevealDelayMs = 150;
+
+    private void StartHoverReveal()
+    {
+        // Repeated MouseEnter (re-entering after a moment, or the mouse moving
+        // within the sliver) must not restart the countdown - holding still
+        // near the edge should still open it.
+        if (_hoverRevealTimer is not null)
+        {
+            return;
+        }
+
+        _hoverRevealTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(AutoHideHoverRevealDelayMs)
+        };
+        _hoverRevealTimer.Tick += HoverRevealTimer_Tick;
+        _hoverRevealTimer.Start();
+    }
+
+    private void HoverRevealTimer_Tick(object? sender, EventArgs e)
+    {
+        StopHoverReveal();
+
+        // Re-checked rather than assumed: the pin button, a re-dock or a drag
+        // reveal could all have changed the state during the dwell.
+        if (!_isDocked || !_settings.IsAutoHidden || _isAutoHideRevealed)
+        {
+            return;
+        }
+
+        if (!IsCursorInsideWindow())
+        {
+            return;
+        }
+
         RevealFromAutoHide();
+    }
+
+    private void StopHoverReveal()
+    {
+        if (_hoverRevealTimer is null)
+        {
+            return;
+        }
+
+        _hoverRevealTimer.Stop();
+        _hoverRevealTimer.Tick -= HoverRevealTimer_Tick;
+        _hoverRevealTimer = null;
     }
 
     // Shared by the cursor reveal above and the drag reveal below. Callers
@@ -1399,6 +1509,7 @@ public partial class MainWindow : Window
     private void RevealFromAutoHide()
     {
         _autoHideRehideTimer?.Stop();
+        StopHoverReveal();
         _isAutoHideRevealed = true;
         // Full height back before the width animation, not after: the flag
         // above has already been set, so this restores the whole edge, and the
@@ -1565,7 +1676,13 @@ public partial class MainWindow : Window
     // (StartAutoHideOutsideClickWatch) doesn't care about the cursor leaving
     // at all.
     private void MainWindow_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
-        => ArmAutoHideRehideTimer();
+    {
+        // Cancels a countdown that hasn't fired yet - the ordinary way a brush
+        // past the edge ends. Not the only way it can end, which is why the
+        // tick re-checks the cursor as well.
+        StopHoverReveal();
+        ArmAutoHideRehideTimer();
+    }
 
     private void ArmAutoHideRehideTimer()
     {
