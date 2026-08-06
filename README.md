@@ -1,4 +1,4 @@
-# Edgetree v1.5.0
+# Edgetree v1.6.0
 
 [한국어 안내](README-ko.md)
 
@@ -11,15 +11,19 @@ straight to a file without opening a full Explorer window.
 
 ## Download
 
-Grab the latest build from the [Releases page](https://github.com/legendsteel11/Edgetree/releases/latest). Two options are attached to each release:
+Grab the latest build from the [Releases page](https://github.com/legendsteel11/Edgetree/releases/latest). Three options are attached to each release:
 
-- **`Edgetree-<version>-win-x64.exe`** (~1 MB) — pick this if you already have
-  the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) installed.
-- **`Edgetree-<version>-win-x64-standalone.exe`** (~160 MB) — a single file
-  with everything bundled in, no .NET install required. Pick this if you're
-  not sure, or if the smaller exe complains about a missing runtime.
+- **`Edgetree-<version>-win-x64-setup.exe`** (~49 MB) — the installer. Click
+  through it and Edgetree lands in your Start menu, with a clean uninstall.
+- **`Edgetree-<version>-win-x64-standalone.exe`** (~155 MB) — one file, nothing
+  to install. Keep it wherever you like and run it.
+- **`Edgetree-<version>-win-x64.exe`** (~1 MB) — the same app, using the
+  [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
+  already on the machine.
 
-Either way, it's one `.exe` — no installer, just run it.
+Settings live in `%AppData%\Edgetree` and all three share them, so moving from
+one to another keeps your favorites, bookmarks and colours — and uninstalling
+leaves them where they are.
 
 ## Screenshots
 
@@ -34,7 +38,8 @@ Either way, it's one `.exe` — no installer, just run it.
 - **Auto-hide with the pin button.** Click the pin and the window shrinks to
   a thin sliver at the edge; move your mouse there and it slides back open.
   The pin lies on its side while auto-hiding — click it again to pin the
-  window open.
+  window open. The sliver can be a short handle at the middle of the edge
+  instead of running its whole height, and it takes a colour of its own.
 - **Floating mode.** Drag the header away from the edge to get a normal,
   movable window. The pin snaps it back to the edge, and both modes remember
   their size and position.
@@ -149,7 +154,59 @@ moment it's moved on its own.
 Either way, the resulting `.exe` is in
 `src/Edgetree/bin/Release/net8.0-windows/win-x64/publish/`.
 
+The installer is built from a third publish — the same self-contained build
+without `PublishSingleFile`, so the files stay loose. That is the point of it:
+a single-file self-contained exe unpacks itself into memory and reads as
+350-400 MB in Task Manager on a machine with no .NET, while loose files are
+mapped from disk normally.
+
+```bash
+dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -o publish/folder
+"$LOCALAPPDATA/Programs/Inno Setup 6/ISCC.exe" installer/Edgetree.iss
+```
+
+[Inno Setup 6](https://jrsoftware.org/isinfo.php) compiles it, and the result
+lands in `releases/v<version>/` beside the other two. The script reads its
+version out of the exe it packages, so bumping the csproj is enough.
+
 ## Changelog
+
+### v1.6.0 (2026-08-06)
+
+- **An installer**: a third way to get it, alongside the two single exes. It
+  lands in your Start menu, uninstalls cleanly, and leaves your settings in
+  place either way
+- **Auto-hide handle**: hiding can leave a short handle at the middle of the
+  screen edge instead of a sliver running its whole height (options menu →
+  "Handle Instead of Full Edge"). The rest of the edge stays clear, so the
+  screen corners and any drag passing along it are no longer interrupted
+- **A colour for the handle and bar**: set at the bottom of Color Settings.
+  This is the one part of the app that sits on the desktop, against your
+  wallpaper, so it gets its own colour - stored per theme, and carried along by
+  the colour export
+- **Your own extensions in the file filter**: Show File Types → "Custom…" takes
+  a comma-separated list and adds it as a kind of its own. It combines with the
+  others, and search still finds everything regardless
+- **Resize a floating window from the top**, and double-click the header to
+  restore a maximized one
+- **The update mark reaches the tray icon**: a red dot on the icon and a line
+  at the top of its menu. The dot on the options button is out of sight while
+  the sidebar is hidden or in the tray, which is exactly when this matters
+- Fixed a new folder being created with a Korean name on an English install,
+  and the row you picked up losing its selection mid-drag
+
+### v1.5.0 (2026-08-04)
+
+- **Colour picker**: clicking a swatch in Color Settings opens the app's own
+  picker, and the sidebar takes each colour as the handle moves
+- **Export and import the colours on their own**: the palette travels as one
+  file, so another PC can be set up to match
+- **Click a bookmark's ribbon to release it**, at the right edge of the row
+- **Each colour's label wears its own colour**: the ones that only appear in a
+  particular situation - Show More, highlight, hover - can be judged where they
+  are being chosen rather than after the fact
+- Changing the file filter or the row count keeps your place in the tree, and
+  the indent guides no longer swallow a click
 
 ### v1.4.2 (2026-08-03)
 
