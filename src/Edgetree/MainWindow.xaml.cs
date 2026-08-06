@@ -521,6 +521,11 @@ public partial class MainWindow : Window
             UpdateAvailableDot.Visibility = Visibility.Visible;
             OptionsButton.ToolTip =
                 $"{Strings.ToolTipOptions} — {string.Format(Strings.ToolTipUpdateAvailable, "v" + latest)}";
+
+            // The same news on the tray icon, which is the only part of the app
+            // still on screen once the sidebar is hidden or sent to the tray -
+            // the dot above is behind whichever of those is in effect.
+            (Application.Current as App)?.ShowUpdateAvailable(latest);
         }
         catch (Exception e) when (e is System.Net.Http.HttpRequestException
             or TaskCanceledException

@@ -187,6 +187,11 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
 
+    // Bitmap.GetHicon hands out a handle the caller owns; disposing the Icon
+    // wrapped around it does not free it.
+    [DllImport("user32.dll")]
+    public static extern bool DestroyIcon(IntPtr hIcon);
+
     private const int VK_LBUTTON = 0x01;
     private const int VK_RBUTTON = 0x02;
 

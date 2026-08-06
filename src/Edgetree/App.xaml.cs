@@ -14,6 +14,11 @@ public partial class App : Application
 {
     private NotifyIcon? _trayIcon;
     private ToolStripMenuItem? _trayToggleItem;
+    private ToolStripMenuItem? _trayUpdateItem;
+    private ToolStripSeparator? _trayUpdateSeparator;
+    private System.Drawing.Icon? _trayBaseIcon;
+    private System.Drawing.Icon? _trayUpdateIcon;
+    private IntPtr _trayUpdateIconHandle;
 
     // Held for the app's whole lifetime (a field, not a local) so it isn't
     // released early by the GC - see OnStartup/OnExit.
@@ -31,6 +36,125 @@ public partial class App : Application
             {
                 _trayIcon.Visible = value;
             }
+        }
+    }
+
+    // Called once, by MainWindow's update check, when a newer release exists.
+    // Lights a dot on the tray icon and puts a row at the top of its menu.
+    //
+    // Deliberately nothing else: no balloon, no dialog, no download. The tray
+    // icon is the one part of this app that is on screen even when the sidebar
+    // is hidden or sent to the tray, which is the whole reason the header's own
+    // dot was not enough.
+    public void ShowUpdateAvailable(Version version)
+    {
+        if (_trayIcon is null || _trayUpdateItem is null || _trayUpdateSeparator is null)
+        {
+            return;
+        }
+
+        _trayUpdateItem.Text = string.Format(Strings.TrayUpdateAvailable, version);
+        _trayUpdateItem.Visible = true;
+        _trayUpdateSeparator.Visible = true;
+
+        // 63 characters is the hard limit on a tray tooltip; the app name plus
+        // a short version cannot reach it, but the format string is
+        // translatable, so it is trimmed rather than trusted.
+        string tip = $"Edgetree — {string.Format(Strings.TrayUpdateAvailable, version)}";
+        _trayIcon.Text = tip.Length <= 63 ? tip : tip[..63];
+
+        if (_trayBaseIcon is not null && _trayUpdateIcon is null)
+        {
+            _trayUpdateIcon = CreateDottedIcon(_trayBaseIcon, out _trayUpdateIconHandle);
+        }
+
+        if (_trayUpdateIcon is not null)
+        {
+            _trayIcon.Icon = _trayUpdateIcon;
+        }
+    }
+
+    // The dot is drawn onto a copy of the app icon rather than shipped as a
+    // second .ico: a new <Resource> entry needs a clean rebuild to actually be
+    // embedded (an incremental build reports success and silently leaves it
+    // out), and this way the badge follows whatever the app icon becomes.
+    //
+    // GetHicon's handle is owned by us and is NOT freed by disposing the Icon,
+    // so it is handed back to be destroyed in OnExit.
+    private static System.Drawing.Icon? CreateDottedIcon(System.Drawing.Icon source, out IntPtr handle)
+    {
+        handle = IntPtr.Zero;
+        try
+        {
+            int size = source.Width > 0 ? source.Width : 32;
+            using var canvas = new System.Drawing.Bitmap(size, size);
+            using (var g = System.Drawing.Graphics.FromImage(canvas))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var art = source.ToBitmap())
+                {
+                    g.DrawImage(art, 0, 0, size, size);
+                }
+
+                // Bottom-right, a little over a third of the icon - big enough
+                // to read at 16px, which is what a tray icon usually is.
+                float d = size * 0.4f;
+                float x = size - d;
+                float y = size - d;
+
+                // A white ring first. Its job is separating the dot from the
+                // ICON underneath, not from the background - and app icons are
+                // mostly dark or coloured, which a dark ring disappears into.
+                // White-ring-plus-red-dot is also what a notification badge
+                // looks like everywhere else, so it reads without explanation.
+                // Not tied to the system light/dark mode on purpose: that would
+                // mean watching for theme changes and redrawing, for a ring.
+                using (var ring = new System.Drawing.SolidBrush(
+                    System.Drawing.Color.FromArgb(255, 255, 255, 255)))
+                {
+                    g.FillEllipse(ring, x - 1.5f, y - 1.5f, d + 3, d + 3);
+                }
+
+                using var dot = new System.Drawing.SolidBrush(
+                    System.Drawing.Color.FromArgb(255, 232, 78, 60));
+                g.FillEllipse(dot, x, y, d, d);
+            }
+
+            handle = canvas.GetHicon();
+            return System.Drawing.Icon.FromHandle(handle);
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException
+            or System.Runtime.InteropServices.ExternalException)
+        {
+            // A badge that can't be drawn just isn't drawn - the menu row still
+            // carries the message.
+            return null;
+        }
+    }
+
+    // The landing rather than the GitHub release: it carries the "업데이트 내역"
+    // card, which is what someone clicking "there is a new version" actually
+    // wants to read, and its download buttons already resolve to the latest
+    // release anyway. It is also ours, so the visit is measurable - hence the
+    // utm_source, without which this cannot be told apart from any other
+    // referrer.
+    private static void OpenReleasesPage()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                // Query first, anchor last - the other order makes utm_source
+                // part of the fragment and it never reaches analytics.
+                // #download is DownloadSection.vue's own id, and it lands on
+                // the update-history card that sits just above the buttons.
+                FileName = "https://edgetree.vercel.app/?utm_source=app-tray#download",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception
+            or InvalidOperationException or System.IO.FileNotFoundException)
+        {
         }
     }
 
@@ -84,15 +208,30 @@ public partial class App : Application
         var iconUri = new Uri("pack://application:,,,/Resources/app.ico");
         using var iconStream = GetResourceStream(iconUri)!.Stream;
 
+        _trayBaseIcon = new System.Drawing.Icon(iconStream);
+
         _trayIcon = new NotifyIcon
         {
-            Icon = new System.Drawing.Icon(iconStream),
+            Icon = _trayBaseIcon,
             Visible = true,
             Text = "Edgetree"
         };
         _trayIcon.MouseClick += TrayIcon_MouseClick;
 
         var contextMenu = new ContextMenuStrip();
+
+        // First row, and hidden until there is actually something to say - see
+        // ShowUpdateAvailable. The header's own dot is the primary signal, but
+        // it is invisible whenever the sidebar is auto-hidden or sent to the
+        // tray, which is exactly when this icon is the only thing on screen.
+        _trayUpdateItem = new ToolStripMenuItem(string.Empty, null, (_, _) => OpenReleasesPage())
+        {
+            Visible = false
+        };
+        _trayUpdateSeparator = new ToolStripSeparator { Visible = false };
+        contextMenu.Items.Add(_trayUpdateItem);
+        contextMenu.Items.Add(_trayUpdateSeparator);
+
         _trayToggleItem = new ToolStripMenuItem(Strings.TrayOpen, null, (_, _) => ToggleMainWindowTray());
         contextMenu.Items.Add(_trayToggleItem);
         contextMenu.Items.Add(new ToolStripSeparator());
@@ -277,6 +416,14 @@ public partial class App : Application
         ExitLog.EndSession();
 
         _trayIcon?.Dispose();
+        _trayUpdateIcon?.Dispose();
+        // Disposing an Icon made by Icon.FromHandle does not release the HICON
+        // GetHicon created - that one is ours to destroy.
+        if (_trayUpdateIconHandle != IntPtr.Zero)
+        {
+            NativeMethods.DestroyIcon(_trayUpdateIconHandle);
+        }
+        _trayBaseIcon?.Dispose();
         _singleInstanceMutex?.ReleaseMutex();
         _singleInstanceMutex?.Dispose();
         base.OnExit(e);
