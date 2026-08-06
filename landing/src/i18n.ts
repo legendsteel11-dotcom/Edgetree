@@ -97,8 +97,12 @@ const dict = {
       requirementsTitle: '시스템 요구사항',
       requirements: [
         'Windows 10 / 11',
-        '일반 버전: .NET 8 데스크톱 런타임 필요',
-        '독립 실행형 버전: 추가 설치 없이 바로 실행',
+        // 세 판을 런타임이 필요한가로 가른다. 예전에는 "독립 실행형: 추가 설치
+        // 없이 바로 실행"이었는데, 설치 버전이 생긴 마당에 "설치 없이"를 요구사항
+        // 칸에서 말하면 어느 쪽 이야기인지 흐려진다. 여기서 답할 질문은 하나다 —
+        // 내 PC에 뭘 더 깔아야 하는가.
+        '설치 버전 · 무설치: 별도 런타임 필요 없음',
+        '경량: .NET 8 데스크톱 런타임 필요',
       ],
       licenseTitle: '라이선스',
       licenseBody:
@@ -237,8 +241,8 @@ const dict = {
       requirementsTitle: 'System Requirements',
       requirements: [
         'Windows 10 / 11',
-        'Standard build: requires the .NET 8 Desktop Runtime',
-        'Standalone build: nothing else to install',
+        'Installer and portable: no runtime needed',
+        'Light build: requires the .NET 8 Desktop Runtime',
       ],
       licenseTitle: 'License',
       licenseBody:
