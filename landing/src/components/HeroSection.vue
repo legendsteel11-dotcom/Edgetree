@@ -15,6 +15,10 @@ onMounted(ensureReleaseAssetsLoaded)
         <h1>{{ t.hero.title }}</h1>
         <p class="tagline">{{ t.hero.tagline }}</p>
         <p class="description">{{ t.hero.description }}</p>
+        <!-- Korean page only (the English string is empty). Placed here rather
+             than beside the screenshots it corrects: by the time someone has
+             scrolled to those, the impression is already made. -->
+        <p v-if="t.hero.langBadge" class="lang-badge">{{ t.hero.langBadge }}</p>
         <div class="cta">
           <a class="btn btn-primary" :href="setupDownloadUrl" target="_blank" rel="noopener"
                   @click="trackDownload('setup', 'hero')">{{ t.hero.ctaDownloadSetup }}</a>
@@ -74,6 +78,20 @@ h1 {
   font-size: 16px;
   line-height: 1.7;
   margin-bottom: 32px;
+}
+
+/* Outlined rather than filled: it sits just above the download buttons and a
+   solid accent pill there would compete with the one control that matters. */
+.lang-badge {
+  display: inline-block;
+  margin: -18px 0 24px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent-strong);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .cta {

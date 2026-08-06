@@ -23,6 +23,15 @@ const dict = {
       tagline: '화면 가장자리에 항상 붙어있는, VS Code 스타일의 가벼운 탐색기',
       description:
         '폴더 구조를 빠르게 훑어보고 파일 위치로 바로 이동하기 위한 보조 도구입니다.',
+      // Korean page only - the English one leaves this empty and the badge is
+      // not rendered at all.
+      //
+      // Every screenshot on this page is of the English UI, and the app's name
+      // is English too, so a Korean visitor scrolling past them can conclude
+      // it is an English-only app and leave (the author's own report,
+      // 2026-08-06). This sits ABOVE the first screenshot, which is the only
+      // place that answers it in time.
+      langBadge: '한국어 지원',
       // Two buttons, not three. The third build is one scroll away in the
       // download section, and a row of three equal-looking choices at the top
       // of the page asks a question before anyone knows what the app is.
@@ -171,6 +180,9 @@ const dict = {
       tagline: 'A lightweight explorer that lives at your screen edge, VS Code style',
       description:
         "A quick way to glance at a folder structure and jump straight to a file.",
+      // Empty on purpose - see the Korean side. An English reader looking at
+      // English screenshots has nothing to be corrected about.
+      langBadge: '',
       ctaDownloadSetup: 'Download Installer',
       ctaDownloadPortable: 'Download Portable',
       ctaGithub: 'View on GitHub',
