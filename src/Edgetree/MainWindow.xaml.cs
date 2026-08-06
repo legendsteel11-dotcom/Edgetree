@@ -1866,6 +1866,12 @@ public partial class MainWindow : Window
         // tried: no smear, but the window's own rectangle still appears all at
         // once, so a long travel exposes an empty panel and a short one is
         // indistinguishable from no animation at all.
+        // Before anything moves. The content only comes back when the widening
+        // finishes, so this cannot wait for that call the way it does on the
+        // way in - it would be stretched across the growing window the whole
+        // time (see UpdateAutoHideHandleOverlay).
+        UpdateAutoHideHandleOverlay(collapsed: false);
+
         // Full height back before the width change, not after: the flag above
         // has already been set, so this restores the whole edge, and the
         // widening then happens at the final height.
@@ -2691,12 +2697,7 @@ public partial class MainWindow : Window
         // else here rather than needing a second code path.
         UpdateRootPathTextVisibility(visibility);
 
-        // The handle/bar colour, which is only ever seen while everything else
-        // is hidden - so it is the exact inverse of this call and belongs here
-        // rather than at each of the four places that make one.
-        AutoHideHandleOverlay.Visibility = visibility == Visibility.Visible
-            ? Visibility.Collapsed
-            : Visibility.Visible;
+        UpdateAutoHideHandleOverlay(collapsed: visibility != Visibility.Visible);
         ExplorerTree.Visibility = visibility;
         SearchButton.Visibility = visibility;
         CollapseAllButton.Visibility = visibility;
@@ -2735,6 +2736,38 @@ public partial class MainWindow : Window
 
         UpdateResizeThumbVisibility();
         UpdatePinButtonVisibility();
+    }
+
+    // The handle/bar's own colour, which is only ever meant to be seen while the
+    // sidebar is collapsed.
+    //
+    // Deliberately NOT just the inverse of SetExpandedContentVisibility, though
+    // that is where it is usually called from: the two come apart at both ends
+    // of a reveal. Opening runs the width animation FIRST and puts the content
+    // back only when it finishes, so an overlay tied to the content stays up -
+    // and stretches - for the whole of the widening. That was invisible while
+    // this colour defaulted to the sidebar background, and unmistakable the
+    // moment it was set to red: the entire window flashed (2026-08-06).
+    //
+    // So it is turned off where the reveal STARTS, and it is bounded here as
+    // well: never wider than the handle, and held against the docked edge. The
+    // ordering fix answers the case we know about; the size is what stops any
+    // other path from painting a full window in a colour meant for 6 pixels.
+    private void UpdateAutoHideHandleOverlay(bool collapsed)
+    {
+        AutoHideHandleOverlay.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
+        if (!collapsed)
+        {
+            return;
+        }
+
+        AutoHideHandleOverlay.Width = CollapsedWidth;
+        // Fully qualified: this Window has a HorizontalAlignment property of its
+        // own, so the bare enum name resolves to that instead and will not
+        // compile.
+        AutoHideHandleOverlay.HorizontalAlignment = _settings.DockOnRight
+            ? System.Windows.HorizontalAlignment.Right
+            : System.Windows.HorizontalAlignment.Left;
     }
 
     // The resize thumb only makes sense docked (ResizeMode=NoResize there, so it's
