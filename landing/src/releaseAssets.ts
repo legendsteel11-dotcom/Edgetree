@@ -16,6 +16,11 @@ const RELEASE_API_URL = 'https://api.github.com/repos/legendsteel11/Edgetree/rel
 // this never needs touching again as new versions ship.
 export const standardDownloadUrl = ref(RELEASE_URL)
 export const standaloneDownloadUrl = ref(RELEASE_URL)
+// The installer, from v1.6.0 on. Falls back to the releases page like the other
+// two, which also covers every release BEFORE it existed - an older latest
+// release simply has no -setup.exe among its assets and the button still lands
+// somewhere useful.
+export const setupDownloadUrl = ref(RELEASE_URL)
 // Empty until the API call resolves - DownloadSection only renders the
 // version line once this has a value, rather than showing a placeholder.
 export const releaseVersion = ref('')
@@ -34,9 +39,13 @@ export function ensureReleaseAssetsLoaded() {
       const assets: { name: string; browser_download_url: string }[] = release?.assets ?? []
       const standalone = assets.find((a) => a.name.endsWith('-standalone.exe'))
       const standard = assets.find((a) => a.name.endsWith('-win-x64.exe') && !a.name.endsWith('-standalone.exe'))
+      // Edgetree-v1.6.0-win-x64-setup.exe. It does not end in '-win-x64.exe',
+      // so the standard match above cannot pick it up by accident.
+      const setup = assets.find((a) => a.name.endsWith('-setup.exe'))
 
       if (standard) standardDownloadUrl.value = standard.browser_download_url
       if (standalone) standaloneDownloadUrl.value = standalone.browser_download_url
+      if (setup) setupDownloadUrl.value = setup.browser_download_url
       if (release?.tag_name) releaseVersion.value = release.tag_name
     })
     .catch(() => {
@@ -60,6 +69,8 @@ export function ensureReleaseAssetsLoaded() {
 // The link is left alone - no preventDefault. A download link doesn't navigate
 // away, so there is no race between sending this and the browser starting the
 // file.
-export function trackDownload(build: 'standalone' | 'standard', where: 'hero' | 'download') {
+// 'setup' joins the two from v1.6.0. The existing names are left alone so the
+// dashboard's history stays comparable across the change.
+export function trackDownload(build: 'standalone' | 'standard' | 'setup', where: 'hero' | 'download') {
   track('download', { build, where, version: releaseVersion.value || 'unknown' })
 }

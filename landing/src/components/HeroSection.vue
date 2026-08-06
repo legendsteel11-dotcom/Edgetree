@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { t } from '../i18n'
-import { standardDownloadUrl, standaloneDownloadUrl, ensureReleaseAssetsLoaded, trackDownload } from '../releaseAssets'
+import { setupDownloadUrl, standaloneDownloadUrl, ensureReleaseAssetsLoaded, trackDownload } from '../releaseAssets'
 
 onMounted(ensureReleaseAssetsLoaded)
 </script>
@@ -16,10 +16,10 @@ onMounted(ensureReleaseAssetsLoaded)
         <p class="tagline">{{ t.hero.tagline }}</p>
         <p class="description">{{ t.hero.description }}</p>
         <div class="cta">
-          <a class="btn btn-primary" :href="standaloneDownloadUrl" target="_blank" rel="noopener"
-                  @click="trackDownload('standalone', 'hero')">{{ t.hero.ctaDownloadStandalone }}</a>
-          <a class="btn btn-secondary" :href="standardDownloadUrl" target="_blank" rel="noopener"
-                  @click="trackDownload('standard', 'hero')">{{ t.hero.ctaDownloadStandard }}</a>
+          <a class="btn btn-primary" :href="setupDownloadUrl" target="_blank" rel="noopener"
+                  @click="trackDownload('setup', 'hero')">{{ t.hero.ctaDownloadSetup }}</a>
+          <a class="btn btn-secondary" :href="standaloneDownloadUrl" target="_blank" rel="noopener"
+                  @click="trackDownload('standalone', 'hero')">{{ t.hero.ctaDownloadPortable }}</a>
           <a class="btn btn-secondary" href="https://github.com/legendsteel11/Edgetree" target="_blank" rel="noopener">{{ t.hero.ctaGithub }}</a>
         </div>
       </div>

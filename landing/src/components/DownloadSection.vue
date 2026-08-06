@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { t } from '../i18n'
 import { track } from '@vercel/analytics'
 import UpdateNotes from './UpdateNotes.vue'
-import { standardDownloadUrl, standaloneDownloadUrl, releaseVersion, ensureReleaseAssetsLoaded, trackDownload } from '../releaseAssets'
+import { standardDownloadUrl, standaloneDownloadUrl, setupDownloadUrl, releaseVersion, ensureReleaseAssetsLoaded, trackDownload } from '../releaseAssets'
 
 onMounted(ensureReleaseAssetsLoaded)
 
@@ -71,24 +71,47 @@ async function copyAddress() {
         </div>
       </div>
 
+      <!-- Three builds, but not three equal cards: about 80% of the other app's
+           downloads take its installer, so this one takes the room and the two
+           alternatives sit under it a size down. Three side by side would ask
+           the reader to weigh 155 MB against 49 MB before they know what either
+           means. -->
+      <a class="lead" :href="setupDownloadUrl" target="_blank" rel="noopener"
+              @click="trackDownload('setup', 'download')">
+        <span class="lead-body">
+          <span class="lead-title">
+            {{ t.download.setupTitle }}
+            <span class="badge">{{ t.download.recommend }}</span>
+          </span>
+          <span class="lead-desc">{{ t.download.setupDesc }}</span>
+        </span>
+        <span class="lead-cta">
+          <span class="cta-label">{{ t.download.button }}</span>
+          <span class="size">{{ t.download.setupSize }}</span>
+        </span>
+      </a>
+
+      <p v-if="releaseVersion" class="version">{{ releaseVersion }}</p>
+
       <div class="grid">
-        <div class="card">
-          <h3>{{ t.download.standardTitle }}</h3>
-          <p>{{ t.download.standardDesc }}</p>
-          <p v-if="releaseVersion" class="version">{{ releaseVersion }}</p>
-          <a class="btn btn-secondary" :href="standardDownloadUrl" target="_blank" rel="noopener"
-                  @click="trackDownload('standard', 'download')">{{ t.download.button }}</a>
-        </div>
-        <div class="card highlight">
-          <h3>{{ t.download.standaloneTitle }}</h3>
-          <p>{{ t.download.standaloneDesc }}</p>
-          <p v-if="releaseVersion" class="version">{{ releaseVersion }}</p>
-          <a class="btn btn-primary" :href="standaloneDownloadUrl" target="_blank" rel="noopener"
-                  @click="trackDownload('standalone', 'download')">{{ t.download.button }}</a>
-        </div>
+        <a class="card" :href="standaloneDownloadUrl" target="_blank" rel="noopener"
+                @click="trackDownload('standalone', 'download')">
+          <span class="card-title">{{ t.download.portableTitle }}</span>
+          <span class="card-desc">{{ t.download.portableDesc }}</span>
+          <span class="card-cta">{{ t.download.button }} · {{ t.download.portableSize }}</span>
+        </a>
+        <a class="card" :href="standardDownloadUrl" target="_blank" rel="noopener"
+                @click="trackDownload('standard', 'download')">
+          <span class="card-title">{{ t.download.lightTitle }}</span>
+          <span class="card-desc">{{ t.download.lightDesc }}</span>
+          <span class="card-cta">{{ t.download.button }} · {{ t.download.lightSize }}</span>
+        </a>
       </div>
 
-      <p class="note">{{ t.download.note }}</p>
+      <!-- Reads as a tip for someone who uses both apps, not as an apology for
+           the runtime: install it once and the small build opens up on both
+           sides. Mirrors the same line on TabStick's landing. -->
+      <p class="note">{{ t.download.bothApps }}</p>
 
       <div class="disclaimers">
         <p>{{ t.download.smartscreenNote }}</p>
@@ -105,41 +128,133 @@ async function copyAddress() {
   border-bottom: 1px solid var(--border); */
 }
 
+/* The lead card. One accent-filled row: title, what it does, and the button
+   built into the card itself so the whole thing is the target. */
+.lead {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 22px 26px;
+  border-radius: 12px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.lead:hover {
+  border-color: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.lead-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.lead-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  color: var(--text-strong);
+  margin-bottom: 6px;
+}
+
+.badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.lead-desc {
+  display: block;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.lead-cta {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.cta-label {
+  padding: 9px 20px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.size {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* The version belongs to the lead card above it - the two alternatives carry
+   the same one, and repeating it three times says nothing three times. */
+.version {
+  max-width: 720px;
+  margin: 8px auto 0;
+  text-align: right;
+  font-size: 12.5px;
+  opacity: 0.55;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+  gap: 16px;
   max-width: 720px;
-  margin: 0 auto;
+  margin: 16px auto 0;
 }
 
+/* A size down from the lead in every direction: no fill, smaller type, the
+   button reduced to a line of text. They are alternatives, not rivals. */
 .card {
+  display: block;
   background: var(--bg-card);
-  /* border: 1px solid var(--border); */
+  border: 1px solid transparent;
   border-radius: 12px;
-  padding: 32px;
-  text-align: center;
+  padding: 20px 22px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease;
 }
 
-.card.highlight {
-  border-color: var(--accent);
+.card:hover {
+  border-color: var(--border);
 }
 
-.card h3 {
-  font-size: 16px;
-  font-weight: 400;
-  margin-bottom: 8px;
+.card-title {
+  display: block;
+  font-size: 15px;
+  color: var(--text-strong);
+  margin-bottom: 4px;
 }
 
-.card p {
-  font-size: 14px;
-  margin-bottom: 20px;
+.card-desc {
+  display: block;
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin-bottom: 12px;
 }
 
-.card p.version {
-  font-size: 12.5px;
-  opacity: 0.55;
-  margin-top: -12px;
+.card-cta {
+  display: block;
+  font-size: 13px;
+  color: var(--accent-strong);
 }
 
 .note {
@@ -226,6 +341,22 @@ async function copyAddress() {
 @media (max-width: 600px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  /* The lead card stacks rather than squeezing its button off the edge. */
+  .lead {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+    gap: 14px;
+  }
+
+  .lead-title {
+    justify-content: center;
+  }
+
+  .version {
+    text-align: center;
   }
 }
 </style>

@@ -15,7 +15,13 @@ const lines = computed(() => (lang.value === 'en' ? entry.value.en : entry.value
 // other than what the buttons underneath hand over, and saying nothing beats
 // saying the wrong thing. An API call that failed or hasn't landed yet leaves
 // releaseVersion empty, which is not evidence of anything - the card stays.
+//
+// The dev server is exempt. The guard is about what the PUBLISHED page claims,
+// and the notes for a release are written before that release exists - which is
+// exactly when they need looking at. Without this, drafting them locally shows
+// an empty space where the card is meant to be.
 const isCurrent = computed(() =>
+  import.meta.env.DEV ||
   releaseVersion.value === '' || releaseVersion.value === changelog[0].version)
 
 function step(by: number) {

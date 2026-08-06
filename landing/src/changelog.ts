@@ -20,6 +20,24 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // The installer is deliberately NOT one of these lines. It is the biggest
+    // thing in this release, and the download cards right below already lead
+    // with it - a line here would spend a quarter of the card repeating what
+    // the reader is about to look at. It belongs in the release notes, which is
+    // where someone arriving from the app's update mark lands.
+    version: 'v1.6.0',
+    ko: [
+      '펼칠 때 가장자리 전체 또는 손잡이를 선택하고, 색도 지정할 수 있습니다',
+      '파일 종류 필터에 원하는 확장자를 직접 넣을 수 있습니다',
+      '버그 수정 및 성능 최적화',
+    ],
+    en: [
+      'Pick what opens it back up — the whole screen edge or just a handle — and give it a colour',
+      'Put your own extensions into the file type filter',
+      'Refinements and bug fixes',
+    ],
+  },
+  {
     version: 'v1.5.0',
     ko: [
       '색상 피커 — 선택하는 대로 사이드바에 바로 적용',

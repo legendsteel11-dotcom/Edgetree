@@ -23,8 +23,11 @@ const dict = {
       tagline: '화면 가장자리에 항상 붙어있는, VS Code 스타일의 가벼운 탐색기',
       description:
         '폴더 구조를 빠르게 훑어보고 파일 위치로 바로 이동하기 위한 보조 도구입니다.',
-      ctaDownloadStandalone: '독립 실행형 다운로드',
-      ctaDownloadStandard: '일반 버전 다운로드',
+      // Two buttons, not three. The third build is one scroll away in the
+      // download section, and a row of three equal-looking choices at the top
+      // of the page asks a question before anyone knows what the app is.
+      ctaDownloadSetup: '설치 버전 다운로드',
+      ctaDownloadPortable: '무설치 다운로드',
       ctaGithub: 'GitHub에서 보기',
     },
     howto: {
@@ -112,12 +115,27 @@ const dict = {
     },
     download: {
       title: '다운로드',
-      standardTitle: '일반 버전',
-      standardDesc: '~1 MB · .NET 8 데스크톱 런타임 필요',
-      standaloneTitle: '독립 실행형',
-      standaloneDesc: '~160 MB · 설치 없이 바로 실행',
+      // 이름을 TabStick과 맞췄다(2026-08-06). 같은 사람이 만든 두 앱이고 랜딩끼리 링크가
+      // 걸려 있어 나란히 보는 사람이 있는데, 한쪽은 '무설치'·'경량'이고 다른 쪽은
+      // '독립 실행형'·'일반 버전'이면 같은 것인지 알 수 없다. '일반'은 그 자리에서
+      // 아무것도 말해 주지 않는 낱말이기도 했다 - 런타임이 필요한 1MB짜리가 '일반'이고
+      // 155MB짜리가 '독립 실행형'이라 오히려 뒤집혀 읽혔다.
+      setupTitle: '설치 버전',
+      setupDesc: '받아서 클릭 몇 번. 시작 메뉴에 등록되고, 제거도 깔끔합니다.',
+      setupSize: '49 MB',
+      portableTitle: '무설치',
+      // TabStick은 '압축을 풀고 바로 실행합니다'인데 이쪽은 zip이 아니라 exe 하나다.
+      portableDesc: '받아서 바로 실행합니다. 파일 하나입니다.',
+      portableSize: '155 MB',
+      lightTitle: '경량',
+      lightDesc: '.NET 8 데스크톱 런타임이 필요합니다.',
+      lightSize: '1 MB',
+      recommend: '추천',
       button: '다운로드',
-      note: '어떤 버전을 받아야 할지 모르겠다면 독립 실행형을 선택하세요.',
+      // 두 앱을 함께 쓰는 사람을 위한 안내이자 TabStick 랜딩에 이미 있는 문장의 거울.
+      // 런타임을 한 번 깔면 양쪽 경량 버전이 열린다는 것이 요지다.
+      bothApps:
+        '.NET 8 데스크톱 런타임을 한 번 설치해 두시면 경량 버전을 쓸 수 있고, 다른 앱 TabStick도 작은 파일 하나로 사용할 수 있습니다.',
       mobileTitle: 'Windows에서 쓰는 앱입니다.',
       mobileDesc: '주소를 복사해 두었다가 PC에서 열어보세요.',
       mobileCopy: '주소 복사',
@@ -148,8 +166,8 @@ const dict = {
       tagline: 'A lightweight explorer that lives at your screen edge, VS Code style',
       description:
         "A quick way to glance at a folder structure and jump straight to a file.",
-      ctaDownloadStandalone: 'Download Standalone',
-      ctaDownloadStandard: 'Download Standard',
+      ctaDownloadSetup: 'Download Installer',
+      ctaDownloadPortable: 'Download Portable',
       ctaGithub: 'View on GitHub',
     },
     howto: {
@@ -237,12 +255,19 @@ const dict = {
     },
     download: {
       title: 'Download',
-      standardTitle: 'Standard',
-      standardDesc: '~1 MB · requires .NET 8 Desktop Runtime',
-      standaloneTitle: 'Standalone',
-      standaloneDesc: '~160 MB · runs with nothing else installed',
+      setupTitle: 'Installer',
+      setupDesc: 'Download, click through, done — it lands in your Start menu and uninstalls cleanly.',
+      setupSize: '49 MB',
+      portableTitle: 'Portable',
+      portableDesc: 'One file. Run it, nothing to install.',
+      portableSize: '155 MB',
+      lightTitle: 'Light',
+      lightDesc: 'Needs the .NET 8 Desktop Runtime.',
+      lightSize: '1 MB',
+      recommend: 'Recommended',
       button: 'Download',
-      note: "Not sure which one? Go with the standalone build.",
+      bothApps:
+        'Install the .NET 8 Desktop Runtime once and you can use the Light build here — and TabStick, the other app, as a single small file too.',
       mobileTitle: 'This one runs on Windows.',
       mobileDesc: 'Copy the address and open it on your PC.',
       mobileCopy: 'Copy address',
