@@ -1,5 +1,18 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { t } from '../i18n'
+
+// The flag lives on the entry itself in i18n.ts, next to the copy, rather than
+// as a list of positions here - this list is edited by hand and reordered, and
+// picking rows by index is the pattern that has silently broken things in this
+// project before. Only some entries carry it, so it is read defensively and
+// normalised to a boolean once.
+const items = computed(() =>
+  t.value.features.items.map((item) => ({
+    title: item.title,
+    desc: item.desc,
+    highlight: 'highlight' in item && item.highlight === true,
+  })))
 </script>
 
 <template>
@@ -10,8 +23,8 @@ import { t } from '../i18n'
       </div>
 
       <div class="grid">
-        <div v-for="item in t.features.items" :key="item.title" class="item">
-          <h3>{{ item.title }}</h3>
+        <div v-for="item in items" :key="item.title" class="item">
+          <h3 :class="{ 'is-highlight': item.highlight }">{{ item.title }}</h3>
           <p>{{ item.desc }}</p>
         </div>
       </div>
@@ -43,6 +56,13 @@ import { t } from '../i18n'
   font-weight: 400;
   margin-bottom: 6px;
   color: var(--text-strong);
+}
+
+/* A few titles lifted out of the twenty. Colour only - no bold, no size change:
+   the list reads as one block and a heavier weight would break the grid's rhythm
+   as well as mark the row. */
+.item h3.is-highlight {
+  color: var(--accent-strong);
 }
 
 .item p {
