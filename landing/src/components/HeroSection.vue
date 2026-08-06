@@ -78,6 +78,11 @@ h1 {
   font-size: 16px;
   line-height: 1.7;
   margin-bottom: 32px;
+  /* The two sentences are broken by hand in i18n.ts - left to wrap, the second
+     one spilled onto a third line and split a word across it. A narrow screen
+     still wraps each line further, which is fine; this only stops the pair
+     from running together. */
+  white-space: pre-line;
 }
 
 /* Outlined rather than filled: it sits just above the download buttons and a

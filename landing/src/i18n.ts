@@ -21,8 +21,17 @@ const dict = {
       eyebrow: 'Windows 폴더/파일 탐색기 유틸',
       title: 'Edgetree',
       tagline: '화면 가장자리에 항상 붙어있는, VS Code 스타일의 가벼운 탐색기',
+      // Was "폴더 구조를 빠르게 훑어보고 파일 위치로 바로 이동하기 위한 보조
+      // 도구입니다" - true, and true of a dozen other things. What actually
+      // makes it a different app is that the tree gets cut down to the work in
+      // hand (author, 2026-08-06), so the one line under the tagline says that
+      // instead. Imperative first, payoff second: the instruction alone would
+      // be onboarding copy in a slot where nobody has decided anything yet.
       description:
-        '폴더 구조를 빠르게 훑어보고 파일 위치로 바로 이동하기 위한 보조 도구입니다.',
+        // Broken at the sentence, not left to wrap: at the hero's width the
+        // second sentence ran onto a third line and split 수월합니 / 다
+        // (2026-08-06). .description is white-space: pre-line for this.
+        '안 쓰는 폴더는 감추고, 자주 사용하는 파일 종류만 선택하세요.\n필요한 파일만 보여주어 작업이 한층 수월합니다.',
       // Korean page only - the English one leaves this empty and the badge is
       // not rendered at all.
       //
@@ -31,7 +40,7 @@ const dict = {
       // it is an English-only app and leave (the author's own report,
       // 2026-08-06). This sits ABOVE the first screenshot, which is the only
       // place that answers it in time.
-      langBadge: '한국어 지원',
+      langBadge: '한국어',
       // Two buttons, not three. The third build is one scroll away in the
       // download section, and a row of three equal-looking choices at the top
       // of the page asks a question before anyone knows what the app is.
@@ -42,6 +51,11 @@ const dict = {
     howto: {
       title: '사용방법',
       steps: [
+        // First, and deliberately before docking: this is the step that makes
+        // the app feel like a different one, and it is the step nobody thinks
+        // to take on their own. "처음 실행 후" belongs here rather than in the
+        // hero - by this point the reader is being shown how to use it.
+        { title: '트리를 내 작업에 맞게 줄이기', desc: '처음 실행 후 작업에 불필요한 폴더를 감추고, 하단 바의 필터로 볼 파일 종류를 선택해 보세요. 트리가 훨씬 짧아지고, 찾는 것이 눈에 바로 들어옵니다.' },
         { title: '도킹 / 자동접기 / 창모드 전환', desc: '제목표시줄 핀 클릭 한 번으로 화면 가장자리에 얇게 숨고, 마우스를 가장자리로 가져가면 다시 펼쳐집니다. 제목표시줄을 드래그하여 창모드로 전환할 수 있습니다.' },
         { title: '간단한 파일 검색', desc: '제목표시줄의 검색 아이콘 혹은 Ctrl + F / Ctrl + E 로 검색창과 탐색기 창을 전환하고 간단한 파일 검색을 할 수 있습니다.' },
         { title: '컨텍스트 메뉴 및 파일 액세스', desc: '탐색기에서 폴더나 파일을 우클릭하여 기본적인 기능 등을 편리하게 사용할 수 있습니다. 이미지 파일은 열지 않고도 메뉴 상단의 미리보기로 바로 확인됩니다. 파일을 창 외부로 복사하거나, VS Code의 탐색기에 바로 등록할 수 있습니다.' },
@@ -179,7 +193,7 @@ const dict = {
       title: 'Edgetree',
       tagline: 'A lightweight explorer that lives at your screen edge, VS Code style',
       description:
-        "A quick way to glance at a folder structure and jump straight to a file.",
+        'Hide the folders you never touch, and keep just the file kinds you work with.\nWith only what you need on screen, the work goes easier.',
       // Empty on purpose - see the Korean side. An English reader looking at
       // English screenshots has nothing to be corrected about.
       langBadge: '',
@@ -190,6 +204,7 @@ const dict = {
     howto: {
       title: 'How to Use',
       steps: [
+        { title: 'Cut the tree down to your work', desc: 'Right after the first launch, hide the folders you never touch and pick the file kinds you want from the bottom bar. The tree gets much shorter, and what you are looking for is simply there.' },
         { title: 'Dock / Auto-Hide / Window Mode', desc: 'One click on the titlebar pin tucks it away to a thin sliver at the screen edge; move your mouse there to bring it back. Drag the titlebar to switch into a floating window.' },
         { title: 'Quick File Search', desc: "The titlebar's search icon (or Ctrl + F / Ctrl + E) toggles between the search box and the explorer for a quick file lookup." },
         { title: 'Context Menu & File Access', desc: 'Right-click a folder or file in the explorer for the essentials at hand — image files show a preview right at the top of the menu, no need to open them. Copy files out to another window, or send them straight to the VS Code explorer.' },
