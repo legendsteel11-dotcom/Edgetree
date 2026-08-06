@@ -30,6 +30,12 @@ public static class FileTypeFilter
     // with nothing the user could do about it.
     public const string Other = "other";
 
+    // The extensions the user typed in themselves. Offered only once it holds
+    // something, and deliberately NOT part of what 기타 answers to: 기타 means
+    // "none of the six lists claims this", and letting a custom entry change
+    // that would make two rows move when one was edited.
+    public const string Custom = "custom";
+
     public static readonly string[] AllCategories =
     {
         Code, Image, Document, Media, Archive, Executable, Other,
@@ -110,6 +116,68 @@ public static class FileTypeFilter
 
     public static bool IsFiltering => SelectedCategories.Count > 0;
 
+    // The user's own extension list, mirrored from
+    // AppSettings.FileFilterCustomExtensions the same way SelectedCategories is
+    // mirrored from FileFilterCategories - a listing asks this class, never the
+    // settings.
+    private static readonly HashSet<string> CustomExtensions =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    public static bool HasCustomExtensions => CustomExtensions.Count > 0;
+
+    public static void SetCustomExtensions(string storedList)
+    {
+        CustomExtensions.Clear();
+        foreach (string extension in Split(storedList))
+        {
+            CustomExtensions.Add(extension);
+        }
+    }
+
+    // Takes what someone actually types - ".PNG, jpg;webp" - and returns the
+    // stored form: lower case, no leading dots, no blanks, no repeats, in the
+    // order given. Commas are what the hint asks for; semicolons, spaces and
+    // newlines are accepted too rather than silently dropping half the input
+    // because of the separator someone happened to reach for.
+    public static string NormalizeExtensions(string? input)
+        => string.Join(",", Split(input));
+
+    private static IEnumerable<string> Split(string? input)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string piece in (input ?? string.Empty)
+            .Split(new[] { ',', ';', ' ', '\t', '\r', '\n', '|' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            // A whole name is accepted as well as a bare extension, so pasting
+            // "report.docx" gives docx rather than nothing. TrimStart handles
+            // ".docx"; the Path call handles the rest.
+            string extension = piece.Trim().TrimStart('.');
+            if (extension.Contains('.'))
+            {
+                extension = Path.GetExtension(extension).TrimStart('.');
+            }
+
+            // '*' is what a file dialog's "*.psd" would leave behind, and any
+            // path separator means this was never an extension at all.
+            extension = extension.Trim('*', '"', '\'');
+            if (extension.Length == 0 || extension.IndexOfAny(new[] { '\\', '/', ':' }) >= 0)
+            {
+                continue;
+            }
+
+            extension = extension.ToLowerInvariant();
+            if (seen.Add(extension))
+            {
+                yield return extension;
+            }
+        }
+    }
+
+    // For the row and chip that offer it: "psd, ai, fig" rather than the stored
+    // "psd,ai,fig".
+    public static string DescribeExtensions(string storedList)
+        => string.Join(", ", Split(storedList));
+
     public static bool ShouldShowFile(string fileName)
     {
         if (SelectedCategories.Count == 0)
@@ -141,6 +209,7 @@ public static class FileTypeFilter
         Media => MediaExtensions.Contains(extension),
         Archive => ArchiveExtensions.Contains(extension),
         Executable => ExecutableExtensions.Contains(extension),
+        Custom => CustomExtensions.Contains(extension),
         Other => !CodeExtensions.Contains(extension)
             && !ImageExtensions.Contains(extension)
             && !DocumentExtensions.Contains(extension)

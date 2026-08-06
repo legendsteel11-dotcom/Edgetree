@@ -4017,6 +4017,14 @@
 
                      WrapPanel, so a narrow window costs a second line instead
                      of cutting chips off the end. -->
+                <!-- The gap BETWEEN wrapped rows is a top margin on the chips
+                     themselves (see AddFooterFilterChip) - a panel's margin
+                     sits outside all of them and leaves two lines touching.
+                     Top rather than bottom so this panel keeps owning the space
+                     under the last row: the two together read as one strip with
+                     even air above and below, which a chip-side bottom margin
+                     could not do without this going to zero and the strip
+                     sitting on the window's edge. -->
                 <WrapPanel x:Name="VersionFooterPanel"
                         Orientation="Horizontal"
                         Margin="8,1,4,3">

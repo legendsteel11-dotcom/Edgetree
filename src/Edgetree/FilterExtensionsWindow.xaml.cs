@@ -1,0 +1,75 @@
+using System.Windows;
+using SidebarExplorer.App.Behaviors;
+using SidebarExplorer.App.Services;
+using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+using Key = System.Windows.Input.Key;
+using MouseButtonEventArgs = System.Windows.Input.MouseButtonEventArgs;
+
+namespace SidebarExplorer.App;
+
+// The one input behind 표시할 파일 종류 → 사용자 지정. A window rather than a
+// row inside the menu: a TextBox hosted in a menu has to fight the menu for
+// every key it receives, and this app's own stuck-capture watchdog reclaims a
+// popup that holds the mouse within a couple of seconds (2026-08-02).
+public partial class FilterExtensionsWindow : Window
+{
+    // The normalised list the user settled on, or null if they backed out.
+    // Empty string is a real answer - it means "remove the custom kind".
+    public string? Result { get; private set; }
+
+    public FilterExtensionsWindow(string currentExtensions)
+    {
+        InitializeComponent();
+
+        // Shown in the readable form, taken back in any form (see
+        // FileTypeFilter.NormalizeExtensions) - what goes in the box is what
+        // the row and the chip say, so the two can be compared at a glance.
+        ExtensionsBox.Text = FileTypeFilter.DescribeExtensions(currentExtensions);
+        UpdateHint();
+    }
+
+    private void ExtensionsBox_Loaded(object sender, RoutedEventArgs e)
+    {
+        // Every text box in this app disables overtype - a bare Insert
+        // otherwise flips it on and breaks Korean composition with no visible
+        // sign it happened (see OvertypeGuard).
+        OvertypeGuard.Disable(ExtensionsBox);
+
+        ExtensionsBox.Focus();
+        ExtensionsBox.SelectAll();
+    }
+
+    private void ExtensionsBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        => UpdateHint();
+
+    private void UpdateHint()
+        => HintText.Text = ExtensionsBox.Text.Trim().Length == 0
+            ? Strings.FilterCustomEmptyHint
+            : Strings.FilterCustomHint;
+
+    // Enter is already the OK button (IsDefault), but only once the box has
+    // given up the key - a TextBox that is not multi-line does, so this exists
+    // for the composition case: finishing Korean input with Enter would
+    // otherwise commit the composition AND close the window in one press.
+    private void ExtensionsBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.ImeProcessed)
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void OkButton_Click(object sender, RoutedEventArgs e)
+    {
+        Result = FileTypeFilter.NormalizeExtensions(ExtensionsBox.Text);
+        DialogResult = true;
+    }
+
+    private void CancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        Result = null;
+        DialogResult = false;
+    }
+
+    private void HeaderGrid_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => DragMove();
+}

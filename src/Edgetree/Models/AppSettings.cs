@@ -328,6 +328,17 @@ public class AppSettings
     // neither needs a migration.
     public List<string> FileFilterCategories { get; set; } = new();
 
+    // The one user-defined kind ("사용자 지정"), as normalised extensions -
+    // lower case, no dots, no duplicates, comma-separated: "psd,ai,fig".
+    // Empty means the row is not offered at all.
+    //
+    // ONE, not a list of named filters: a second one needs a managing list
+    // with a − per row (the shape 숨긴 폴더 uses) and a name per entry, while
+    // going from one to many later is easy and the reverse is not (user's call,
+    // 2026-08-06). It is selected like any other kind, so it can be combined
+    // with 코드 or 이미지 rather than replacing them.
+    public string FileFilterCustomExtensions { get; set; } = "";
+
     // Folders the user has taken out of the tree ("이 폴더 숨기기"). Only the
     // tree hides them - the file search still finds what is inside, because a
     // search is a deliberate act of looking and "분명 있는데 검색이 안 된다" is

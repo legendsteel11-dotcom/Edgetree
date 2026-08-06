@@ -339,6 +339,12 @@ public partial class MainWindow : Window
             FileTypeFilter.SelectedCategories.Add(category);
         }
 
+        // Before the categories are honoured, not after: 사용자 지정 selected
+        // with nothing behind it claims no file at all, and if it were the only
+        // kind picked the first read would come back empty.
+        FileTypeFilter.SetCustomExtensions(_settings.FileFilterCustomExtensions);
+        DropCustomFilterIfEmpty();
+
         // Must be set before the tree/favorites below ever read an icon, same
         // as the sort/display statics above.
         ShellIconService.UseShellIcons = _settings.UseShellIcons;
@@ -4966,6 +4972,70 @@ public partial class MainWindow : Window
         {
             submenu.Items.Add(BuildFileFilterRow(label(), category));
         }
+
+        // The user's own kind, and the row that edits it. Two rows rather than
+        // one that does both: the seven above are switches, and a switch that
+        // also opens a window when you happen to hit it in the wrong state is
+        // the kind of row people stop trusting. The list is only offered once
+        // it holds something - there is nothing to select otherwise.
+        submenu.Items.Add(new Separator());
+        if (FileTypeFilter.HasCustomExtensions)
+        {
+            submenu.Items.Add(BuildFileFilterRow(
+                FileTypeFilter.DescribeExtensions(_settings.FileFilterCustomExtensions),
+                FileTypeFilter.Custom));
+        }
+
+        var edit = FollowMenuFont(new MenuItem { Header = Strings.MenuFileFilterCustomEdit });
+        edit.Click += (_, args) =>
+        {
+            args.Handled = true;
+            EditCustomFileFilter();
+        };
+        submenu.Items.Add(edit);
+    }
+
+    // Asks for the extensions, then applies whatever comes back. Selecting the
+    // custom kind on the way out is deliberate: someone who has just typed
+    // "psd, ai" is asking to see those files, and leaving them to find the row
+    // and tick it would make the window they just filled in do nothing visible.
+    private void EditCustomFileFilter()
+    {
+        var window = new FilterExtensionsWindow(_settings.FileFilterCustomExtensions) { Owner = this };
+        PositionNearOptionsButton(window);
+        if (window.ShowDialog() != true || window.Result is not { } extensions)
+        {
+            return;
+        }
+
+        bool wasSelected = _settings.FileFilterCategories.Contains(FileTypeFilter.Custom);
+        _settings.FileFilterCustomExtensions = extensions;
+        FileTypeFilter.SetCustomExtensions(extensions);
+
+        if (extensions.Length > 0 && !wasSelected)
+        {
+            _settings.FileFilterCategories.Add(FileTypeFilter.Custom);
+        }
+
+        DropCustomFilterIfEmpty();
+
+        // The chip carries the extensions as its label, so it is a different
+        // chip now - and it appears or disappears with the list itself.
+        RebuildFooterFilterChips();
+        ApplyFileFilter();
+    }
+
+    // An empty custom list claims no file, so leaving it selected would filter
+    // everything away - and with 전체 unlit the footer would insist a filter is
+    // on while naming nothing. Clearing the extensions IS the way to remove
+    // this kind, so the selection has to go with them.
+    private void DropCustomFilterIfEmpty()
+    {
+        if (!FileTypeFilter.HasCustomExtensions)
+        {
+            _settings.FileFilterCategories.Remove(FileTypeFilter.Custom);
+            FileTypeFilter.SelectedCategories.Remove(FileTypeFilter.Custom);
+        }
     }
 
     private MenuItem BuildFileFilterRow(string header, string category)
@@ -5042,24 +5112,63 @@ public partial class MainWindow : Window
     // from under the cursor mid-click.
     private readonly List<ToggleButton> _footerFilterChips = new();
 
+    // Carried by every chip rather than by the panel around them: once the row
+    // wraps, the only thing between the two lines is what the chips themselves
+    // bring (user, 2026-08-06 - the two lines were touching). It goes on their
+    // TOP, so the panel's own bottom margin still holds the strip off the
+    // window's edge and the air above and below comes out even.
+    private const double FooterChipRowGap = 2;
+
     private void BuildFooterFilterChips()
     {
         // 전체 first and set apart by a wider gap: it is not one of the kinds,
         // it is the empty selection - the same asymmetry the menu draws with a
         // separator, which a single row has no room for.
-        AddFooterFilterChip(Strings.MenuFileFilterAll, FileFilterAllTag, new Thickness(0, 0, 8, 0));
+        AddFooterFilterChip(Strings.MenuFileFilterAll, FileFilterAllTag, new Thickness(0, FooterChipRowGap, 8, 0));
         foreach (var (category, label) in FileFilterRows)
         {
             AddFooterFilterChip(
                 category == FileTypeFilter.Executable ? Strings.FilterChipExecutable : label(),
                 category,
-                new Thickness(0, 0, 2, 0));
+                new Thickness(0, FooterChipRowGap, 2, 0));
+        }
+
+        // Last, and only once it holds something. It carries the extensions
+        // themselves rather than the words 사용자 지정 - the strip's job is to
+        // say what is being hidden, and "사용자 지정" answers that with a
+        // question. Long lists are cut short with the full one on hover; the
+        // chips already wrap to a second line, but one chip should not be able
+        // to take the whole of it.
+        if (FileTypeFilter.HasCustomExtensions)
+        {
+            string described = FileTypeFilter.DescribeExtensions(_settings.FileFilterCustomExtensions);
+            AddFooterFilterChip(
+                Shorten(described, 14),
+                FileTypeFilter.Custom,
+                new Thickness(0, 0, 2, 0),
+                described);
         }
 
         UpdateFileFilterIndicator();
     }
 
-    private void AddFooterFilterChip(string label, string category, Thickness margin)
+    private static string Shorten(string text, int limit)
+        => text.Length <= limit ? text : text[..limit].TrimEnd(',', ' ') + "…";
+
+    // The chips are built once and then only their IsChecked moves - except
+    // when the custom list is edited, which changes what the chips ARE.
+    private void RebuildFooterFilterChips()
+    {
+        foreach (var chip in _footerFilterChips)
+        {
+            VersionFooterPanel.Children.Remove(chip);
+        }
+
+        _footerFilterChips.Clear();
+        BuildFooterFilterChips();
+    }
+
+    private void AddFooterFilterChip(string label, string category, Thickness margin, string? tooltip = null)
     {
         var chip = new ToggleButton
         {
@@ -5067,6 +5176,7 @@ public partial class MainWindow : Window
             Tag = category,
             Style = (Style)FindResource("FooterFilterChipStyle"),
             Margin = margin,
+            ToolTip = tooltip,
         };
 
         chip.Click += (_, _) =>

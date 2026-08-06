@@ -36,6 +36,19 @@ public static class Strings
     public static string MenuFileFilterArchive = "압축";
     public static string MenuFileFilterExecutable = "실행 파일 · 바로가기";
     public static string MenuFileFilterOther = "기타";
+    // Opens the input. The ellipsis is the whole promise that this row asks
+    // something rather than switching something, which is what every other row
+    // in this list does.
+    public static string MenuFileFilterCustomEdit = "사용자 지정…";
+    public static string FilterCustomTitle = "사용자 지정 확장자";
+    // At the point of use, because nobody reads help - it has to say both the
+    // separator and that a dot is optional, in one line.
+    public static string FilterCustomHint = "쉼표로 구분 · psd, ai, .fig";
+    // Under the box, only while it holds nothing: an empty box is the way to
+    // remove the filter, and that is not guessable.
+    public static string FilterCustomEmptyHint = "비워 두고 확인하면 사용자 지정이 없어집니다";
+    public static string ButtonOk = "확인";
+    public static string ButtonCancel = "취소";
 
     public static string MenuFontWeight = "글꼴 굵기";
     public static string MenuFontWeightNormal = "보통";
@@ -390,6 +403,12 @@ public static class Strings
         MenuFileFilterArchive = "Archives";
         MenuFileFilterExecutable = "Programs & Shortcuts";
         MenuFileFilterOther = "Other";
+        MenuFileFilterCustomEdit = "Custom…";
+        FilterCustomTitle = "Custom Extensions";
+        FilterCustomHint = "Separate with commas · psd, ai, .fig";
+        FilterCustomEmptyHint = "Leaving this empty removes the custom kind";
+        ButtonOk = "OK";
+        ButtonCancel = "Cancel";
         MenuFontWeight = "Font Weight";
         MenuFontWeightNormal = "Normal";
         MenuFontWeightBold = "Bold";
