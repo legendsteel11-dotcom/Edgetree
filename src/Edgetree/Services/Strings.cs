@@ -311,6 +311,9 @@ public static class Strings
     public static string TrayHide = "트레이로";
     public static string TrayAbout = "정보";
     public static string TrayExit = "종료";
+    // Only present in the tray menu when there is actually a newer release -
+    // no row at all otherwise, and never a balloon.
+    public static string TrayUpdateAvailable = "새 업데이트 - v{0}";
 
     // MessageBox titles/bodies
     public static string PasteFailedTitle = "붙여넣기 실패";
@@ -318,6 +321,15 @@ public static class Strings
     public static string CopyIntoSelfError = "폴더를 자기 자신이나 그 하위 폴더로 복사할 수 없습니다.";
     public static string NewFolderFailedTitle = "새 폴더 만들기 실패";
     public static string RenameFailedTitle = "이름 바꾸기 실패";
+    // The name a newly created folder gets, and the message when a rename is
+    // refused. Both used to be Korean literals sitting in FileOperationService,
+    // so an English install still wrote a folder called "새 폴더" onto the
+    // user's disk - reported from a German freeware forum, 2026-08-05: "bei
+    // einem kurzen Test tauchte trotz englisch noch koreanischer Text auf".
+    // Anything a user can SEE belongs here, including text that ends up as a
+    // filename.
+    public static string NewFolderDefaultName = "새 폴더";
+    public static string RenameFailedBody = "이름을 바꿀 수 없습니다.";
     public static string DeleteConfirmTitle = "삭제 확인";
     public static string DeleteConfirmBody = "'{0}'을(를) 휴지통으로 보낼까요?";
     public static string DeleteConfirmBodyMultiple = "선택한 {0}개 항목을 휴지통으로 보낼까요?";
@@ -558,12 +570,15 @@ public static class Strings
         TrayHide = "Send to Tray";
         TrayAbout = "About";
         TrayExit = "Exit";
+        TrayUpdateAvailable = "New update - v{0}";
 
         PasteFailedTitle = "Paste Failed";
         MoveIntoSelfError = "A folder can't be moved into itself or into one of its own subfolders.";
         CopyIntoSelfError = "A folder can't be copied into itself or into one of its own subfolders.";
         NewFolderFailedTitle = "Failed to Create Folder";
         RenameFailedTitle = "Rename Failed";
+        NewFolderDefaultName = "New Folder";
+        RenameFailedBody = "Could not rename this item.";
         DeleteConfirmTitle = "Confirm Delete";
         DeleteConfirmBody = "Send '{0}' to the Recycle Bin?";
         DeleteConfirmBodyMultiple = "Send {0} selected items to the Recycle Bin?";

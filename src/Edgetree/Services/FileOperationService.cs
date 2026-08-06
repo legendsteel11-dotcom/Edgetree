@@ -374,7 +374,7 @@ public static class FileOperationService
         error = null;
         try
         {
-            string path = GetUniqueDestination(Path.Combine(parentDirectory, "새 폴더"));
+            string path = GetUniqueDestination(Path.Combine(parentDirectory, Strings.NewFolderDefaultName));
             Directory.CreateDirectory(path);
             createdPath = path;
             return true;
@@ -394,7 +394,7 @@ public static class FileOperationService
             string? dir = Path.GetDirectoryName(path);
             if (dir is null)
             {
-                error = "이름을 바꿀 수 없습니다.";
+                error = Strings.RenameFailedBody;
                 return false;
             }
             string newPath = Path.Combine(dir, newName);
