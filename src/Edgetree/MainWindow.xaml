@@ -119,6 +119,11 @@
                 Color="#FF1C1C1C"/>
         <SolidColorBrush x:Key="HeaderBackground"
                 Color="#FF1E1E1E"/>
+        <!-- The auto-hidden handle/bar (AppSettings.AutoHideHandleColorHex).
+             Painted by AutoHideHandleOverlay at the very bottom of this file,
+             not by any of the panels - see its comment. -->
+        <SolidColorBrush x:Key="AutoHideHandleBackground"
+                Color="#FF1A1A1A"/>
         <!-- ForegroundText/HighlightForeground (general header/menu/favorites
              chrome text) now live in App.xaml instead - Application-level so
              ColorSettingsWindow/AboutWindow can share them too, see its own
@@ -4443,6 +4448,25 @@
                 </ListBox>
             </Grid>
         </Grid>
+
+        <!-- What the auto-hidden sidebar actually shows: one flat colour over
+             the whole window, up for exactly as long as the content is down
+             (SetExpandedContentVisibility owns both).
+
+             A cover rather than a recolour of the panels underneath. Those
+             panels are two colours - the header's 36px and the tree's
+             background below it - so a 6px strip on the desktop was showing a
+             seam nobody chose, and reaching them would mean swapping resource
+             keys the whole tree also reads (the expensive kind of write, see
+             SetBrushColor).
+
+             IsHitTestVisible="False" is load-bearing: the collapsed window is
+             hovered to reveal it and can be dragged open, and a covering
+             Border with a Background would answer all of that itself. -->
+        <Border x:Name="AutoHideHandleOverlay"
+                Background="{DynamicResource AutoHideHandleBackground}"
+                IsHitTestVisible="False"
+                Visibility="Collapsed"/>
 
         <!-- Resize grip: overlaid on the content's right edge (see the note on
              the root Grid above), not a sibling occupying its own column. -->

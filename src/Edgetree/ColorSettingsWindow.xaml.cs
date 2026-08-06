@@ -76,6 +76,7 @@ public partial class ColorSettingsWindow : Window
         GuideLineActiveSwatch.Background = ParseBrush(CurrentGuideLineActiveColorHex);
         HeaderSwatch.Background = ParseBrush(CurrentHeaderBackgroundColorHex);
         PanelDividerSwatch.Background = ParseBrush(CurrentPanelDividerColorHex);
+        AutoHideHandleSwatch.Background = ParseBrush(CurrentAutoHideHandleColorHex);
 
         // The codes beside them follow the same way - a theme flip, a reset to
         // defaults or a pick from the colour dialog all land here, so no caller
@@ -177,7 +178,7 @@ public partial class ColorSettingsWindow : Window
 
     // One pair of get/set properties per color row, each reading/writing
     // whichever of the dark/light fields IsLightMode currently points at -
-    // every other place in this file (RefreshSwatches, the 15 PickColor
+    // every other place in this file (RefreshSwatches, the 16 PickColor
     // wirings below, ResetDefaults_Click) goes through these instead of the
     // raw AppSettings fields directly, so there's exactly one place that
     // knows the dark/light field-name mapping for each row.
@@ -257,6 +258,16 @@ public partial class ColorSettingsWindow : Window
         set { if (_settings.IsLightMode) _settings.LightHeaderBackgroundColorHex = value; else _settings.HeaderBackgroundColorHex = value; }
     }
 
+    // Reading either of these resolves "unset" to the sidebar background of
+    // the same theme (see AppSettings), so this row behaves like any other -
+    // it always has a real colour to show, and writing one is what makes it
+    // stop following.
+    private string CurrentAutoHideHandleColorHex
+    {
+        get => _settings.IsLightMode ? _settings.LightAutoHideHandleColorHex : _settings.AutoHideHandleColorHex;
+        set { if (_settings.IsLightMode) _settings.LightAutoHideHandleColorHex = value; else _settings.AutoHideHandleColorHex = value; }
+    }
+
     private void ThemeToggle_Click(object sender, RoutedEventArgs e)
     {
         _settings.IsLightMode = !_settings.IsLightMode;
@@ -264,7 +275,7 @@ public partial class ColorSettingsWindow : Window
         _onChanged();
     }
 
-    // True only if every one of the current theme's 15 colors already
+    // True only if every one of the current theme's 16 colors already
     // matches that theme's own default (a fresh AppSettings() instance) -
     // ResetDefaultsButton is disabled in that case, since there'd be nothing
     // to actually reset.
@@ -285,7 +296,8 @@ public partial class ColorSettingsWindow : Window
             && CurrentGuideLineColorHex == GetDefault(defaults, s => s.GuideLineColorHex, s => s.LightGuideLineColorHex)
             && CurrentGuideLineActiveColorHex == GetDefault(defaults, s => s.GuideLineActiveColorHex, s => s.LightGuideLineActiveColorHex)
             && CurrentPanelDividerColorHex == GetDefault(defaults, s => s.PanelDividerColorHex, s => s.LightPanelDividerColorHex)
-            && CurrentHeaderBackgroundColorHex == GetDefault(defaults, s => s.HeaderBackgroundColorHex, s => s.LightHeaderBackgroundColorHex);
+            && CurrentHeaderBackgroundColorHex == GetDefault(defaults, s => s.HeaderBackgroundColorHex, s => s.LightHeaderBackgroundColorHex)
+            && CurrentAutoHideHandleColorHex == GetDefault(defaults, s => s.AutoHideHandleColorHex, s => s.LightAutoHideHandleColorHex);
 
         string GetDefault(AppSettings d, Func<AppSettings, string> dark, Func<AppSettings, string> light)
             => _settings.IsLightMode ? light(d) : dark(d);
@@ -306,7 +318,7 @@ public partial class ColorSettingsWindow : Window
         Close();
     }
 
-    // Only the currently active theme's 15 colors - the other theme's
+    // Only the currently active theme's 16 colors - the other theme's
     // customizations are left completely untouched (per explicit request).
     // ResetDefaultsButton is disabled whenever there'd be nothing to reset
     // (see UpdateResetButtonEnabled), so reaching this handler at all means a
@@ -470,6 +482,12 @@ public partial class ColorSettingsWindow : Window
         CurrentHeaderBackgroundColorHex = defaults.IsLightMode ? defaults.LightHeaderBackgroundColorHex : defaults.HeaderBackgroundColorHex;
         CurrentPanelDividerColorHex = defaults.IsLightMode ? defaults.LightPanelDividerColorHex : defaults.PanelDividerColorHex;
 
+        // Written out rather than put back to "follow the background": the
+        // background on the line above has just been reset as well, so the two
+        // still match, and every row on this page ends up holding a colour of
+        // its own - which is what the button says it does.
+        CurrentAutoHideHandleColorHex = defaults.IsLightMode ? defaults.LightAutoHideHandleColorHex : defaults.AutoHideHandleColorHex;
+
         RefreshSwatches();
         _onChanged();
     }
@@ -518,6 +536,9 @@ public partial class ColorSettingsWindow : Window
 
     private void PanelDividerSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(PanelDividerSwatch, () => CurrentPanelDividerColorHex, hex => CurrentPanelDividerColorHex = hex);
+
+    private void AutoHideHandleSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => PickColor(AutoHideHandleSwatch, () => CurrentAutoHideHandleColorHex, hex => CurrentAutoHideHandleColorHex = hex);
 
     // ----- 색상 코드 직접 입력 -----------------------------------------------
     //
@@ -568,12 +589,14 @@ public partial class ColorSettingsWindow : Window
             return (() => CurrentHeaderBackgroundColorHex, hex => CurrentHeaderBackgroundColorHex = hex);
         if (ReferenceEquals(swatch, PanelDividerSwatch))
             return (() => CurrentPanelDividerColorHex, hex => CurrentPanelDividerColorHex = hex);
+        if (ReferenceEquals(swatch, AutoHideHandleSwatch))
+            return (() => CurrentAutoHideHandleColorHex, hex => CurrentAutoHideHandleColorHex = hex);
 
         return null;
     }
 
     // Every box names its swatch in its Tag, so these handlers serve all
-    // fifteen. The Tag holds the NAME and this looks it up, rather than holding
+    // sixteen. The Tag holds the NAME and this looks it up, rather than holding
     // an {Binding ElementName=...} to the swatch itself: that binding is not
     // resolved yet when the box raises Loaded, so the first fill found no
     // swatch and every box came up EMPTY until it had been clicked into and
@@ -582,7 +605,7 @@ public partial class ColorSettingsWindow : Window
         => (sender as TextBox)?.Tag is string name ? FindName(name) as Border : null;
 
     // Collected as they load rather than named one by one, so RefreshSwatches
-    // can put the current values back into all of them without a fifteen-line
+    // can put the current values back into all of them without a sixteen-line
     // list to keep in step.
     private readonly List<TextBox> _hexBoxes = new();
 

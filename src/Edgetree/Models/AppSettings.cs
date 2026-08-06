@@ -129,11 +129,54 @@ public class AppSettings
     // for a subtle depth hierarchy across the three panels.
     public string HeaderBackgroundColorHex { get; set; } = "#FF1E1E1E";
 
+    // The auto-hidden sidebar - both the handle and the full-height bar, which
+    // share one colour because they are the same thing at two lengths.
+    //
+    // A new colour row is normally the last resort here (reuse an existing one
+    // first), and this is the exception that earns one: it is the only part of
+    // the app that sits on the DESKTOP, against whatever wallpaper the user
+    // has, rather than against the app's own chrome. Everything else is judged
+    // next to the tree.
+    //
+    // Stored as null until it is actually set, and null means "whatever the
+    // sidebar background is". That is what keeps an upgrade invisible: someone
+    // who spent time on a custom background gets a handle in that same custom
+    // colour, not the shipped default. Reset writes the colour out for real
+    // (see ColorSettingsWindow.ResetDefaults_Click) - by then the background
+    // beside it has been reset too, so the two still agree.
+    // The two below are the only ones written to settings.json; the JSON names
+    // are the ordinary ones, so nothing about the file looks unusual.
+    //
+    // Their C# names deliberately do NOT end in ColorHex. That suffix is what
+    // 색상만 내보내기/불러오기 collects by (ColorSettingsWindow.ColorProperties),
+    // and a palette file has no business carrying "not set on the machine this
+    // came from" - the resolved pair below travels instead.
+    [JsonPropertyName("AutoHideHandleColorHex")]
+    public string? StoredAutoHideHandleColor { get; set; }
+    [JsonPropertyName("LightAutoHideHandleColorHex")]
+    public string? StoredLightAutoHideHandleColor { get; set; }
+
+    [JsonIgnore]
+    public string AutoHideHandleColorHex
+    {
+        get => StoredAutoHideHandleColor ?? BackgroundColorHex;
+        set => StoredAutoHideHandleColor = value;
+    }
+
+    [JsonIgnore]
+    public string LightAutoHideHandleColorHex
+    {
+        get => StoredLightAutoHideHandleColor ?? LightBackgroundColorHex;
+        set => StoredLightAutoHideHandleColor = value;
+    }
+
     // "라이트/다크 모드" toggle above the color rows in ColorSettingsWindow -
     // which of the two palettes below is currently active/persisted/applied.
     public bool IsLightMode { get; set; } = false;
 
-    // Light-mode counterpart to each of the 15 dark colors above - a
+    // Light-mode counterpart to each of the 15 dark colors above (the 16th,
+    // the auto-hide handle, keeps its own light twin beside it - the two share
+    // the fallback logic and read as one thing) - a
     // deliberately hand-picked VS Code Light+-style palette, not a
     // mathematical inversion of the dark values (which tends to look muddy).
     // Kept as their own flat, separately-named properties rather than nested

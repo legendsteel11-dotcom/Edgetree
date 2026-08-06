@@ -654,7 +654,7 @@ public partial class MainWindow : Window
             }
 
             // Menus/context menus/the Color Settings and About dialogs/header
-            // icons - general chrome, not part of the 15 colors below.
+            // icons - general chrome, not part of the 16 colors below.
             (Application.Current as App)?.ApplyChromeTheme(light);
 
             // Menu/context-menu drop shadow (see MenuDropShadow's own comment
@@ -765,6 +765,7 @@ public partial class MainWindow : Window
         SetBrushColor("TreeGuideLineActiveBrush", light ? _settings.LightGuideLineActiveColorHex : _settings.GuideLineActiveColorHex);
         SetBrushColor("PanelDividerBrush", light ? _settings.LightPanelDividerColorHex : _settings.PanelDividerColorHex);
         SetBrushColor("HeaderBackground", light ? _settings.LightHeaderBackgroundColorHex : _settings.HeaderBackgroundColorHex);
+        SetBrushColor("AutoHideHandleBackground", light ? _settings.LightAutoHideHandleColorHex : _settings.AutoHideHandleColorHex);
 
         // The results sort button's icon has its own light/dark variants (same
         // as the folder override icon) - re-resolve it now that IsLightMode
@@ -2683,6 +2684,13 @@ public partial class MainWindow : Window
         // whenever that's on, but still hides/shows in step with everything
         // else here rather than needing a second code path.
         UpdateRootPathTextVisibility(visibility);
+
+        // The handle/bar colour, which is only ever seen while everything else
+        // is hidden - so it is the exact inverse of this call and belongs here
+        // rather than at each of the four places that make one.
+        AutoHideHandleOverlay.Visibility = visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
         ExplorerTree.Visibility = visibility;
         SearchButton.Visibility = visibility;
         CollapseAllButton.Visibility = visibility;

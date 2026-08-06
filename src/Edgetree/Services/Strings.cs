@@ -267,6 +267,10 @@ public static class Strings
     public static string ColorLabelGuideLineActive = "들여쓰기 안내선 강조";
     public static string ColorLabelHeader = "제목 표시줄 배경";
     public static string ColorLabelPanelDivider = "영역 구분선";
+    // Names both shapes the hidden sidebar can take, because one colour covers
+    // both and the option menu already calls them 손잡이 and 막대
+    // (MenuAutoHideUseHandle / MenuAutoHideSliverWidth).
+    public static string ColorLabelAutoHideHandle = "숨김 시 손잡이/막대";
     public static string ButtonDefaults = "기본값";
     public static string ButtonClose = "닫기";
     // Colours travel between machines; the rest of settings.json does not -
@@ -535,6 +539,7 @@ public static class Strings
         ColorLabelGuideLineActive = "Guide Line Highlight";
         ColorLabelHeader = "Title Bar Background";
         ColorLabelPanelDivider = "Panel Divider";
+        ColorLabelAutoHideHandle = "Auto-Hide Handle/Bar";
         ButtonDefaults = "Defaults";
         ButtonClose = "Close";
         ButtonExportColors = "Export";

@@ -254,6 +254,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -528,13 +529,34 @@
                             MouseLeftButtonUp="PanelDividerSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
+                <!-- Last, and on its own: it is the one colour on this page
+                     that is not seen against the app at all - the sidebar has
+                     to be hidden first, so there is nothing to compare it with
+                     while it is being set. -->
+                <TextBlock Grid.Row="16"
+                        Grid.Column="0"
+                        Text="{x:Static services:Strings.ColorLabelAutoHideHandle}"
+                        Style="{StaticResource ColorRowLabelStyle}"
+                        Margin="{DynamicResource DialogRowSpacing}"/>
+                <StackPanel Grid.Row="16"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="AutoHideHandleSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="AutoHideHandleSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="AutoHideHandleSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
+
                 <!-- 기본값 sits at the far left, away from 닫기. It throws away
                      every colour on this page and the two used to be neighbours,
                      one button-width apart - the kind of miss that costs the
                      whole palette. Opposite ends of the row is the usual place
                      for a discard action, and the confirm prompt stays either
                      way. -->
-                <Grid Grid.Row="16"
+                <Grid Grid.Row="17"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0">
