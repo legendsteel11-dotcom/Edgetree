@@ -24,7 +24,16 @@ function Write-ExitLog($text) {
 
 # Wildcard, not the exact name: release copies get renamed and would otherwise
 # report as "not running" while holding the build's output file locked.
-$procs = @(Get-Process | Where-Object { $_.ProcessName -like '*dgetree*' })
+#
+# The installer is the exception, and it had to be carved out by hand: it is
+# called Edgetree-v1.5.0-win-x64-setup.exe, so the wildcard above matched it and
+# a routine pre-build close went after Setup itself while it was mid-run
+# (2026-08-06). Windows refused - it runs elevated - but the attempt is the
+# problem: this script must never be able to interrupt an install, and it has no
+# business touching anything but the app. Anything with "setup" in its name is
+# not the app.
+$isApp = { $_.ProcessName -like '*dgetree*' -and $_.ProcessName -notlike '*setup*' }
+$procs = @(Get-Process | Where-Object $isApp)
 
 if ($procs.Count -eq 0) {
     'not running'
@@ -61,12 +70,12 @@ foreach ($hwnd in $windows) {
 
 # Four seconds is generous for an app whose exit path is a settings write.
 $deadline = 40
-while ($deadline -gt 0 -and @(Get-Process | Where-Object { $_.ProcessName -like '*dgetree*' }).Count -gt 0) {
+while ($deadline -gt 0 -and @(Get-Process | Where-Object $isApp).Count -gt 0) {
     Start-Sleep -Milliseconds 100
     $deadline--
 }
 
-$left = @(Get-Process | Where-Object { $_.ProcessName -like '*dgetree*' })
+$left = @(Get-Process | Where-Object $isApp)
 if ($left.Count -eq 0) {
     "closed cleanly: pid $ids"
     return
