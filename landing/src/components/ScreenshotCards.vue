@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { t } from '../i18n'
 
+// Index-matched to t.screenshots.items - insert into both or neither.
 const images = [
   'et-01.png',
+  'et-07.png',
   'et-02.png',
   'et-03.png',
   'et-04.png',
@@ -64,7 +66,12 @@ const images = [
   height: 100%;
   width: 100%;
   object-fit: cover;
-  object-position: top;
+  /* left, not the default centre: the sidebar sits flush against the left of
+     every shot while the right is desktop wallpaper, so whatever `cover` has
+     to trim horizontally should come off the wallpaper. Matters for the two
+     shots trimmed at the top (the filter and the floating window), which are
+     wider than this box and would otherwise lose a slice of the app. */
+  object-position: left top;
 }
 
 figcaption {

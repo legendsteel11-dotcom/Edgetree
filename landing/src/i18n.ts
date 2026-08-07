@@ -67,7 +67,11 @@ const dict = {
       items: [
         {
           title: '도킹/자동 접기',
-          desc: '화면의 좌/우에 고정시키거나 자동 접기 토글로 마우스를 움직여 펴거나 감출 수 있습니다.',
+          desc: '화면의 좌/우에 고정시키거나 자동 접기 토글로 마우스를 움직여 펴거나 감출 수 있습니다. 숨을 때 손잡이와 전체 막대 중에서 선택할 수 있고, 고정된 상태의 높이와 위치도 원하는 대로 조정됩니다.',
+        },
+        {
+          title: '파일 종류 필터',
+          desc: '하단 막대에서 볼 파일 종류를 선택하면 나머지는 트리에서 빠집니다. 원하는 확장자를 직접 추가할 수도 있습니다.',
         },
         {
           title: '창모드 전환',
@@ -83,7 +87,7 @@ const dict = {
         },
         {
           title: '색상 커스터마이징',
-          desc: '폴더명, 파일명, 배경, 선택 영역 등 색상을 원하는 대로 바꿀 수 있고, 다크/라이트 모드를 각각 따로 지정할 수 있습니다.',
+          desc: '폴더명, 파일명, 배경, 선택 영역 등 색상을 원하는 대로 바꿀 수 있고, 다크/라이트 모드를 각각 따로 지정할 수 있습니다. 색을 선택하는 동안 트리에 바로 반영되어 확인하면서 정할 수 있습니다.',
         },
         {
           title: '파일 검색',
@@ -216,7 +220,11 @@ const dict = {
       items: [
         {
           title: 'Docking',
-          desc: 'Anchors to the left or right edge of your screen, always ready — switch sides anytime from the options menu.',
+          desc: 'Anchors to the left or right edge of your screen, always ready — switch sides anytime from the options menu. Hiding leaves either a short handle or a bar down the whole edge, and you can set how tall the docked sidebar is and where it sits.',
+        },
+        {
+          title: 'File type filter',
+          desc: 'Pick the kinds of files you want from the bar at the bottom and the rest drop out of the tree. You can add extensions of your own, too.',
         },
         {
           title: 'Floating window mode',
@@ -232,7 +240,7 @@ const dict = {
         },
         {
           title: 'Color customization',
-          desc: 'Customizable colors for folder names, file names, backgrounds, selection, and more — with separate dark and light palettes.',
+          desc: 'Customizable colors for folder names, file names, backgrounds, selection, and more — with separate dark and light palettes. Every pick lands on the tree as you make it, so you judge a color where you will actually see it.',
         },
         {
           title: 'File search',
