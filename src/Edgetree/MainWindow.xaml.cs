@@ -254,6 +254,7 @@ public partial class MainWindow : Window
 
     private const int WM_LBUTTONDOWN = 0x0201;
     private const int WM_LBUTTONUP = 0x0202;
+    private const int WM_WINDOWPOSCHANGED = 0x0047;
 
     private IntPtr SingleInstanceWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
@@ -261,6 +262,15 @@ public partial class MainWindow : Window
         {
             (Application.Current as App)?.RestoreMainWindow();
             handled = true;
+        }
+        else if (msg == WM_WINDOWPOSCHANGED && (_inTopBandDrag || _inBottomBandDrag))
+        {
+            // Instrument only (compiles away in Release): any real geometry
+            // change the window manager performed while a band drag ran. The
+            // design gives the gestures no reason to move the window at all,
+            // so a line here that isn't the clip region's own
+            // FRAMECHANGED|NOSIZE|NOMOVE echo is a bug with a name on it.
+            LogWindowPosChanged(lParam);
         }
         else if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP)
         {
@@ -1130,13 +1140,30 @@ public partial class MainWindow : Window
 
         if (IsCollapsedToHandle)
         {
+            RootContent.Margin = new Thickness(0);
             Height = AutoHideHandleHeight(bandHeight);
             Top = bandTop + ((bandHeight - Height) / 2);
         }
         else
         {
-            Top = bandTop;
-            Height = bandHeight;
+            // The expanded docked window ALWAYS covers the whole work-area
+            // edge; the band the user actually sees is RootContent's top and
+            // bottom margins (so the content lays out to exactly the band)
+            // plus a window region clipping away the strips outside it (see
+            // ApplyWindowClipRegion below). Not Top/Height = the band, and
+            // that is the point: a WPF window whose geometry changes shows
+            // every late frame wrong - shifted by the move, or with
+            // uninitialized surface where it grew - which a full day of
+            // instrumented rounds (2026-08-07, resize.log) established cannot
+            // be prevented from outside the framework: not by single
+            // SetWindowPos calls, not by the OS sizing loop, not by
+            // WM_NCCALCSIZE valid rects. Parked like this once, resizing the
+            // band from either edge changes no window geometry at all.
+            Top = workArea.Top;
+            Height = workArea.Height;
+            RootContent.Margin = new Thickness(
+                0, Math.Max(0, bandTop - workArea.Top),
+                0, Math.Max(0, workArea.Bottom - (bandTop + bandHeight)));
         }
 
         if (!keepLeft)
@@ -1148,7 +1175,7 @@ public partial class MainWindow : Window
         // the corner clipping is sized in this window's pixels, so it is stale
         // whenever the size or the DPI it was cut for changes - and every one
         // of those changes already arrives at this method.
-        ApplyHandleCornerRegion();
+        ApplyWindowClipRegion();
 
         // The menu cap is a fraction of this same work area, so it is stale the
         // moment the window lands on a different monitor, the taskbar resizes,
@@ -1596,11 +1623,26 @@ public partial class MainWindow : Window
     // is all DWM can do) would cut a notch out of the screen edge itself.
     private const double AutoHideHandleCornerRadius = 4;
 
-    // Applied and cleared by the same method so the two can't drift apart: a
-    // region left behind after the sidebar expands would clip the tree to a
-    // handle's shape. Called from PositionToWorkArea, which every path that can
-    // change the window's size, edge or DPI already goes through.
-    private void ApplyHandleCornerRegion()
+    // Every window region this app uses, applied and cleared by the same
+    // method so the states can't drift apart: the collapsed handle's rounded
+    // corners, the expanded band's top clip (the strip between the work area's
+    // top and where the band starts - see PositionToWorkArea for why the
+    // window covers it at all), or no region. Called from PositionToWorkArea,
+    // which every path that can change the window's size, edge or DPI already
+    // goes through, and from the top grip's DragDelta, which moves the band
+    // clip live.
+    //
+    // What was last applied is remembered so identical consecutive requests
+    // don't touch the window: SetWindowRgn is a full-frame invalidate, and
+    // re-issuing it for no change is exactly the per-event churn that
+    // WindowChromeWorker's non-glass path was caught doing (see Dock()).
+    private const int ClipUnknown = 0;
+    private const int ClipHandle = 1;
+    private const int ClipNone = 2;
+    private const int ClipBand = 3;
+    private (int Kind, int TopPx, int BottomPx) _appliedClip = (ClipUnknown, 0, 0);
+
+    private void ApplyWindowClipRegion()
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero)
@@ -1608,23 +1650,45 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!IsCollapsedToHandle)
+        // The sizes things SHOULD have, not ActualWidth/ActualHeight: the
+        // latter lag a layout pass behind PositionToWorkArea, and this runs
+        // right after it. Regions are in physical pixels; everything above is
+        // in DIPs.
+        var dpi = VisualTreeHelper.GetDpi(this);
+
+        if (IsCollapsedToHandle)
         {
-            NativeMethods.ClearWindowRegion(hwnd);
+            // Re-applied unconditionally: unlike the two cases below, its
+            // shape depends on width and DPI as well, which the cheap state
+            // tuple doesn't capture.
+            _appliedClip = (ClipHandle, 0, 0);
+            NativeMethods.SetRoundedSideRegion(
+                hwnd,
+                (int)Math.Round(CollapsedWidth * dpi.DpiScaleX),
+                (int)Math.Round(Height * dpi.DpiScaleY),
+                (int)Math.Round(AutoHideHandleCornerRadius * dpi.DpiScaleX),
+                roundLeftSide: _settings.DockOnRight);
             return;
         }
 
-        // The sizes it SHOULD have, not ActualWidth/ActualHeight: the latter
-        // lag a layout pass behind PositionToWorkArea, and this runs right
-        // after it.
-        // Regions are in physical pixels; everything above is in DIPs.
-        var dpi = VisualTreeHelper.GetDpi(this);
-        NativeMethods.SetRoundedSideRegion(
-            hwnd,
-            (int)Math.Round(CollapsedWidth * dpi.DpiScaleX),
-            (int)Math.Round(Height * dpi.DpiScaleY),
-            (int)Math.Round(AutoHideHandleCornerRadius * dpi.DpiScaleX),
-            roundLeftSide: _settings.DockOnRight);
+        if (_isDocked && (RootContent.Margin.Top > 0.5 || RootContent.Margin.Bottom > 0.5))
+        {
+            var wanted = (ClipBand,
+                (int)Math.Round(RootContent.Margin.Top * dpi.DpiScaleY),
+                (int)Math.Round((Height - RootContent.Margin.Bottom) * dpi.DpiScaleY));
+            if (_appliedClip != wanted)
+            {
+                _appliedClip = wanted;
+                NativeMethods.SetBandRegion(hwnd, wanted.Item2, wanted.Item3);
+            }
+            return;
+        }
+
+        if (_appliedClip.Kind != ClipNone)
+        {
+            _appliedClip = (ClipNone, 0, 0);
+            NativeMethods.ClearWindowRegion(hwnd);
+        }
     }
 
     // Entered by clicking the app icon while docked and expanded - shrinks
@@ -1754,7 +1818,7 @@ public partial class MainWindow : Window
         _settings.IsAutoHidden = false;
         _isAutoHideRevealed = false;
         _revealedByDrag = false;
-        ApplyHandleCornerRegion();
+        ApplyWindowClipRegion();
         ApplyTopmostState("exit");
         UpdatePinButtonVisibility();
 
@@ -2480,13 +2544,20 @@ public partial class MainWindow : Window
     // Asks Windows where the pointer actually is, rather than trusting an
     // enter/leave event to have arrived. Also used by the outside-click watch
     // and by the drag dwell, which has no reliable "left" event of its own.
+    //
+    // Measured from the visible band, not the raw window rect: the expanded
+    // docked window intentionally reaches above the band to the work area's
+    // top, clipped away by a region (see PositionToWorkArea) - a cursor in
+    // that covered-but-clipped strip is OUTSIDE everything the user can see.
     private bool IsCursorInsideWindow()
     {
         var cursor = System.Windows.Forms.Cursor.Position;
         var dpi = VisualTreeHelper.GetDpi(this);
         double x = cursor.X / dpi.DpiScaleX;
         double y = cursor.Y / dpi.DpiScaleY;
-        return x >= Left && x <= Left + Width && y >= Top && y <= Top + Height;
+        return x >= Left && x <= Left + Width &&
+               y >= Top + RootContent.Margin.Top &&
+               y <= Top + Height - RootContent.Margin.Bottom;
     }
 
     // A mouse gesture that STARTED in this window and is still under way, even
@@ -2507,10 +2578,15 @@ public partial class MainWindow : Window
     // actually being held so a capture that leaks can't wedge auto-hide open
     // for good; the stuck-capture watchdog, which releases exactly that kind of
     // leak, is a separate mechanism and doesn't depend on this one.
+    // Two captures answer it, not one: the OS sizing loop (the docked vertical
+    // resize hands the mouse to Windows - see StartDockedVerticalResize) holds
+    // the mouse at the Win32 level with WPF never knowing, so Mouse.Captured
+    // alone would call that gesture "outside" and let auto-hide close the
+    // window out from under an active resize.
     private bool IsPointerGestureFromInsideWindow
         => System.Windows.Forms.Control.MouseButtons != System.Windows.Forms.MouseButtons.None &&
-           Mouse.Captured is DependencyObject captured &&
-           Window.GetWindow(captured) == this;
+           ((Mouse.Captured is DependencyObject captured && Window.GetWindow(captured) == this) ||
+            GetCapture() == new WindowInteropHelper(this).Handle);
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern IntPtr GetCapture();
@@ -3091,6 +3167,12 @@ public partial class MainWindow : Window
         }
         Width = _floatingWidth ?? ClampExpandedWidth(_settings.ExpandedWidth);
 
+        // The docked band's margin-and-clip arrangement (see PositionToWorkArea)
+        // has no meaning on a floating window - it would show as a dead strip.
+        RootContent.Margin = new Thickness(0);
+        _appliedClip = (ClipNone, 0, 0);
+        NativeMethods.ClearWindowRegion(new WindowInteropHelper(this).Handle);
+
         ResizeMode = ResizeMode.CanResize;
         ChromeSettings.CaptionHeight = HeaderHeight;
         ChromeSettings.ResizeBorderThickness = new Thickness(FloatingResizeBorder);
@@ -3103,10 +3185,10 @@ public partial class MainWindow : Window
         // frame - a bare, nonzero GlassFrameThickness (even just a 1px sliver
         // on one edge, never actually rendered as glass on Win10/11 without
         // Mica/Acrylic) is what re-enables DWM's shadow without bringing back
-        // any other native chrome. Only wanted while floating - the docked
-        // sidebar sits flush against the screen edge, where a shadow has
-        // nothing to visually separate it from (see Dock() below, which
-        // zeroes this back out).
+        // any other native chrome. Dock() used to zero this back out to shed
+        // the shadow at the screen edge; it now keeps the same sliver, and for
+        // a different reason than the shadow - see its comment. Re-stated here
+        // all the same so neither mode depends on the other having run.
         ChromeSettings.GlassFrameThickness = new Thickness(0, 0, 0, 1);
 
         var hwnd = new WindowInteropHelper(this).Handle;
@@ -3212,7 +3294,20 @@ public partial class MainWindow : Window
         ResizeMode = ResizeMode.NoResize;
         ChromeSettings.CaptionHeight = 0;
         ChromeSettings.ResizeBorderThickness = new Thickness(0);
-        ChromeSettings.GlassFrameThickness = new Thickness(0);
+        // Deliberately NOT zeroed (it used to be, to drop the floating shadow
+        // at the dock). GlassFrameThickness=0 puts WindowChromeWorker into its
+        // non-glass path, and that path re-applies a window region
+        // (SetWindowRgn - a full-frame invalidate) on EVERY
+        // WM_WINDOWPOSCHANGED. resize.log caught it 2026-08-07: one extra
+        // FRAMECHANGED|NOSIZE|NOMOVE SetWindowPos after every drag event of a
+        // docked vertical resize, while the band's fixed edge was provably
+        // still - the forced redraw, landing a composition behind the
+        // geometry, is what read as the bottom edge shaking. The glass path
+        // (any nonzero thickness) applies no region at all, so the same 1px
+        // bottom sliver the floating window uses stays on here. The shadow it
+        // brings is mostly against the screen edges the docked window sits
+        // flush with.
+        ChromeSettings.GlassFrameThickness = new Thickness(0, 0, 0, 1);
         // Nothing to expose while docked, and left showing it would only take
         // the top of the header away from the header's own handlers.
         TopResizeStrip.Visibility = Visibility.Collapsed;
@@ -11508,88 +11603,75 @@ public partial class MainWindow : Window
     // sidebar starts as well as how tall it is; dragging the bottom only changes
     // the height. Between them that is position and size out of one gesture,
     // which is how any other window behaves.
-    // Where inside the 6px grip the drag started, so the edge tracks the point
-    // that was actually grabbed instead of jumping to centre on the cursor.
-    private double _verticalDragGrabOffset;
+    //
+    // Neither gesture touches window geometry AT ALL. While docked and
+    // expanded, the window is parked covering the whole work-area edge
+    // (PositionToWorkArea); the band the user sees is RootContent's top and
+    // bottom margins plus the window clip region, and a drag just moves those
+    // - pure content changes, which WPF renders atomically. This shape
+    // survived a day of instrumented alternatives (2026-08-07, resize.log):
+    // every way of actually resizing the window during a drag - one
+    // SetWindowPos per event, the OS's own sizing loop, WM_NCCALCSIZE
+    // WVR_VALIDRECTS (honored by the window manager, irrelevant to WPF's
+    // D3D-presented surface), a one-off expand/commit at the gesture's ends -
+    // left a visible artifact somewhere, because WPF presents frames to the
+    // compositor asynchronously and ANY geometry change can be composed a
+    // beat before the frame that matches it (a floating window's native top
+    // border tears identically with no custom code involved - the control
+    // test that closed the question). Moving the origin shifts every late
+    // frame by the drag delta; growing the window exposes uninitialized
+    // surface, seen as handle-colored garbage past the old edge. No geometry,
+    // no artifact class.
+    private bool _inTopBandDrag;
+    private bool _inBottomBandDrag;
 
-    // The edge that is NOT being dragged, captured once and held for the whole
-    // gesture.
-    //
-    // It used to be re-derived from the live window every event (`Top + Height`
-    // while dragging the top). Those two are written to the real window and read
-    // back through a rounding on the way out and another on the way in, so the
-    // edge that was supposed to be standing still moved a fraction each time -
-    // and since the new height is measured from it, the wobble was fed straight
-    // back into the thing being reported as shaking (2026-08-06).
-    //
-    // A value that must not change during a gesture has no business being
-    // recomputed during it.
-    private double _verticalDragAnchor;
+    // Gesture state captured at DragStarted, in DIPs: the window's fixed
+    // extents, the band edge that must not move, where inside the grip the
+    // cursor grabbed, and the band's height floor.
+    private double _bandWorkTopDip;        // window top (= work area top)
+    private double _bandWindowBottomDip;   // window bottom (= work area bottom)
+    private double _bandAnchorBottomDip;   // band bottom, fixed during a top drag
+    private double _bandAnchorTopDip;      // band top, fixed during a bottom drag
+    private double _bandGrabOffsetDip;
+    private double _bandMinHeightDip;
 
-    // The edge follows the CURSOR's own position, not the accumulated
-    // DragDelta.
-    //
-    // A Thumb reports movement in its own coordinate space, and these two
-    // thumbs are anchored to the very edges they resize - so every event moves
-    // the thumb as well, and what it reports next is measured from somewhere
-    // new. The bottom edge survives that (it writes Height only, and the thumb
-    // ends up exactly under the cursor again, which cancels out); the top edge
-    // moves Top AND Height and the cancellation does not come out even. The
-    // result was the sidebar shaking under the pointer (2026-08-06).
-    //
-    // An absolute position has no such loop: wherever the cursor is, that is
-    // where the edge goes, and an error cannot accumulate across events. The
-    // screen-pixels-to-DIP conversion is the same one IsCursorInCollapsedZone
-    // has been using.
-    private double CursorDip()
+    // Absolute cursor position, not accumulated DragDelta: these grips are
+    // anchored to the very edge they move, so every event relocates the
+    // Thumb's own coordinate space and accumulated deltas drift (2026-08-06).
+    private double CursorDipY()
         => System.Windows.Forms.Cursor.Position.Y / VisualTreeHelper.GetDpi(this).DpiScaleY;
 
-    private void TopResizeThumb_DragStarted(object sender, DragStartedEventArgs e)
+    // Back to the full edge - the escape hatch for a sidebar dragged down to a
+    // stub, the same convention the width thumb's double-click uses. Read off
+    // ClickCount in the Preview handlers because neither grip's press bubbles
+    // far enough for a MouseDoubleClick to be raised.
+    private bool HandleVerticalThumbDoubleClick(MouseButtonEventArgs e)
     {
-        _verticalDragGrabOffset = CursorDip() - Top;
-        _verticalDragAnchor = Top + Height;
-        BeginResizeLog("top");
-    }
-
-    private void BottomResizeThumb_DragStarted(object sender, DragStartedEventArgs e)
-    {
-        _verticalDragGrabOffset = CursorDip() - (Top + Height);
-        _verticalDragAnchor = Top;
-        BeginResizeLog("bottom");
-    }
-
-    private void VerticalResizeThumb_DragCompleted(object sender, DragCompletedEventArgs e)
-        => FlushResizeLog();
-
-    private void TopResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
-        => ResizeDockedBand(newTop: CursorDip() - _verticalDragGrabOffset, newBottom: null);
-
-    private void BottomResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
-        => ResizeDockedBand(newTop: null, newBottom: CursorDip() - _verticalDragGrabOffset);
-
-    // Back to the full edge. The escape hatch for a sidebar dragged down to a
-    // stub - the same convention the width thumb's double-click already uses,
-    // and the reason neither gesture needs an entry in a menu.
-    private void VerticalResizeThumb_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        if (!CanResizeWidth)
+        if (e.ClickCount != 2)
         {
-            return;
+            return false;
         }
 
         e.Handled = true;
         _settings.DockedHeightRatio = 1.0;
         _settings.DockedTopRatio = 0.0;
         PositionToWorkArea();
+        return true;
     }
 
-    // Both edges land here so the clamping is written once. Exactly one of the
-    // two is given; the other one stays where it is.
-    //
-    // The edge being dragged is the one that gives way at the floor: pull the
-    // top down too far and the top stops, rather than the bottom being pushed
-    // off the screen to keep the gesture going.
-    private void ResizeDockedBand(double? newTop, double? newBottom)
+    private void TopResizeThumb_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!CanResizeWidth)
+        {
+            return;
+        }
+
+        // A single press is deliberately NOT handled: it falls through to the
+        // Thumb, which captures and raises the DragStarted below.
+        HandleVerticalThumbDoubleClick(e);
+    }
+
+    private void TopResizeThumb_DragStarted(object sender, DragStartedEventArgs e)
     {
         if (!CanResizeWidth)
         {
@@ -11597,71 +11679,136 @@ public partial class MainWindow : Window
         }
 
         var workArea = GetCurrentMonitorWorkArea();
-        double floor = Math.Min(MinDockedHeight, workArea.Height);
-
-        // The opposite edge comes from the anchor taken at DragStarted, never
-        // from the window being dragged - see _verticalDragAnchor.
-        double top, bottom;
-        if (newTop is { } wantedTop)
-        {
-            bottom = _verticalDragAnchor;
-            top = Math.Clamp(wantedTop, workArea.Top, bottom - floor);
-        }
-        else
-        {
-            top = _verticalDragAnchor;
-            bottom = Math.Clamp(newBottom ?? (top + Height), top + floor, workArea.Bottom);
-        }
-
-        double height = bottom - top;
-        LogResize(top, bottom);
-
-        // Stored as it will be read back - a fraction of the work area, and a
-        // fraction of whatever space that leaves (see AppSettings). The slack
-        // guard is not a formality: at full height it is zero, and the division
-        // would put a NaN into the settings file.
-        double slack = workArea.Height - height;
-        _settings.DockedHeightRatio = height / workArea.Height;
-        _settings.DockedTopRatio = slack > 0.5 ? (top - workArea.Top) / slack : 0;
-
-        ApplyBandToWindow(top, bottom);
+        _bandWorkTopDip = Top;
+        _bandAnchorBottomDip = Top + Height - RootContent.Margin.Bottom;
+        _bandGrabOffsetDip = CursorDipY() - (Top + RootContent.Margin.Top);
+        _bandMinHeightDip = Math.Min(MinDockedHeight, workArea.Height);
+        _inTopBandDrag = true;
+        BeginResizeLog("top-band");
     }
 
-    // One window operation for a change that moves the top and the bottom stays.
-    //
-    // Two property writes cannot do it - see NativeMethods.SetWindowBounds. The
-    // bottom is handed over as a POSITION rather than folded into a height, and
-    // both edges are rounded to device pixels once each, so the anchored edge
-    // lands on the same physical row every event.
-    private void ApplyBandToWindow(double top, double bottom)
+    private void TopResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
     {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd == IntPtr.Zero)
+        if (!_inTopBandDrag)
         {
-            Top = top;
-            Height = bottom - top;
             return;
         }
 
-        var dpi = VisualTreeHelper.GetDpi(this);
-        int y = (int)Math.Round(top * dpi.DpiScaleY);
-        int bottomPixels = (int)Math.Round(bottom * dpi.DpiScaleY);
-        int x = (int)Math.Round(Left * dpi.DpiScaleX);
-        int width = (int)Math.Round(Width * dpi.DpiScaleX);
+        double top = Math.Clamp(CursorDipY() - _bandGrabOffsetDip,
+            _bandWorkTopDip, Math.Max(_bandWorkTopDip, _bandAnchorBottomDip - _bandMinHeightDip));
+        RootContent.Margin = new Thickness(
+            0, top - _bandWorkTopDip, 0, RootContent.Margin.Bottom);
+        ApplyWindowClipRegion();
+        LogBandDrag(top);
+    }
 
-        NativeMethods.SetWindowBounds(hwnd, x, y, width, bottomPixels - y);
+    private void TopResizeThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        if (!_inTopBandDrag)
+        {
+            return;
+        }
+
+        _inTopBandDrag = false;
+        StoreDockedBandRatios(GetCurrentMonitorWorkArea());
+        FlushResizeLog();
+    }
+
+    private void BottomResizeThumb_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!CanResizeWidth)
+        {
+            return;
+        }
+
+        // A single press is deliberately NOT handled: it falls through to the
+        // Thumb, which captures and raises the DragStarted below.
+        HandleVerticalThumbDoubleClick(e);
+    }
+
+    private void BottomResizeThumb_DragStarted(object sender, DragStartedEventArgs e)
+    {
+        if (!CanResizeWidth)
+        {
+            return;
+        }
+
+        var workArea = GetCurrentMonitorWorkArea();
+        _bandWindowBottomDip = Top + Height;
+        _bandAnchorTopDip = Top + RootContent.Margin.Top;
+        _bandGrabOffsetDip = CursorDipY() - (Top + Height - RootContent.Margin.Bottom);
+        _bandMinHeightDip = Math.Min(MinDockedHeight, workArea.Height);
+        _inBottomBandDrag = true;
+        BeginResizeLog("bottom-band");
+    }
+
+    private void BottomResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
+    {
+        if (!_inBottomBandDrag)
+        {
+            return;
+        }
+
+        double bottom = Math.Clamp(CursorDipY() - _bandGrabOffsetDip,
+            Math.Min(_bandAnchorTopDip + _bandMinHeightDip, _bandWindowBottomDip),
+            _bandWindowBottomDip);
+        RootContent.Margin = new Thickness(
+            0, RootContent.Margin.Top, 0, _bandWindowBottomDip - bottom);
+        ApplyWindowClipRegion();
+        LogBandDrag(bottom);
+    }
+
+    private void BottomResizeThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        if (!_inBottomBandDrag)
+        {
+            return;
+        }
+
+        _inBottomBandDrag = false;
+        StoreDockedBandRatios(GetCurrentMonitorWorkArea());
+        FlushResizeLog();
+    }
+
+    // Stored as they will be read back - a fraction of the work area, and a
+    // fraction of whatever space that leaves (see AppSettings). The slack guard
+    // is not a formality: at full height it is zero, and the division would put
+    // a NaN into the settings file.
+    //
+    // The band, not the window: the expanded docked window intentionally
+    // reaches above the band to the work area's top, with the margin covering
+    // the difference (see PositionToWorkArea).
+    private void StoreDockedBandRatios(Rect workArea)
+    {
+        double bandTop = Top + RootContent.Margin.Top;
+        double bandHeight = Height - RootContent.Margin.Top - RootContent.Margin.Bottom;
+        double slack = workArea.Height - bandHeight;
+        _settings.DockedHeightRatio = Math.Clamp(bandHeight / workArea.Height, 0, 1);
+        _settings.DockedTopRatio = slack > 0.5
+            ? Math.Clamp((bandTop - workArea.Top) / slack, 0, 1)
+            : 0;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct WindowPos
+    {
+        public IntPtr Hwnd;
+        public IntPtr HwndInsertAfter;
+        public int X, Y, Cx, Cy;
+        public uint Flags;
     }
 
     // ----- 세로 리사이즈 계측기 (Debug 전용) --------------------------------
     //
     // Kept in memory for the length of one drag and written once when the button
-    // comes up: a file append per mouse-move would itself be a source of hitching,
+    // comes up: a file append per event would itself be a source of hitching,
     // which is the last thing to add to something being investigated for shaking.
     //
-    // What the columns answer: does the cursor move smoothly (cur), does the edge
-    // we compute follow it (top/bot), and does the window come back holding what
-    // we just gave it (was) - a `was` that never equals the previous line's value
-    // means the rounding round-trip is the problem, not the arithmetic.
+    // What the lines answer: `band` is where each event put the visible edge,
+    // `applied` is any real window-geometry change the window manager performed
+    // while the drag ran (see the WM_WINDOWPOSCHANGED hook). The gestures have
+    // no reason to move the window, so an `applied` line that is not the clip
+    // region's own no-move echo names the culprit directly.
     private readonly List<string> _resizeLog = new();
 
     [System.Diagnostics.Conditional("DEBUG")]
@@ -11670,14 +11817,22 @@ public partial class MainWindow : Window
         _resizeLog.Clear();
         var dpi = VisualTreeHelper.GetDpi(this);
         _resizeLog.Add($"{DateTime.Now:HH:mm:ss.fff}  drag {edge} start  " +
-            $"dpi={dpi.DpiScaleY:F3} anchor={_verticalDragAnchor:F2} grab={_verticalDragGrabOffset:F2} " +
-            $"Top={Top:F2} Height={Height:F2}");
+            $"dpi={dpi.DpiScaleY:F3} Top={Top:F2} Height={Height:F2} " +
+            $"margin={RootContent.Margin.Top:F2}/{RootContent.Margin.Bottom:F2}");
     }
 
+    // Where each event put the visible edge (the dragged one; the other is in
+    // the start line's margins).
     [System.Diagnostics.Conditional("DEBUG")]
-    private void LogResize(double top, double bottom)
-        => _resizeLog.Add($"  cur={System.Windows.Forms.Cursor.Position.Y} " +
-            $"want top={top:F2} bot={bottom:F2} h={bottom - top:F2}  was Top={Top:F2} Height={Height:F2}");
+    private void LogBandDrag(double edgeDip)
+        => _resizeLog.Add($"  band    edge={edgeDip:F2}");
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogWindowPosChanged(IntPtr lParam)
+    {
+        var pos = System.Runtime.InteropServices.Marshal.PtrToStructure<WindowPos>(lParam);
+        _resizeLog.Add($"  applied y={pos.Y} cy={pos.Cy} bot={pos.Y + pos.Cy} flags=0x{pos.Flags:X4}");
+    }
 
     [System.Diagnostics.Conditional("DEBUG")]
     private void FlushResizeLog()

@@ -138,36 +138,32 @@ internal static class NativeMethods
         => SetWindowPos(hWnd, topmost ? HwndTopmost : HwndNoTopmost, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
-    private const uint SWP_NOZORDER = 0x0004;
+    // Clips the window to the horizontal band [topPx, bottomPx), in physical
+    // pixels relative to the window's own top-left. The region's right edge is
+    // deliberately enormous so width changes never have to re-issue it - a
+    // region is a full-frame invalidate each time it is set, and this clip
+    // only exists for the two horizontal edges. Ownership of the region passes
+    // to the window on success.
+    private const int RegionFarEdge = 1 << 20;
 
-    // Do not carry the old client bitmap into the new frame.
-    //
-    // Growing a window from its TOP edge, Windows copies what was already drawn
-    // to the new window's top-left and repaints only what that leaves uncovered.
-    // Anything anchored to the BOTTOM of the client area - this app's footer -
-    // therefore appears one frame at the old distance from the top, i.e. above
-    // where it belongs, and drops into place when WPF's own repaint lands. Over
-    // a drag that reads as the footer shaking while the window itself is
-    // provably still (2026-08-06: resize.log showed the bottom edge fixed to the
-    // pixel through the whole gesture, which is what ruled the arithmetic out
-    // and left the blit).
-    private const uint SWP_NOCOPYBITS = 0x0100;
+    public static void SetBandRegion(IntPtr hWnd, int topPx, int bottomPx)
+    {
+        if (hWnd == IntPtr.Zero)
+        {
+            return;
+        }
 
-    // Move AND resize in one operation, in physical pixels.
-    //
-    // WPF cannot: Window.Top and Window.Height are two properties and each one
-    // goes straight through to the real window, so anything needing both is two
-    // operations with a composited frame in between. Dragging the top edge while
-    // the bottom stays put is exactly that pair, and the in-between frame is the
-    // window at its new top with its old height - the bottom edge flicking away
-    // and back on every drag event.
-    //
-    // Confirmed by instrument before this was used (2026-08-06, resize.log): the
-    // arithmetic was exact to the pixel and the anchor never moved, so what was
-    // being seen shaking was never a value - it was that extra frame.
-    public static bool SetWindowBounds(IntPtr hWnd, int x, int y, int width, int height)
-        => SetWindowPos(hWnd, IntPtr.Zero, x, y, width, height,
-            SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+        IntPtr region = CreateRectRgn(0, topPx, RegionFarEdge, bottomPx);
+        if (region == IntPtr.Zero)
+        {
+            return;
+        }
+
+        if (SetWindowRgn(hWnd, region, true) == 0)
+        {
+            DeleteObject(region);
+        }
+    }
 
 
     // Clipboard change notification. Nothing else tells an app that its own

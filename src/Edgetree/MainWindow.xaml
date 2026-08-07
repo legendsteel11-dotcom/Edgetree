@@ -48,11 +48,16 @@
     <shell:WindowChrome.WindowChrome>
         <!-- CaptionHeight/ResizeBorderThickness start at 0 (docked: fixed position,
              no native move/resize). Undock()/Dock() in code-behind flip these when
-             the header is dragged away from / pinned back to the left edge. -->
+             the header is dragged away from / pinned back to the left edge.
+
+             GlassFrameThickness starts NONZERO and stays that way in both modes:
+             zero would put WindowChromeWorker on its non-glass path, which
+             re-applies a window region (a full-frame invalidate) on every
+             WM_WINDOWPOSCHANGED - see Dock() for the measurement that caught it. -->
         <shell:WindowChrome x:Name="ChromeSettings"
                              CaptionHeight="0"
                              ResizeBorderThickness="0"
-                             GlassFrameThickness="0"
+                             GlassFrameThickness="0,0,0,1"
                              CornerRadius="0"
                              UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
@@ -4522,6 +4527,13 @@
              TOP edge moves Top and Height together, so where the band sits comes
              out of the same gesture instead of needing a second one.
 
+             Both grips run ordinary WPF Thumb drags that move ONLY
+             RootContent's margins and the window clip region - the window
+             itself is parked covering the whole work-area edge for as long as
+             it is docked (see PositionToWorkArea), so neither gesture involves
+             window geometry at all. Double-click restore is read off
+             ClickCount in both Preview handlers.
+
              Both are hidden unless the window is docked and open - see
              UpdateResizeThumbVisibility, which owns all three thumbs. -->
         <Thumb x:Name="TopResizeThumb"
@@ -4530,20 +4542,20 @@
                 Style="{StaticResource ResizeThumbHorizontalStyle}"
                 Cursor="SizeNS"
                 Visibility="Collapsed"
+                PreviewMouseLeftButtonDown="TopResizeThumb_PreviewMouseLeftButtonDown"
                 DragStarted="TopResizeThumb_DragStarted"
                 DragDelta="TopResizeThumb_DragDelta"
-                DragCompleted="VerticalResizeThumb_DragCompleted"
-                MouseDoubleClick="VerticalResizeThumb_MouseDoubleClick"/>
+                DragCompleted="TopResizeThumb_DragCompleted"/>
         <Thumb x:Name="BottomResizeThumb"
                 VerticalAlignment="Bottom"
                 Height="6"
                 Style="{StaticResource ResizeThumbHorizontalStyle}"
                 Cursor="SizeNS"
                 Visibility="Collapsed"
+                PreviewMouseLeftButtonDown="BottomResizeThumb_PreviewMouseLeftButtonDown"
                 DragStarted="BottomResizeThumb_DragStarted"
                 DragDelta="BottomResizeThumb_DragDelta"
-                DragCompleted="VerticalResizeThumb_DragCompleted"
-                MouseDoubleClick="VerticalResizeThumb_MouseDoubleClick"/>
+                DragCompleted="BottomResizeThumb_DragCompleted"/>
 
         <!-- Resize grip: overlaid on the content's right edge (see the note on
              the root Grid above), not a sibling occupying its own column. -->
