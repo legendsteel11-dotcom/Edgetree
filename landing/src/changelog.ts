@@ -20,6 +20,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: 'v1.7.0',
+    ko: [
+      '사이드바가 화면 높이를 다 쓰지 않아도 됩니다 — 위/아래 가장자리를 끌어 조정',
+      '처음 설치하면 가장자리 가운데의 손잡이로 시작합니다',
+      '버그 수정 및 성능 최적화',
+    ],
+    en: [
+      'The sidebar no longer has to fill the screen — drag its top or bottom edge',
+      'A fresh install starts with the handle at the middle of the screen edge',
+      'Refinements and bug fixes',
+    ],
+  },
+  {
     // The installer is deliberately NOT one of these lines. It is the biggest
     // thing in this release, and the download cards right below already lead
     // with it - a line here would spend a quarter of the card repeating what

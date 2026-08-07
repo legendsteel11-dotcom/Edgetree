@@ -1,4 +1,4 @@
-# Edgetree v1.6.0
+# Edgetree v1.7.0
 
 [한국어 안내](README-ko.md)
 
@@ -170,6 +170,19 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v1.7.0 (2026-08-07)
+
+- **A sidebar that need not fill the screen**: drag the docked sidebar's top or
+  bottom edge to set how much of the screen edge it takes. The top edge moves it
+  as well, so where it sits and how tall it is come out of one gesture, and a
+  double-click on either edge goes back to the full edge. It is kept as a share
+  of the work area rather than in pixels, so a different monitor does not undo
+  it, and the auto-hide handle and bar measure from that band — a sidebar
+  occupying the top third leaves its handle in that third
+- **A first run starts with the handle**: a machine with no settings yet opens
+  with the short handle at the middle of the screen edge instead of a bar down
+  the whole side. An existing install keeps whatever it was already using
 
 ### v1.6.0 (2026-08-06)
 
