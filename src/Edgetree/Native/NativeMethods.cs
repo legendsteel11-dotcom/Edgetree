@@ -367,6 +367,25 @@ internal static class NativeMethods
         AllowSetForegroundWindow(ASFW_ANY);
     }
 
+    private const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+    private const int DWMSBT_AUTO = 0;
+    private const int DWMSBT_MAINWINDOW = 2;
+
+    // Declares (or withdraws) a Mica system backdrop for the window - not for
+    // its looks, which don't change at all behind this app's opaque content,
+    // but for what DWM paints where the app hasn't yet: with a glass frame
+    // extended, a fast native resize fills the freshly exposed area with DWM's
+    // under-sheet, which is ACCENT-colored by default (blue slabs, 2026-08-07)
+    // and theme-colored material once a backdrop is declared - dark grey on
+    // the dark theme, quiet against the sidebar. Windows 11 22621+ only; on
+    // older builds DwmSetWindowAttribute fails harmlessly, same rule as the
+    // corner preference below.
+    public static void SetMicaBackdrop(IntPtr hWnd, bool enabled)
+    {
+        int type = enabled ? DWMSBT_MAINWINDOW : DWMSBT_AUTO;
+        DwmSetWindowAttribute(hWnd, DWMWA_SYSTEMBACKDROP_TYPE, ref type, sizeof(int));
+    }
+
     // Docked, the window is flush against the screen edge - rounded corners
     // there would just look like a gap against the taskbar/desktop. Floating,
     // it's a normal window on the desktop like any other, so it should round

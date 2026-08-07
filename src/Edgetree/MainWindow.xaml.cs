@@ -3173,6 +3173,14 @@ public partial class MainWindow : Window
         _appliedClip = (ClipNone, 0, 0);
         NativeMethods.ClearWindowRegion(new WindowInteropHelper(this).Handle);
 
+        // Floors for the native resize borders, which answer to nothing else -
+        // without them the frame can be dragged down to a sliver that is
+        // almost impossible to find again (reported 2026-08-07, "없어질 뻔").
+        // Floating only: docked sizes are all programmatic and the auto-hide
+        // sliver (3-8px) and handle must stay allowed - Dock() resets these.
+        MinWidth = MinExpandedWidth;
+        MinHeight = MinDockedHeight;
+
         ResizeMode = ResizeMode.CanResize;
         ChromeSettings.CaptionHeight = HeaderHeight;
         ChromeSettings.ResizeBorderThickness = new Thickness(FloatingResizeBorder);
@@ -3185,14 +3193,30 @@ public partial class MainWindow : Window
         // frame - a bare, nonzero GlassFrameThickness (even just a 1px sliver
         // on one edge, never actually rendered as glass on Win10/11 without
         // Mica/Acrylic) is what re-enables DWM's shadow without bringing back
-        // any other native chrome. Dock() used to zero this back out to shed
-        // the shadow at the screen edge; it now keeps the same sliver, and for
-        // a different reason than the shadow - see its comment. Re-stated here
-        // all the same so neither mode depends on the other having run.
+        // any other native chrome.
+        //
+        // Known cost, accepted 2026-08-07: with a glass frame extended, DWM
+        // paints its sheet under the client in the Windows ACCENT color, and a
+        // fast native resize shows that sheet in the freshly exposed area
+        // until WPF's frame lands (confirmed by the slabs tracking an accent
+        // recolor; the app's own colors and DWMWA_CAPTION_COLOR changed
+        // nothing). The two attempted cures were worse than the flash: zeroing
+        // this killed the shadow AND WindowChromeWorker's non-glass region
+        // churn made every resize invalidate the window, and answering
+        // WM_ERASEBKGND painted flat color over live content on each of those
+        // invalidates - "the whole window blinking its content away"
+        // (2026-08-07). SetMicaBackdrop below is the one lever left: with a
+        // system backdrop declared, DWM's sheet is theme-colored material
+        // instead of accent.
         ChromeSettings.GlassFrameThickness = new Thickness(0, 0, 0, 1);
 
         var hwnd = new WindowInteropHelper(this).Handle;
         NativeMethods.MakeAppWindow(hwnd);
+
+        // Floating only, and only for what it does to resize flashes - see
+        // SetMicaBackdrop. Docked never resizes natively, so it withdraws this
+        // rather than carry an extra DWM state nothing exercises.
+        NativeMethods.SetMicaBackdrop(hwnd, enabled: true);
 
         // Re-stated after the extended-style rewrite - see
         // MainWindow_SourceInitialized. Floating drops the auto-hide half of
@@ -3291,6 +3315,11 @@ public partial class MainWindow : Window
 
         _isDocked = true;
 
+        // The floating floors off again - every docked size is programmatic,
+        // and the auto-hide sliver/handle sit far below them (see Undock).
+        MinWidth = 0;
+        MinHeight = 0;
+
         ResizeMode = ResizeMode.NoResize;
         ChromeSettings.CaptionHeight = 0;
         ChromeSettings.ResizeBorderThickness = new Thickness(0);
@@ -3314,6 +3343,7 @@ public partial class MainWindow : Window
 
         var hwnd = new WindowInteropHelper(this).Handle;
         NativeMethods.MakeToolWindow(hwnd);
+        NativeMethods.SetMicaBackdrop(hwnd, enabled: false);
         NativeMethods.SetWindowCornerPreference(hwnd, rounded: false);
         ShowInTaskbar = false;
         ApplyTopmostState("dock");
