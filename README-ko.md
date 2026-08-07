@@ -1,4 +1,4 @@
-# Edgetree v1.7.0
+# Edgetree v1.7.1
 
 [English](README.md)
 
@@ -206,6 +206,11 @@ dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -o publi
 csproj만 올리면 됩니다.
 
 ## 변경 이력
+
+### v1.7.1 (2026-08-07)
+
+- 사이드바 높이를 줄이고 자동 숨김을 함께 쓸 때, 펼쳐지는 순간 드물게 앱이
+  종료될 수 있던 문제를 수정했습니다
 
 ### v1.7.0 (2026-08-07)
 

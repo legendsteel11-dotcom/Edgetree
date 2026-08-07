@@ -20,6 +20,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: 'v1.7.1',
+    ko: [
+      'v1.7.0에 이어진 안정성 수정입니다 — 새 기능은 아래 v1.7.0 항목을 봐 주세요',
+      '사이드바가 펼쳐지는 순간 드물게 앱이 종료될 수 있던 문제를 수정했습니다',
+    ],
+    en: [
+      'A stability follow-up to v1.7.0 — see below for what that release added',
+      'Fixed the app closing unexpectedly in rare cases as the sidebar slides open',
+    ],
+  },
+  {
     version: 'v1.7.0',
     ko: [
       '사이드바가 화면 높이를 다 쓰지 않아도 됩니다 — 위/아래 가장자리를 끌어 조정',

@@ -1159,11 +1159,24 @@ public partial class MainWindow : Window
             // SetWindowPos calls, not by the OS sizing loop, not by
             // WM_NCCALCSIZE valid rects. Parked like this once, resizing the
             // band from either edge changes no window geometry at all.
+            // The margins come OFF before Height is written and go back on
+            // after, and that order is load-bearing. Height here can SHRINK -
+            // a DPI change, a different monitor, the taskbar growing - and if
+            // the previous band's margins are still in place when it does,
+            // there is an instant where a small Height carries large margins.
+            // A layout pass landing in that instant asks the tree to measure
+            // at a NEGATIVE height, which throws out of
+            // VirtualizingStackPanel ("너비와 높이는 음수일 수 없습니다") and
+            // takes the process with it - crashed twice on a language change,
+            // whose restart runs exactly this path while the DPI settles
+            // (2026-08-07, exit.log).
+            RootContent.Margin = new Thickness(0);
             Top = workArea.Top;
             Height = workArea.Height;
             RootContent.Margin = new Thickness(
                 0, Math.Max(0, bandTop - workArea.Top),
                 0, Math.Max(0, workArea.Bottom - (bandTop + bandHeight)));
+            AssertBandFits("position");
         }
 
         if (!keepLeft)
@@ -1641,6 +1654,27 @@ public partial class MainWindow : Window
     private const int ClipNone = 2;
     private const int ClipBand = 3;
     private (int Kind, int TopPx, int BottomPx) _appliedClip = (ClipUnknown, 0, 0);
+
+    // The invariant the band arrangement rests on: the margins hold the strips
+    // OUTSIDE the band, so together they can never reach the window's height -
+    // whatever is left is the band, and a band is never empty.
+    //
+    // An INSTRUMENT, not a guard: it records and changes nothing. Clamping the
+    // margins here instead would keep the app alive while quietly drawing the
+    // band in the wrong place, and would make the next mis-ordered write look
+    // fine. Breaking this means some path wrote Height and the margins in the
+    // wrong order (see PositionToWorkArea) - the line names which one.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void AssertBandFits(string where)
+    {
+        double content = Height - RootContent.Margin.Top - RootContent.Margin.Bottom;
+        if (content <= 0)
+        {
+            ExitLog.Record($"band invariant broken at {where}: Height={Height:F2} " +
+                $"margin={RootContent.Margin.Top:F2}/{RootContent.Margin.Bottom:F2} " +
+                $"content={content:F2}");
+        }
+    }
 
     private void ApplyWindowClipRegion()
     {
@@ -3180,9 +3214,16 @@ public partial class MainWindow : Window
         // the cursor is; the corner-nudge and remembered-spot paths below then
         // also start from the band, which is where the user last saw the
         // window.
-        Top += RootContent.Margin.Top;
-        Height -= RootContent.Margin.Top + RootContent.Margin.Bottom;
+        // Read both edges out FIRST, then drop the margins, and only then
+        // shrink the window onto them. Doing it in the written order
+        // (Height -= ... before the margins go) leaves an instant where a
+        // band-sized Height still carries the full margins, i.e. a negative
+        // content height - see PositionToWorkArea for what that crashes.
+        double bandTop = Top + RootContent.Margin.Top;
+        double bandHeight = Height - RootContent.Margin.Top - RootContent.Margin.Bottom;
         RootContent.Margin = new Thickness(0);
+        Top = bandTop;
+        Height = bandHeight;
         _appliedClip = (ClipNone, 0, 0);
         NativeMethods.ClearWindowRegion(new WindowInteropHelper(this).Handle);
 

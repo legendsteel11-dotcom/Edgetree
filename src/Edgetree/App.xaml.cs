@@ -189,16 +189,67 @@ public partial class App : Application
         // Before anything touches a drive - see the method's own note.
         NativeMethods.SuppressDeviceErrorDialogs();
 
+        // See the recovery handler below. Per session, deliberately small: 5
+        // covers a bad afternoon of races; hundreds would mean something is
+        // actually broken and deserves to be seen crashing. Captured by the
+        // handler's closure - state lives here, not on the class.
+        const int MaxLayoutCrashRecoveries = 5;
+        int layoutCrashRecoveries = 0;
+
         // Windows signing the user out or shutting down closes the app without
         // any click, and looks exactly like "it just disappeared" afterwards.
         SessionEnding += (_, args) => ExitLog.Record($"windows session ending ({args.ReasonSessionEnding})");
 
-#if DEBUG
-        // Neither handler swallows anything (Handled stays false) - they only
-        // get the exception written down before the process goes, since a
-        // crash on a background thread can otherwise leave nothing behind.
+        // ----- 안전장치: WPF 가상화 레이아웃 크래시 복구 (Release 포함) -----
+        //
+        // A KNOWN WPF framework bug family, not this app's arithmetic:
+        // VirtualizingStackPanel computes a negative Size when items change or
+        // the viewport moves while a layout pass is in flight (dotnet/wpf
+        // #2854, #382; "너비와 높이는 음수일 수 없습니다"). It reached this app
+        // on 2026-08-07, the day the docked band halved the tree's viewport:
+        // three crashes within minutes around auto-hide reveals, all dying in
+        // SyncUniformSizeFlags under InitializeViewport. Reproduced once
+        // locally, then 8 identical activation rounds survived - a race, not
+        // a deterministic path, so there is nothing app-side to fix directly.
+        //
+        // The recovery: swallow exactly that exception shape, ask for a fresh
+        // measure pass (the very next pass computes sane values - the inputs
+        // were never wrong), and cap the attempts so a genuinely persistent
+        // failure still surfaces as a crash instead of a silent busy-loop.
+        // What this device HIDES: any real negative-size bug of our own in the
+        // tree's layout would now read as log lines instead of a crash - which
+        // is why every recovery is written to exit.log (Debug) and why the cap
+        // exists.
         DispatcherUnhandledException += (_, args) =>
+        {
+            if (args.Exception is ArgumentException layoutEx &&
+                layoutEx.StackTrace?.Contains("VirtualizingStackPanel") == true &&
+                layoutCrashRecoveries < MaxLayoutCrashRecoveries)
+            {
+                layoutCrashRecoveries++;
+                args.Handled = true;
+                ExitLog.Record($"RECOVERED (virtualization layout, {layoutCrashRecoveries}/{MaxLayoutCrashRecoveries}): {layoutEx.Message}");
+
+                // The aborted pass leaves the panel dirty; a root-level nudge
+                // makes sure a full pass actually runs rather than waiting on
+                // whatever input happens next.
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    MainWindow?.InvalidateMeasure();
+                }), System.Windows.Threading.DispatcherPriority.Background);
+                return;
+            }
+
+#if DEBUG
+            // Not swallowed (Handled stays false) - only written down before
+            // the process goes.
             ExitLog.Record($"UNHANDLED (ui thread): {args.Exception}");
+#endif
+        };
+
+#if DEBUG
+        // Background-thread crashes can otherwise leave nothing behind. Never
+        // recoverable - by the time this fires the process is already going.
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             ExitLog.Record($"UNHANDLED (background): {args.ExceptionObject}");
 #endif

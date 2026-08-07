@@ -1,4 +1,4 @@
-# Edgetree v1.7.0
+# Edgetree v1.7.1
 
 [한국어 안내](README-ko.md)
 
@@ -170,6 +170,11 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v1.7.1 (2026-08-07)
+
+- Fixed the app closing unexpectedly in rare cases while the sidebar slides
+  open, seen with a shortened sidebar and auto-hide together
 
 ### v1.7.0 (2026-08-07)
 
