@@ -189,12 +189,20 @@ public partial class App : Application
         // Before anything touches a drive - see the method's own note.
         NativeMethods.SuppressDeviceErrorDialogs();
 
-        // See the recovery handler below. Per session, deliberately small: 5
-        // covers a bad afternoon of races; hundreds would mean something is
-        // actually broken and deserves to be seen crashing. Captured by the
-        // handler's closure - state lives here, not on the class.
-        const int MaxLayoutCrashRecoveries = 5;
-        int layoutCrashRecoveries = 0;
+        // See the recovery handler below. A RATE, not a lifetime count - the
+        // first cut was "5 per session", and the user asked the right
+        // question: this app stays up for days, so a lifetime cap spends its
+        // protection fastest on exactly the long-running sessions it exists
+        // for. What separates the two cases is how BUNCHED the failures come,
+        // not how many: the legitimate race is occasional (worst observed:
+        // three in eleven minutes, then none across dozens of reveals), while
+        // a genuinely broken layout throws on every pass - dozens a second.
+        // So: recover freely, but a fifth failure within one minute of the
+        // first-of-five means something is actually broken and deserves to be
+        // seen crashing. Captured by the handler's closure - state lives
+        // here, not on the class.
+        const int LayoutCrashBurstLimit = 5;
+        var layoutCrashTimes = new Queue<DateTime>();
 
         // Windows signing the user out or shutting down closes the app without
         // any click, and looks exactly like "it just disappeared" afterwards.
@@ -223,12 +231,27 @@ public partial class App : Application
         DispatcherUnhandledException += (_, args) =>
         {
             if (args.Exception is ArgumentException layoutEx &&
-                layoutEx.StackTrace?.Contains("VirtualizingStackPanel") == true &&
-                layoutCrashRecoveries < MaxLayoutCrashRecoveries)
+                layoutEx.StackTrace?.Contains("VirtualizingStackPanel") == true)
             {
-                layoutCrashRecoveries++;
+                // Only the last minute's failures count against the limit.
+                var now = DateTime.UtcNow;
+                while (layoutCrashTimes.Count > 0 && (now - layoutCrashTimes.Peek()) > TimeSpan.FromMinutes(1))
+                {
+                    layoutCrashTimes.Dequeue();
+                }
+                if (layoutCrashTimes.Count >= LayoutCrashBurstLimit - 1)
+                {
+                    // Fifth within a minute: stop recovering, let it crash.
+                    ExitLog.Record("virtualization layout crash burst - giving up recovery");
+#if DEBUG
+                    ExitLog.Record($"UNHANDLED (ui thread): {args.Exception}");
+#endif
+                    return;
+                }
+                layoutCrashTimes.Enqueue(now);
+
                 args.Handled = true;
-                ExitLog.Record($"RECOVERED (virtualization layout, {layoutCrashRecoveries}/{MaxLayoutCrashRecoveries}): {layoutEx.Message}");
+                ExitLog.Record($"RECOVERED (virtualization layout, {layoutCrashTimes.Count}/{LayoutCrashBurstLimit - 1} in the last minute): {layoutEx.Message}");
 
                 // The aborted pass leaves the panel dirty; a root-level nudge
                 // makes sure a full pass actually runs rather than waiting on
