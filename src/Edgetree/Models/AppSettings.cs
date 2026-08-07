@@ -38,8 +38,20 @@ public class AppSettings
     // the sidebar mid-drag (2026-08-05: dragging files out of the desktop's
     // top-left corner). A handle leaves the rest of the edge alone.
     //
-    // Off by default: the full sliver is easier to find, and someone who never
-    // hits this should not have their reveal target quietly shrink.
+    // False here, TRUE on a first run - see ForFirstRun at the bottom of this
+    // file. The two answers are for two different people:
+    //
+    // Someone already using the app chose nothing when this option appeared, so
+    // flipping it would quietly shrink the reveal target they have been aiming
+    // at for months. They keep the full edge until they ask otherwise.
+    //
+    // Someone opening it for the first time is judging it, and the full-height
+    // bar reads as unfriendly there - it draws a line down the whole side of the
+    // screen, so the screen looks cut in two rather than having something
+    // sitting at its edge. The handle is the same thickness and does not
+    // (author, using the handle exclusively since it shipped: "이쁘기도 하고
+    // 화면이 잘린 느낌도 안 들고요", and of the bar, "초기에 불친절하게
+    // 보였습니다").
     public bool AutoHideUseHandle { get; set; } = false;
 
     // Whether the peek slides in and out or simply appears.
@@ -369,4 +381,19 @@ public class AppSettings
     // desc, 3=date asc, 4=date desc - see MainWindow's SearchSortMode enum and
     // SearchSortButton_Click. Remembered across sessions.
     public int SearchSortMode { get; set; } = 0;
+
+    // The settings a machine gets the very FIRST time the app runs on it -
+    // no settings.json anywhere, not even the pre-rebrand one (see
+    // SettingsService.Load, which is the only caller and is careful to tell a
+    // missing file apart from an unreadable one: a corrupt file is an existing
+    // install having a bad day, not a new user).
+    //
+    // Only entries that should differ from an UPGRADE belong here. Every other
+    // default stays where it is declared above, because the rule this project
+    // works to is that upgrading changes nothing on screen - and a first run
+    // has no screen to change.
+    public static AppSettings ForFirstRun() => new()
+    {
+        AutoHideUseHandle = true,
+    };
 }

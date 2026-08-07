@@ -41,6 +41,18 @@ public class SettingsService
                     return settings;
                 }
             }
+            else
+            {
+                // No settings file at either location: nobody has ever run this
+                // app on this machine. That is the one case allowed to differ
+                // from the plain defaults - see AppSettings.ForFirstRun.
+                //
+                // Deliberately NOT the fall-through below. A file that exists
+                // but cannot be read or parsed lands there instead, and that is
+                // an existing install having a bad day: it should come back
+                // looking like the app it was, not like a new one.
+                return AppSettings.ForFirstRun();
+            }
         }
         catch (IOException) { }
         catch (JsonException) { }
