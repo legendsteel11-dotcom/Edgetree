@@ -61,7 +61,7 @@ leaves them where they are.
   only the path you're on stays open.
 - **Inline rename** with `F2`, right in the row — no popup. Clicking an
   already-selected file again after a pause works too, like Explorer.
-- **Sorting** by name or date, ascending or descending — globally, or per
+- **Sorting** by name, date, type or size, ascending or descending — globally, or per
   folder from its right-click menu.
 - **Bookmarks** (`Ctrl+Alt+K`): mark rows you keep coming back to and cycle
   through them with `Ctrl+Alt+L` / `Ctrl+Alt+J`.
