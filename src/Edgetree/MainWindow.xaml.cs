@@ -3168,7 +3168,20 @@ public partial class MainWindow : Window
         Width = _floatingWidth ?? ClampExpandedWidth(_settings.ExpandedWidth);
 
         // The docked band's margin-and-clip arrangement (see PositionToWorkArea)
-        // has no meaning on a floating window - it would show as a dead strip.
+        // has no meaning on a floating window - but it must be converted to
+        // real geometry BEFORE being cleared, not just dropped. The parked
+        // window's Top is the work area's top no matter where the band sits;
+        // the header the user is mid-dragging (or just double-clicked) is at
+        // the BAND's top. Clearing the margin alone made the content leap up
+        // to the parked Top - a bottom-band undock threw the window to the
+        // screen top, far from the cursor that was dragging it (reported
+        // 2026-08-07, "창이 위로 튀고... 커서가 저 멀리"). Committing the band
+        // as the window's actual bounds first keeps the header exactly where
+        // the cursor is; the corner-nudge and remembered-spot paths below then
+        // also start from the band, which is where the user last saw the
+        // window.
+        Top += RootContent.Margin.Top;
+        Height -= RootContent.Margin.Top + RootContent.Margin.Bottom;
         RootContent.Margin = new Thickness(0);
         _appliedClip = (ClipNone, 0, 0);
         NativeMethods.ClearWindowRegion(new WindowInteropHelper(this).Handle);
