@@ -138,6 +138,38 @@ internal static class NativeMethods
         => SetWindowPos(hWnd, topmost ? HwndTopmost : HwndNoTopmost, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
+    private const uint SWP_NOZORDER = 0x0004;
+
+    // Do not carry the old client bitmap into the new frame.
+    //
+    // Growing a window from its TOP edge, Windows copies what was already drawn
+    // to the new window's top-left and repaints only what that leaves uncovered.
+    // Anything anchored to the BOTTOM of the client area - this app's footer -
+    // therefore appears one frame at the old distance from the top, i.e. above
+    // where it belongs, and drops into place when WPF's own repaint lands. Over
+    // a drag that reads as the footer shaking while the window itself is
+    // provably still (2026-08-06: resize.log showed the bottom edge fixed to the
+    // pixel through the whole gesture, which is what ruled the arithmetic out
+    // and left the blit).
+    private const uint SWP_NOCOPYBITS = 0x0100;
+
+    // Move AND resize in one operation, in physical pixels.
+    //
+    // WPF cannot: Window.Top and Window.Height are two properties and each one
+    // goes straight through to the real window, so anything needing both is two
+    // operations with a composited frame in between. Dragging the top edge while
+    // the bottom stays put is exactly that pair, and the in-between frame is the
+    // window at its new top with its old height - the bottom edge flicking away
+    // and back on every drag event.
+    //
+    // Confirmed by instrument before this was used (2026-08-06, resize.log): the
+    // arithmetic was exact to the pixel and the anchor never moved, so what was
+    // being seen shaking was never a value - it was that extra frame.
+    public static bool SetWindowBounds(IntPtr hWnd, int x, int y, int width, int height)
+        => SetWindowPos(hWnd, IntPtr.Zero, x, y, width, height,
+            SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
+
+
     // Clipboard change notification. Nothing else tells an app that its own
     // cut has been consumed or replaced - the 잘라내기 markers would otherwise
     // outlive the clipboard entry they stand for (2026-07-28: pasting an

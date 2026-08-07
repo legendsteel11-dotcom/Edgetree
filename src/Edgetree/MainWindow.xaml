@@ -2098,6 +2098,42 @@
             </Setter>
         </Style>
 
+        <!-- The same thumb turned on its side, for the docked window's top and
+             bottom edges. A copy rather than one style with a bound orientation:
+             the whole template is a Grid holding one Border, and a second copy
+             of it costs less than the machinery to rotate the first. -->
+        <Style x:Key="ResizeThumbHorizontalStyle"
+                TargetType="Thumb">
+            <Setter Property="Background"
+                    Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Grid Background="Transparent">
+                            <Border x:Name="Bar"
+                                    Height="1"
+                                    VerticalAlignment="Center"
+                                    Background="Transparent"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bar"
+                                        Property="Background"
+                                        Value="#FF6B6B6B"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging"
+                                    Value="True">
+                                <Setter TargetName="Bar"
+                                        Property="Background"
+                                        Value="#FF9B9B9B"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- A thin, translucent scrollbar thumb (VS Code style) instead of the
              stock Windows scrollbar chrome. Implicit (no x:Key) so it applies to
              every ScrollBar in scope, including the TreeView's internal one. -->
@@ -4475,6 +4511,39 @@
                 Background="{DynamicResource AutoHideHandleBackground}"
                 IsHitTestVisible="False"
                 Visibility="Collapsed"/>
+
+        <!-- The docked window's own top and bottom edges. Docked, WPF's frame is
+             gone (ResizeMode=NoResize), so height is drag-resized the same way
+             width already is - by a Thumb overlaid on the edge.
+
+             Two of them rather than one, because height alone is not the whole
+             request: shrink from the bottom only and the sidebar is always
+             pinned to the top of the screen with the gap below it. Dragging the
+             TOP edge moves Top and Height together, so where the band sits comes
+             out of the same gesture instead of needing a second one.
+
+             Both are hidden unless the window is docked and open - see
+             UpdateResizeThumbVisibility, which owns all three thumbs. -->
+        <Thumb x:Name="TopResizeThumb"
+                VerticalAlignment="Top"
+                Height="6"
+                Style="{StaticResource ResizeThumbHorizontalStyle}"
+                Cursor="SizeNS"
+                Visibility="Collapsed"
+                DragStarted="TopResizeThumb_DragStarted"
+                DragDelta="TopResizeThumb_DragDelta"
+                DragCompleted="VerticalResizeThumb_DragCompleted"
+                MouseDoubleClick="VerticalResizeThumb_MouseDoubleClick"/>
+        <Thumb x:Name="BottomResizeThumb"
+                VerticalAlignment="Bottom"
+                Height="6"
+                Style="{StaticResource ResizeThumbHorizontalStyle}"
+                Cursor="SizeNS"
+                Visibility="Collapsed"
+                DragStarted="BottomResizeThumb_DragStarted"
+                DragDelta="BottomResizeThumb_DragDelta"
+                DragCompleted="VerticalResizeThumb_DragCompleted"
+                MouseDoubleClick="VerticalResizeThumb_MouseDoubleClick"/>
 
         <!-- Resize grip: overlaid on the content's right edge (see the note on
              the root Grid above), not a sibling occupying its own column. -->

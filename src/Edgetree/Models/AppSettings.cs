@@ -63,6 +63,24 @@ public class AppSettings
     // sliding would carry the window across a neighbouring monitor, so the
     // instant path has to stay a first-class one either way.
     public bool AutoHideSlide { get; set; } = true;
+
+    // How much of the screen edge the docked window occupies, and where in it.
+    //
+    // Ratios, not pixels, and that is the whole reason they are shaped this way:
+    // a height in pixels is wrong the moment the window lands on a monitor of a
+    // different size, and this app recomputes its geometry on every DPI, monitor
+    // and taskbar change (PositionToWorkArea). A ratio survives all of them.
+    //
+    // DockedTopRatio is a fraction of the LEFTOVER space rather than of the work
+    // area - 0 is against the top, 1 against the bottom, 0.5 centred - so the
+    // band cannot be placed partly off the screen no matter what the two values
+    // are, including in a hand-edited file. Both are clamped at the point of use
+    // anyway (MainWindow.DockedBand), the same as MaxItemsPerFolder and
+    // AutoHideSliverWidth.
+    //
+    // 1.0 / 0.0 is the full edge, which is what the app has always done.
+    public double DockedHeightRatio { get; set; } = 1.0;
+    public double DockedTopRatio { get; set; } = 0.0;
     public double TreeFontSize { get; set; } = 12;
     public ObservableCollection<FavoriteEntry> Favorites { get; set; } = new();
     public double FavoritesPanelHeight { get; set; } = 100;

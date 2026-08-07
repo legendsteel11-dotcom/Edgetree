@@ -1121,15 +1121,22 @@ public partial class MainWindow : Window
         // is handled HERE and nowhere else: startup, docking, DPI changes,
         // monitor changes and taskbar changes all recompute through this
         // method, so they all follow the handle for free.
+        // Not the work area itself any more - the band of it the user has left
+        // the sidebar occupying. Full edge until they drag one of the vertical
+        // thumbs, and everything below (the handle, the bar, the hover zone)
+        // measures from the band so that a shortened sidebar is not hovered
+        // where it is not.
+        var (bandTop, bandHeight) = DockedBand(workArea);
+
         if (IsCollapsedToHandle)
         {
-            Height = AutoHideHandleHeight(workArea);
-            Top = workArea.Top + ((workArea.Height - Height) / 2);
+            Height = AutoHideHandleHeight(bandHeight);
+            Top = bandTop + ((bandHeight - Height) / 2);
         }
         else
         {
-            Top = workArea.Top;
-            Height = workArea.Height;
+            Top = bandTop;
+            Height = bandHeight;
         }
 
         if (!keepLeft)
@@ -1549,12 +1556,40 @@ public partial class MainWindow : Window
         ? Math.Max(AutoHideSliverWidth, 6)
         : AutoHideSliverWidth;
 
-    // A share of the screen rather than a fixed number of pixels, bounded at
-    // both ends: 12% of a 43-inch display is still a sensible grab target,
-    // while a fixed 120px would be a stripe on one screen and a speck on
+    // The shortest the docked window may be dragged. The header alone is 36px,
+    // so anything under this is a sidebar with no tree in it - and the thumbs
+    // that would undo the mistake are its own two edges, which by then are
+    // almost touching.
+    private const double MinDockedHeight = 150;
+
+    // Which slice of the screen edge the docked window occupies - the whole of
+    // it by default, less once the top/bottom thumbs have been dragged.
+    //
+    // Clamped here rather than trusted from the file (same rule as
+    // MaxItemsPerFolder and AutoHideSliverWidth), and the position is a fraction
+    // of the LEFTOVER space, so no pair of values can put the band off screen.
+    private (double Top, double Height) DockedBand(Rect workArea)
+    {
+        double height = Math.Clamp(
+            workArea.Height * Math.Clamp(_settings.DockedHeightRatio, 0, 1),
+            Math.Min(MinDockedHeight, workArea.Height),
+            workArea.Height);
+
+        double slack = workArea.Height - height;
+        double top = workArea.Top + (slack * Math.Clamp(_settings.DockedTopRatio, 0, 1));
+        return (top, height);
+    }
+
+    // A share of the sidebar's own band rather than a fixed number of pixels,
+    // bounded at both ends: 12% of a 43-inch display is still a sensible grab
+    // target, while a fixed 120px would be a stripe on one screen and a speck on
     // another. The clamps are what stop either extreme.
-    private static double AutoHideHandleHeight(Rect workArea)
-        => Math.Clamp(workArea.Height * 0.12, 60, 160);
+    //
+    // Measured from the BAND, not the screen: a sidebar occupying the top third
+    // has to leave its handle in that third, or the handle is somewhere the
+    // window will never appear.
+    private static double AutoHideHandleHeight(double bandHeight)
+        => Math.Min(bandHeight, Math.Clamp(bandHeight * 0.12, 60, 160));
 
     // Only the two corners facing AWAY from the screen edge - the pair against
     // the edge has nothing to show a curve against. Rounding both pairs (which
@@ -2284,13 +2319,14 @@ public partial class MainWindow : Window
     private bool IsCursorInCollapsedZone()
     {
         var workArea = GetCurrentMonitorWorkArea();
+        var (bandTop, bandHeight) = DockedBand(workArea);
         double width = CollapsedWidth;
         double height = _settings.AutoHideUseHandle
-            ? AutoHideHandleHeight(workArea)
-            : workArea.Height;
+            ? AutoHideHandleHeight(bandHeight)
+            : bandHeight;
         double top = _settings.AutoHideUseHandle
-            ? workArea.Top + ((workArea.Height - height) / 2)
-            : workArea.Top;
+            ? bandTop + ((bandHeight - height) / 2)
+            : bandTop;
         double left = _settings.DockOnRight ? workArea.Right - width : workArea.Left;
 
         var cursor = System.Windows.Forms.Cursor.Position;
@@ -2785,6 +2821,16 @@ public partial class MainWindow : Window
         bool show = CanResizeWidth;
         ResizeThumb.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         ResizeThumb.IsHitTestVisible = show;
+
+        // The two vertical ones follow the same rule for the same reason: docked
+        // there is no frame to drag, and collapsed to a sliver there is nothing
+        // worth resizing. Floating gets the OS frame back and TopResizeStrip
+        // hands it the top edge (see its own note), so these must be gone by
+        // then or the two would fight over the same six pixels.
+        TopResizeThumb.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        TopResizeThumb.IsHitTestVisible = show;
+        BottomResizeThumb.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        BottomResizeThumb.IsHitTestVisible = show;
 
         // Right-docked, the window grows toward the left (see
         // ResizeThumb_DragDelta), so the grab handle needs to be on the left
@@ -11456,6 +11502,205 @@ public partial class MainWindow : Window
         double rawDelta = _settings.DockOnRight ? -e.HorizontalChange : e.HorizontalChange;
         double newWidth = ClampExpandedWidth(Width + rawDelta);
         SetExpandedWidthAnchored(newWidth);
+    }
+
+    // The docked window's top and bottom edges. Dragging the top moves where the
+    // sidebar starts as well as how tall it is; dragging the bottom only changes
+    // the height. Between them that is position and size out of one gesture,
+    // which is how any other window behaves.
+    // Where inside the 6px grip the drag started, so the edge tracks the point
+    // that was actually grabbed instead of jumping to centre on the cursor.
+    private double _verticalDragGrabOffset;
+
+    // The edge that is NOT being dragged, captured once and held for the whole
+    // gesture.
+    //
+    // It used to be re-derived from the live window every event (`Top + Height`
+    // while dragging the top). Those two are written to the real window and read
+    // back through a rounding on the way out and another on the way in, so the
+    // edge that was supposed to be standing still moved a fraction each time -
+    // and since the new height is measured from it, the wobble was fed straight
+    // back into the thing being reported as shaking (2026-08-06).
+    //
+    // A value that must not change during a gesture has no business being
+    // recomputed during it.
+    private double _verticalDragAnchor;
+
+    // The edge follows the CURSOR's own position, not the accumulated
+    // DragDelta.
+    //
+    // A Thumb reports movement in its own coordinate space, and these two
+    // thumbs are anchored to the very edges they resize - so every event moves
+    // the thumb as well, and what it reports next is measured from somewhere
+    // new. The bottom edge survives that (it writes Height only, and the thumb
+    // ends up exactly under the cursor again, which cancels out); the top edge
+    // moves Top AND Height and the cancellation does not come out even. The
+    // result was the sidebar shaking under the pointer (2026-08-06).
+    //
+    // An absolute position has no such loop: wherever the cursor is, that is
+    // where the edge goes, and an error cannot accumulate across events. The
+    // screen-pixels-to-DIP conversion is the same one IsCursorInCollapsedZone
+    // has been using.
+    private double CursorDip()
+        => System.Windows.Forms.Cursor.Position.Y / VisualTreeHelper.GetDpi(this).DpiScaleY;
+
+    private void TopResizeThumb_DragStarted(object sender, DragStartedEventArgs e)
+    {
+        _verticalDragGrabOffset = CursorDip() - Top;
+        _verticalDragAnchor = Top + Height;
+        BeginResizeLog("top");
+    }
+
+    private void BottomResizeThumb_DragStarted(object sender, DragStartedEventArgs e)
+    {
+        _verticalDragGrabOffset = CursorDip() - (Top + Height);
+        _verticalDragAnchor = Top;
+        BeginResizeLog("bottom");
+    }
+
+    private void VerticalResizeThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+        => FlushResizeLog();
+
+    private void TopResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
+        => ResizeDockedBand(newTop: CursorDip() - _verticalDragGrabOffset, newBottom: null);
+
+    private void BottomResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
+        => ResizeDockedBand(newTop: null, newBottom: CursorDip() - _verticalDragGrabOffset);
+
+    // Back to the full edge. The escape hatch for a sidebar dragged down to a
+    // stub - the same convention the width thumb's double-click already uses,
+    // and the reason neither gesture needs an entry in a menu.
+    private void VerticalResizeThumb_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (!CanResizeWidth)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        _settings.DockedHeightRatio = 1.0;
+        _settings.DockedTopRatio = 0.0;
+        PositionToWorkArea();
+    }
+
+    // Both edges land here so the clamping is written once. Exactly one of the
+    // two is given; the other one stays where it is.
+    //
+    // The edge being dragged is the one that gives way at the floor: pull the
+    // top down too far and the top stops, rather than the bottom being pushed
+    // off the screen to keep the gesture going.
+    private void ResizeDockedBand(double? newTop, double? newBottom)
+    {
+        if (!CanResizeWidth)
+        {
+            return;
+        }
+
+        var workArea = GetCurrentMonitorWorkArea();
+        double floor = Math.Min(MinDockedHeight, workArea.Height);
+
+        // The opposite edge comes from the anchor taken at DragStarted, never
+        // from the window being dragged - see _verticalDragAnchor.
+        double top, bottom;
+        if (newTop is { } wantedTop)
+        {
+            bottom = _verticalDragAnchor;
+            top = Math.Clamp(wantedTop, workArea.Top, bottom - floor);
+        }
+        else
+        {
+            top = _verticalDragAnchor;
+            bottom = Math.Clamp(newBottom ?? (top + Height), top + floor, workArea.Bottom);
+        }
+
+        double height = bottom - top;
+        LogResize(top, bottom);
+
+        // Stored as it will be read back - a fraction of the work area, and a
+        // fraction of whatever space that leaves (see AppSettings). The slack
+        // guard is not a formality: at full height it is zero, and the division
+        // would put a NaN into the settings file.
+        double slack = workArea.Height - height;
+        _settings.DockedHeightRatio = height / workArea.Height;
+        _settings.DockedTopRatio = slack > 0.5 ? (top - workArea.Top) / slack : 0;
+
+        ApplyBandToWindow(top, bottom);
+    }
+
+    // One window operation for a change that moves the top and the bottom stays.
+    //
+    // Two property writes cannot do it - see NativeMethods.SetWindowBounds. The
+    // bottom is handed over as a POSITION rather than folded into a height, and
+    // both edges are rounded to device pixels once each, so the anchored edge
+    // lands on the same physical row every event.
+    private void ApplyBandToWindow(double top, double bottom)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            Top = top;
+            Height = bottom - top;
+            return;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        int y = (int)Math.Round(top * dpi.DpiScaleY);
+        int bottomPixels = (int)Math.Round(bottom * dpi.DpiScaleY);
+        int x = (int)Math.Round(Left * dpi.DpiScaleX);
+        int width = (int)Math.Round(Width * dpi.DpiScaleX);
+
+        NativeMethods.SetWindowBounds(hwnd, x, y, width, bottomPixels - y);
+    }
+
+    // ----- 세로 리사이즈 계측기 (Debug 전용) --------------------------------
+    //
+    // Kept in memory for the length of one drag and written once when the button
+    // comes up: a file append per mouse-move would itself be a source of hitching,
+    // which is the last thing to add to something being investigated for shaking.
+    //
+    // What the columns answer: does the cursor move smoothly (cur), does the edge
+    // we compute follow it (top/bot), and does the window come back holding what
+    // we just gave it (was) - a `was` that never equals the previous line's value
+    // means the rounding round-trip is the problem, not the arithmetic.
+    private readonly List<string> _resizeLog = new();
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void BeginResizeLog(string edge)
+    {
+        _resizeLog.Clear();
+        var dpi = VisualTreeHelper.GetDpi(this);
+        _resizeLog.Add($"{DateTime.Now:HH:mm:ss.fff}  drag {edge} start  " +
+            $"dpi={dpi.DpiScaleY:F3} anchor={_verticalDragAnchor:F2} grab={_verticalDragGrabOffset:F2} " +
+            $"Top={Top:F2} Height={Height:F2}");
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogResize(double top, double bottom)
+        => _resizeLog.Add($"  cur={System.Windows.Forms.Cursor.Position.Y} " +
+            $"want top={top:F2} bot={bottom:F2} h={bottom - top:F2}  was Top={Top:F2} Height={Height:F2}");
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void FlushResizeLog()
+    {
+        if (_resizeLog.Count == 0)
+        {
+            return;
+        }
+
+        _resizeLog.Add($"  end    Top={Top:F2} Height={Height:F2} " +
+            $"ratio={_settings.DockedHeightRatio:F4}/{_settings.DockedTopRatio:F4}");
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllLines(Path.Combine(dir, "resize.log"), _resizeLog);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+
+        _resizeLog.Clear();
     }
 
     // Shared anchoring logic between manual drag-resize and the fit/restore
