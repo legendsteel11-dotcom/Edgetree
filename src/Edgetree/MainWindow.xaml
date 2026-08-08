@@ -2664,11 +2664,15 @@
                     Value="Hand"/>
             <Setter Property="Opacity"
                     Value="0.65"/>
+            <!-- Template-bound rather than fixed: the collapse chevron sits on
+                 the viewer's background, the expand chevron on the tree's. -->
+            <Setter Property="Background"
+                    Value="{DynamicResource ViewerBackground}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd"
-                                Background="{DynamicResource ViewerBackground}"
+                                Background="{TemplateBinding Background}"
                                 CornerRadius="3"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="Center"
@@ -4965,6 +4969,36 @@
                     ToolTip="{x:Static services:Strings.ViewerClose}">
                 <Path x:Name="ViewerCollapseGlyph"
                         Data="M6,0 L2,5 L6,10"
+                        Stroke="{DynamicResource ForegroundText}"
+                        StrokeThickness="1.4"
+                        StrokeLineJoin="Round"
+                        StrokeStartLineCap="Round"
+                        StrokeEndLineCap="Round"/>
+            </Button>
+
+            <!-- The same chevron the other way round: with the panel closed and
+                 an IMAGE row selected, it opens the viewer from the tree's own
+                 edge instead of the header button. Only under those two
+                 conditions, which is what keeps it from becoming a permanent
+                 fixture on the edge it shares with the tree's scrollbar and
+                 (docked) the width grip - see UpdateViewerExpandButton. It
+                 points the way the panel will come from. -->
+            <Button x:Name="ViewerExpandButton"
+                    Grid.Row="1"
+                    Grid.RowSpan="4"
+                    Grid.Column="1"
+                    Width="14"
+                    Height="40"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Panel.ZIndex="3"
+                    Visibility="Collapsed"
+                    Background="{DynamicResource SidebarBackground}"
+                    Style="{StaticResource ViewerCollapseButtonStyle}"
+                    Click="ViewerExpandButton_Click"
+                    ToolTip="{x:Static services:Strings.ToolTipViewer}">
+                <Path x:Name="ViewerExpandGlyph"
+                        Data="M2,0 L6,5 L2,10"
                         Stroke="{DynamicResource ForegroundText}"
                         StrokeThickness="1.4"
                         StrokeLineJoin="Round"

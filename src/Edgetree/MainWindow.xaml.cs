@@ -8854,6 +8854,10 @@ public partial class MainWindow : Window
         // The viewer panel follows the selection (debounced - see the
         // method). A no-op while the panel is closed.
         ScheduleViewerPreview();
+        // Not debounced: this one only appears or disappears, and waiting
+        // 120ms to show a button the cursor may already be heading for reads
+        // as lag rather than as smoothing.
+        UpdateViewerExpandButton();
 
         // Picking a folder directly in the tree keeps the favorites list in
         // sync: highlight it there too if it happens to be one, otherwise
@@ -12533,6 +12537,10 @@ public partial class MainWindow : Window
     // can ask for the full-resolution one exactly once.
     private int _viewerDecodedWidth;
     private bool _viewerFullResPending;
+    // True from the first frame of a window resize until it settles - see
+    // ViewerImageHost_SizeChanged.
+    private bool _viewerResizing;
+    private System.Windows.Threading.DispatcherTimer? _viewerSettleTimer;
     private bool _viewerPanning;
     // The temporary full cover (middle-click on the picture, Esc to leave).
     // Deliberately NOT the same thing as the 0px divider position tried and
@@ -12593,6 +12601,39 @@ public partial class MainWindow : Window
     // divider, rather than the far corner of the window (user, 2026-08-09).
     private void ViewerCollapseButton_Click(object sender, RoutedEventArgs e) => CloseViewer();
 
+    private void ViewerExpandButton_Click(object sender, RoutedEventArgs e) => OpenViewer();
+
+    // The collapse chevron's mirror, shown only while the panel is CLOSED and
+    // an image row is selected. Both conditions matter: the edge it sits on is
+    // also the tree's scrollbar and, docked, the width grip, so it has to earn
+    // its place each time rather than stand there permanently. Hidden while
+    // auto-hidden and collapsed too, since OpenViewer declines from a sliver
+    // and a control that does nothing is worse than no control.
+    private void UpdateViewerExpandButton()
+    {
+        bool show =
+            !_viewerOpen &&
+            !(_settings.IsAutoHidden && !_isAutoHideRevealed) &&
+            _selectedItem is { IsPlaceholder: false, IsShowMore: false, IsDirectory: false } item &&
+            ThumbnailExtensions.Contains(Path.GetExtension(item.FullPath));
+
+        ViewerExpandButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (!show)
+        {
+            return;
+        }
+
+        // Points where the panel will come FROM, which is the side it opens on
+        // - the mirror of the collapse chevron, which points at the tree.
+        bool opensOnLeft = _isDocked && _settings.DockOnRight;
+        Grid.SetColumn(ViewerExpandButton, 1);
+        ViewerExpandButton.HorizontalAlignment = opensOnLeft
+            ? System.Windows.HorizontalAlignment.Left
+            : System.Windows.HorizontalAlignment.Right;
+        ViewerExpandGlyph.Data = Geometry.Parse(
+            opensOnLeft ? "M6,0 L2,5 L6,10" : "M2,0 L6,5 L2,10");
+    }
+
     private void OpenViewer()
     {
         // Collapsed-to-sliver is the only state that declines: there is no
@@ -12629,6 +12670,7 @@ public partial class MainWindow : Window
         ViewerPanel.Visibility = Visibility.Visible;
         ViewerSplitThumb.Visibility = Visibility.Visible;
         ViewerCollapseButton.Visibility = Visibility.Visible;
+        UpdateViewerExpandButton();
 
         // The band clip's state tuple carries no width (see _appliedClip), so
         // force the next pass to re-derive it against the widened window.
@@ -12663,6 +12705,7 @@ public partial class MainWindow : Window
         ViewerPanel.Visibility = Visibility.Collapsed;
         ViewerSplitThumb.Visibility = Visibility.Collapsed;
         ViewerCollapseButton.Visibility = Visibility.Collapsed;
+        UpdateViewerExpandButton();
         ViewerImage.Source = null;
         ViewerIconImage.Source = null;
 
@@ -12874,15 +12917,52 @@ public partial class MainWindow : Window
     }
 
     // Fit is a ratio, so it moves with the panel - and a zoom held at, say,
-    // 200% has to STAY 200% while the divider drags, which means recomputing
-    // the transform (it is stored relative to fit) on every resize. Cheap: two
-    // doubles and the readout, no decode.
+    // 200% has to STAY 200% while the window resizes, which means recomputing
+    // the transform (it is stored relative to fit) on every frame of it.
+    // That part is two doubles. Everything else waits for the size to settle.
     private void ViewerImageHost_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (_viewerOpen && _viewerPixelWidth > 0)
+        if (!_viewerOpen || _viewerPixelWidth <= 0)
         {
-            ApplyViewerZoom();
+            return;
         }
+
+        // HighQuality resampling of a large bitmap, every frame, is the other
+        // half of the cost - and it only gets worse once the full-resolution
+        // decode has been swapped in. Bilinear while the size is moving; the
+        // sharp one comes back with everything else at the end.
+        _viewerResizing = true;
+        RenderOptions.SetBitmapScalingMode(ViewerImage, BitmapScalingMode.LowQuality);
+
+        ApplyViewerZoomTransform();
+        ScheduleViewerSettle();
+    }
+
+    // Fires once the window has stopped changing size. Short enough that the
+    // sharp image and the readout feel like they belong to the gesture, long
+    // enough that a drag never reaches it mid-flight.
+    private void ScheduleViewerSettle()
+    {
+        if (_viewerSettleTimer is null)
+        {
+            _viewerSettleTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(160),
+            };
+            _viewerSettleTimer.Tick += (_, _) =>
+            {
+                _viewerSettleTimer!.Stop();
+                _viewerResizing = false;
+                RenderOptions.SetBitmapScalingMode(ViewerImage, BitmapScalingMode.HighQuality);
+                if (_viewerOpen && _viewerPixelWidth > 0)
+                {
+                    ApplyViewerZoom();
+                }
+            };
+        }
+
+        _viewerSettleTimer.Stop();
+        _viewerSettleTimer.Start();
     }
 
     // The scale the Uniform stretch is already drawing at - the same
@@ -12935,7 +13015,14 @@ public partial class MainWindow : Window
     // the zoom should BE and then calls this - so there is exactly one place
     // where a frame's worth of work happens, and it is two doubles and a
     // clamp. No decode, no measure, no layout pass.
-    private void ApplyViewerZoom()
+    // The per-frame half, and deliberately nothing else: two doubles and a
+    // clamp, whatever the picture's size. A live window resize raises a
+    // SizeChanged per frame, and everything the full method below does on top
+    // of this - a new string in the zoom readout, four chips re-deciding their
+    // checked/enabled state, the cursor, the navigator, the full-resolution
+    // decode - was riding every one of those frames, which is what made a
+    // floating resize stutter "이미지 사이즈와 관계 없이" (user, 2026-08-09).
+    private void ApplyViewerZoomTransform()
     {
         // The RAW fit here, never the rest scale: this converts to the
         // transform, and what the Stretch has already drawn is the raw fit.
@@ -12947,6 +13034,11 @@ public partial class MainWindow : Window
         ViewerZoomScale.ScaleY = relative;
 
         ClampViewerPan();
+    }
+
+    private void ApplyViewerZoom()
+    {
+        ApplyViewerZoomTransform();
         // Asked here rather than only from SetViewerZoom, which was the first
         // version and left two ways in uncovered (reported 2026-08-08): going
         // full screen, and a new picture arriving while already full screen,
@@ -13170,7 +13262,12 @@ public partial class MainWindow : Window
     // whole.
     private void RequestViewerFullResolution()
     {
-        if (_viewerFullResPending ||
+        // Never mid-resize: the slot outgrows the current decode on the first
+        // frame of a drag, and answering that with a full-resolution decode
+        // puts an 8-megapixel bitmap in front of a scaler that then has to
+        // rework it every frame for the rest of the drag.
+        if (_viewerResizing ||
+            _viewerFullResPending ||
             _pendingViewerPath is not { } path ||
             _viewerPixelWidth <= 0 ||
             _viewerDecodedWidth >= _viewerPixelWidth)
@@ -13328,6 +13425,9 @@ public partial class MainWindow : Window
         ViewerZoomPan.X = _viewerPanOriginX + (point.X - _viewerPanOrigin.X);
         ViewerZoomPan.Y = _viewerPanOriginY + (point.Y - _viewerPanOrigin.Y);
         ClampViewerPan();
+        // The navigator box has to track the pan frame by frame - that IS its
+        // job - and it is two transform values when it is on, nothing when it
+        // is off. The rest of the settle work has no business here.
         UpdateViewerNavigator();
     }
 
@@ -13449,6 +13549,8 @@ public partial class MainWindow : Window
             : new Thickness(-7, 0, 0, 0);
         ViewerCollapseGlyph.Data = Geometry.Parse(
             _viewerOnLeft ? "M2,0 L6,5 L2,10" : "M6,0 L2,5 L6,10");
+
+        UpdateViewerExpandButton();
     }
 
     // The panel column always fits the window, whatever resized it. The
@@ -13620,39 +13722,104 @@ public partial class MainWindow : Window
         UpdateViewerPreview();
     }
 
-    // Non-image selections (and images whose decode failed): the file's own
-    // shell icon, centered - the panel stays a selection preview rather than
-    // going blank.
+    // Non-image selections (and images whose decode failed). Two steps, in
+    // this order:
+    //
+    // 1. Ask the SHELL for a real thumbnail, at the size of the slot it is
+    //    going into. Whatever thumbnail providers this machine has installed
+    //    answer here - PSD, AI, PDF's first page, a video's frame, and SVG if
+    //    something like PowerToys registered a handler for it. Windows has no
+    //    WIC codec for any of those, so this is the only way the panel ever
+    //    shows them, and it costs no dependency. Before this the panel showed
+    //    a 96px file-type icon marooned in a 900px panel ("포토샵도 아쭈
+    //    쬐깐하게 보여서", user 2026-08-09).
+    // 2. Only if that fails, the file-type icon at icon size - a .txt has no
+    //    thumbnail and never will, and a blown-up icon is worse than a small
+    //    one.
+    //
+    // What comes back is a raster, capped by the shell around 1024px, so this
+    // is not the vector answer for SVG - it is the cheap one. A real SVG
+    // renderer stays a separate question (a new dependency, see TODO).
     private void ShowViewerIcon(string path)
     {
-        ShellThumbnailService.GetPreview(path, 96, thumbnailOnly: false, (icon, _, _) =>
+        int slotSize = (int)Math.Ceiling(
+            Math.Clamp(ViewerImageHost.ActualWidth, 256, 2048) *
+            VisualTreeHelper.GetDpi(this).DpiScaleX);
+
+        ShellThumbnailService.GetThumbnail(path, slotSize, (thumbnail, pixelWidth, pixelHeight) =>
         {
             if (!_viewerOpen || !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
 
-            ViewerImage.Visibility = Visibility.Collapsed;
-            ViewerImage.Source = null;
-            ViewerIconImage.Visibility = Visibility.Visible;
-            ViewerIconImage.Source = icon;
-            // A shell icon has nothing to zoom, so the strip goes with it.
-            ClearViewerZoom();
-            try
+            if (thumbnail is BitmapSource frame)
             {
-                // Files get size · date like images do; folders just their
-                // date.
-                var fileInfo = new FileInfo(path);
-                string date = $"{File.GetLastWriteTime(path):yyyy-MM-dd HH:mm}";
-                ViewerFileInfo.Text = fileInfo.Exists
-                    ? $"{FormatFileSize(fileInfo.Length)}  ·  {date}"
-                    : date;
+                ViewerIconImage.Visibility = Visibility.Collapsed;
+                ViewerIconImage.Source = null;
+                ViewerImage.Visibility = Visibility.Visible;
+                ViewerImage.Source = frame;
+
+                // The thumbnail's own pixels are all there is, so they are what
+                // the zoom measures against - and marking them as the decoded
+                // width too stops RequestViewerFullResolution from trying to
+                // re-read a file WIC cannot open in the first place.
+                _viewerPixelWidth = frame.PixelWidth;
+                _viewerPixelHeight = frame.PixelHeight;
+                _viewerDecodedWidth = frame.PixelWidth;
+                if (!string.Equals(_viewerZoomPath, path, StringComparison.OrdinalIgnoreCase))
+                {
+                    _viewerZoomPath = path;
+                    _viewerZoom = null;
+                    ViewerZoomPan.X = 0;
+                    ViewerZoomPan.Y = 0;
+                }
+                ApplyViewerZoom();
+
+                // The ORIGINAL dimensions when the header could be read (see
+                // the service); for a PSD or an SVG it can't, and printing the
+                // thumbnail's size there would be a plain lie.
+                SetViewerFileInfo(path, pixelWidth, pixelHeight);
+                return;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+
+            ShellThumbnailService.GetPreview(path, 96, thumbnailOnly: false, (icon, _, _) =>
             {
-                ViewerFileInfo.Text = string.Empty;
-            }
+                if (!_viewerOpen || !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                ViewerImage.Visibility = Visibility.Collapsed;
+                ViewerImage.Source = null;
+                ViewerIconImage.Visibility = Visibility.Visible;
+                ViewerIconImage.Source = icon;
+                // A file-type icon has nothing to zoom, so the strip goes too.
+                ClearViewerZoom();
+                SetViewerFileInfo(path, 0, 0);
+            });
         });
+    }
+
+    // Size · date, with the pixel dimensions in front when they are actually
+    // known. Files get size · date; a folder just its date.
+    private void SetViewerFileInfo(string path, int pixelWidth, int pixelHeight)
+    {
+        try
+        {
+            var fileInfo = new FileInfo(path);
+            string date = $"{File.GetLastWriteTime(path):yyyy-MM-dd HH:mm}";
+            string body = fileInfo.Exists
+                ? $"{FormatFileSize(fileInfo.Length)}  ·  {date}"
+                : date;
+            ViewerFileInfo.Text = pixelWidth > 0 && pixelHeight > 0
+                ? $"{pixelWidth} × {pixelHeight}  ·  {body}"
+                : body;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            ViewerFileInfo.Text = string.Empty;
+        }
     }
 
     // ===================================================================
