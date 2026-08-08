@@ -12529,9 +12529,14 @@ public partial class MainWindow : Window
         double target = ViewerPanelWidth + (_viewerOnLeft ? e.HorizontalChange : -e.HorizontalChange);
 
         // The tree keeps its split floor (see MinTreeSplitWidth - a column
-        // floor, not the window one) of the fixed window width. Max(min, ...)
-        // so a window too narrow for both floors can't hand Math.Clamp an
-        // inverted range (which throws).
+        // floor, not the window one) of the fixed window width. A floating
+        // window briefly had a floor of 0 here - divider pushed all the way,
+        // viewer covering the whole window - tried at the user's request and
+        // rolled back the same hour ("아무리 봐도 어색"): a strip of tree
+        // always remains, in both modes. If full-cover comes back, it wants
+        // to be a real fullscreen view (round 3), not a 0px column.
+        // Max(min, ...) so a window too narrow for both floors can't hand
+        // Math.Clamp an inverted range (which throws).
         double maxAllowed = Math.Max(MinViewerWidth,
             Math.Min(MaxViewerWidth, Width - MinTreeSplitWidth));
         _settings.ViewerWidth = Math.Clamp(target, MinViewerWidth, maxAllowed);
@@ -12558,8 +12563,14 @@ public partial class MainWindow : Window
         // tree width (the standing rule) - so it is also the one that must
         // record it, or the next reveal/restart rebuilds the window from a
         // stale tree share plus the new panel width and the total jumps.
-        _settings.ExpandedWidth = Math.Clamp(
-            Width - CurrentViewerPanelWidth, MinTreeSplitWidth, MaxExpandedWidth);
+        // Docked only: ExpandedWidth is the DOCKED tree width, and a
+        // floating session pushed to full-cover (tree 0) must not leak into
+        // it - same containment SaveCurrentWidth applies.
+        if (_isDocked)
+        {
+            _settings.ExpandedWidth = Math.Clamp(
+                Width - CurrentViewerPanelWidth, MinTreeSplitWidth, MaxExpandedWidth);
+        }
         _settingsService.Save(_settings);
 
         // A panel widened past its decode width would keep showing the
