@@ -1709,6 +1709,51 @@ public partial class MainWindow : Window
     // almost touching.
     private const double MinDockedHeight = 150;
 
+    // Hold a modifier while dragging a docked edge and it lands on a fraction
+    // of the screen instead of wherever the cursor is (user, 2026-08-09). Two
+    // grids rather than one, and both fine enough to be worth reaching for:
+    // SHIFT is the everyday one and CTRL refines it (the user's own pairing -
+    // the first version had them the other way round and read backwards).
+    // Multiples of each other on purpose, so every Shift line is also a Ctrl
+    // line and refining never means starting over.
+    private const int DockedSnapDivisionsCoarse = 16;
+    private const int DockedSnapDivisionsFine = 32;
+
+    // Null means no snapping. The FINER grid wins when both are down: adding
+    // a second key reads as asking for more precision, not less.
+    private static int? DockedSnapDivisions
+    {
+        get
+        {
+            var modifiers = Keyboard.Modifiers;
+            if (modifiers.HasFlag(ModifierKeys.Control))
+            {
+                return DockedSnapDivisionsFine;
+            }
+
+            return modifiers.HasFlag(ModifierKeys.Shift) ? DockedSnapDivisionsCoarse : null;
+        }
+    }
+
+    // Read live off the keyboard on every drag event rather than captured when
+    // the drag started, so a key can be taken, swapped and let go mid-drag -
+    // which is how snapping works in everything else that has it.
+    private static double SnapToGrid(double value, double origin, double extent)
+    {
+        if (DockedSnapDivisions is not { } divisions || extent <= 0)
+        {
+            return value;
+        }
+
+        double step = extent / divisions;
+        return origin + Math.Round((value - origin) / step) * step;
+    }
+
+    // The work area the current band drag is snapping against, captured at
+    // DragStarted so a monitor query doesn't ride every mouse move.
+    private double _snapGridOriginDip;
+    private double _snapGridExtentDip;
+
     // Which slice of the screen edge the docked window occupies - the whole of
     // it by default, less once the top/bottom thumbs have been dragged.
     //
@@ -11886,7 +11931,20 @@ public partial class MainWindow : Window
         // with the viewer open the window total legitimately exceeds it -
         // SetExpandedWidthAnchored does all the bounding per policy.
         double rawDelta = _settings.DockOnRight ? -e.HorizontalChange : e.HorizontalChange;
-        SetExpandedWidthAnchored(Width + rawDelta);
+
+        // The same grids as the band edges, on the WINDOW's whole width -
+        // which is what the eye reads off the screen, and which puts the outer
+        // edge on the same grid lines from either screen side (docked left the
+        // window starts at the work area's left, docked right it ends at its
+        // right). The monitor is only queried while a modifier is actually
+        // held, so an ordinary drag costs nothing new.
+        double target = Width + rawDelta;
+        if (DockedSnapDivisions is not null)
+        {
+            target = SnapToGrid(target, 0, GetCurrentMonitorWorkArea().Width);
+        }
+
+        SetExpandedWidthAnchored(target);
     }
 
     // The docked window's top and bottom edges. Dragging the top moves where the
@@ -11973,6 +12031,8 @@ public partial class MainWindow : Window
         _bandAnchorBottomDip = Top + Height - RootContent.Margin.Bottom;
         _bandGrabOffsetDip = CursorDipY() - (Top + RootContent.Margin.Top);
         _bandMinHeightDip = Math.Min(MinDockedHeight, workArea.Height);
+        _snapGridOriginDip = workArea.Top;
+        _snapGridExtentDip = workArea.Height;
         _inTopBandDrag = true;
         BeginResizeLog("top-band");
     }
@@ -11984,7 +12044,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        double top = Math.Clamp(CursorDipY() - _bandGrabOffsetDip,
+        // Snapped BEFORE the clamp, so the floors still have the last word: a
+        // grid line that would leave the band shorter than its minimum simply
+        // doesn't survive the clamp below.
+        double top = Math.Clamp(
+            SnapToGrid(CursorDipY() - _bandGrabOffsetDip, _snapGridOriginDip, _snapGridExtentDip),
             _bandWorkTopDip, Math.Max(_bandWorkTopDip, _bandAnchorBottomDip - _bandMinHeightDip));
         RootContent.Margin = new Thickness(
             0, top - _bandWorkTopDip, 0, RootContent.Margin.Bottom);
@@ -12028,6 +12092,8 @@ public partial class MainWindow : Window
         _bandAnchorTopDip = Top + RootContent.Margin.Top;
         _bandGrabOffsetDip = CursorDipY() - (Top + Height - RootContent.Margin.Bottom);
         _bandMinHeightDip = Math.Min(MinDockedHeight, workArea.Height);
+        _snapGridOriginDip = workArea.Top;
+        _snapGridExtentDip = workArea.Height;
         _inBottomBandDrag = true;
         BeginResizeLog("bottom-band");
     }
@@ -12039,7 +12105,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        double bottom = Math.Clamp(CursorDipY() - _bandGrabOffsetDip,
+        double bottom = Math.Clamp(
+            SnapToGrid(CursorDipY() - _bandGrabOffsetDip, _snapGridOriginDip, _snapGridExtentDip),
             Math.Min(_bandAnchorTopDip + _bandMinHeightDip, _bandWindowBottomDip),
             _bandWindowBottomDip);
         RootContent.Margin = new Thickness(
