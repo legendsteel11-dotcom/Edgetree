@@ -3983,14 +3983,16 @@
                  and everything below. Position-mode flipping of that border
                  is gone too: the line IS the boundary now, same on either
                  side. -->
-            <!-- 2px, not 1: this line separates two lists that look alike, and
-                 a hairline between them read as a gap rather than a boundary
-                 (2026-08-04). The splitter's grab zone is unaffected - it
-                 floats over this row at a fixed 9px and simply centres on
-                 whatever height the line takes. -->
+            <!-- Back to 1px, matching every other section divider (user,
+                 2026-08-08). It spent 08-04~08-08 at 2px ("a hairline between
+                 two alike lists read as a gap"), but once the viewer panel
+                 added another 1px line the odd one out was this one. The
+                 splitter's grab zone is unaffected - it floats over this row
+                 at a fixed 9px and simply centres on whatever height the
+                 line takes. -->
             <Border Grid.Row="2"
                     Grid.Column="1"
-                    Height="2"
+                    Height="1"
                     Background="{DynamicResource PanelDividerBrush}"/>
             <!-- Functionality unchanged (drag-resize, double-click fit); only
                  WHERE the grab zone lives did: negative margins float it over
