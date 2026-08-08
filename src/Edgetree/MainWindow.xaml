@@ -4638,6 +4638,26 @@
                     </Button>
                 </Grid>
             </Border>
+
+            <!-- The tree/viewer divider's grab zone: dragging it re-splits the
+                 CURRENT window between tree and panel - no window geometry at
+                 all, unlike the outer-edge ResizeThumb. Straddles the divider
+                 line by 4px on each side (same negative-margin trick as
+                 FavoritesSplitter); OpenViewer moves it to whichever column
+                 the panel took and flips its edge/margins. -->
+            <Thumb x:Name="ViewerSplitThumb"
+                    Grid.Row="1"
+                    Grid.RowSpan="4"
+                    Grid.Column="2"
+                    Width="8"
+                    Margin="-4,0,0,0"
+                    HorizontalAlignment="Left"
+                    Panel.ZIndex="2"
+                    Style="{StaticResource ResizeThumbStyle}"
+                    Cursor="SizeWE"
+                    Visibility="Collapsed"
+                    DragDelta="ViewerSplitThumb_DragDelta"
+                    DragCompleted="ViewerSplitThumb_DragCompleted"/>
         </Grid>
 
         <!-- What the auto-hidden sidebar actually shows: one flat colour over
@@ -4707,6 +4727,7 @@
                 Style="{StaticResource ResizeThumbStyle}"
                 Cursor="SizeWE"
                DragDelta="ResizeThumb_DragDelta"
+               DragCompleted="ResizeThumb_DragCompleted"
                MouseDoubleClick="ResizeThumb_MouseDoubleClick"/>
 
         <!-- Hands the window's top edge back to Windows so a floating window can

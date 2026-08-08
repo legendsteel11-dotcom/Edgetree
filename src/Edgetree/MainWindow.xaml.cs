@@ -36,7 +36,11 @@ public partial class MainWindow : Window
     // 180 → 204 when the viewer toggle became the seventh header button - the
     // floor exists so the button row still fits (see ApplyHeaderMetrics).
     private const double MinExpandedWidth = 204;
-    private const double MaxExpandedWidth = 1200;
+    // 1200 → 2000 (user, 2026-08-08): with the viewer panel in the window
+    // the old cap - sized for a tree-only sidebar - was suddenly the tight
+    // constraint on the OUTER edge drag. This still caps only the TREE's
+    // share; the viewer's own cap is MaxViewerWidth in the viewer region.
+    private const double MaxExpandedWidth = 2000;
     private const int ToggleAnimationMs = 200;
     // Topped out at 16 until a user asked for larger text for presbyopia; the
     // extra steps go to 20, which is where a docked sidebar of realistic width
@@ -404,7 +408,13 @@ public partial class MainWindow : Window
         // just left at their XAML-default (top) positions.
         ApplyFavoritesPosition();
 
-        Width = _settings.IsAutoHidden ? CollapsedWidth : ClampExpandedWidth(_settings.ExpandedWidth);
+        // A stored tree width below the window floor is legal exactly when
+        // the viewer is about to reopen on top of it (the split floor is the
+        // smaller one) - clamping it to the window floor here would move the
+        // tree share the user set with the middle divider.
+        Width = _settings.IsAutoHidden ? CollapsedWidth
+            : _settings.ViewerOpen ? Math.Clamp(_settings.ExpandedWidth, MinTreeSplitWidth, MaxExpandedWidth)
+            : ClampExpandedWidth(_settings.ExpandedWidth);
         ApplyHeaderMetrics();
         SetExpandedContentVisibility(_settings.IsAutoHidden ? Visibility.Collapsed : Visibility.Visible);
         PositionToWorkArea();
@@ -1999,7 +2009,13 @@ public partial class MainWindow : Window
         // Plus the viewer panel if it stayed open through the hide (the
         // experiment note in EnterAutoHide) - ExpandedWidth is the tree
         // alone, and restoring only that would crush the panel's column.
-        double expandedWidth = ClampExpandedWidth(_settings.ExpandedWidth) + CurrentViewerPanelWidth;
+        // Same split-floor clamp as startup: with the panel open the tree
+        // share may sit below the window floor, and rounding it up here
+        // would move what the middle divider set.
+        double treeWidth = _viewerOpen
+            ? Math.Clamp(_settings.ExpandedWidth, MinTreeSplitWidth, MaxExpandedWidth)
+            : ClampExpandedWidth(_settings.ExpandedWidth);
+        double expandedWidth = treeWidth + CurrentViewerPanelWidth;
 
         // Revealing never slides, and that asymmetry is the whole finding of
         // 2026-08-05. A window has no pixels where it is off the screen, so one
@@ -11680,9 +11696,11 @@ public partial class MainWindow : Window
         // window - the opposite sign from the left-docked case - and the
         // window has to slide left by the same amount to keep its right edge
         // anchored to the screen edge, since Width alone only grows rightward.
+        // No pre-clamp here: ClampExpandedWidth bounds the TREE's share, and
+        // with the viewer open the window total legitimately exceeds it -
+        // SetExpandedWidthAnchored does all the bounding per policy.
         double rawDelta = _settings.DockOnRight ? -e.HorizontalChange : e.HorizontalChange;
-        double newWidth = ClampExpandedWidth(Width + rawDelta);
-        SetExpandedWidthAnchored(newWidth);
+        SetExpandedWidthAnchored(Width + rawDelta);
     }
 
     // The docked window's top and bottom edges. Dragging the top moves where the
@@ -11950,18 +11968,42 @@ public partial class MainWindow : Window
     // the screen edge, since Width alone only grows/shrinks rightward.
     private void SetExpandedWidthAnchored(double newWidth)
     {
-        // newWidth is the whole WINDOW's target - with the viewer panel open
-        // that includes the panel, so the clamp shifts by its width and only
-        // the tree's share is persisted (ExpandedWidth stays the tree alone,
-        // see the viewer region).
+        // newWidth is the whole WINDOW's target. With the viewer panel open,
+        // the outer edge belongs to the VIEWER alone (user's calls,
+        // 2026-08-08, two refinements the same hour): the tree's share never
+        // moves from here - the middle divider is the one and only way to
+        // resize the tree - and the drag simply stops at the viewer's own
+        // bounds instead of cascading into the tree. ExpandedWidth is left
+        // untouched on that branch for the same reason: the tree didn't
+        // move, and its remembered width shouldn't either.
         double viewerWidth = CurrentViewerPanelWidth;
-        newWidth = ClampExpandedWidth(newWidth - viewerWidth) + viewerWidth;
+        if (_viewerOpen)
+        {
+            double treeShare = Width - viewerWidth;
+            viewerWidth = Math.Clamp(newWidth - treeShare, MinViewerWidth, MaxViewerWidth);
+            newWidth = treeShare + viewerWidth;
+
+            _settings.ViewerWidth = viewerWidth;
+            if (_viewerOnLeft)
+            {
+                ViewerColumnLeft.Width = new GridLength(viewerWidth);
+            }
+            else
+            {
+                ViewerColumnRight.Width = new GridLength(viewerWidth);
+            }
+        }
+        else
+        {
+            newWidth = ClampExpandedWidth(newWidth);
+            _settings.ExpandedWidth = newWidth;
+        }
+
         if (_settings.DockOnRight)
         {
             Left -= newWidth - Width;
         }
         Width = newWidth;
-        _settings.ExpandedWidth = newWidth - viewerWidth;
     }
 
     // Double-clicking the resize thumb auto-fits the window to exactly the
@@ -11974,7 +12016,11 @@ public partial class MainWindow : Window
     {
         // Left button only - same latent trap as ExplorerTree_MouseDoubleClick
         // (see its comment): WPF raises this for right-button double-clicks too.
-        if (e.ChangedButton != MouseButton.Left || !CanResizeWidth)
+        // A deliberate no-op while the viewer is open (user, 2026-08-08): the
+        // outer edge then belongs to the viewer (see SetExpandedWidthAnchored),
+        // and a "fit the tree" gesture on the viewer's edge fits nothing the
+        // user is looking at.
+        if (e.ChangedButton != MouseButton.Left || !CanResizeWidth || _viewerOpen)
         {
             return;
         }
@@ -11999,9 +12045,9 @@ public partial class MainWindow : Window
         }
 
         _contentFitRestoreWidth = Width;
-        // fitWidth measures the tree's content; the window also has to keep
-        // carrying the viewer panel if it's open.
-        SetExpandedWidthAnchored(fitWidth + CurrentViewerPanelWidth);
+        // Viewer-open never reaches here (the guard above) - fitWidth is the
+        // tree's content and the tree is the whole window.
+        SetExpandedWidthAnchored(fitWidth);
         _contentFitWidthApplied = Width;
     }
 
@@ -12154,8 +12200,14 @@ public partial class MainWindow : Window
         if (_isDocked && !_settings.IsAutoHidden)
         {
             // Minus the viewer panel: ExpandedWidth is the TREE's width alone
-            // (see the viewer region below).
-            _settings.ExpandedWidth = ClampExpandedWidth(Width - CurrentViewerPanelWidth);
+            // (see the viewer region below). With the panel open the tree's
+            // share may legitimately sit below the WINDOW floor (the split
+            // floor is smaller), and the standing rule is that nothing but
+            // the middle divider moves the stored tree width - so this keeps
+            // the split-floor clamp, not the window one.
+            _settings.ExpandedWidth = _viewerOpen
+                ? Math.Clamp(Width - CurrentViewerPanelWidth, MinTreeSplitWidth, MaxExpandedWidth)
+                : ClampExpandedWidth(Width);
         }
 
         _settings.ExpandedFolderPaths = CollectAllExpandedPaths();
@@ -12187,7 +12239,17 @@ public partial class MainWindow : Window
     private System.Windows.Threading.DispatcherTimer? _viewerPreviewTimer;
 
     private const double MinViewerWidth = 240;
-    private const double MaxViewerWidth = 800;
+    // 800 → 1600 → 3200 the day the split drag landed (user kept hitting
+    // it: the panel is where the pixels should go). The split can only grow
+    // within the current window anyway - the real bound is the window minus
+    // MinTreeSplitWidth - so this cap mostly bounds what a saved width can
+    // re-widen the window by on the next open.
+    private const double MaxViewerWidth = 3200;
+    // The tree column's floor under the SPLIT drag - deliberately smaller
+    // than MinExpandedWidth: that one is a WINDOW floor (seven header
+    // buttons must fit), and the header spans all three columns, so the
+    // tree column itself can go much narrower before anything breaks.
+    private const double MinTreeSplitWidth = 120;
 
     private double ViewerPanelWidth => Math.Clamp(_settings.ViewerWidth, MinViewerWidth, MaxViewerWidth);
 
@@ -12244,6 +12306,16 @@ public partial class MainWindow : Window
             : new Thickness(1, 0, 0, 0);
         ViewerPanel.Visibility = Visibility.Visible;
 
+        // The split grab zone rides the panel's tree-side edge.
+        Grid.SetColumn(ViewerSplitThumb, _viewerOnLeft ? 0 : 2);
+        ViewerSplitThumb.HorizontalAlignment = _viewerOnLeft
+            ? System.Windows.HorizontalAlignment.Right
+            : System.Windows.HorizontalAlignment.Left;
+        ViewerSplitThumb.Margin = _viewerOnLeft
+            ? new Thickness(0, 0, -4, 0)
+            : new Thickness(-4, 0, 0, 0);
+        ViewerSplitThumb.Visibility = Visibility.Visible;
+
         if (_viewerOnLeft)
         {
             Left -= panelWidth;
@@ -12288,6 +12360,7 @@ public partial class MainWindow : Window
         ViewerColumnLeft.Width = new GridLength(0);
         ViewerColumnRight.Width = new GridLength(0);
         ViewerPanel.Visibility = Visibility.Collapsed;
+        ViewerSplitThumb.Visibility = Visibility.Collapsed;
         ViewerImage.Source = null;
         ViewerIconImage.Source = null;
 
@@ -12437,6 +12510,77 @@ public partial class MainWindow : Window
             ViewerImage.Source = bitmap;
             ViewerFileInfo.Text = $"{pixelWidth} × {pixelHeight}   {modified:yyyy-MM-dd HH:mm}";
         });
+    }
+
+    // Dragging the tree/viewer divider re-splits the CURRENT window between
+    // the two: only the grid columns move, the window's bounds never do -
+    // which is what makes this the one resize in the app with no dock or
+    // auto-hide interaction at all. The image refits live through Stretch;
+    // the sharp re-decode at the final width happens once, on release.
+    private void ViewerSplitThumb_DragDelta(object sender, DragDeltaEventArgs e)
+    {
+        if (!_viewerOpen)
+        {
+            return;
+        }
+
+        // The thumb sits on the panel's tree-side edge, so the sign flips
+        // with the panel's side: panel on the right grows by dragging LEFT.
+        double target = ViewerPanelWidth + (_viewerOnLeft ? e.HorizontalChange : -e.HorizontalChange);
+
+        // The tree keeps its split floor (see MinTreeSplitWidth - a column
+        // floor, not the window one) of the fixed window width. Max(min, ...)
+        // so a window too narrow for both floors can't hand Math.Clamp an
+        // inverted range (which throws).
+        double maxAllowed = Math.Max(MinViewerWidth,
+            Math.Min(MaxViewerWidth, Width - MinTreeSplitWidth));
+        _settings.ViewerWidth = Math.Clamp(target, MinViewerWidth, maxAllowed);
+
+        double panelWidth = ViewerPanelWidth;
+        if (_viewerOnLeft)
+        {
+            ViewerColumnLeft.Width = new GridLength(panelWidth);
+        }
+        else
+        {
+            ViewerColumnRight.Width = new GridLength(panelWidth);
+        }
+    }
+
+    private void ViewerSplitThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        if (!_viewerOpen)
+        {
+            return;
+        }
+
+        // The middle divider is the ONE gesture allowed to move the stored
+        // tree width (the standing rule) - so it is also the one that must
+        // record it, or the next reveal/restart rebuilds the window from a
+        // stale tree share plus the new panel width and the total jumps.
+        _settings.ExpandedWidth = Math.Clamp(
+            Width - CurrentViewerPanelWidth, MinTreeSplitWidth, MaxExpandedWidth);
+        _settingsService.Save(_settings);
+
+        // A panel widened past its decode width would keep showing the
+        // narrow decode upscaled soft - reload once at the settled width.
+        _pendingViewerPath = null;
+        UpdateViewerPreview();
+    }
+
+    // The OUTER edge drag resizes the viewer too now (tree-hold policy in
+    // SetExpandedWidthAnchored), so its release needs the same settle work
+    // the split thumb's does. Harmless with the viewer closed.
+    private void ResizeThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        if (!_viewerOpen)
+        {
+            return;
+        }
+
+        _settingsService.Save(_settings);
+        _pendingViewerPath = null;
+        UpdateViewerPreview();
     }
 
     // Non-image selections (and images whose decode failed): the file's own
