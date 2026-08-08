@@ -970,6 +970,29 @@ public partial class MainWindow : Window
 
     private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        // BARE +/- is the viewer's zoom (Ctrl+/- stays the app's font size -
+        // two different scales on one pair of keys, told apart by the
+        // modifier). Only while the panel is open and showing something
+        // zoomable, and never while a text box has the keyboard: rename and
+        // the search field both take a literal "+".
+        if (Keyboard.Modifiers == ModifierKeys.None &&
+            _viewerOpen &&
+            _viewerPixelWidth > 0 &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            switch (e.Key)
+            {
+                case Key.OemPlus or Key.Add:
+                    StepViewerZoom(+1, null);
+                    e.Handled = true;
+                    return;
+                case Key.OemMinus or Key.Subtract:
+                    StepViewerZoom(-1, null);
+                    e.Handled = true;
+                    return;
+            }
+        }
+
         // Ctrl+"+" is very often physically Ctrl+Shift+= on standard keyboards
         // (the unshifted key produces "="); requiring an exact Modifiers match
         // rejected that combination outright, so just require Control to be down.
@@ -12353,6 +12376,33 @@ public partial class MainWindow : Window
     // window gains or loses and the tree stays where the user put it.
     private double? _viewerTreeShare;
     private string? _pendingViewerPath;
+
+    // Zoom state (round 2). NULL is the rest state, "fit inside the panel" -
+    // deliberately not a number, because fit has no fixed value: it moves with
+    // every divider drag and window resize, and storing the number it happened
+    // to have would silently stop fitting the moment the panel changed width.
+    // Non-null is a DISPLAY scale where 1.0 means the bitmap's own pixels.
+    private double? _viewerZoom;
+    // The original file's pixel size (not the decode's - DecodePixelWidth
+    // rewrites the bitmap's own PixelWidth), which is what every scale here is
+    // measured against.
+    private int _viewerPixelWidth;
+    private int _viewerPixelHeight;
+    // Width the bitmap on screen was actually decoded at, so zooming past it
+    // can ask for the full-resolution one exactly once.
+    private int _viewerDecodedWidth;
+    private bool _viewerFullResPending;
+    private bool _viewerPanning;
+    private System.Windows.Point _viewerPanOrigin;
+    private double _viewerPanOriginX;
+    private double _viewerPanOriginY;
+
+    // Percentages the stepper and the wheel both land on. Fit is not in the
+    // ladder - it is the floor instead (see StepViewerZoom): a fit that lands
+    // at 34% would otherwise leave 25% and 33% as two near-identical rungs
+    // below the picture's rest state.
+    private static readonly double[] ViewerZoomSteps =
+        { 0.25, 0.33, 0.5, 0.67, 1.0, 1.5, 2.0, 3.0, 4.0, 8.0 };
     private System.Windows.Threading.DispatcherTimer? _viewerPreviewTimer;
 
     private const double MinViewerWidth = 240;
@@ -12533,6 +12583,7 @@ public partial class MainWindow : Window
             ViewerIconImage.Source = null;
             ViewerFileName.Text = string.Empty;
             ViewerFileInfo.Text = string.Empty;
+            ClearViewerZoom();
             return;
         }
 
@@ -12566,7 +12617,12 @@ public partial class MainWindow : Window
     // Background thread. Header first (original dimensions - DecodePixelWidth
     // rewrites the decoded bitmap's own), then the scaled decode; only a
     // frozen bitmap crosses back to the UI thread.
-    private void LoadViewerImage(string path, int decodeWidth)
+    //
+    // fullResolution marks the second, on-demand pass a zoom past the panel
+    // width asks for: it swaps a sharper bitmap into a picture the user is
+    // already looking at, so it must not disturb the zoom, the pan, or - if
+    // the decode fails this time - the perfectly good image on screen.
+    private void LoadViewerImage(string path, int decodeWidth, bool fullResolution = false)
     {
         BitmapImage? bitmap = null;
         int pixelWidth = 0, pixelHeight = 0;
@@ -12608,6 +12664,25 @@ public partial class MainWindow : Window
         {
             if (!_viewerOpen || !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
             {
+                if (fullResolution)
+                {
+                    _viewerFullResPending = false;
+                }
+                return;
+            }
+
+            if (fullResolution)
+            {
+                _viewerFullResPending = false;
+                // A failed second pass leaves the first one alone: the picture
+                // on screen is still correct, just softer than it could be.
+                if (bitmap is null)
+                {
+                    return;
+                }
+
+                _viewerDecodedWidth = bitmap.PixelWidth;
+                ViewerImage.Source = bitmap;
                 return;
             }
 
@@ -12623,8 +12698,328 @@ public partial class MainWindow : Window
             ViewerImage.Source = bitmap;
             ViewerFileInfo.Text =
                 $"{pixelWidth} × {pixelHeight}  ·  {FormatFileSize(fileLength)}  ·  {modified:yyyy-MM-dd HH:mm}";
+
+            // A new picture always arrives fitted (user's call, round 2): a
+            // zoom carried over from the last file lands somewhere arbitrary
+            // in this one, and arrow-keying a folder would show a different
+            // corner of every image.
+            _viewerPixelWidth = pixelWidth;
+            _viewerPixelHeight = pixelHeight;
+            _viewerDecodedWidth = bitmap.PixelWidth;
+            _viewerZoom = null;
+            ViewerZoomPan.X = 0;
+            ViewerZoomPan.Y = 0;
+            ApplyViewerZoom();
         });
     }
+
+    // Fit is a ratio, so it moves with the panel - and a zoom held at, say,
+    // 200% has to STAY 200% while the divider drags, which means recomputing
+    // the transform (it is stored relative to fit) on every resize. Cheap: two
+    // doubles and the readout, no decode.
+    private void ViewerImageHost_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_viewerOpen && _viewerPixelWidth > 0)
+        {
+            ApplyViewerZoom();
+        }
+    }
+
+    // The scale the Uniform stretch is already drawing at - the same
+    // arithmetic WPF does, repeated here because the number is needed for the
+    // readout and for every zoom step, and the Image element's ActualWidth
+    // reports the SLOT it fills, not the picture inside it.
+    private double ViewerFitScale
+    {
+        get
+        {
+            if (_viewerPixelWidth <= 0 || _viewerPixelHeight <= 0)
+            {
+                return 1;
+            }
+
+            var margin = ViewerImage.Margin;
+            double availableWidth = ViewerImageHost.ActualWidth - margin.Left - margin.Right;
+            double availableHeight = ViewerImageHost.ActualHeight - margin.Top - margin.Bottom;
+            if (availableWidth <= 0 || availableHeight <= 0)
+            {
+                return 1;
+            }
+
+            return Math.Min(availableWidth / _viewerPixelWidth, availableHeight / _viewerPixelHeight);
+        }
+    }
+
+    private double ViewerDisplayScale => _viewerZoom ?? ViewerFitScale;
+
+    // Only a picture bigger than its panel can be dragged; at or below fit
+    // there is nothing off-screen to bring into view, so the cursor stays
+    // ordinary and a drag there does nothing at all.
+    private bool ViewerCanPan =>
+        _viewerPixelWidth > 0 &&
+        (_viewerPixelWidth * ViewerDisplayScale > ViewerImageHost.ActualWidth + 0.5 ||
+         _viewerPixelHeight * ViewerDisplayScale > ViewerImageHost.ActualHeight + 0.5);
+
+    // The one thing that touches the transform. Everything else decides what
+    // the zoom should BE and then calls this - so there is exactly one place
+    // where a frame's worth of work happens, and it is two doubles and a
+    // clamp. No decode, no measure, no layout pass.
+    private void ApplyViewerZoom()
+    {
+        double fit = ViewerFitScale;
+        double display = _viewerZoom ?? fit;
+
+        // Relative to fit, because the Image is already fitted by Stretch.
+        double relative = fit > 0 ? display / fit : 1;
+        ViewerZoomScale.ScaleX = relative;
+        ViewerZoomScale.ScaleY = relative;
+
+        ClampViewerPan();
+        UpdateViewerZoomBar();
+        ViewerImageHost.Cursor = ViewerCanPan
+            ? (_viewerPanning ? System.Windows.Input.Cursors.ScrollAll : System.Windows.Input.Cursors.SizeAll)
+            : null;
+    }
+
+    // Keeps the picture from being dragged off its own panel: an axis smaller
+    // than the panel is pinned centred, a larger one can travel exactly as far
+    // as its overhang and no further.
+    private void ClampViewerPan()
+    {
+        double display = ViewerDisplayScale;
+        double overhangX = (_viewerPixelWidth * display - ViewerImageHost.ActualWidth) / 2;
+        double overhangY = (_viewerPixelHeight * display - ViewerImageHost.ActualHeight) / 2;
+        double limitX = Math.Max(0, overhangX);
+        double limitY = Math.Max(0, overhangY);
+        ViewerZoomPan.X = Math.Clamp(ViewerZoomPan.X, -limitX, limitX);
+        ViewerZoomPan.Y = Math.Clamp(ViewerZoomPan.Y, -limitY, limitY);
+    }
+
+    private void UpdateViewerZoomBar()
+    {
+        bool hasImage = _viewerPixelWidth > 0 && ViewerImage.Source is not null;
+        ViewerZoomBar.Visibility = hasImage ? Visibility.Visible : Visibility.Collapsed;
+        if (!hasImage)
+        {
+            return;
+        }
+
+        double fit = ViewerFitScale;
+        double display = _viewerZoom ?? fit;
+        // The real percentage even while fitted (a fit at 34% says "34%"),
+        // which is the number someone reading the strip actually wants; the
+        // lit 맞춤 chip beside it already says WHICH state that number is.
+        ViewerZoomText.Text = $"{Math.Round(display * 100)}%";
+        ViewerFitChip.IsChecked = _viewerZoom is null;
+        ViewerActualChip.IsChecked = _viewerZoom is { } z && Math.Abs(z - 1) < 0.001;
+        ViewerZoomOutButton.IsEnabled = display > fit + 0.001;
+        ViewerZoomInButton.IsEnabled = display < ViewerZoomSteps[^1] - 0.001;
+    }
+
+    // zoom == null means fit. The anchor is a point in the host's coordinates
+    // that should keep showing the same pixel of the picture across the change
+    // - the cursor for a wheel turn, nothing for a button (which zooms about
+    // the centre, since there is no cursor position that means anything).
+    private void SetViewerZoom(double? zoom, System.Windows.Point? anchor)
+    {
+        double before = ViewerDisplayScale;
+
+        if (zoom is null)
+        {
+            _viewerZoom = null;
+            ViewerZoomPan.X = 0;
+            ViewerZoomPan.Y = 0;
+        }
+        else
+        {
+            _viewerZoom = zoom;
+            if (anchor is { } point && before > 0)
+            {
+                // The content point under the anchor sits at (anchor - pan)
+                // from the centre, measured in today's scale; after the change
+                // it has to sit at the same place on screen, so the pan moves
+                // to anchor - (anchor - pan) * (after / before).
+                double ratio = zoom.Value / before;
+                double fromCentreX = point.X - ViewerImageHost.ActualWidth / 2;
+                double fromCentreY = point.Y - ViewerImageHost.ActualHeight / 2;
+                ViewerZoomPan.X = fromCentreX - (fromCentreX - ViewerZoomPan.X) * ratio;
+                ViewerZoomPan.Y = fromCentreY - (fromCentreY - ViewerZoomPan.Y) * ratio;
+            }
+        }
+
+        ApplyViewerZoom();
+        RequestViewerFullResolution();
+    }
+
+    // One rung of the ladder, with fit as the floor: stepping down past the
+    // rung nearest fit lands ON fit rather than somewhere slightly smaller
+    // than the panel, and there is nothing below that.
+    private void StepViewerZoom(int direction, System.Windows.Point? anchor)
+    {
+        if (_viewerPixelWidth <= 0 || ViewerImage.Source is null)
+        {
+            return;
+        }
+
+        double fit = ViewerFitScale;
+        double current = _viewerZoom ?? fit;
+
+        if (direction > 0)
+        {
+            foreach (double step in ViewerZoomSteps)
+            {
+                if (step > current + 0.001)
+                {
+                    SetViewerZoom(step, anchor);
+                    return;
+                }
+            }
+            return;
+        }
+
+        for (int i = ViewerZoomSteps.Length - 1; i >= 0; i--)
+        {
+            if (ViewerZoomSteps[i] < current - 0.001)
+            {
+                SetViewerZoom(ViewerZoomSteps[i] > fit ? ViewerZoomSteps[i] : null, anchor);
+                return;
+            }
+        }
+
+        if (current > fit + 0.001)
+        {
+            SetViewerZoom(null, anchor);
+        }
+    }
+
+    // Round 1 decodes at panel width, which is the right size for a picture
+    // that never grows past fit and the wrong one the moment it does - an 8K
+    // wallpaper decoded for a 900px slot goes soft as soon as it is bigger
+    // than the slot. Ask for the full-resolution decode once, the first time
+    // the zoom actually needs it, and never for a picture that is already
+    // whole.
+    private void RequestViewerFullResolution()
+    {
+        if (_viewerFullResPending ||
+            _pendingViewerPath is not { } path ||
+            _viewerPixelWidth <= 0 ||
+            _viewerDecodedWidth >= _viewerPixelWidth)
+        {
+            return;
+        }
+
+        double onScreenWidth =
+            _viewerPixelWidth * ViewerDisplayScale * VisualTreeHelper.GetDpi(this).DpiScaleX;
+        if (onScreenWidth <= _viewerDecodedWidth + 1)
+        {
+            return;
+        }
+
+        _viewerFullResPending = true;
+        Task.Run(() => LoadViewerImage(path, int.MaxValue, fullResolution: true));
+    }
+
+    private void ViewerImageHost_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        // The picture never scrolls, so the wheel is free to mean zoom with no
+        // modifier - and it has to be Handled either way, or the notch carries
+        // on into whatever is behind the panel.
+        e.Handled = true;
+        StepViewerZoom(Math.Sign(e.Delta), e.GetPosition(ViewerImageHost));
+    }
+
+    private void ViewerImageHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2)
+        {
+            // The gesture every viewer has: fit and 1:1 with nothing to aim at.
+            SetViewerZoom(_viewerZoom is null ? 1 : null, null);
+            e.Handled = true;
+            return;
+        }
+
+        if (!ViewerCanPan)
+        {
+            return;
+        }
+
+        _viewerPanning = true;
+        _viewerPanOrigin = e.GetPosition(ViewerImageHost);
+        _viewerPanOriginX = ViewerZoomPan.X;
+        _viewerPanOriginY = ViewerZoomPan.Y;
+        ViewerImageHost.CaptureMouse();
+        ViewerImageHost.Cursor = System.Windows.Input.Cursors.ScrollAll;
+        e.Handled = true;
+    }
+
+    private void ViewerImageHost_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_viewerPanning)
+        {
+            return;
+        }
+
+        // Absolute from where the drag started, not accumulated per event: an
+        // accumulating pan drifts away from the cursor every time a move is
+        // coalesced or a clamp bites.
+        var point = e.GetPosition(ViewerImageHost);
+        ViewerZoomPan.X = _viewerPanOriginX + (point.X - _viewerPanOrigin.X);
+        ViewerZoomPan.Y = _viewerPanOriginY + (point.Y - _viewerPanOrigin.Y);
+        ClampViewerPan();
+    }
+
+    private void ViewerImageHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_viewerPanning)
+        {
+            return;
+        }
+
+        _viewerPanning = false;
+        ViewerImageHost.ReleaseMouseCapture();
+        ViewerImageHost.Cursor = ViewerCanPan ? System.Windows.Input.Cursors.SizeAll : null;
+    }
+
+    // SAFETY DEVICE: capture can end without a mouse-up ever arriving - another
+    // window taking it, a system event, or the app's own stuck-capture watchdog
+    // reclaiming a leak. The pan flag would survive all three, and then a bare
+    // mouse move with no button held would drag the picture around. What this
+    // hides: any path that ends a pan other than the user letting go.
+    private void ViewerImageHost_LostMouseCapture(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_viewerPanning)
+        {
+            return;
+        }
+
+        _viewerPanning = false;
+        ViewerImageHost.Cursor = ViewerCanPan ? System.Windows.Input.Cursors.SizeAll : null;
+    }
+
+    // Nothing zoomable on screen: back to rest, and the strip goes away rather
+    // than sitting there reading "100%" over a shell icon.
+    private void ClearViewerZoom()
+    {
+        _viewerZoom = null;
+        _viewerPixelWidth = 0;
+        _viewerPixelHeight = 0;
+        _viewerDecodedWidth = 0;
+        _viewerPanning = false;
+        ViewerZoomScale.ScaleX = 1;
+        ViewerZoomScale.ScaleY = 1;
+        ViewerZoomPan.X = 0;
+        ViewerZoomPan.Y = 0;
+        ViewerImageHost.Cursor = null;
+        UpdateViewerZoomBar();
+    }
+
+    private void ViewerFitChip_Click(object sender, RoutedEventArgs e) => SetViewerZoom(null, null);
+
+    private void ViewerActualChip_Click(object sender, RoutedEventArgs e) => SetViewerZoom(1, null);
+
+    private void ViewerZoomInButton_Click(object sender, RoutedEventArgs e) => StepViewerZoom(+1, null);
+
+    private void ViewerZoomOutButton_Click(object sender, RoutedEventArgs e) => StepViewerZoom(-1, null);
 
     // Re-aims the panel at the side the current mode wants - screen-interior
     // (left column) when docked on the right edge, the right column
@@ -12842,6 +13237,8 @@ public partial class MainWindow : Window
             ViewerImage.Source = null;
             ViewerIconImage.Visibility = Visibility.Visible;
             ViewerIconImage.Source = icon;
+            // A shell icon has nothing to zoom, so the strip goes with it.
+            ClearViewerZoom();
             try
             {
                 // Files get size · date like images do; folders just their

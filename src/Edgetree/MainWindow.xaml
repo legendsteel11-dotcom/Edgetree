@@ -2590,6 +2590,67 @@
             </Setter>
         </Style>
 
+        <!-- The chip above, minus the checked state: the viewer's zoom stepper
+             (− and +) does something rather than IS something, so it can't be
+             a ToggleButton, but it sits in the same strip as 맞춤/1:1 and has
+             to match them pixel for pixel. Kept as a separate Style rather
+             than a shared template because the checked trigger is the only
+             difference and duplicating four setters beats a BasedOn chain
+             across two control types. -->
+        <Style x:Key="FooterActionChipStyle"
+                TargetType="Button">
+            <Setter Property="FontSize"
+                    Value="11"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource ForegroundText}"/>
+            <Setter Property="Opacity"
+                    Value="0.65"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="Focusable"
+                    Value="False"/>
+            <Setter Property="Margin"
+                    Value="0,0,2,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="Transparent"
+                                CornerRadius="3"
+                                Padding="5,1"
+                                SnapsToDevicePixels="True">
+                            <TextBlock Text="{TemplateBinding Content}"
+                                    VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowHoverBackground}"/>
+                                <Setter Property="Opacity"
+                                        Value="1"/>
+                            </Trigger>
+                            <!-- A step that can't be taken (already at fit, or
+                                 at 800%) stays visible and stops answering -
+                                 the alternative, hiding it, would shuffle the
+                                 strip's width every time the zoom crosses an
+                                 end. Half the resting ink, which is the one
+                                 place opacity still means "unavailable"
+                                 rather than "secondary". -->
+                            <Trigger Property="IsEnabled"
+                                    Value="False">
+                                <Setter Property="Opacity"
+                                        Value="0.3"/>
+                                <Setter Property="Cursor"
+                                        Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="RowPathTooltip"
                 TargetType="TextBlock">
             <Setter Property="ToolTipService.InitialShowDelay"
@@ -4593,15 +4654,49 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <!-- Fit-inside for round 1 (zoom/pan come next round).
-                         Uniform with no StretchDirection cap: the user asked
-                         for no size ceiling, so a small image may scale up -
-                         HighQuality keeps that acceptable. -->
-                    <Image x:Name="ViewerImage"
+                    <!-- Zoom and pan (round 2) ride entirely on the Image's
+                         RenderTransform - no re-layout and no re-decode in a
+                         frame, which is the standing rule for anything that
+                         runs while the mouse is moving. Stretch stays Uniform,
+                         so WPF keeps doing the fit arithmetic for us and the
+                         scale factor below is measured RELATIVE to fit: 1.0 is
+                         the rest state, and 1:1 is whatever number makes the
+                         bitmap's own pixels line up. The host Border is what
+                         clips the zoomed-in image to the panel and what the
+                         wheel and the drag listen on (an Image only gets mouse
+                         events where it has actually drawn pixels, so the
+                         letterboxed margins beside a wide picture would be
+                         dead to both). -->
+                    <Border x:Name="ViewerImageHost"
                             Grid.Row="0"
-                            Stretch="Uniform"
-                            RenderOptions.BitmapScalingMode="HighQuality"
-                            Margin="10"/>
+                            ClipToBounds="True"
+                            Background="Transparent"
+                            SizeChanged="ViewerImageHost_SizeChanged"
+                            MouseWheel="ViewerImageHost_MouseWheel"
+                            MouseLeftButtonDown="ViewerImageHost_MouseLeftButtonDown"
+                            MouseMove="ViewerImageHost_MouseMove"
+                            MouseLeftButtonUp="ViewerImageHost_MouseLeftButtonUp"
+                            LostMouseCapture="ViewerImageHost_LostMouseCapture">
+                        <!-- Uniform with no StretchDirection cap: the user
+                             asked for no size ceiling, so a small image may
+                             scale up - HighQuality keeps that acceptable. -->
+                        <Image x:Name="ViewerImage"
+                                Stretch="Uniform"
+                                RenderOptions.BitmapScalingMode="HighQuality"
+                                RenderTransformOrigin="0.5,0.5"
+                                Margin="10">
+                            <Image.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="ViewerZoomScale"
+                                            ScaleX="1"
+                                            ScaleY="1"/>
+                                    <TranslateTransform x:Name="ViewerZoomPan"
+                                            X="0"
+                                            Y="0"/>
+                                </TransformGroup>
+                            </Image.RenderTransform>
+                        </Image>
+                    </Border>
                     <!-- What a non-image selection shows instead: the file's
                          own shell icon, natural size, centered. -->
                     <Image x:Name="ViewerIconImage"
@@ -4633,6 +4728,47 @@
                                 FontSize="{DynamicResource MenuThumbnailInfoFontSize}"
                                 TextAlignment="Center"
                                 Margin="0,9,0,0"/>
+                        <!-- Its own centred row rather than the right end of
+                             the metadata line: both caption lines are centred,
+                             and hanging controls off one end of a centred line
+                             reads as a mistake at every width (and collides
+                             with a long metadata string at narrow ones). A
+                             row of chips under a caption is also exactly what
+                             the footer filter strip already looks like, which
+                             is where the user pointed. -->
+                        <StackPanel x:Name="ViewerZoomBar"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Margin="0,7,-2,0">
+                            <ToggleButton x:Name="ViewerFitChip"
+                                    Style="{StaticResource FooterFilterChipStyle}"
+                                    Content="{x:Static services:Strings.ViewerZoomFit}"
+                                    Click="ViewerFitChip_Click"/>
+                            <ToggleButton x:Name="ViewerActualChip"
+                                    Style="{StaticResource FooterFilterChipStyle}"
+                                    Content="{x:Static services:Strings.ViewerZoomActual}"
+                                    Click="ViewerActualChip_Click"/>
+                            <Button x:Name="ViewerZoomOutButton"
+                                    Style="{StaticResource FooterActionChipStyle}"
+                                    Content="&#x2212;"
+                                    Margin="6,0,2,0"
+                                    Click="ViewerZoomOutButton_Click"/>
+                            <!-- Fixed width so stepping through 25%..800%
+                                 doesn't shove the + button sideways under the
+                                 cursor mid-click. -->
+                            <TextBlock x:Name="ViewerZoomText"
+                                    Width="34"
+                                    FontSize="11"
+                                    Foreground="{DynamicResource ForegroundText}"
+                                    Opacity="0.65"
+                                    TextAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                            <Button x:Name="ViewerZoomInButton"
+                                    Style="{StaticResource FooterActionChipStyle}"
+                                    Content="+"
+                                    Margin="2,0,0,0"
+                                    Click="ViewerZoomInButton_Click"/>
+                        </StackPanel>
                     </StackPanel>
                     <Button x:Name="ViewerCloseButton"
                             Grid.Row="0"
