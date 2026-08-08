@@ -1750,10 +1750,12 @@ public partial class MainWindow : Window
     // reveal side of this transition stutter (see AnimateWidth's comment).
     private void EnterAutoHide()
     {
-        // The viewer panel folds before anything hides (user's call,
-        // 2026-08-08) - so the slide, the collapse and the later reveal all
-        // work on the plain tree-only width they were built around.
-        CloseViewer();
+        // EXPERIMENT (2026-08-08, user request): the viewer panel used to
+        // fold here so hide/reveal only ever handled the tree-only width.
+        // Now it rides along - the slide and collapse just see a wider
+        // window, and RevealFromAutoHide adds the panel's width back on. If
+        // hide/reveal misbehaves with the viewer open, this is the first
+        // place to look (the fold was one CloseViewer() call right here).
 
         _settings.IsAutoHidden = true;
         StopHoverReveal();
@@ -1994,7 +1996,10 @@ public partial class MainWindow : Window
 
         _isAutoHideRevealed = true;
 
-        double expandedWidth = ClampExpandedWidth(_settings.ExpandedWidth);
+        // Plus the viewer panel if it stayed open through the hide (the
+        // experiment note in EnterAutoHide) - ExpandedWidth is the tree
+        // alone, and restoring only that would crush the panel's column.
+        double expandedWidth = ClampExpandedWidth(_settings.ExpandedWidth) + CurrentViewerPanelWidth;
 
         // Revealing never slides, and that asymmetry is the whole finding of
         // 2026-08-05. A window has no pixels where it is off the screen, so one
