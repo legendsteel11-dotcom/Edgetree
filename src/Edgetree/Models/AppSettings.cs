@@ -17,6 +17,14 @@ public class AppSettings
     public bool ViewerOpen { get; set; } = false;
     public double ViewerWidth { get; set; } = 360;
 
+    // The zoom navigator (chip at the end of the viewer's zoom strip). OFF by
+    // default on purpose: the person who asked for it doesn't want it on their
+    // own screen - "저는 없어도 깔끔한데 분명 이 상황에서는 요구될 의견이라서"
+    // - so it exists for whoever goes looking, and stays out of the way of
+    // everyone who doesn't. Even switched on it only appears while the picture
+    // is actually bigger than the panel; there is nothing to navigate at fit.
+    public bool ViewerNavigator { get; set; } = false;
+
     // Collapsed to a bare sliver at the screen edge that peeks open on
     // mouse-over - see MainWindow.xaml.cs's EnterAutoHide/ExitAutoHide.
     // Entered by a single click on the app icon while docked and expanded.

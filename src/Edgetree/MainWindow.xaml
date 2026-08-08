@@ -3707,7 +3707,12 @@
                  it always sits between whichever row is on top and whichever
                  is on bottom. -->
             <Grid.RowDefinitions>
-                <RowDefinition Height="36"/>
+                <!-- Fixed, not Auto - so hiding the header alone leaves the row
+                     behind as a 36px band of background at the top of the
+                     window. The viewer's full cover zeroes this height itself
+                     (SetViewerFullscreen) and puts it back on the way out. -->
+                <RowDefinition x:Name="HeaderRow"
+                        Height="36"/>
                 <RowDefinition x:Name="Row1"
                         Height="0"/>
                 <RowDefinition x:Name="FavoritesSplitterRow"
@@ -4167,7 +4172,8 @@
                  the two casualties of the viewer's column split - they sat at
                  the default column 0, which is the zero-width viewer column,
                  and vanished; 2026-08-08.) -->
-            <Border Grid.Row="0"
+            <Border x:Name="HeaderUnderline"
+                    Grid.Row="0"
                     Grid.ColumnSpan="3"
                     Height="1"
                     VerticalAlignment="Bottom"
@@ -4673,6 +4679,7 @@
                             Background="Transparent"
                             SizeChanged="ViewerImageHost_SizeChanged"
                             MouseWheel="ViewerImageHost_MouseWheel"
+                            MouseDown="ViewerImageHost_MouseDown"
                             MouseLeftButtonDown="ViewerImageHost_MouseLeftButtonDown"
                             MouseMove="ViewerImageHost_MouseMove"
                             MouseLeftButtonUp="ViewerImageHost_MouseLeftButtonUp"
@@ -4697,6 +4704,55 @@
                             </Image.RenderTransform>
                         </Image>
                     </Border>
+                    <!-- Zoom navigator: the whole picture small, with a box
+                         showing which part of it the panel is currently
+                         looking at. A sibling of the host rather than a child,
+                         so the host stays a Border with one child and its clip
+                         is untouched; it sizes itself to the picture's aspect
+                         in code.
+                         IsHitTestVisible=False on purpose - read-only for now,
+                         and without it the corner it sits in would be a dead
+                         patch where the pan drag stops working.
+                         Fixed colours, the one place in this app that ignores
+                         the theme: what shows through behind it is the PHOTO,
+                         so a light-theme plate would vanish on a bright image
+                         and a dark one on a dark image. The dimmed thumbnail
+                         under a white box is what keeps the box readable over
+                         any picture. -->
+                    <Border x:Name="ViewerNavigatorPlate"
+                            Grid.Row="0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            Margin="0,0,10,10"
+                            Visibility="Collapsed"
+                            IsHitTestVisible="False"
+                            Background="#CC181818"
+                            BorderBrush="#59FFFFFF"
+                            BorderThickness="1"
+                            SnapsToDevicePixels="True">
+                        <Grid>
+                            <Image x:Name="ViewerNavigatorImage"
+                                    Stretch="Fill"
+                                    Opacity="0.65"
+                                    RenderOptions.BitmapScalingMode="LowQuality"/>
+                            <!-- Moved by a TranslateTransform, never by Margin:
+                                 this box tracks the pan drag frame by frame,
+                                 and a margin would run a layout pass on each
+                                 one. Width/Height do change on a zoom STEP,
+                                 which is once per notch, not once per frame. -->
+                            <Border x:Name="ViewerNavigatorBox"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Top"
+                                    BorderBrush="#FFFFFFFF"
+                                    BorderThickness="1"
+                                    Background="#26FFFFFF"
+                                    SnapsToDevicePixels="True">
+                                <Border.RenderTransform>
+                                    <TranslateTransform x:Name="ViewerNavigatorBoxOffset"/>
+                                </Border.RenderTransform>
+                            </Border>
+                        </Grid>
+                    </Border>
                     <!-- What a non-image selection shows instead: the file's
                          own shell icon, natural size, centered. -->
                     <Image x:Name="ViewerIconImage"
@@ -4715,7 +4771,8 @@
                          chips' unchecked ink (ForegroundText at the chips'
                          own 0.65 - matching them is the user's spec here, so
                          the no-opacity rule yields to the pairing). -->
-                    <StackPanel Grid.Row="1"
+                    <StackPanel x:Name="ViewerCaptionPanel"
+                            Grid.Row="1"
                             Margin="10,0,10,10">
                         <TextBlock x:Name="ViewerFileName"
                                 Foreground="{DynamicResource FileNameForeground}"
@@ -4768,6 +4825,11 @@
                                     Content="+"
                                     Margin="2,0,0,0"
                                     Click="ViewerZoomInButton_Click"/>
+                            <ToggleButton x:Name="ViewerNavigatorChip"
+                                    Style="{StaticResource FooterFilterChipStyle}"
+                                    Content="{x:Static services:Strings.ViewerNavigator}"
+                                    Margin="6,0,0,0"
+                                    Click="ViewerNavigatorChip_Click"/>
                         </StackPanel>
                     </StackPanel>
                     <Button x:Name="ViewerCloseButton"

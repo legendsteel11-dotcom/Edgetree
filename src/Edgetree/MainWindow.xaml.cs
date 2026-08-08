@@ -970,6 +970,55 @@ public partial class MainWindow : Window
 
     private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        // Esc leaves the viewer's full cover. Middle-clicking again does too,
+        // but a mode that fills the screen has no visible way out of its own,
+        // and Esc is what a hand reaches for. Narrow enough not to disturb the
+        // tree's own Esc (which calls off a multi-selection or a pending cut).
+        if (_viewerFullscreen && e.Key == Key.Escape &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            SetViewerFullscreen(false);
+            e.Handled = true;
+            return;
+        }
+
+        // Enter toggles the full cover, but ONLY while the viewer is actually
+        // showing a decoded picture. Everywhere else Enter keeps meaning what
+        // it has always meant in the tree - open the row with its default app,
+        // expand the folder - so what is given up is narrow: opening an image
+        // in the system photo app by keyboard, while that same image is
+        // already on screen here. Double-click and the row menu's 열기 both
+        // still do it.
+        if (_viewerOpen &&
+            _viewerPixelWidth > 0 &&
+            ViewerImage.Source is not null &&
+            Keyboard.Modifiers == ModifierKeys.None &&
+            e.Key is Key.Enter or Key.Return &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            SetViewerFullscreen(!_viewerFullscreen);
+            e.Handled = true;
+            return;
+        }
+
+        // Space = next picture, which is what every photo viewer does. The tree
+        // has no Space action of its own, so nothing is taken away - and this
+        // just asks focus to move down, landing wherever the Down arrow would
+        // have, rather than defining a second idea of "next" to keep in sync.
+        if (Keyboard.Modifiers == ModifierKeys.None &&
+            _viewerOpen &&
+            e.Key == Key.Space &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            if (Keyboard.FocusedElement is UIElement focused &&
+                focused.MoveFocus(new System.Windows.Input.TraversalRequest(
+                    System.Windows.Input.FocusNavigationDirection.Down)))
+            {
+                e.Handled = true;
+            }
+            return;
+        }
+
         // BARE +/- is the viewer's zoom (Ctrl+/- stays the app's font size -
         // two different scales on one pair of keys, told apart by the
         // modifier). Only while the panel is open and showing something
@@ -12393,16 +12442,24 @@ public partial class MainWindow : Window
     private int _viewerDecodedWidth;
     private bool _viewerFullResPending;
     private bool _viewerPanning;
+    // The temporary full cover (middle-click on the picture, Esc to leave).
+    // Deliberately NOT the same thing as the 0px divider position tried and
+    // rolled back on 2026-08-08 ("아무리 봐도 어색") - that was proposed as the
+    // resting split, where a strip of tree always belongs; this is a mode
+    // entered on purpose and left by the gesture that entered it.
+    private bool _viewerFullscreen;
+    private WindowState? _viewerFullscreenPreviousState;
     private System.Windows.Point _viewerPanOrigin;
     private double _viewerPanOriginX;
     private double _viewerPanOriginY;
 
-    // Percentages the stepper and the wheel both land on. Fit is not in the
-    // ladder - it is the floor instead (see StepViewerZoom): a fit that lands
-    // at 34% would otherwise leave 25% and 33% as two near-identical rungs
-    // below the picture's rest state.
+    // Percentages the stepper and the wheel both land on. Fit is not one of
+    // them - it is a ratio, and it moves - so the 맞춤 chip is how you get
+    // back to it. Nor is it the floor any more: it was, and that left a large
+    // picture unable to zoom out at all past the size it rested at, which no
+    // other viewer does (user, 2026-08-08). The ladder simply runs down to 5%.
     private static readonly double[] ViewerZoomSteps =
-        { 0.25, 0.33, 0.5, 0.67, 1.0, 1.5, 2.0, 3.0, 4.0, 8.0 };
+        { 0.05, 0.1, 0.17, 0.25, 0.33, 0.5, 0.67, 1.0, 1.5, 2.0, 3.0, 4.0, 8.0 };
     private System.Windows.Threading.DispatcherTimer? _viewerPreviewTimer;
 
     private const double MinViewerWidth = 240;
@@ -12512,6 +12569,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        SetViewerFullscreen(false);
+
         _viewerOpen = false;
         _pendingViewerPath = null;
         _viewerTreeShare = null;
@@ -12600,12 +12659,22 @@ public partial class MainWindow : Window
         bool isImage = !item.IsDirectory && ThumbnailExtensions.Contains(Path.GetExtension(path));
         if (isImage)
         {
-            // Decode at panel width, not full size: an 8K wallpaper decoded
-            // whole is ~100MB of pixels for a ~400px slot, and round 1 never
-            // shows more than fit-inside. The zoom round will re-decode full
-            // size on demand.
+            // Decode at the size of the slot it lands in, not full size: an 8K
+            // wallpaper decoded whole is ~100MB of pixels for a ~400px slot,
+            // and nothing is drawn bigger than the slot until someone zooms
+            // (which asks for the full-resolution pass separately).
+            //
+            // The slot is the HOST, not the remembered panel width, whenever
+            // the two differ - full screen the panel width is still the little
+            // number from the windowed split, so every picture arrived
+            // decoded for a 960px slot and sat there soft on a 4K screen
+            // (reported 2026-08-08). Getting it right here means the second
+            // pass usually isn't needed at all.
+            double slotWidth = ViewerImageHost.ActualWidth > 0
+                ? Math.Max(ViewerImageHost.ActualWidth, ViewerPanelWidth)
+                : ViewerPanelWidth;
             int decodeWidth = (int)Math.Ceiling(
-                Math.Max(200, ViewerPanelWidth) * VisualTreeHelper.GetDpi(this).DpiScaleX);
+                Math.Max(200, slotWidth) * VisualTreeHelper.GetDpi(this).DpiScaleX);
             Task.Run(() => LoadViewerImage(path, decodeWidth));
         }
         else
@@ -12750,7 +12819,18 @@ public partial class MainWindow : Window
         }
     }
 
-    private double ViewerDisplayScale => _viewerZoom ?? ViewerFitScale;
+    // The scale the picture RESTS at. In the panel that is plain fit, ceiling
+    // and all - the round-1 call was that a small picture may scale up to fill
+    // the slot. Full screen it stops at 100%: "작은건 작게 큰건 맞추면" (user,
+    // 2026-08-08) - big pictures fit the monitor, small ones stay their own
+    // size rather than being blown up across a 4K screen. That ceiling is also
+    // what makes a 3840 picture on a 3840 screen land at exactly 1:1: the raw
+    // fit works out a hair over 1.0, because a maximized WPF window is a few
+    // pixels wider than the screen it covers, and the ceiling swallows it.
+    private double ViewerRestScale =>
+        _viewerFullscreen ? Math.Min(1, ViewerFitScale) : ViewerFitScale;
+
+    private double ViewerDisplayScale => _viewerZoom ?? ViewerRestScale;
 
     // Only a picture bigger than its panel can be dragged; at or below fit
     // there is nothing off-screen to bring into view, so the cursor stays
@@ -12766,15 +12846,26 @@ public partial class MainWindow : Window
     // clamp. No decode, no measure, no layout pass.
     private void ApplyViewerZoom()
     {
+        // The RAW fit here, never the rest scale: this converts to the
+        // transform, and what the Stretch has already drawn is the raw fit.
         double fit = ViewerFitScale;
-        double display = _viewerZoom ?? fit;
+        double display = ViewerDisplayScale;
 
-        // Relative to fit, because the Image is already fitted by Stretch.
         double relative = fit > 0 ? display / fit : 1;
         ViewerZoomScale.ScaleX = relative;
         ViewerZoomScale.ScaleY = relative;
 
         ClampViewerPan();
+        // Asked here rather than only from SetViewerZoom, which was the first
+        // version and left two ways in uncovered (reported 2026-08-08): going
+        // full screen, and a new picture arriving while already full screen,
+        // both change how big the bitmap is drawn without any zoom happening -
+        // so the panel-width decode stayed on screen, soft, until the wheel
+        // was turned. This method is the one thing every one of those paths
+        // ends at. It stays cheap: the request guards on already-pending,
+        // already-whole, and already-big-enough before it starts anything.
+        RequestViewerFullResolution();
+        UpdateViewerNavigator();
         UpdateViewerZoomBar();
         ViewerImageHost.Cursor = ViewerCanPan
             ? (_viewerPanning ? System.Windows.Input.Cursors.ScrollAll : System.Windows.Input.Cursors.SizeAll)
@@ -12804,7 +12895,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        double fit = ViewerFitScale;
+        double fit = ViewerRestScale;
         double display = _viewerZoom ?? fit;
         // The real percentage even while fitted (a fit at 34% says "34%"),
         // which is the number someone reading the strip actually wants; the
@@ -12812,8 +12903,101 @@ public partial class MainWindow : Window
         ViewerZoomText.Text = $"{Math.Round(display * 100)}%";
         ViewerFitChip.IsChecked = _viewerZoom is null;
         ViewerActualChip.IsChecked = _viewerZoom is { } z && Math.Abs(z - 1) < 0.001;
-        ViewerZoomOutButton.IsEnabled = display > fit + 0.001;
+        ViewerZoomOutButton.IsEnabled = display > ViewerZoomSteps[0] + 0.001;
         ViewerZoomInButton.IsEnabled = display < ViewerZoomSteps[^1] - 0.001;
+        ViewerNavigatorChip.IsChecked = _settings.ViewerNavigator;
+    }
+
+    // Below this the plate would be taking a serious bite out of the picture
+    // it is meant to help read - the panel's own floor is 240px wide.
+    private const double ViewerNavigatorMinHostWidth = 220;
+    private const double ViewerNavigatorMinHostHeight = 160;
+    // Proportional to the panel's shorter side, so the same plate that reads
+    // right beside a 900px panel doesn't become a postage stamp once the
+    // viewer has the whole 4K screen (user, 2026-08-08). The ceiling is what
+    // keeps "bigger screen" from turning into "map instead of picture".
+    private const double ViewerNavigatorSideRatio = 0.22;
+    private const double ViewerNavigatorMinSide = 56;
+    private const double ViewerNavigatorMaxSide = 280;
+
+    // The whole picture, small, with a box around the part the panel is
+    // showing. Everything it needs was already being computed for the zoom -
+    // the visible region in image pixels is the panel's size divided by the
+    // scale, centred on the pan - so this adds arithmetic, not state.
+    private void UpdateViewerNavigator()
+    {
+        if (!_settings.ViewerNavigator ||
+            _viewerPixelWidth <= 0 ||
+            ViewerImage.Source is null ||
+            !ViewerCanPan ||
+            ViewerImageHost.ActualWidth < ViewerNavigatorMinHostWidth ||
+            ViewerImageHost.ActualHeight < ViewerNavigatorMinHostHeight)
+        {
+            ViewerNavigatorPlate.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // The same bitmap the panel is already showing - a navigator this size
+        // has no use for its own decode, at either resolution.
+        if (!ReferenceEquals(ViewerNavigatorImage.Source, ViewerImage.Source))
+        {
+            ViewerNavigatorImage.Source = ViewerImage.Source;
+        }
+
+        double side = Math.Clamp(
+            Math.Min(ViewerImageHost.ActualWidth, ViewerImageHost.ActualHeight)
+                * ViewerNavigatorSideRatio,
+            ViewerNavigatorMinSide, ViewerNavigatorMaxSide);
+        double plateWidth, plateHeight;
+        if (_viewerPixelWidth >= _viewerPixelHeight)
+        {
+            plateWidth = side;
+            plateHeight = Math.Max(16, side * _viewerPixelHeight / _viewerPixelWidth);
+        }
+        else
+        {
+            plateHeight = side;
+            plateWidth = Math.Max(16, side * _viewerPixelWidth / _viewerPixelHeight);
+        }
+
+        ViewerNavigatorPlate.Width = plateWidth;
+        ViewerNavigatorPlate.Height = plateHeight;
+        ViewerNavigatorPlate.Visibility = Visibility.Visible;
+
+        double display = ViewerDisplayScale;
+        double mapScale = plateWidth / _viewerPixelWidth;
+        double visibleWidth = ViewerImageHost.ActualWidth / display;
+        double visibleHeight = ViewerImageHost.ActualHeight / display;
+        // Pan moves the picture, so the viewport travels the other way.
+        double visibleLeft =
+            _viewerPixelWidth / 2.0 - (ViewerZoomPan.X + ViewerImageHost.ActualWidth / 2) / display;
+        double visibleTop =
+            _viewerPixelHeight / 2.0 - (ViewerZoomPan.Y + ViewerImageHost.ActualHeight / 2) / display;
+
+        double boxWidth = Math.Min(plateWidth, visibleWidth * mapScale);
+        double boxHeight = Math.Min(plateHeight, visibleHeight * mapScale);
+
+        // NaN on the first pass, and every comparison against NaN is false -
+        // so ask about NaN explicitly or the box never gets its first size.
+        if (double.IsNaN(ViewerNavigatorBox.Width) ||
+            Math.Abs(ViewerNavigatorBox.Width - boxWidth) > 0.5 ||
+            Math.Abs(ViewerNavigatorBox.Height - boxHeight) > 0.5)
+        {
+            ViewerNavigatorBox.Width = boxWidth;
+            ViewerNavigatorBox.Height = boxHeight;
+        }
+
+        ViewerNavigatorBoxOffset.X = Math.Clamp(
+            visibleLeft * mapScale, 0, Math.Max(0, plateWidth - boxWidth));
+        ViewerNavigatorBoxOffset.Y = Math.Clamp(
+            visibleTop * mapScale, 0, Math.Max(0, plateHeight - boxHeight));
+    }
+
+    private void ViewerNavigatorChip_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ViewerNavigator = ViewerNavigatorChip.IsChecked == true;
+        _settingsService.Save(_settings);
+        UpdateViewerNavigator();
     }
 
     // zoom == null means fit. The anchor is a point in the host's coordinates
@@ -12861,7 +13045,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        double fit = ViewerFitScale;
+        double fit = ViewerRestScale;
         double current = _viewerZoom ?? fit;
 
         if (direction > 0)
@@ -12881,14 +13065,9 @@ public partial class MainWindow : Window
         {
             if (ViewerZoomSteps[i] < current - 0.001)
             {
-                SetViewerZoom(ViewerZoomSteps[i] > fit ? ViewerZoomSteps[i] : null, anchor);
+                SetViewerZoom(ViewerZoomSteps[i], anchor);
                 return;
             }
-        }
-
-        if (current > fit + 0.001)
-        {
-            SetViewerZoom(null, anchor);
         }
     }
 
@@ -12926,6 +13105,97 @@ public partial class MainWindow : Window
         // on into whatever is behind the panel.
         e.Handled = true;
         StepViewerZoom(Math.Sign(e.Delta), e.GetPosition(ViewerImageHost));
+    }
+
+    // Middle-click on the picture toggles a full cover: the window maximizes
+    // (floating only) and the viewer takes the tree's column as well. Docked,
+    // the window is a parked band with a clip region and margins, and
+    // maximizing it would fight every rule the dock geometry runs on - so
+    // there the mode is columns only, which is the one resize in this app with
+    // no dock interaction at all.
+    private void SetViewerFullscreen(bool on)
+    {
+        if (!_viewerOpen || _viewerFullscreen == on)
+        {
+            return;
+        }
+
+        _viewerFullscreen = on;
+
+        if (on)
+        {
+            if (!_isDocked && WindowState != WindowState.Maximized)
+            {
+                _viewerFullscreenPreviousState = WindowState;
+                WindowState = WindowState.Maximized;
+            }
+        }
+        else if (_viewerFullscreenPreviousState is { } previous)
+        {
+            _viewerFullscreenPreviousState = null;
+            WindowState = previous;
+        }
+
+        // The header goes with it. Without this the mode was just "the window
+        // is maximized" (user, 2026-08-08) - and worse, entering it from a
+        // window ALREADY maximized by a header double-click changed nothing
+        // but the tree, so the same middle-click looked like it was opening
+        // and closing the explorer rather than entering a mode. With the
+        // header gone, every route in looks the same and looks like a mode.
+        // Row 0 is Auto-height, so collapsing both children collapses the row
+        // and the viewer rises to the top of the window.
+        // EVERY piece of chrome goes, not just the header. Keeping the caption
+        // strip and the close button was the first attempt, on the reasoning
+        // that the mode would otherwise have nothing to hold on to - but they
+        // eat the picture's own space, so a 3840 image on a 3840 screen had
+        // nowhere to be 1:1 (user, 2026-08-08: "보통 일반적으로 다른
+        // 이미지뷰어들의 1:1은 아무 정보도 표시하지 않습니다"). Margins and
+        // the panel's divider line go for the same reason - a 1px border is
+        // still 1px the picture doesn't get. The way out is Esc, Enter or
+        // middle-click; that is what every other viewer offers too.
+        var chrome = on ? Visibility.Collapsed : Visibility.Visible;
+        HeaderGrid.Visibility = chrome;
+        HeaderUnderline.Visibility = chrome;
+        // The row is a FIXED 36, not Auto, so hiding its contents left a 36px
+        // band of background across the top of the picture (reported with a
+        // screenshot, 2026-08-08). The height has to go too.
+        HeaderRow.Height = on ? new GridLength(0) : new GridLength(36);
+        ViewerCaptionPanel.Visibility = chrome;
+        ViewerCloseButton.Visibility = chrome;
+        ViewerImage.Margin = on ? default : new Thickness(10);
+        ViewerPanel.BorderThickness = on
+            ? default
+            : (_viewerOnLeft ? new Thickness(0, 0, 1, 0) : new Thickness(1, 0, 0, 0));
+
+        // Nothing to split while the viewer is the whole window.
+        ViewerSplitThumb.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+
+        // Both crossings land at the rest state. Carrying a zoom across meant
+        // going full screen after one wheel turn in the panel put you at that
+        // magnification on a 4K screen, looking at a corner of the picture
+        // rather than the picture (reported 2026-08-08). Leaving resets for the
+        // same reason in reverse: a zoom chosen for the whole screen is a
+        // strange place to drop someone back into a 900px panel.
+        _viewerZoom = null;
+        ViewerZoomPan.X = 0;
+        ViewerZoomPan.Y = 0;
+
+        ClampViewerColumnToWindow();
+        // The clamp usually resizes the column and the layout pass that
+        // follows re-applies this - but not when the column was already the
+        // width it wanted, so do it here too rather than depend on a resize.
+        ApplyViewerZoom();
+    }
+
+    private void ViewerImageHost_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Middle)
+        {
+            return;
+        }
+
+        SetViewerFullscreen(!_viewerFullscreen);
+        e.Handled = true;
     }
 
     private void ViewerImageHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -12966,6 +13236,7 @@ public partial class MainWindow : Window
         ViewerZoomPan.X = _viewerPanOriginX + (point.X - _viewerPanOrigin.X);
         ViewerZoomPan.Y = _viewerPanOriginY + (point.Y - _viewerPanOrigin.Y);
         ClampViewerPan();
+        UpdateViewerNavigator();
     }
 
     private void ViewerImageHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -13010,6 +13281,8 @@ public partial class MainWindow : Window
         ViewerZoomPan.X = 0;
         ViewerZoomPan.Y = 0;
         ViewerImageHost.Cursor = null;
+        ViewerNavigatorImage.Source = null;
+        UpdateViewerNavigator();
         UpdateViewerZoomBar();
     }
 
@@ -13033,6 +13306,11 @@ public partial class MainWindow : Window
         {
             return;
         }
+
+        // Dock, undock and side changes rebuild the split from scratch, and
+        // the full cover has no place in one - leave it here, in the single
+        // place all three pass through, so the columns below are the real ones.
+        SetViewerFullscreen(false);
 
         _viewerOnLeft = _isDocked && _settings.DockOnRight;
         double panelWidth = Math.Min(ViewerPanelWidth, Math.Max(0, Width - MinTreeSplitWidth));
@@ -13084,6 +13362,21 @@ public partial class MainWindow : Window
         }
 
         double windowWidth = ActualWidth > 0 ? ActualWidth : Width;
+
+        // The full cover takes the whole window, tree floor and viewer cap
+        // both stood down - they are rules about a SPLIT, and there isn't one
+        // here. _viewerTreeShare is left untouched, so leaving the mode puts
+        // the split back exactly as it was.
+        if (_viewerFullscreen)
+        {
+            var covered = _viewerOnLeft ? ViewerColumnLeft : ViewerColumnRight;
+            if (Math.Abs(covered.Width.Value - windowWidth) > 0.5)
+            {
+                covered.Width = new GridLength(windowWidth);
+            }
+            return;
+        }
+
         double available = Math.Max(0, windowWidth - MinTreeSplitWidth);
 
         // The tree column is the STAR one, so left alone it absorbs every
