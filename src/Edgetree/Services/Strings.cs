@@ -103,6 +103,11 @@ public static class Strings
     public static string CollapseAllConfirmTitle = "모든 펼친 폴더 접기";
     public static string CollapseAllConfirmBody = "모든 펼쳐졌던 폴더를 접겠습니까?";
     public static string MenuAlwaysOnTop = "항상 위에 표시";
+    // The submenu holding the set-once housekeeping toggles (autostart, tray
+    // icon, folder/file icons, title bar text) - they sat as top-level rows
+    // until the menu grew long enough that daily rows and once-ever rows were
+    // shoulder to shoulder (user, 2026-08-08).
+    public static string MenuGeneralSettings = "기본 설정";
     public static string MenuStartWithWindows = "부팅 후 자동 시작";
     public static string MenuAlwaysShowTrayIcon = "트레이 아이콘";
     public static string MenuShowFolderIcons = "폴더 아이콘";
@@ -454,6 +459,7 @@ public static class Strings
         MenuRemoveFavorite = "Remove from Favorites";
 
         MenuAlwaysOnTop = "Always on Top";
+        MenuGeneralSettings = "General";
         MenuStartWithWindows = "Start with Windows";
         MenuAlwaysShowTrayIcon = "Always Show Tray Icon";
         MenuShowFolderIcons = "Show Folder Icons";

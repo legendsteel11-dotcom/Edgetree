@@ -1333,30 +1333,6 @@
                     Tag="reserve-check-column"
                     AutomationProperties.AutomationId="collapseAllExpanded"
                     Click="CollapseAllExpandedMenuItem_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuAlwaysOnTop}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="alwaysOnTop"
-                    Click="AlwaysOnTopMenuItem_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuStartWithWindows}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="startWithWindows"
-                    Click="StartWithWindowsMenuItem_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuAlwaysShowTrayIcon}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="trayIcon"
-                    Click="TrayIconMenuItem_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuShowFolderIcons}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="showFolderIcons"
-                    Click="ShowFolderIconsMenuItem_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuShowFileIcons}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="showFileIcons"
-                    Click="ShowFileIconsMenuItem_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuHideTitleBarTitle}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="hideTitleBarTitle"
-                    Click="HideTitleBarTitleMenuItem_Click"/>
             <!-- Everything about the panel beside the tree in one place: WHAT it
                  shows, then - past a separator - WHERE it sits. The position
                  toggle used to be a row of its own out here, named after
@@ -1377,19 +1353,54 @@
                     IsCheckable="True"
                     AutomationProperties.AutomationId="autoHideCloseOnLeave"
                     Click="AutoHideCloseOnLeaveMenuItem_Click"/>
-            <!-- Next to the other auto-hide toggle rather than beside the
-                 thickness stepper: both of these answer "how does the hidden
-                 sidebar behave", while the stepper sits with the other steppers
-                 because a menu is read by shape first (see that row's own
-                 comment). -->
-            <MenuItem Header="{x:Static services:Strings.MenuAutoHideUseHandle}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="autoHideUseHandle"
-                    Click="AutoHideUseHandleMenuItem_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuAutoHideSlide}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="autoHideSlide"
-                    Click="AutoHideSlideMenuItem_Click"/>
+            <!-- The set-once toggles, folded out of the top level where they
+                 stood shoulder to shoulder with the daily rows (user,
+                 2026-08-08, widened the same day: always-on-top and the two
+                 auto-hide behavior toggles followed once 손잡이만 became the
+                 default). Sits HERE, beside 패널 표시, because a menu is read
+                 by shape first: two submenus close the toggle block together
+                 instead of one being stranded mid-checkbox. Their checked
+                 state is set on THIS submenu's children in OptionsMenu_Opened
+                 - FindMenuItem only looks at direct children, and leaving the
+                 moved ids in the outer chain would fail the whole match
+                 silently (the v1.3.4/v1.4.0 breakage shape - see the 패널
+                 표시 note there). -->
+            <MenuItem Header="{x:Static services:Strings.MenuGeneralSettings}"
+                    AutomationProperties.AutomationId="generalSettings"
+                    Tag="reserve-check-column">
+                <MenuItem Header="{x:Static services:Strings.MenuAlwaysOnTop}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="alwaysOnTop"
+                        Click="AlwaysOnTopMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuStartWithWindows}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="startWithWindows"
+                        Click="StartWithWindowsMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuAlwaysShowTrayIcon}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="trayIcon"
+                        Click="TrayIconMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuShowFolderIcons}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="showFolderIcons"
+                        Click="ShowFolderIconsMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuShowFileIcons}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="showFileIcons"
+                        Click="ShowFileIconsMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuHideTitleBarTitle}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="hideTitleBarTitle"
+                        Click="HideTitleBarTitleMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuAutoHideUseHandle}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="autoHideUseHandle"
+                        Click="AutoHideUseHandleMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuAutoHideSlide}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="autoHideSlide"
+                        Click="AutoHideSlideMenuItem_Click"/>
+            </MenuItem>
             <!-- Last in the group, and directly above the separator: what
                  follows it is the bookmark and hidden-folder lists, which is
                  where someone lands next after choosing what the panel shows

@@ -4945,16 +4945,9 @@ public partial class MainWindow : Window
         if (sender is ContextMenu menu &&
             FindMenuItem(menu, "autoCollapse") is { } autoCollapse &&
             FindMenuItem(menu, "collapseAllExpanded") is { } collapseAllExpanded &&
-            FindMenuItem(menu, "alwaysOnTop") is { } alwaysOnTop &&
-            FindMenuItem(menu, "startWithWindows") is { } startWithWindows &&
-            FindMenuItem(menu, "trayIcon") is { } trayIcon &&
-            FindMenuItem(menu, "showFolderIcons") is { } showFolderIcons &&
-            FindMenuItem(menu, "showFileIcons") is { } showFileIcons &&
-            FindMenuItem(menu, "hideTitleBarTitle") is { } hideTitleBarTitle &&
+            FindMenuItem(menu, "generalSettings") is { } generalSettings &&
             FindMenuItem(menu, "dockOnRight") is { } dockOnRight &&
             FindMenuItem(menu, "autoHideCloseOnLeave") is { } autoHideCloseOnLeave &&
-            FindMenuItem(menu, "autoHideUseHandle") is { } autoHideUseHandle &&
-            FindMenuItem(menu, "autoHideSlide") is { } autoHideSlide &&
             FindMenuItem(menu, "bookmarkList") is { } bookmarkList &&
             FindMenuItem(menu, "fontSizeRow") is { } fontSizeRow &&
             FindMenuItem(menu, "maxItemsRow") is { } maxItemsRow &&
@@ -4979,24 +4972,37 @@ public partial class MainWindow : Window
             RebuildBookmarkListMenu();
 
             autoCollapse.IsChecked = _settings.AutoCollapseFolders;
-            alwaysOnTop.IsChecked = _settings.AlwaysOnTop;
-            startWithWindows.IsChecked = _settings.StartWithWindows;
-            trayIcon.IsChecked = _settings.AlwaysShowTrayIcon;
-            showFolderIcons.IsChecked = _settings.ShowFolderIcons;
-            showFileIcons.IsChecked = _settings.ShowFileIcons;
-            hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
             dockOnRight.IsChecked = _settings.DockOnRight;
             autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
-            autoHideUseHandle.IsChecked = _settings.AutoHideUseHandle;
-            autoHideSlide.IsChecked = _settings.AutoHideSlide;
 
-            // FindMenuItem only looks at direct children, so everything in the
-            // 패널 표시 submenu - the three modes AND the position toggle that
-            // moved in with them - is looked up on that submenu rather than on
-            // the menu itself. Leaving favoritesAtBottom in the outer chain
-            // after it moved would have made the whole chain fail to match and
-            // taken every setting above it down silently: the exact shape of
-            // the v1.3.4/v1.4.0 menu breakages.
+            // FindMenuItem only looks at direct children, so anything living
+            // in a submenu (기본 설정's toggles here, 패널 표시's rows below)
+            // is looked up on that submenu rather than on the menu itself. Leaving a moved id in the outer chain would make the
+            // whole chain fail to match and take every setting down silently:
+            // the exact shape of the v1.3.4/v1.4.0 menu breakages.
+            if (FindMenuItem(generalSettings, "alwaysOnTop") is { } alwaysOnTop &&
+                FindMenuItem(generalSettings, "startWithWindows") is { } startWithWindows &&
+                FindMenuItem(generalSettings, "trayIcon") is { } trayIcon &&
+                FindMenuItem(generalSettings, "showFolderIcons") is { } showFolderIcons &&
+                FindMenuItem(generalSettings, "showFileIcons") is { } showFileIcons &&
+                FindMenuItem(generalSettings, "hideTitleBarTitle") is { } hideTitleBarTitle &&
+                FindMenuItem(generalSettings, "autoHideUseHandle") is { } autoHideUseHandle &&
+                FindMenuItem(generalSettings, "autoHideSlide") is { } autoHideSlide)
+            {
+                alwaysOnTop.IsChecked = _settings.AlwaysOnTop;
+                startWithWindows.IsChecked = _settings.StartWithWindows;
+                trayIcon.IsChecked = _settings.AlwaysShowTrayIcon;
+                showFolderIcons.IsChecked = _settings.ShowFolderIcons;
+                showFileIcons.IsChecked = _settings.ShowFileIcons;
+                hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
+                autoHideUseHandle.IsChecked = _settings.AutoHideUseHandle;
+                autoHideSlide.IsChecked = _settings.AutoHideSlide;
+            }
+            else
+            {
+                LogClickLine("options menu: a 기본 설정 row is missing");
+            }
+
             if (FindMenuItem(sidePanel, "sidePanelFavorites") is { } panelFavorites &&
                 FindMenuItem(sidePanel, "sidePanelBookmarks") is { } panelBookmarks &&
                 FindMenuItem(sidePanel, "sidePanelNone") is { } panelNone &&
