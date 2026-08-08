@@ -12243,12 +12243,14 @@ public partial class MainWindow : Window
     private System.Windows.Threading.DispatcherTimer? _viewerPreviewTimer;
 
     private const double MinViewerWidth = 240;
-    // 800 → 1600 → 3200 the day the split drag landed (user kept hitting
-    // it: the panel is where the pixels should go). The split can only grow
-    // within the current window anyway - the real bound is the window minus
-    // MinTreeSplitWidth - so this cap mostly bounds what a saved width can
-    // re-widen the window by on the next open.
-    private const double MaxViewerWidth = 3200;
+    // 800 → 1600 → 3200 → 3720 the day the split drag landed (user kept
+    // hitting it: the panel is where the pixels should go). 3720 is the
+    // user's own 4K arithmetic - 3840 minus the tree's 120 floor - chosen so
+    // a near-fullscreen window can give everything but the tree strip to the
+    // panel. The split can only grow within the current window anyway - the
+    // real bound is the window minus MinTreeSplitWidth - so this cap mostly
+    // bounds what a saved width can re-widen the window by on the next open.
+    private const double MaxViewerWidth = 3720;
     // The tree column's floor under the SPLIT drag - deliberately smaller
     // than MinExpandedWidth: that one is a WINDOW floor (seven header
     // buttons must fit), and the header spans all three columns, so the
