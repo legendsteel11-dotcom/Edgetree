@@ -1492,8 +1492,13 @@
                  both sitting right here in the menu. Someone who finds text
                  hard to read looks in the settings menu, not a shortcut list -
                  so the row carries the shortcut in its own label too. -->
+            <!-- MenuStepperRowPadding on every stepper row (this one and the
+                 five below): the +/- buttons stand taller than a text line, so
+                 under the shared MenuItemPadding these rows broke the menu's
+                 row rhythm - see ApplyLayoutMetrics for the arithmetic. -->
             <MenuItem StaysOpenOnClick="True"
                     Focusable="False"
+                    Padding="{DynamicResource MenuStepperRowPadding}"
                     AutomationProperties.AutomationId="fontSizeRow">
                 <MenuItem.Header>
                     <Grid>
@@ -1527,6 +1532,7 @@
                  options menu out from under the user. -->
             <MenuItem StaysOpenOnClick="True"
                     Focusable="False"
+                    Padding="{DynamicResource MenuStepperRowPadding}"
                     AutomationProperties.AutomationId="maxItemsRow">
                 <MenuItem.Header>
                     <Grid>
@@ -1560,6 +1566,7 @@
                  options menu out from under the user. -->
             <MenuItem StaysOpenOnClick="True"
                     Focusable="False"
+                    Padding="{DynamicResource MenuStepperRowPadding}"
                     AutomationProperties.AutomationId="tabSpacingRow">
                 <MenuItem.Header>
                     <Grid>
@@ -1593,6 +1600,7 @@
                  options menu out from under the user. -->
             <MenuItem StaysOpenOnClick="True"
                     Focusable="False"
+                    Padding="{DynamicResource MenuStepperRowPadding}"
                     AutomationProperties.AutomationId="rowSpacingRow">
                 <MenuItem.Header>
                     <Grid>
@@ -1630,6 +1638,7 @@
                  mistake. -->
             <MenuItem StaysOpenOnClick="True"
                     Focusable="False"
+                    Padding="{DynamicResource MenuStepperRowPadding}"
                     AutomationProperties.AutomationId="autoHideSliverWidthRow">
                 <MenuItem.Header>
                     <Grid>
@@ -1661,6 +1670,7 @@
             </MenuItem>
             <MenuItem StaysOpenOnClick="True"
                     Focusable="False"
+                    Padding="{DynamicResource MenuStepperRowPadding}"
                     AutomationProperties.AutomationId="scrollBarThicknessRow">
                 <MenuItem.Header>
                     <Grid>

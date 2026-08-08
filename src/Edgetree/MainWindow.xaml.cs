@@ -6914,6 +6914,23 @@ public partial class MainWindow : Window
         appResources["MenuItemPadding"] = new Thickness(
             Math.Round(15.0 * scale), menuVerticalPadding,
             Math.Round(15.0 * scale), menuVerticalPadding);
+        // The stepper rows were the one place the menu's row rhythm hiccuped:
+        // their +/- buttons stand taller than a line of text, so under the
+        // shared padding those rows came out a few pixels taller than every
+        // row around them (user, 2026-08-08). Their padding hands back the
+        // buttons' overshoot instead - half above, half below - so a stepper
+        // row measures the same as a plain row. Floored at zero: below ~11pt
+        // the 20px button floor (see MenuStepperButtonSize above - shrinking
+        // the buttons was already tried and rejected) is taller than a fully
+        // unpadded text row, and a pixel or two of leftover height there is
+        // the acceptable end of it.
+        double menuLineHeight = ExplorerTree.FontFamily.LineSpacing * ExplorerTree.FontSize;
+        double stepperOvershoot = Math.Max(0.0,
+            (double)appResources["MenuStepperButtonSize"] - menuLineHeight);
+        double stepperVerticalPadding = Math.Max(0.0, menuVerticalPadding - stepperOvershoot / 2.0);
+        appResources["MenuStepperRowPadding"] = new Thickness(
+            Math.Round(15.0 * scale), stepperVerticalPadding,
+            Math.Round(15.0 * scale), stepperVerticalPadding);
         double menuHorizontalPadding = Math.Round(5.0 * scale);
         appResources["MenuPadding"] = new Thickness(
             menuHorizontalPadding, menuVerticalPadding,
