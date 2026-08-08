@@ -4943,11 +4943,8 @@ public partial class MainWindow : Window
         // the MenuItem template reads it to reserve the check column
         // ("reserve-check-column"), so identity had to live somewhere else.
         if (sender is ContextMenu menu &&
-            FindMenuItem(menu, "autoCollapse") is { } autoCollapse &&
             FindMenuItem(menu, "collapseAllExpanded") is { } collapseAllExpanded &&
             FindMenuItem(menu, "generalSettings") is { } generalSettings &&
-            FindMenuItem(menu, "dockOnRight") is { } dockOnRight &&
-            FindMenuItem(menu, "autoHideCloseOnLeave") is { } autoHideCloseOnLeave &&
             FindMenuItem(menu, "bookmarkList") is { } bookmarkList &&
             FindMenuItem(menu, "fontSizeRow") is { } fontSizeRow &&
             FindMenuItem(menu, "maxItemsRow") is { } maxItemsRow &&
@@ -4971,30 +4968,33 @@ public partial class MainWindow : Window
             bookmarkList.SubmenuOpened += BookmarkSubmenu_Opened;
             RebuildBookmarkListMenu();
 
-            autoCollapse.IsChecked = _settings.AutoCollapseFolders;
-            dockOnRight.IsChecked = _settings.DockOnRight;
-            autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
-
             // FindMenuItem only looks at direct children, so anything living
             // in a submenu (기본 설정's toggles here, 패널 표시's rows below)
-            // is looked up on that submenu rather than on the menu itself. Leaving a moved id in the outer chain would make the
-            // whole chain fail to match and take every setting down silently:
-            // the exact shape of the v1.3.4/v1.4.0 menu breakages.
+            // is looked up on that submenu rather than on the menu itself.
+            // Leaving a moved id in the outer chain would make the whole
+            // chain fail to match and take every setting down silently: the
+            // exact shape of the v1.3.4/v1.4.0 menu breakages.
             if (FindMenuItem(generalSettings, "alwaysOnTop") is { } alwaysOnTop &&
+                FindMenuItem(generalSettings, "dockOnRight") is { } dockOnRight &&
                 FindMenuItem(generalSettings, "startWithWindows") is { } startWithWindows &&
                 FindMenuItem(generalSettings, "trayIcon") is { } trayIcon &&
                 FindMenuItem(generalSettings, "showFolderIcons") is { } showFolderIcons &&
                 FindMenuItem(generalSettings, "showFileIcons") is { } showFileIcons &&
                 FindMenuItem(generalSettings, "hideTitleBarTitle") is { } hideTitleBarTitle &&
+                FindMenuItem(generalSettings, "autoCollapse") is { } autoCollapse &&
+                FindMenuItem(generalSettings, "autoHideCloseOnLeave") is { } autoHideCloseOnLeave &&
                 FindMenuItem(generalSettings, "autoHideUseHandle") is { } autoHideUseHandle &&
                 FindMenuItem(generalSettings, "autoHideSlide") is { } autoHideSlide)
             {
                 alwaysOnTop.IsChecked = _settings.AlwaysOnTop;
+                dockOnRight.IsChecked = _settings.DockOnRight;
                 startWithWindows.IsChecked = _settings.StartWithWindows;
                 trayIcon.IsChecked = _settings.AlwaysShowTrayIcon;
                 showFolderIcons.IsChecked = _settings.ShowFolderIcons;
                 showFileIcons.IsChecked = _settings.ShowFileIcons;
                 hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
+                autoCollapse.IsChecked = _settings.AutoCollapseFolders;
+                autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
                 autoHideUseHandle.IsChecked = _settings.AutoHideUseHandle;
                 autoHideSlide.IsChecked = _settings.AutoHideSlide;
             }

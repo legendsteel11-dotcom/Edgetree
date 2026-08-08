@@ -1313,65 +1313,39 @@
                 Opened="OptionsMenu_Opened"
                 Closed="AnyMenu_Closed"
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
-            <MenuItem Header="{x:Static services:Strings.MenuAutoCollapse}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="autoCollapse"
-                    Click="AutoCollapseMenuItem_Click"/>
             <!-- One-shot cleanup, unlike the title bar's collapse button (which
                  is a toggle that remembers what was expanded and can restore
                  it). Disabled while nothing is expanded - see
                  OptionsMenu_Opened. -->
-            <!-- Not checkable, so the template's check column would collapse to
-                 zero width and its label would sit 18px left of the checkable
-                 items around it. This used to be patched with a hardcoded
-                 Padding="32,4,14,4" - which drifted out of alignment the day
-                 the menu paddings became font-scaled - so the check column is
-                 now reserved structurally instead (see the Tag trigger in the
-                 MenuItem template), the same reservation its checkable
-                 siblings get, at every font size. -->
+            <!-- No reserve-check-column here anymore: the top level lost its
+                 last checkable row when the toggles moved into 기본 설정
+                 (2026-08-08), so there is no check column left to line up
+                 with - reserving one now would indent this row past every
+                 neighbour instead. Same for the two submenu rows below. -->
             <MenuItem Header="{x:Static services:Strings.MenuCollapseAllExpanded}"
-                    Tag="reserve-check-column"
                     AutomationProperties.AutomationId="collapseAllExpanded"
                     Click="CollapseAllExpandedMenuItem_Click"/>
-            <!-- Everything about the panel beside the tree in one place: WHAT it
-                 shows, then - past a separator - WHERE it sits. The position
-                 toggle used to be a row of its own out here, named after
-                 favorites; folding it in both drops a line from this menu and
-                 stops the name lying now that the panel can hold either list
-                 (user's call, 2026-08-02).
-
-                 Three states rather than a favorites on/off toggle: the panel
-                 only used to disappear when the favorites list was EMPTY, so
-                 giving that row back to the tree meant deleting entries.
-                 Checkable so exactly one mode reads as current;
-                 OptionsMenu_Opened sets which. -->
-            <MenuItem Header="{x:Static services:Strings.MenuDockOnRight}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="dockOnRight"
-                    Click="DockOnRightMenuItem_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuAutoHideCloseOnLeave}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="autoHideCloseOnLeave"
-                    Click="AutoHideCloseOnLeaveMenuItem_Click"/>
-            <!-- The set-once toggles, folded out of the top level where they
-                 stood shoulder to shoulder with the daily rows (user,
-                 2026-08-08, widened the same day: always-on-top and the two
-                 auto-hide behavior toggles followed once 손잡이만 became the
-                 default). Sits HERE, beside 패널 표시, because a menu is read
-                 by shape first: two submenus close the toggle block together
-                 instead of one being stranded mid-checkbox. Their checked
-                 state is set on THIS submenu's children in OptionsMenu_Opened
-                 - FindMenuItem only looks at direct children, and leaving the
-                 moved ids in the outer chain would fail the whole match
-                 silently (the v1.3.4/v1.4.0 breakage shape - see the 패널
-                 표시 note there). -->
+            <!-- Every toggle the menu has lives in here now (2026-08-08, three
+                 rounds the same day: first the set-once housekeeping, then
+                 always-on-top and the auto-hide pair, and finally the daily
+                 three - so the top level carries no checkable row at all and
+                 every remaining row shares one left edge with the sections
+                 below). Separators split it window / appearance / behavior.
+                 Checked state is set on THIS submenu's children in
+                 OptionsMenu_Opened - FindMenuItem only looks at direct
+                 children, and leaving a moved id in the outer chain would
+                 fail the whole match silently (the v1.3.4/v1.4.0 breakage
+                 shape - see the 패널 표시 note there). -->
             <MenuItem Header="{x:Static services:Strings.MenuGeneralSettings}"
-                    AutomationProperties.AutomationId="generalSettings"
-                    Tag="reserve-check-column">
+                    AutomationProperties.AutomationId="generalSettings">
                 <MenuItem Header="{x:Static services:Strings.MenuAlwaysOnTop}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="alwaysOnTop"
                         Click="AlwaysOnTopMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuDockOnRight}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="dockOnRight"
+                        Click="DockOnRightMenuItem_Click"/>
                 <MenuItem Header="{x:Static services:Strings.MenuStartWithWindows}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="startWithWindows"
@@ -1380,6 +1354,7 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="trayIcon"
                         Click="TrayIconMenuItem_Click"/>
+                <Separator/>
                 <MenuItem Header="{x:Static services:Strings.MenuShowFolderIcons}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="showFolderIcons"
@@ -1392,6 +1367,15 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="hideTitleBarTitle"
                         Click="HideTitleBarTitleMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="{x:Static services:Strings.MenuAutoCollapse}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="autoCollapse"
+                        Click="AutoCollapseMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuAutoHideCloseOnLeave}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="autoHideCloseOnLeave"
+                        Click="AutoHideCloseOnLeaveMenuItem_Click"/>
                 <MenuItem Header="{x:Static services:Strings.MenuAutoHideUseHandle}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="autoHideUseHandle"
@@ -1401,14 +1385,25 @@
                         AutomationProperties.AutomationId="autoHideSlide"
                         Click="AutoHideSlideMenuItem_Click"/>
             </MenuItem>
-            <!-- Last in the group, and directly above the separator: what
-                 follows it is the bookmark and hidden-folder lists, which is
-                 where someone lands next after choosing what the panel shows
-                 (user's call, 2026-08-04). Above the two window toggles it had
-                 the same neighbours in the wrong order. -->
+            <!-- Everything about the panel beside the tree in one place: WHAT
+                 it shows, then - past a separator - WHERE it sits. The
+                 position toggle used to be a row of its own out on the menu,
+                 named after favorites; folding it in both drops a line and
+                 stops the name lying now that the panel can hold either list
+                 (user's call, 2026-08-02).
+
+                 Three states rather than a favorites on/off toggle: the panel
+                 only used to disappear when the favorites list was EMPTY, so
+                 giving that row back to the tree meant deleting entries.
+                 Checkable so exactly one mode reads as current;
+                 OptionsMenu_Opened sets which.
+
+                 Last in the group, directly above the separator: what follows
+                 is the bookmark and hidden-folder lists, which is where
+                 someone lands next after choosing what the panel shows
+                 (user's call, 2026-08-04). -->
             <MenuItem Header="{x:Static services:Strings.MenuSidePanel}"
-                    AutomationProperties.AutomationId="sidePanel"
-                    Tag="reserve-check-column">
+                    AutomationProperties.AutomationId="sidePanel">
                 <MenuItem Header="{x:Static services:Strings.MenuSidePanelFavorites}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="sidePanelFavorites"
@@ -1473,11 +1468,6 @@
                  "폴더만 굵게" earns its place as more than a compromise - it
                  makes the structure readable without thickening every file name
                  in the tree. -->
-            <!-- No "reserve-check-column" here, unlike 패널 표시 up among the
-                 checkboxes: this row's neighbours are the steppers and the
-                 plain submenus (색상 설정, 북마크 목록), none of which reserve
-                 that column - so claiming it left this one label alone,
-                 indented past every row around it. -->
             <MenuItem Header="{x:Static services:Strings.MenuFontWeight}"
                     AutomationProperties.AutomationId="fontWeight">
                 <MenuItem Header="{x:Static services:Strings.MenuFontWeightNormal}"
