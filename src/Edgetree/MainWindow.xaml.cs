@@ -12540,6 +12540,12 @@ public partial class MainWindow : Window
     // to have would silently stop fitting the moment the panel changed width.
     // Non-null is a DISPLAY scale where 1.0 means the bitmap's own pixels.
     private double? _viewerZoom;
+    // Which rest state a NEW picture arrives in: fit (false) or 1:1 (true).
+    // Set only by the two chips and the double-click that toggles them, so
+    // picking 1:1 once carries down a folder - the wheel and +/- stay a
+    // one-off zoom on the picture in front of you and are deliberately NOT
+    // remembered (user, 2026-08-09). Session-only; nothing is persisted.
+    private bool _viewerRestAtActualSize;
     // Which file the zoom above belongs to. The panel reloads the SAME file
     // whenever a width drag settles (to re-decode at the new size), and
     // "arriving picture resets to fit" read that as a new picture - so any
@@ -12925,7 +12931,9 @@ public partial class MainWindow : Window
             if (!string.Equals(_viewerZoomPath, path, StringComparison.OrdinalIgnoreCase))
             {
                 _viewerZoomPath = path;
-                _viewerZoom = null;
+                // The REMEMBERED rest state, not always fit: picking 1:1 once
+                // is meant to carry down a folder.
+                _viewerZoom = ViewerRestZoom;
                 ViewerZoomPan.X = 0;
                 ViewerZoomPan.Y = 0;
             }
@@ -13383,7 +13391,7 @@ public partial class MainWindow : Window
         // rather than the picture (reported 2026-08-08). Leaving resets for the
         // same reason in reverse: a zoom chosen for the whole screen is a
         // strange place to drop someone back into a 900px panel.
-        _viewerZoom = null;
+        _viewerZoom = ViewerRestZoom;
         ViewerZoomPan.X = 0;
         ViewerZoomPan.Y = 0;
 
@@ -13409,8 +13417,12 @@ public partial class MainWindow : Window
     {
         if (e.ClickCount == 2)
         {
-            // The gesture every viewer has: fit and 1:1 with nothing to aim at.
-            SetViewerZoom(_viewerZoom is null ? 1 : null, null);
+            // The gesture every viewer has: fit and 1:1 with nothing to aim
+            // at. It lands on the same two states the chips do, so it moves
+            // the remembered rest state with them.
+            // At fit it goes to 1:1; from anywhere else - including a wheel
+            // zoom - it comes back to fit, which is the behaviour it had.
+            SetViewerRest(_viewerZoom is null);
             e.Handled = true;
             return;
         }
@@ -13497,9 +13509,21 @@ public partial class MainWindow : Window
         UpdateViewerZoomBar();
     }
 
-    private void ViewerFitChip_Click(object sender, RoutedEventArgs e) => SetViewerZoom(null, null);
+    // The two chips are the ONLY things that move the remembered rest state -
+    // see _viewerRestAtActualSize.
+    private void ViewerFitChip_Click(object sender, RoutedEventArgs e) => SetViewerRest(false);
 
-    private void ViewerActualChip_Click(object sender, RoutedEventArgs e) => SetViewerZoom(1, null);
+    private void ViewerActualChip_Click(object sender, RoutedEventArgs e) => SetViewerRest(true);
+
+    private void SetViewerRest(bool atActualSize)
+    {
+        _viewerRestAtActualSize = atActualSize;
+        SetViewerZoom(ViewerRestZoom, null);
+    }
+
+    // null means fit, which is how the zoom stores it (fit is a ratio that
+    // moves, so it has no number of its own).
+    private double? ViewerRestZoom => _viewerRestAtActualSize ? 1 : null;
 
     private void ViewerZoomInButton_Click(object sender, RoutedEventArgs e) => StepViewerZoom(+1, null);
 
@@ -13788,7 +13812,7 @@ public partial class MainWindow : Window
                 if (!string.Equals(_viewerZoomPath, path, StringComparison.OrdinalIgnoreCase))
                 {
                     _viewerZoomPath = path;
-                    _viewerZoom = null;
+                    _viewerZoom = ViewerRestZoom;
                     ViewerZoomPan.X = 0;
                     ViewerZoomPan.Y = 0;
                 }
