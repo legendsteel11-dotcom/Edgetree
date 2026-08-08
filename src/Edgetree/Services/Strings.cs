@@ -219,6 +219,8 @@ public static class Strings
     // File search (Ctrl+F view - see MainWindow's search-view methods and
     // Services/FileSearchService)
     public static string ToolTipSearch = "검색 (Ctrl+F)";
+    public static string ToolTipViewer = "이미지 뷰어";
+    public static string MenuOpenInViewer = "뷰어에서 보기";
     public static string ToolTipExitSearch = "탐색기로 (Ctrl+E)";
     public static string SearchTooltipBrowseFolder = "검색할 폴더 선택";
     public static string SearchTooltipRefresh = "다시 인덱싱";
@@ -519,6 +521,8 @@ public static class Strings
         ShowMoreFormat = "… Show {0} more";
 
         ToolTipSearch = "Search (Ctrl+F)";
+        ToolTipViewer = "Image Viewer";
+        MenuOpenInViewer = "Open in Viewer";
         ToolTipExitSearch = "Back to Explorer (Ctrl+E)";
         SearchTooltipBrowseFolder = "Choose folder to search";
         SearchTooltipRefresh = "Reindex";

@@ -965,6 +965,15 @@
                 </MenuItem.Header>
             </MenuItem>
             <Separator Visibility="Collapsed" Tag="thumbnailSep"/>
+            <!-- Opens the image viewer panel on this file. Image rows only -
+                 shown/hidden by PrepareTreeRowContextMenu alongside the
+                 thumbnail decision above (same extension gate). Placed AFTER
+                 the thumbnail pair: that pair is matched positionally as the
+                 menu's first two items. -->
+            <MenuItem Header="{x:Static services:Strings.MenuOpenInViewer}"
+                    Tag="openInViewer"
+                    Visibility="Collapsed"
+                    Click="OpenInViewer_Click"/>
             <!-- Multi-selection header row ("N개 항목 선택됨"): shown, with its
                  separator, only while a Ctrl/Shift-click multi-selection is
                  active - text and visibility both set on every open by
@@ -3605,6 +3614,21 @@
             <TranslateTransform x:Name="ContentSlide"/>
         </Grid.RenderTransform>
         <Grid Background="{DynamicResource SidebarBackground}">
+            <!-- Three columns for the image viewer panel: the sidebar content
+                 lives in the middle (*) column, and the two zero-width outer
+                 columns are where the viewer opens - right column normally,
+                 LEFT column when docked on the screen's right edge, so the
+                 panel always grows toward the screen's interior and the tree
+                 stays put at the edge (see OpenViewer). Both stay 0 while the
+                 viewer is closed, so this grid measures exactly as the
+                 original single-column layout did. -->
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="ViewerColumnLeft"
+                        Width="0"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition x:Name="ViewerColumnRight"
+                        Width="0"/>
+            </Grid.ColumnDefinitions>
             <!-- Row1/Row3 are deliberately neutral names, not "FavoritesRow"/
                  "TreeRow": which one actually hosts the favorites panel vs the
                  tree depends on the "즐겨찾기를 아래에 표시" option (see
@@ -3651,6 +3675,7 @@
                  dragging rather than our own DragMove() call below. -->
             <Grid x:Name="HeaderGrid"
                     Grid.Row="0"
+                    Grid.ColumnSpan="3"
                     Background="{DynamicResource HeaderBackground}"
                     MouseLeftButtonDown="HeaderGrid_MouseLeftButtonDown"
                     MouseMove="HeaderGrid_MouseMove"
@@ -3665,8 +3690,9 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <!-- The strip the six header buttons sit in is not a drag
+                <!-- The strip the seven header buttons sit in is not a drag
                      handle. Their gaps are 2-4px, and the header's drag only
                      needs the system threshold to be crossed - easy to do by
                      accident on a target that small - so a slightly wandering
@@ -3675,7 +3701,7 @@
                      keep their own clicks; this only ever sees the misses, and
                      swallows them. -->
                 <Border Grid.Column="2"
-                        Grid.ColumnSpan="6"
+                        Grid.ColumnSpan="7"
                         Background="Transparent"
                         MouseLeftButtonDown="HeaderButtonStrip_MouseLeftButtonDown"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
@@ -3778,8 +3804,25 @@
                         </Path.RenderTransform>
                     </Path>
                 </Button>
-                <Button x:Name="CollapseAllButton"
+                <!-- The image viewer toggle - opens/closes the preview panel
+                     beside the tree (see OpenViewer/CloseViewer). An eye on
+                     the same hand-built 16-unit box as the magnifier. -->
+                <Button x:Name="ViewerButton"
                         Grid.Column="4"
+                        Style="{StaticResource ToggleButtonStyle}"
+                        Click="ViewerButton_Click"
+                        Margin="{DynamicResource HeaderButtonMargin}"
+                        RenderTransform="{StaticResource ShiftUp1px}"
+                        ToolTip="{x:Static services:Strings.ToolTipViewer}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Path Data="M1.5,8 C3.4,4.9 5.6,3.4 8,3.4 C10.4,3.4 12.6,4.9 14.5,8 C12.6,11.1 10.4,12.6 8,12.6 C5.6,12.6 3.4,11.1 1.5,8 Z M10.1,8 A2.1,2.1 0 1 0 5.9,8 A2.1,2.1 0 1 0 10.1,8 Z"
+                            Stroke="{DynamicResource ForegroundText}"
+                            StrokeThickness="1.4"
+                            RenderTransformOrigin="0.5,0.5"
+                            RenderTransform="{StaticResource HeaderGlyphGrow}"/>
+                </Button>
+                <Button x:Name="CollapseAllButton"
+                        Grid.Column="5"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="CollapseAllButton_Click"
                         Margin="{DynamicResource HeaderButtonMargin}"
@@ -3793,7 +3836,7 @@
                             RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>
                 <Button x:Name="OptionsButton"
-                        Grid.Column="5"
+                        Grid.Column="6"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="OptionsButton_Click"
                         Margin="{DynamicResource HeaderButtonMargin}"
@@ -3838,7 +3881,7 @@
                     </Grid>
                 </Button>
                 <Button x:Name="MinimizeButton"
-                        Grid.Column="6"
+                        Grid.Column="7"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="MinimizeButton_Click"
                         Margin="{DynamicResource HeaderButtonMargin}"
@@ -3863,7 +3906,7 @@
                      its own hit-box instead of crowding the window's true
                      right edge. -->
                 <Button x:Name="CloseButton"
-                        Grid.Column="7"
+                        Grid.Column="8"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="CloseButton_Click"
                         Margin="{DynamicResource HeaderCloseButtonMargin}"
@@ -3882,6 +3925,7 @@
 
             <ListBox x:Name="FavoritesList"
                     Grid.Row="1"
+                    Grid.Column="1"
                     Style="{StaticResource FavoritesListBoxStyle}"
                     Background="{DynamicResource FavoritesBackground}"
                     BorderThickness="0"
@@ -3904,6 +3948,7 @@
                  the shortcuts silently (user's call, 2026-08-02). -->
             <ListBox x:Name="BookmarkPanelList"
                     Grid.Row="1"
+                    Grid.Column="1"
                     Style="{StaticResource FavoritesListBoxStyle}"
                     Background="{DynamicResource FavoritesBackground}"
                     BorderThickness="0"
@@ -3921,6 +3966,7 @@
                  code (FavoritesReorder region). -->
             <Border x:Name="FavoriteDropIndicator"
                     Grid.Row="1"
+                    Grid.Column="1"
                     Height="2"
                     Margin="0"
                     VerticalAlignment="Top"
@@ -3943,6 +3989,7 @@
                  floats over this row at a fixed 9px and simply centres on
                  whatever height the line takes. -->
             <Border Grid.Row="2"
+                    Grid.Column="1"
                     Height="2"
                     Background="{DynamicResource PanelDividerBrush}"/>
             <!-- Functionality unchanged (drag-resize, double-click fit); only
@@ -3953,6 +4000,7 @@
                  overlapped strip's hit-testing from the rows beneath. -->
             <GridSplitter x:Name="FavoritesSplitter"
                     Grid.Row="2"
+                    Grid.Column="1"
                     Height="9"
                     Margin="0,-4,0,-4"
                     Panel.ZIndex="1"
@@ -4009,6 +4057,7 @@
                  tree (the property inherits) and breaks scrolling app-wide. -->
             <TreeView x:Name="ExplorerTree"
                     Grid.Row="3"
+                    Grid.Column="1"
                     Style="{StaticResource ExplorerTreeViewStyle}"
                       Background="{DynamicResource SidebarBackground}"
                       Foreground="{DynamicResource FolderNameForeground}"
@@ -4044,7 +4093,14 @@
                  (see the TODO note: divider 2px lower, header content 1px
                  higher, without moving the header row's own height or the
                  OTHER divider between favorites and the tree). -->
+            <!-- Spans all three columns like the header above it, so the line
+                 keeps running across the viewer panel's top too. (The column
+                 assignment matters at all because the unnamed dividers were
+                 the two casualties of the viewer's column split - they sat at
+                 the default column 0, which is the zero-width viewer column,
+                 and vanished; 2026-08-08.) -->
             <Border Grid.Row="0"
+                    Grid.ColumnSpan="3"
                     Height="1"
                     VerticalAlignment="Bottom"
                     Margin="0,0,0,-2"
@@ -4058,6 +4114,7 @@
                  rail - too narrow for this text, which used to just clip. -->
             <Border x:Name="VersionFooterBorder"
                     Grid.Row="4"
+                    Grid.Column="1"
                     BorderThickness="0,1,0,0"
                     BorderBrush="{DynamicResource PanelDividerBrush}">
                 <!-- The version, and then one toggle per file-kind filter
@@ -4094,6 +4151,7 @@
             <Grid x:Name="SearchView"
                     Grid.Row="1"
                     Grid.RowSpan="4"
+                    Grid.Column="1"
                     Background="{DynamicResource SidebarBackground}"
                     Visibility="Collapsed">
                 <Grid.RowDefinitions>
@@ -4507,6 +4565,77 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
             </Grid>
+
+            <!-- The image viewer panel (round 1). Lives in one of the two
+                 zero-width outer columns declared at the top of this grid;
+                 OpenViewer picks which (screen-interior side), sizes the
+                 column and widens the window by the same amount, so opening
+                 it never takes a pixel from the tree. Below the header row
+                 only - the header spans all three columns above it. The
+                 divider border side is set in code to face the tree. -->
+            <Border x:Name="ViewerPanel"
+                    Grid.Row="1"
+                    Grid.RowSpan="4"
+                    Grid.Column="2"
+                    Visibility="Collapsed"
+                    Background="{DynamicResource SidebarBackground}"
+                    BorderBrush="{DynamicResource PanelDividerBrush}"
+                    BorderThickness="1,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <!-- Fit-inside for round 1 (zoom/pan come next round).
+                         Uniform with no StretchDirection cap: the user asked
+                         for no size ceiling, so a small image may scale up -
+                         HighQuality keeps that acceptable. -->
+                    <Image x:Name="ViewerImage"
+                            Grid.Row="0"
+                            Stretch="Uniform"
+                            RenderOptions.BitmapScalingMode="HighQuality"
+                            Margin="10"/>
+                    <!-- What a non-image selection shows instead: the file's
+                         own shell icon, natural size, centered. -->
+                    <Image x:Name="ViewerIconImage"
+                            Grid.Row="0"
+                            Width="64"
+                            Height="64"
+                            Stretch="Uniform"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed"/>
+                    <StackPanel Grid.Row="1"
+                            Margin="10,0,10,10">
+                        <TextBlock x:Name="ViewerFileName"
+                                Foreground="{DynamicResource ForegroundText}"
+                                FontSize="{DynamicResource MenuFontSize}"
+                                TextTrimming="CharacterEllipsis"
+                                TextAlignment="Center"/>
+                        <!-- Set apart by SIZE, never by opacity (the standing
+                             rule for secondary text in this app). -->
+                        <TextBlock x:Name="ViewerFileInfo"
+                                Foreground="{DynamicResource SecondaryForeground}"
+                                FontSize="{DynamicResource MenuThumbnailInfoFontSize}"
+                                TextAlignment="Center"
+                                Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <Button x:Name="ViewerCloseButton"
+                            Grid.Row="0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,4,4,0"
+                            Style="{StaticResource ToggleButtonStyle}"
+                            Click="ViewerCloseButton_Click"
+                            ToolTip="{x:Static services:Strings.ToolTipClose}">
+                        <Path Data="M4,4 L12,12 M12,4 L4,12"
+                                Stroke="{DynamicResource ForegroundText}"
+                                StrokeThickness="1.5"
+                                StrokeStartLineCap="Round"
+                                StrokeEndLineCap="Round"/>
+                    </Button>
+                </Grid>
+            </Border>
         </Grid>
 
         <!-- What the auto-hidden sidebar actually shows: one flat colour over

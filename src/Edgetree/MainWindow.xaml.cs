@@ -33,7 +33,9 @@ namespace SidebarExplorer.App;
 
 public partial class MainWindow : Window
 {
-    private const double MinExpandedWidth = 180;
+    // 180 → 204 when the viewer toggle became the seventh header button - the
+    // floor exists so the button row still fits (see ApplyHeaderMetrics).
+    private const double MinExpandedWidth = 204;
     private const double MaxExpandedWidth = 1200;
     private const int ToggleAnimationMs = 200;
     // Topped out at 16 until a user asked for larger text for presbyopia; the
@@ -407,6 +409,14 @@ public partial class MainWindow : Window
         SetExpandedContentVisibility(_settings.IsAutoHidden ? Visibility.Collapsed : Visibility.Visible);
         PositionToWorkArea();
         UpdateResizeThumbVisibility();
+
+        // The viewer panel survives restarts. On top of the tree-only Width
+        // set above, through the same one path every open takes - and never
+        // over an auto-hidden start (OpenViewer declines those itself).
+        if (_settings.ViewerOpen)
+        {
+            OpenViewer();
+        }
 
         ExplorerTree.FontSize = TreeFontSizeSteps.Contains(_settings.TreeFontSize)
             ? _settings.TreeFontSize
@@ -1740,6 +1750,11 @@ public partial class MainWindow : Window
     // reveal side of this transition stutter (see AnimateWidth's comment).
     private void EnterAutoHide()
     {
+        // The viewer panel folds before anything hides (user's call,
+        // 2026-08-08) - so the slide, the collapse and the later reveal all
+        // work on the plain tree-only width they were built around.
+        CloseViewer();
+
         _settings.IsAutoHidden = true;
         StopHoverReveal();
 
@@ -2846,6 +2861,7 @@ public partial class MainWindow : Window
         UpdateAutoHideHandleOverlay(collapsed: visibility != Visibility.Visible);
         ExplorerTree.Visibility = visibility;
         SearchButton.Visibility = visibility;
+        ViewerButton.Visibility = visibility;
         CollapseAllButton.Visibility = visibility;
         OptionsButton.Visibility = visibility;
         MinimizeButton.Visibility = visibility;
@@ -2980,7 +2996,7 @@ public partial class MainWindow : Window
     // the only flexible column - so once it has been squeezed to nothing, a
     // narrower window just pushes the buttons out past the right edge. Stepping
     // their size and spacing down keeps the whole row inside the window all the
-    // way to MinExpandedWidth (180), where 6 buttons at 24px + the app icon
+    // way to MinExpandedWidth (204), where 7 buttons at 24px + the app icon
     // still fit. Read via DynamicResource by ToggleButtonStyle and the header
     // buttons' own margins.
     private void ApplyHeaderMetrics()
@@ -3174,6 +3190,13 @@ public partial class MainWindow : Window
         {
             return;
         }
+
+        // Folded across every dock transition rather than carried through it:
+        // both Dock and Undock rewrite the window's bounds from remembered
+        // tree-only values, and a panel surviving into that rewrite would be
+        // crushed or double-counted. Reopening is one click.
+        CloseViewer();
+
         _isDocked = false;
 
         // Aero-snap (dragging the header to the screen edge, or Win+Up) can
@@ -3352,6 +3375,9 @@ public partial class MainWindow : Window
         {
             return;
         }
+
+        // Same reason as Undock's - see the note there.
+        CloseViewer();
 
         // Same Aero-snap reset as Undock() - matters here too, otherwise the
         // floating bounds snapshotted right below would be the maximized
@@ -6428,6 +6454,11 @@ public partial class MainWindow : Window
     {
         if (sender is MenuItem menuItem)
         {
+            // The panel's "screen-interior" side flips with the dock edge;
+            // folding it keeps this handler's PositionToWorkArea call working
+            // on the tree-only width it always has.
+            CloseViewer();
+
             _settings.DockOnRight = menuItem.IsChecked;
             UpdateResizeThumbVisibility();
             UpdatePinButtonVisibility();
@@ -8426,6 +8457,18 @@ public partial class MainWindow : Window
                         ? file.FullPath
                         : null;
                 UpdateThumbnailRow(thumbnailItem, thumbnailSeparator, thumbnailPath);
+
+                // "뷰어에서 보기" rides the same single-file decision, gated
+                // further to actual image extensions - the viewer shows icons
+                // for anything else, so offering it on an .exe row would be
+                // a long way round to nothing.
+                if (FindTaggedMenuElement<MenuItem>(menu, "openInViewer") is { } openInViewerItem)
+                {
+                    openInViewerItem.Visibility =
+                        thumbnailPath is not null && ThumbnailExtensions.Contains(Path.GetExtension(thumbnailPath))
+                            ? Visibility.Visible
+                            : Visibility.Collapsed;
+                }
             }
         }
     }
@@ -8578,6 +8621,10 @@ public partial class MainWindow : Window
         {
             newGuideTarget.IsAncestorOfSelection = true;
         }
+
+        // The viewer panel follows the selection (debounced - see the
+        // method). A no-op while the panel is closed.
+        ScheduleViewerPreview();
 
         // Picking a folder directly in the tree keeps the favorites list in
         // sync: highlight it there too if it happens to be one, otherwise
@@ -11898,13 +11945,18 @@ public partial class MainWindow : Window
     // the screen edge, since Width alone only grows/shrinks rightward.
     private void SetExpandedWidthAnchored(double newWidth)
     {
-        newWidth = ClampExpandedWidth(newWidth);
+        // newWidth is the whole WINDOW's target - with the viewer panel open
+        // that includes the panel, so the clamp shifts by its width and only
+        // the tree's share is persisted (ExpandedWidth stays the tree alone,
+        // see the viewer region).
+        double viewerWidth = CurrentViewerPanelWidth;
+        newWidth = ClampExpandedWidth(newWidth - viewerWidth) + viewerWidth;
         if (_settings.DockOnRight)
         {
             Left -= newWidth - Width;
         }
         Width = newWidth;
-        _settings.ExpandedWidth = newWidth;
+        _settings.ExpandedWidth = newWidth - viewerWidth;
     }
 
     // Double-clicking the resize thumb auto-fits the window to exactly the
@@ -11942,7 +11994,9 @@ public partial class MainWindow : Window
         }
 
         _contentFitRestoreWidth = Width;
-        SetExpandedWidthAnchored(fitWidth);
+        // fitWidth measures the tree's content; the window also has to keep
+        // carrying the viewer panel if it's open.
+        SetExpandedWidthAnchored(fitWidth + CurrentViewerPanelWidth);
         _contentFitWidthApplied = Width;
     }
 
@@ -12094,13 +12148,317 @@ public partial class MainWindow : Window
         // definitely shouldn't either.
         if (_isDocked && !_settings.IsAutoHidden)
         {
-            _settings.ExpandedWidth = ClampExpandedWidth(Width);
+            // Minus the viewer panel: ExpandedWidth is the TREE's width alone
+            // (see the viewer region below).
+            _settings.ExpandedWidth = ClampExpandedWidth(Width - CurrentViewerPanelWidth);
         }
 
         _settings.ExpandedFolderPaths = CollectAllExpandedPaths();
         _settings.LastSelectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
 
         _settingsService.Save(_settings);
+    }
+
+    // ===================================================================
+    // Image viewer panel (round 1: open/close geometry + selection-follow
+    // preview; zoom/pan and the image context menu are later rounds).
+    //
+    // The panel is one of the content grid's two outer columns; opening it
+    // widens the WINDOW by the panel's width, so the tree keeps every pixel
+    // it had and _settings.ExpandedWidth stays the TREE's width alone -
+    // every place that persists a width subtracts the panel again
+    // (SaveCurrentWidth, SetExpandedWidthAnchored). Docked on the right
+    // edge the extra width grows toward the screen's interior (Left shifts
+    // left by the same amount); docked left or floating it grows rightward.
+    //
+    // Deliberately kept OUT of every risky geometry path: dock, undock,
+    // dock-side change and auto-hide all close the panel first (auto-hide
+    // folding it is the user's call, 2026-08-08), so PositionToWorkArea,
+    // the reveal slide and the band clip never meet a widened window.
+
+    private bool _viewerOpen;
+    private bool _viewerOnLeft;
+    private string? _pendingViewerPath;
+    private System.Windows.Threading.DispatcherTimer? _viewerPreviewTimer;
+
+    private const double MinViewerWidth = 240;
+    private const double MaxViewerWidth = 800;
+
+    private double ViewerPanelWidth => Math.Clamp(_settings.ViewerWidth, MinViewerWidth, MaxViewerWidth);
+
+    // What the window's Width currently carries on top of the tree - the
+    // number every width-persisting path subtracts.
+    private double CurrentViewerPanelWidth => _viewerOpen ? ViewerPanelWidth : 0;
+
+    private void ViewerButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewerOpen)
+        {
+            CloseViewer();
+        }
+        else
+        {
+            OpenViewer();
+        }
+    }
+
+    private void ViewerCloseButton_Click(object sender, RoutedEventArgs e) => CloseViewer();
+
+    // The row context menu's "뷰어에서 보기" - the row is already selected by
+    // PrepareTreeRowContextMenu, so opening the panel (or refreshing it if
+    // already open) shows exactly that file.
+    private void OpenInViewer_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewerOpen)
+        {
+            UpdateViewerPreview();
+        }
+        else
+        {
+            OpenViewer();
+        }
+    }
+
+    private void OpenViewer()
+    {
+        if (_viewerOpen || _settings.IsAutoHidden)
+        {
+            return;
+        }
+
+        _viewerOpen = true;
+        _viewerOnLeft = _isDocked && _settings.DockOnRight;
+
+        double panelWidth = ViewerPanelWidth;
+        ViewerColumnLeft.Width = new GridLength(_viewerOnLeft ? panelWidth : 0);
+        ViewerColumnRight.Width = new GridLength(_viewerOnLeft ? 0 : panelWidth);
+        Grid.SetColumn(ViewerPanel, _viewerOnLeft ? 0 : 2);
+        // The divider faces the tree.
+        ViewerPanel.BorderThickness = _viewerOnLeft
+            ? new Thickness(0, 0, 1, 0)
+            : new Thickness(1, 0, 0, 0);
+        ViewerPanel.Visibility = Visibility.Visible;
+
+        if (_viewerOnLeft)
+        {
+            Left -= panelWidth;
+        }
+        Width += panelWidth;
+        if (!_isDocked)
+        {
+            // A floating window near the screen's right edge would otherwise
+            // grow past it.
+            var workArea = GetCurrentMonitorWorkArea();
+            if (Left + Width > workArea.Right)
+            {
+                Left = Math.Max(workArea.Left, workArea.Right - Width);
+            }
+        }
+
+        // The band clip's state tuple carries no width (see _appliedClip), so
+        // force the next pass to re-derive it against the widened window.
+        _appliedClip = (ClipUnknown, 0, 0);
+        ApplyWindowClipRegion();
+
+        if (!_settings.ViewerOpen)
+        {
+            _settings.ViewerOpen = true;
+            _settingsService.Save(_settings);
+        }
+
+        UpdateViewerPreview();
+    }
+
+    private void CloseViewer()
+    {
+        if (!_viewerOpen)
+        {
+            return;
+        }
+
+        _viewerOpen = false;
+        _pendingViewerPath = null;
+
+        double panelWidth = ViewerPanelWidth;
+        ViewerColumnLeft.Width = new GridLength(0);
+        ViewerColumnRight.Width = new GridLength(0);
+        ViewerPanel.Visibility = Visibility.Collapsed;
+        ViewerImage.Source = null;
+        ViewerIconImage.Source = null;
+
+        Width = Math.Max(MinExpandedWidth, Width - panelWidth);
+        if (_viewerOnLeft)
+        {
+            Left += panelWidth;
+        }
+
+        _appliedClip = (ClipUnknown, 0, 0);
+        ApplyWindowClipRegion();
+
+        if (_settings.ViewerOpen)
+        {
+            _settings.ViewerOpen = false;
+            _settingsService.Save(_settings);
+        }
+    }
+
+    // Selection changes debounce through a short timer: arrow-keying down a
+    // folder of images fires SelectedItemChanged per row, and decoding every
+    // intermediate file would stutter exactly the browsing this panel is
+    // for. 120ms is below "feels laggy" and above key-repeat.
+    private void ScheduleViewerPreview()
+    {
+        if (!_viewerOpen)
+        {
+            return;
+        }
+
+        if (_viewerPreviewTimer is null)
+        {
+            _viewerPreviewTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(120),
+            };
+            _viewerPreviewTimer.Tick += (_, _) =>
+            {
+                _viewerPreviewTimer!.Stop();
+                UpdateViewerPreview();
+            };
+        }
+
+        _viewerPreviewTimer.Stop();
+        _viewerPreviewTimer.Start();
+    }
+
+    private void UpdateViewerPreview()
+    {
+        if (!_viewerOpen)
+        {
+            return;
+        }
+
+        var item = _selectedItem;
+        if (item is null || item.IsPlaceholder || item.IsShowMore)
+        {
+            _pendingViewerPath = null;
+            ViewerImage.Source = null;
+            ViewerIconImage.Source = null;
+            ViewerFileName.Text = string.Empty;
+            ViewerFileInfo.Text = string.Empty;
+            return;
+        }
+
+        string path = item.FullPath;
+        if (string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        _pendingViewerPath = path;
+
+        ViewerFileName.Text = item.Name;
+        ViewerFileInfo.Text = string.Empty;
+
+        bool isImage = !item.IsDirectory && ThumbnailExtensions.Contains(Path.GetExtension(path));
+        if (isImage)
+        {
+            // Decode at panel width, not full size: an 8K wallpaper decoded
+            // whole is ~100MB of pixels for a ~400px slot, and round 1 never
+            // shows more than fit-inside. The zoom round will re-decode full
+            // size on demand.
+            int decodeWidth = (int)Math.Ceiling(
+                Math.Max(200, ViewerPanelWidth) * VisualTreeHelper.GetDpi(this).DpiScaleX);
+            Task.Run(() => LoadViewerImage(path, decodeWidth));
+        }
+        else
+        {
+            ShowViewerIcon(path);
+        }
+    }
+
+    // Background thread. Header first (original dimensions - DecodePixelWidth
+    // rewrites the decoded bitmap's own), then the scaled decode; only a
+    // frozen bitmap crosses back to the UI thread.
+    private void LoadViewerImage(string path, int decodeWidth)
+    {
+        BitmapImage? bitmap = null;
+        int pixelWidth = 0, pixelHeight = 0;
+        DateTime modified = default;
+        try
+        {
+            modified = File.GetLastWriteTime(path);
+            using (var stream = File.OpenRead(path))
+            {
+                var frame = BitmapDecoder.Create(stream,
+                    BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0];
+                pixelWidth = frame.PixelWidth;
+                pixelHeight = frame.PixelHeight;
+            }
+
+            bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.UriSource = new Uri(path);
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            if (pixelWidth > decodeWidth)
+            {
+                bitmap.DecodePixelWidth = decodeWidth;
+            }
+            bitmap.EndInit();
+            bitmap.Freeze();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException
+                                       or FileFormatException or ArgumentException or UriFormatException)
+        {
+            // No WIC codec (webp/heic without the store extension), unreadable
+            // or vanished file - fall through to the shell icon below.
+            bitmap = null;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (!_viewerOpen || !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (bitmap is null)
+            {
+                ShowViewerIcon(path);
+                return;
+            }
+
+            ViewerIconImage.Visibility = Visibility.Collapsed;
+            ViewerIconImage.Source = null;
+            ViewerImage.Visibility = Visibility.Visible;
+            ViewerImage.Source = bitmap;
+            ViewerFileInfo.Text = $"{pixelWidth} × {pixelHeight}   {modified:yyyy-MM-dd HH:mm}";
+        });
+    }
+
+    // Non-image selections (and images whose decode failed): the file's own
+    // shell icon, centered - the panel stays a selection preview rather than
+    // going blank.
+    private void ShowViewerIcon(string path)
+    {
+        ShellThumbnailService.GetPreview(path, 96, thumbnailOnly: false, (icon, _, _) =>
+        {
+            if (!_viewerOpen || !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            ViewerImage.Visibility = Visibility.Collapsed;
+            ViewerImage.Source = null;
+            ViewerIconImage.Visibility = Visibility.Visible;
+            ViewerIconImage.Source = icon;
+            try
+            {
+                ViewerFileInfo.Text = $"{File.GetLastWriteTime(path):yyyy-MM-dd HH:mm}";
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                ViewerFileInfo.Text = string.Empty;
+            }
+        });
     }
 
     // ===================================================================

@@ -8,6 +8,15 @@ public class AppSettings
 {
     public double ExpandedWidth { get; set; } = 240;
 
+    // The image viewer panel (header eye button / 뷰어에서 보기). ExpandedWidth
+    // above stays the TREE's width alone: opening the viewer widens the WINDOW
+    // by ViewerWidth on top of it, and every place that persists a width
+    // subtracts the panel again (see MainWindow's viewer region). ViewerOpen
+    // survives restarts; auto-hide and dock transitions fold the panel and
+    // clear it (user's call, 2026-08-08).
+    public bool ViewerOpen { get; set; } = false;
+    public double ViewerWidth { get; set; } = 360;
+
     // Collapsed to a bare sliver at the screen edge that peeks open on
     // mouse-over - see MainWindow.xaml.cs's EnterAutoHide/ExitAutoHide.
     // Entered by a single click on the app icon while docked and expanded.

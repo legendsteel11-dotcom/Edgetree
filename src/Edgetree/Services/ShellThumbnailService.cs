@@ -31,10 +31,17 @@ public static class ShellThumbnailService
     // scaled, so they can't be read off it), 0 when they couldn't be read -
     // decoded header-only, on the same background hop as the thumbnail.
     public static void GetThumbnail(string path, int pixelSize, Action<ImageSource?, int, int> onCompleted)
+        => GetPreview(path, pixelSize, thumbnailOnly: true, onCompleted);
+
+    // thumbnailOnly:false lets the shell fall back to the file-type icon -
+    // what the viewer panel shows for a non-image selection. The context
+    // menu's thumbnail slot keeps thumbnailOnly:true (see the flag note in
+    // Extract).
+    public static void GetPreview(string path, int pixelSize, bool thumbnailOnly, Action<ImageSource?, int, int> onCompleted)
     {
         Task.Run(() =>
         {
-            var thumbnail = Extract(path, pixelSize);
+            var thumbnail = Extract(path, pixelSize, thumbnailOnly);
 
             int pixelWidth = 0, pixelHeight = 0;
             try
@@ -55,7 +62,7 @@ public static class ShellThumbnailService
         });
     }
 
-    private static ImageSource? Extract(string path, int pixelSize)
+    private static ImageSource? Extract(string path, int pixelSize, bool thumbnailOnly)
     {
         IShellItemImageFactory? factory = null;
         IntPtr hBitmap = IntPtr.Zero;
@@ -68,12 +75,15 @@ public static class ShellThumbnailService
                 return null;
             }
 
-            // THUMBNAILONLY: fail rather than fall back to a file-type icon -
-            // the menu slot is for an actual preview, and the row already has
-            // its icon. BIGGERSIZEOK: a cached larger thumbnail is fine, the
-            // Image control scales it down.
+            // THUMBNAILONLY (the thumbnail slot's mode): fail rather than fall
+            // back to a file-type icon - the menu slot is for an actual
+            // preview, and the row already has its icon. Without it (the
+            // viewer's non-image mode) the shell answers with the icon
+            // instead. BIGGERSIZEOK: a cached larger image is fine, the Image
+            // control scales it down.
             var size = new SIZE { cx = pixelSize, cy = pixelSize };
-            if (factory.GetImage(size, SIIGBF_THUMBNAILONLY | SIIGBF_BIGGERSIZEOK, out hBitmap) != 0 ||
+            int flags = SIIGBF_BIGGERSIZEOK | (thumbnailOnly ? SIIGBF_THUMBNAILONLY : 0);
+            if (factory.GetImage(size, flags, out hBitmap) != 0 ||
                 hBitmap == IntPtr.Zero)
             {
                 return null;
