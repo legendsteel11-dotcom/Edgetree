@@ -3931,9 +3931,34 @@
                         RenderTransform="{StaticResource ShiftUp1px}"
                         ToolTip="{x:Static services:Strings.ToolTipViewer}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Path Data="M2.6,3.6 H13.4 A1.1,1.1 0 0 1 14.5,4.7 V11.3 A1.1,1.1 0 0 1 13.4,12.4 H2.6 A1.1,1.1 0 0 1 1.5,11.3 V4.7 A1.1,1.1 0 0 1 2.6,3.6 Z M12.2,6.5 A1,1 0 1 0 10.2,6.5 A1,1 0 1 0 12.2,6.5 Z M2.3,12.0 L6.0,7.9 L9.0,11.1 L10.7,9.4 L13.7,12.0"
-                            Stroke="{DynamicResource ForegroundText}"
-                            StrokeThickness="1.3"
+                    <!-- Material Symbols "image" (Resources/Icons/image_16dp_
+                         E3E3E3_FILL0_wght400_GRAD0_opsz24.svg), the user's own
+                         pick after the hand-drawn one read as "조금 튀는".
+                         The weight was settled by eye against the arithmetic
+                         and the arithmetic won: this app's glyphs are 1.4 in a
+                         16 box = 8.8%, 400/24 works out at about 8.3%, and it
+                         is the one that sits right. 500/20 read heavy; 300/24
+                         was tried after it and read worse the other way
+                         ("이건 더 이상하네요"), so 400 it is. Smaller opsz
+                         thickens the stroke at the same weight, which is why
+                         both axes have to be picked together - 24 throughout.
+                         The dp in the filename is irrelevant: every download
+                         gives the same 960-box path.
+                         STRETCH="UNIFORM" IS WHAT MAKES IT VISIBLE: Material's
+                         paths live in a 960 box with NEGATIVE y, and a Path
+                         defaults to Stretch="None" - the geometry is then drawn
+                         at those literal coordinates, entirely outside the
+                         element's own box, and clipped away to nothing. Uniform
+                         normalises it into the Width/Height below instead,
+                         which is also why no Viewbox is needed.
+                         13, not 16: Stretch fits the path's BOUNDS, dropping
+                         the padding the 960 box builds in, and the neighbouring
+                         hand-drawn glyphs sit inset by about that much. -->
+                    <Path Data="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"
+                            Fill="{DynamicResource ForegroundText}"
+                            Stretch="Uniform"
+                            Width="13"
+                            Height="13"
                             RenderTransformOrigin="0.5,0.5"
                             RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>

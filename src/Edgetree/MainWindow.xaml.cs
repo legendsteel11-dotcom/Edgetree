@@ -11531,8 +11531,16 @@ public partial class MainWindow : Window
 
         // Long enough to rule out a real double-click, which must open the file
         // instead. Read from the user's own Windows double-click speed rather
-        // than hardcoding a guess, plus a small margin so a double-click landing
-        // right at that limit still cancels this in time.
+        // than hardcoding a guess, plus a margin so a double-click landing right
+        // at that limit still cancels this in time.
+        //
+        // The margin is the only part of this that is ours to spend, and it
+        // was tried at 30 on 2026-08-09 and REVERTED the same minute: 530ms
+        // made the rename box feel like it was opening on clicks that weren't
+        // meant for it ("더 리네임이 자주 되는것 같이 느껴지고"). The wait is
+        // not the complaint's real subject - the system double-click time is
+        // 500 of it - so shortening the margin buys a feeling of misfires
+        // rather than a feeling of speed. Leave it at 100.
         _pendingRenameTimer.Interval = TimeSpan.FromMilliseconds(
             System.Windows.Forms.SystemInformation.DoubleClickTime + 100);
         _pendingRenameTimer.Stop();
