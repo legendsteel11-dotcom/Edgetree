@@ -12082,7 +12082,11 @@ public partial class MainWindow : Window
         double viewerWidth = CurrentViewerPanelWidth;
         if (_viewerOpen)
         {
-            double treeShare = Width - viewerWidth;
+            // The held share, not Width minus the STORED panel width: those
+            // two part company the moment the window has squeezed or grown
+            // the panel away from what settings remember, and the difference
+            // used to leak straight into the tree.
+            double treeShare = _viewerTreeShare ?? (Width - viewerWidth);
             viewerWidth = Math.Clamp(newWidth - treeShare, MinViewerWidth, MaxViewerWidth);
             newWidth = treeShare + viewerWidth;
 
@@ -12338,6 +12342,16 @@ public partial class MainWindow : Window
 
     private bool _viewerOpen;
     private bool _viewerOnLeft;
+    // The tree's width, held across every window resize that isn't the middle
+    // divider (the standing rule: the divider is the ONE gesture that moves
+    // it). Kept by the app rather than read back off the window, because the
+    // WPF properties don't survive the trip: instrumented 2026-08-08, Width
+    // is 3854 the moment a maximize starts while ActualWidth still reads the
+    // old 1246, and they swap roles again on the restore - so anything
+    // derived from them mid-transition is a coin toss. Null until the panel
+    // opens; then ClampViewerColumnToWindow hands the panel every pixel the
+    // window gains or loses and the tree stays where the user put it.
+    private double? _viewerTreeShare;
     private string? _pendingViewerPath;
     private System.Windows.Threading.DispatcherTimer? _viewerPreviewTimer;
 
@@ -12450,6 +12464,7 @@ public partial class MainWindow : Window
 
         _viewerOpen = false;
         _pendingViewerPath = null;
+        _viewerTreeShare = null;
 
         double panelWidth = ViewerPanelWidth;
         ViewerColumnLeft.Width = new GridLength(0);
@@ -12629,6 +12644,18 @@ public partial class MainWindow : Window
 
         ViewerColumnLeft.Width = new GridLength(_viewerOnLeft ? panelWidth : 0);
         ViewerColumnRight.Width = new GridLength(_viewerOnLeft ? 0 : panelWidth);
+
+        // Re-anchor the tree here and only here among the app's own width
+        // writes: every caller (open, dock, undock, side change) has already
+        // set Width to the total it wants, so the remainder IS the tree share
+        // being asked for. A window too narrow to hold the remembered panel
+        // plus a tree floor is a SQUEEZE, not a new split - it must not
+        // rewrite the anchor, or an auto-hide collapse to an 8px sliver would
+        // record a 120px tree and the reveal would never grow back.
+        if (!double.IsNaN(Width) && Width - ViewerPanelWidth >= MinTreeSplitWidth)
+        {
+            _viewerTreeShare = Width - ViewerPanelWidth;
+        }
         Grid.SetColumn(ViewerPanel, _viewerOnLeft ? 0 : 2);
         // The divider faces the tree.
         ViewerPanel.BorderThickness = _viewerOnLeft
@@ -12661,8 +12688,25 @@ public partial class MainWindow : Window
             return;
         }
 
-        double available = Math.Max(0, ActualWidth - MinTreeSplitWidth);
-        double target = Math.Min(ViewerPanelWidth, available);
+        double windowWidth = ActualWidth > 0 ? ActualWidth : Width;
+        double available = Math.Max(0, windowWidth - MinTreeSplitWidth);
+
+        // The tree column is the STAR one, so left alone it absorbs every
+        // pixel the window gains or loses - which is what a maximize looked
+        // like on a 4K screen (reported 2026-08-08): a wall of tree and a
+        // viewer still sitting at the width it had in a 1246px window. The
+        // same arithmetic moved the tree on an ordinary border resize, which
+        // the standing rule says only the middle divider may do. So the
+        // TREE is what gets held here and the panel takes the whole delta,
+        // in both directions, clamped so the tree keeps its split floor and
+        // the panel its cap. _settings.ViewerWidth is still deliberately
+        // never written from this method: a maximize, an auto-hide collapse
+        // and a work-area squeeze are all transient, and the remembered
+        // width has to survive them intact.
+        double target = _viewerTreeShare is { } treeShare
+            ? Math.Clamp(windowWidth - treeShare, 0, Math.Min(MaxViewerWidth, available))
+            : Math.Min(ViewerPanelWidth, available);
+
         var column = _viewerOnLeft ? ViewerColumnLeft : ViewerColumnRight;
         if (Math.Abs(column.Width.Value - target) < 0.5)
         {
@@ -12686,7 +12730,15 @@ public partial class MainWindow : Window
 
         // The thumb sits on the panel's tree-side edge, so the sign flips
         // with the panel's side: panel on the right grows by dragging LEFT.
-        double target = ViewerPanelWidth + (_viewerOnLeft ? e.HorizontalChange : -e.HorizontalChange);
+        //
+        // Measured from the column the user is actually looking at, not from
+        // the stored width: the two part company whenever the window can't
+        // hold the remembered panel (a squeeze) or holds more than it (a
+        // maximize), and reading the stored one there made the first delta
+        // jump the divider to somewhere the cursor wasn't.
+        var draggedColumn = _viewerOnLeft ? ViewerColumnLeft : ViewerColumnRight;
+        double target = draggedColumn.Width.Value
+            + (_viewerOnLeft ? e.HorizontalChange : -e.HorizontalChange);
 
         // The tree keeps its split floor (see MinTreeSplitWidth - a column
         // floor, not the window one) of the fixed window width. A floating
@@ -12698,17 +12750,30 @@ public partial class MainWindow : Window
         // Max(min, ...) so a window too narrow for both floors can't hand
         // Math.Clamp an inverted range (which throws).
         //
-        // ActualWidth, not Width: MAXIMIZED (Win+Up), the Width property
-        // still holds the restore bounds and only ActualWidth is the real
-        // window - clamping against Width capped a fullscreen split at the
-        // restore width's remainder, a wall of dead space to the divider's
-        // right (reported 2026-08-08, screenshot).
+        // ActualWidth, not Width: MAXIMIZED, only ActualWidth is the window
+        // the user is dragging inside - clamping against Width capped a
+        // fullscreen split at the restore width's remainder, a wall of dead
+        // space to the divider's right (reported 2026-08-08, screenshot).
         double windowWidth = ActualWidth > 0 ? ActualWidth : Width;
         double maxAllowed = Math.Max(MinViewerWidth,
             Math.Min(MaxViewerWidth, windowWidth - MinTreeSplitWidth));
-        _settings.ViewerWidth = Math.Clamp(target, MinViewerWidth, maxAllowed);
+        double panelWidth = Math.Clamp(target, MinViewerWidth, maxAllowed);
 
-        double panelWidth = ViewerPanelWidth;
+        // This is the one gesture allowed to move the tree, so it is the one
+        // that re-anchors the share every window resize afterwards holds to.
+        _viewerTreeShare = Math.Max(MinTreeSplitWidth, windowWidth - panelWidth);
+
+        // Maximized, the width under the cursor belongs to a window that stops
+        // existing at the next restore, so it must not become the remembered
+        // one - storing it was how a single nudge of the divider erased the
+        // width the restored window goes back to. The tree share above already
+        // carries the split through the restore; the stored panel width is
+        // left for the next open/restart to rebuild the window from.
+        if (WindowState != WindowState.Maximized)
+        {
+            _settings.ViewerWidth = panelWidth;
+        }
+
         if (_viewerOnLeft)
         {
             ViewerColumnLeft.Width = new GridLength(panelWidth);
