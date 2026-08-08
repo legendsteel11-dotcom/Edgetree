@@ -3090,14 +3090,27 @@ public partial class MainWindow : Window
         // Win+Up left the window stuck full-screen with only a drag to get it
         // back). Restoring is therefore done here, explicitly.
         //
-        // Restore ONLY. A double-click on a window that is not maximized still
-        // does nothing, so this cannot bring back the mis-operation the dock
-        // toggle was removed for.
-        if (e.ClickCount == 2 && WindowState == WindowState.Maximized)
+        // Floating gets the full caption double-click pair now (maximize AND
+        // restore, user 2026-08-08): with the viewer panel attached, a
+        // fullscreen-sized float is genuinely useful, the header has no
+        // column left for a maximize button, and this is the gesture every
+        // window already answers to. The mis-operation this block once
+        // removed was the DOCK toggle, and that stays gone - a docked
+        // double-click still does nothing.
+        if (e.ClickCount == 2)
         {
-            WindowState = WindowState.Normal;
-            e.Handled = true;
-            return;
+            if (WindowState == WindowState.Maximized)
+            {
+                WindowState = WindowState.Normal;
+                e.Handled = true;
+                return;
+            }
+            if (!_isDocked)
+            {
+                WindowState = WindowState.Maximized;
+                e.Handled = true;
+                return;
+            }
         }
 
         _headerDragStart = e.GetPosition(this);
@@ -3293,6 +3306,31 @@ public partial class MainWindow : Window
         // Floating always carries the panel on the right; a panel that was
         // on the interior-left of a right-docked window swings over here.
         ApplyViewerSide();
+
+        // A session's FIRST float with the panel open used to inherit the
+        // tree-only width and the band's full height - the panel crushed to
+        // its floor inside a tall skinny strip, which is a poor first
+        // picture for exactly the person seeing float mode for the first
+        // time. A starter shape instead (user, 2026-08-08): the panel at
+        // least 960 wide, the window built around a 16:9-ish panel - a
+        // quarter-of-a-4K feel on any monitor. Only when nothing is
+        // remembered: a session that has floated before restores its own
+        // bounds above, and a panel already set WIDER than 960 keeps that.
+        if (_viewerOpen && _floatingWidth is null)
+        {
+            if (_settings.ViewerWidth < 960)
+            {
+                _settings.ViewerWidth = Math.Clamp(960, MinViewerWidth, MaxViewerWidth);
+            }
+
+            var floatArea = GetCurrentMonitorWorkArea();
+            double treeShare = Math.Clamp(_settings.ExpandedWidth, MinTreeSplitWidth, MaxExpandedWidth);
+            Width = Math.Min(treeShare + ViewerPanelWidth, floatArea.Width * 0.9);
+            // 9/16 of the panel plus the header and the caption strip under
+            // the picture - lands the panel itself at roughly 960×540.
+            Height = Math.Clamp(ViewerPanelWidth * 9.0 / 16 + 110, MinDockedHeight, floatArea.Height * 0.9);
+            ApplyViewerSide();
+        }
 
         // Floors for the native resize borders, which answer to nothing else -
         // without them the frame can be dragged down to a sliver that is
@@ -12659,8 +12697,15 @@ public partial class MainWindow : Window
         // to be a real fullscreen view (round 3), not a 0px column.
         // Max(min, ...) so a window too narrow for both floors can't hand
         // Math.Clamp an inverted range (which throws).
+        //
+        // ActualWidth, not Width: MAXIMIZED (Win+Up), the Width property
+        // still holds the restore bounds and only ActualWidth is the real
+        // window - clamping against Width capped a fullscreen split at the
+        // restore width's remainder, a wall of dead space to the divider's
+        // right (reported 2026-08-08, screenshot).
+        double windowWidth = ActualWidth > 0 ? ActualWidth : Width;
         double maxAllowed = Math.Max(MinViewerWidth,
-            Math.Min(MaxViewerWidth, Width - MinTreeSplitWidth));
+            Math.Min(MaxViewerWidth, windowWidth - MinTreeSplitWidth));
         _settings.ViewerWidth = Math.Clamp(target, MinViewerWidth, maxAllowed);
 
         double panelWidth = ViewerPanelWidth;
