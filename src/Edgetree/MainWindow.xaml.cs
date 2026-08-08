@@ -1389,7 +1389,14 @@ public partial class MainWindow : Window
         // Retimed for the short offset above - the old numbers were scaled to a
         // journey the width of the window and would now spend most of a second
         // covering a hundred pixels.
-        => Math.Clamp(360 + (distance * 0.60), 520, 1200);
+        //
+        // Leaving caps far lower than arriving (1200 → 640, user 2026-08-08):
+        // the slide-out's distance is the whole window's width, and with the
+        // viewer panel that can be 3800px - which pinned every wide close to
+        // the old 1.2s ceiling, dragging exactly the half of the animation
+        // the eye has already moved on from. Narrow windows never reached
+        // either cap, so their feel is untouched.
+        => Math.Clamp(360 + (distance * 0.60), 520, arriving ? 1200 : 640);
 
     // A slide moves the window in from beyond the docked edge - which, with a
     // second display sitting there, means it comes in ACROSS that display
