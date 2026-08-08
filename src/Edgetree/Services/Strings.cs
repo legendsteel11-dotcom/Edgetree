@@ -281,7 +281,12 @@ public static class Strings
     public static string ColorLabelFileNameFont = "파일 이름";
     public static string ColorLabelFileNameHighlightFont = "파일 이름 강조";
     public static string ColorLabelSelection = "선택된 항목";
-    public static string ColorLabelHistory = "즐겨찾기 배경";
+    // Named after the PANEL, not favorites - the same correction 아래에 표시
+    // got in the options menu, and for the same reason: this one brush paints
+    // the favorites list, the bookmark list AND the search view's scope strip
+    // (which borrows the panel's colour on purpose). The stored JSON key stays
+    // HistoryBackgroundColorHex so nobody's customised colour resets.
+    public static string ColorLabelHistory = "패널 배경";
     public static string ColorLabelHoverBackground = "마우스 오버";
     public static string ColorLabelFolderNameHoverFont = "폴더 이름 마우스 오버";
     public static string ColorLabelFileNameHoverFont = "파일 이름 마우스 오버";
@@ -565,7 +570,7 @@ public static class Strings
         ColorLabelFileNameFont = "File Name";
         ColorLabelFileNameHighlightFont = "File Name Highlight";
         ColorLabelSelection = "Selected Item";
-        ColorLabelHistory = "Favorites Background";
+        ColorLabelHistory = "Panel Background";
         ColorLabelHoverBackground = "Mouse Hover";
         ColorLabelFolderNameHoverFont = "Folder Name Mouse Hover";
         ColorLabelFileNameHoverFont = "File Name Mouse Hover";
