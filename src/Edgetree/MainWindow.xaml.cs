@@ -8664,6 +8664,10 @@ public partial class MainWindow : Window
                         thumbnailPath is not null && ThumbnailExtensions.Contains(Path.GetExtension(thumbnailPath))
                             ? Visibility.Visible
                             : Visibility.Collapsed;
+                    // Set on every open, not bound: the panel opens and closes
+                    // from four other places and this menu only exists for the
+                    // instant it is on screen.
+                    openInViewerItem.IsChecked = _viewerOpen;
                 }
             }
         }
@@ -12497,14 +12501,15 @@ public partial class MainWindow : Window
 
     private void ViewerCloseButton_Click(object sender, RoutedEventArgs e) => CloseViewer();
 
-    // The row context menu's "뷰어에서 보기" - the row is already selected by
-    // PrepareTreeRowContextMenu, so opening the panel (or refreshing it if
-    // already open) shows exactly that file.
+    // The row context menu's "뷰어에서 보기", a toggle - the row is already
+    // selected by PrepareTreeRowContextMenu and the viewer follows the
+    // selection, so opening the panel shows exactly that file, and with the
+    // panel already open the only thing left for this row to do is close it.
     private void OpenInViewer_Click(object sender, RoutedEventArgs e)
     {
         if (_viewerOpen)
         {
-            UpdateViewerPreview();
+            CloseViewer();
         }
         else
         {
