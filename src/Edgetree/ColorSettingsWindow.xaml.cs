@@ -7,6 +7,7 @@ using SidebarExplorer.App.Services;
 using SidebarExplorer.App.Behaviors;
 using MouseButtonEventArgs = System.Windows.Input.MouseButtonEventArgs;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+using Keyboard = System.Windows.Input.Keyboard;
 using TextBox = System.Windows.Controls.TextBox;
 using Key = System.Windows.Input.Key;
 using Color = System.Windows.Media.Color;
@@ -32,7 +33,43 @@ public partial class ColorSettingsWindow : Window
         RefreshSwatches();
         Deactivated += Window_Deactivated;
         PreviewKeyDown += ColorSettingsWindow_PreviewKeyDown;
+        PreviewMouseDown += Window_PreviewMouseDown;
         Closing += (_, _) => ClosePicker(keep: true);
+    }
+
+    // Clicking anywhere that isn't the hex box being edited commits it -
+    // Keyboard.ClearFocus fires the box's LostKeyboardFocus, whose handler
+    // already applies the value. Without this, the dialog's labels and
+    // panels take no focus, so a click "away" left the box focused and only
+    // Enter or Tab got the user out (reported 2026-08-08).
+    private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (Keyboard.FocusedElement is TextBox focused &&
+            _hexBoxes.Contains(focused) &&
+            e.OriginalSource is DependencyObject origin &&
+            !IsDescendantOf(origin, focused))
+        {
+            Keyboard.ClearFocus();
+        }
+    }
+
+    // Visual-tree walk (falling back to logical for non-visuals like Run):
+    // the click's OriginalSource inside a TextBox is its inner TextBoxView,
+    // never the TextBox itself.
+    private static bool IsDescendantOf(DependencyObject element, DependencyObject ancestor)
+    {
+        for (DependencyObject? node = element; node is not null;
+             node = node is System.Windows.Media.Visual
+                 ? System.Windows.Media.VisualTreeHelper.GetParent(node)
+                 : LogicalTreeHelper.GetParent(node))
+        {
+            if (ReferenceEquals(node, ancestor))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Nudges attention back to this dialog if the user clicks outside the
@@ -76,6 +113,7 @@ public partial class ColorSettingsWindow : Window
         GuideLineActiveSwatch.Background = ParseBrush(CurrentGuideLineActiveColorHex);
         HeaderSwatch.Background = ParseBrush(CurrentHeaderBackgroundColorHex);
         PanelDividerSwatch.Background = ParseBrush(CurrentPanelDividerColorHex);
+        ViewerBackgroundSwatch.Background = ParseBrush(CurrentViewerBackgroundColorHex);
         AutoHideHandleSwatch.Background = ParseBrush(CurrentAutoHideHandleColorHex);
 
         // The codes beside them follow the same way - a theme flip, a reset to
@@ -252,6 +290,12 @@ public partial class ColorSettingsWindow : Window
         get => _settings.IsLightMode ? _settings.LightPanelDividerColorHex : _settings.PanelDividerColorHex;
         set { if (_settings.IsLightMode) _settings.LightPanelDividerColorHex = value; else _settings.PanelDividerColorHex = value; }
     }
+
+    private string CurrentViewerBackgroundColorHex
+    {
+        get => _settings.IsLightMode ? _settings.LightViewerBackgroundColorHex : _settings.ViewerBackgroundColorHex;
+        set { if (_settings.IsLightMode) _settings.LightViewerBackgroundColorHex = value; else _settings.ViewerBackgroundColorHex = value; }
+    }
     private string CurrentHeaderBackgroundColorHex
     {
         get => _settings.IsLightMode ? _settings.LightHeaderBackgroundColorHex : _settings.HeaderBackgroundColorHex;
@@ -296,6 +340,7 @@ public partial class ColorSettingsWindow : Window
             && CurrentGuideLineColorHex == GetDefault(defaults, s => s.GuideLineColorHex, s => s.LightGuideLineColorHex)
             && CurrentGuideLineActiveColorHex == GetDefault(defaults, s => s.GuideLineActiveColorHex, s => s.LightGuideLineActiveColorHex)
             && CurrentPanelDividerColorHex == GetDefault(defaults, s => s.PanelDividerColorHex, s => s.LightPanelDividerColorHex)
+            && CurrentViewerBackgroundColorHex == GetDefault(defaults, s => s.ViewerBackgroundColorHex, s => s.LightViewerBackgroundColorHex)
             && CurrentHeaderBackgroundColorHex == GetDefault(defaults, s => s.HeaderBackgroundColorHex, s => s.LightHeaderBackgroundColorHex)
             && CurrentAutoHideHandleColorHex == GetDefault(defaults, s => s.AutoHideHandleColorHex, s => s.LightAutoHideHandleColorHex);
 
@@ -481,6 +526,7 @@ public partial class ColorSettingsWindow : Window
         CurrentGuideLineActiveColorHex = defaults.IsLightMode ? defaults.LightGuideLineActiveColorHex : defaults.GuideLineActiveColorHex;
         CurrentHeaderBackgroundColorHex = defaults.IsLightMode ? defaults.LightHeaderBackgroundColorHex : defaults.HeaderBackgroundColorHex;
         CurrentPanelDividerColorHex = defaults.IsLightMode ? defaults.LightPanelDividerColorHex : defaults.PanelDividerColorHex;
+        CurrentViewerBackgroundColorHex = defaults.IsLightMode ? defaults.LightViewerBackgroundColorHex : defaults.ViewerBackgroundColorHex;
 
         // Written out rather than put back to "follow the background": the
         // background on the line above has just been reset as well, so the two
@@ -537,6 +583,9 @@ public partial class ColorSettingsWindow : Window
     private void PanelDividerSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(PanelDividerSwatch, () => CurrentPanelDividerColorHex, hex => CurrentPanelDividerColorHex = hex);
 
+    private void ViewerBackgroundSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => PickColor(ViewerBackgroundSwatch, () => CurrentViewerBackgroundColorHex, hex => CurrentViewerBackgroundColorHex = hex);
+
     private void AutoHideHandleSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(AutoHideHandleSwatch, () => CurrentAutoHideHandleColorHex, hex => CurrentAutoHideHandleColorHex = hex);
 
@@ -589,6 +638,8 @@ public partial class ColorSettingsWindow : Window
             return (() => CurrentHeaderBackgroundColorHex, hex => CurrentHeaderBackgroundColorHex = hex);
         if (ReferenceEquals(swatch, PanelDividerSwatch))
             return (() => CurrentPanelDividerColorHex, hex => CurrentPanelDividerColorHex = hex);
+        if (ReferenceEquals(swatch, ViewerBackgroundSwatch))
+            return (() => CurrentViewerBackgroundColorHex, hex => CurrentViewerBackgroundColorHex = hex);
         if (ReferenceEquals(swatch, AutoHideHandleSwatch))
             return (() => CurrentAutoHideHandleColorHex, hex => CurrentAutoHideHandleColorHex = hex);
 

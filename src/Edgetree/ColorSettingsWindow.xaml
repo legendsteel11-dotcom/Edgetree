@@ -255,6 +255,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -443,12 +444,12 @@
                             MouseLeftButtonUp="BackgroundSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="11"
+                <TextBlock Grid.Row="12"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelSelection}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="11"
+                <StackPanel Grid.Row="12"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -460,13 +461,13 @@
                             MouseLeftButtonUp="SelectionSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="12"
+                <TextBlock Grid.Row="13"
                         Grid.Column="0"
                         x:Name="LabelHoverBackground"
                         Text="{x:Static services:Strings.ColorLabelHoverBackground}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="12"
+                <StackPanel Grid.Row="13"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -478,12 +479,12 @@
                             MouseLeftButtonUp="HoverBackgroundSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="13"
+                <TextBlock Grid.Row="14"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelGuideLine}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="13"
+                <StackPanel Grid.Row="14"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -495,12 +496,12 @@
                             MouseLeftButtonUp="GuideLineSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="14"
+                <TextBlock Grid.Row="15"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelGuideLineActive}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="14"
+                <StackPanel Grid.Row="15"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -512,12 +513,12 @@
                             MouseLeftButtonUp="GuideLineActiveSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="15"
+                <TextBlock Grid.Row="16"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelPanelDivider}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="15"
+                <StackPanel Grid.Row="16"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -529,16 +530,36 @@
                             MouseLeftButtonUp="PanelDividerSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
+                <!-- Row 11, right under 탐색기 배경 (user's call, 2026-08-08:
+                     the two backgrounds belong together) - declared here out
+                     of row order only because it arrived later. -->
+                <TextBlock Grid.Row="11"
+                        Grid.Column="0"
+                        Text="{x:Static services:Strings.ColorLabelViewerBackground}"
+                        Style="{StaticResource ColorRowLabelStyle}"
+                        Margin="{DynamicResource DialogRowSpacing}"/>
+                <StackPanel Grid.Row="11"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <TextBox Tag="ViewerBackgroundSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="ViewerBackgroundSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="ViewerBackgroundSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
+
                 <!-- Last, and on its own: it is the one colour on this page
                      that is not seen against the app at all - the sidebar has
                      to be hidden first, so there is nothing to compare it with
                      while it is being set. -->
-                <TextBlock Grid.Row="16"
+                <TextBlock Grid.Row="17"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelAutoHideHandle}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="16"
+                <StackPanel Grid.Row="17"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -556,7 +577,7 @@
                      whole palette. Opposite ends of the row is the usual place
                      for a discard action, and the confirm prompt stays either
                      way. -->
-                <Grid Grid.Row="17"
+                <Grid Grid.Row="18"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0">

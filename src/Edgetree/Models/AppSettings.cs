@@ -163,6 +163,11 @@ public class AppSettings
     // these. Same default so existing users see no change until they
     // customize it separately.
     public string PanelDividerColorHex { get; set; } = "#FF323438";
+    // "뷰어 배경" - the image viewer panel's own backdrop, separate from the
+    // tree background so a photo can sit on near-black while the tree stays
+    // its own colour. Same default as the tree background, so nothing
+    // changes until it's customized.
+    public string ViewerBackgroundColorHex { get; set; } = "#FF1A1A1A";
 
     // Lightest of the three background shades (30 vs 28 favorites, 26 tree)
     // for a subtle depth hierarchy across the three panels.
@@ -237,6 +242,7 @@ public class AppSettings
     public string LightGuideLineColorHex { get; set; } = "#FFD9D9D9";
     public string LightGuideLineActiveColorHex { get; set; } = "#FFA0A0A0";
     public string LightPanelDividerColorHex { get; set; } = "#FFD9D9D9";
+    public string LightViewerBackgroundColorHex { get; set; } = "#FFFFFFFF";
     public string LightHeaderBackgroundColorHex { get; set; } = "#FFF3F3F3";
 
     // "ko" or "en" (see Services/Strings.cs). Restart-only - Strings.Initialize

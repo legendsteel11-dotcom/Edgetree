@@ -181,6 +181,11 @@
              for why that used to be the case). -->
         <SolidColorBrush x:Key="PanelDividerBrush"
                 Color="#FF323438"/>
+        <!-- The image viewer panel's backdrop (AppSettings.
+             ViewerBackgroundColorHex) - its own colour row in 색상 설정, so a
+             photo can sit on near-black while the tree keeps its colour. -->
+        <SolidColorBrush x:Key="ViewerBackground"
+                Color="#FF1A1A1A"/>
 
 
         <!-- Folder icons only (see the HierarchicalDataTemplate's IsDirectory
@@ -4580,7 +4585,7 @@
                     Grid.RowSpan="4"
                     Grid.Column="2"
                     Visibility="Collapsed"
-                    Background="{DynamicResource SidebarBackground}"
+                    Background="{DynamicResource ViewerBackground}"
                     BorderBrush="{DynamicResource PanelDividerBrush}"
                     BorderThickness="1,0,0,0">
                 <Grid>
@@ -4607,20 +4612,27 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             Visibility="Collapsed"/>
+                    <!-- Name, a wide gap, then ONE metadata line (resolution ·
+                         size · date) - briefly three lines, folded back the
+                         same day: nothing more is coming to this caption
+                         (user, 2026-08-08). The name wears the tree's own
+                         file-name colour; the metadata line wears the footer
+                         chips' unchecked ink (ForegroundText at the chips'
+                         own 0.65 - matching them is the user's spec here, so
+                         the no-opacity rule yields to the pairing). -->
                     <StackPanel Grid.Row="1"
                             Margin="10,0,10,10">
                         <TextBlock x:Name="ViewerFileName"
-                                Foreground="{DynamicResource ForegroundText}"
+                                Foreground="{DynamicResource FileNameForeground}"
                                 FontSize="{DynamicResource MenuFontSize}"
                                 TextTrimming="CharacterEllipsis"
                                 TextAlignment="Center"/>
-                        <!-- Set apart by SIZE, never by opacity (the standing
-                             rule for secondary text in this app). -->
                         <TextBlock x:Name="ViewerFileInfo"
-                                Foreground="{DynamicResource SecondaryForeground}"
+                                Foreground="{DynamicResource ForegroundText}"
+                                Opacity="0.65"
                                 FontSize="{DynamicResource MenuThumbnailInfoFontSize}"
                                 TextAlignment="Center"
-                                Margin="0,2,0,0"/>
+                                Margin="0,9,0,0"/>
                     </StackPanel>
                     <Button x:Name="ViewerCloseButton"
                             Grid.Row="0"

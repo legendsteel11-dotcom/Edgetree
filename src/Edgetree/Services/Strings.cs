@@ -286,6 +286,7 @@ public static class Strings
     public static string ColorLabelGuideLineActive = "들여쓰기 안내선 강조";
     public static string ColorLabelHeader = "제목 표시줄 배경";
     public static string ColorLabelPanelDivider = "영역 구분선";
+    public static string ColorLabelViewerBackground = "뷰어 배경";
     // Names both shapes the hidden sidebar can take, because one colour covers
     // both and the option menu already calls them 손잡이 and 막대
     // (MenuAutoHideUseHandle / MenuAutoHideSliverWidth).
@@ -566,6 +567,7 @@ public static class Strings
         ColorLabelGuideLineActive = "Guide Line Highlight";
         ColorLabelHeader = "Title Bar Background";
         ColorLabelPanelDivider = "Panel Divider";
+        ColorLabelViewerBackground = "Viewer Background";
         ColorLabelAutoHideHandle = "Auto-Hide Handle/Bar";
         ButtonDefaults = "Defaults";
         ButtonClose = "Close";

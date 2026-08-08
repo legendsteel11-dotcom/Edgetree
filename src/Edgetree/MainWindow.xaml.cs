@@ -807,6 +807,7 @@ public partial class MainWindow : Window
         SetBrushColor("TreeGuideLineBrush", light ? _settings.LightGuideLineColorHex : _settings.GuideLineColorHex);
         SetBrushColor("TreeGuideLineActiveBrush", light ? _settings.LightGuideLineActiveColorHex : _settings.GuideLineActiveColorHex);
         SetBrushColor("PanelDividerBrush", light ? _settings.LightPanelDividerColorHex : _settings.PanelDividerColorHex);
+        SetBrushColor("ViewerBackground", light ? _settings.LightViewerBackgroundColorHex : _settings.ViewerBackgroundColorHex);
         SetBrushColor("HeaderBackground", light ? _settings.LightHeaderBackgroundColorHex : _settings.HeaderBackgroundColorHex);
         SetBrushColor("AutoHideHandleBackground", light ? _settings.LightAutoHideHandleColorHex : _settings.AutoHideHandleColorHex);
 
@@ -12504,10 +12505,13 @@ public partial class MainWindow : Window
     {
         BitmapImage? bitmap = null;
         int pixelWidth = 0, pixelHeight = 0;
+        long fileLength = 0;
         DateTime modified = default;
         try
         {
-            modified = File.GetLastWriteTime(path);
+            var fileInfo = new FileInfo(path);
+            fileLength = fileInfo.Length;
+            modified = fileInfo.LastWriteTime;
             using (var stream = File.OpenRead(path))
             {
                 var frame = BitmapDecoder.Create(stream,
@@ -12552,7 +12556,8 @@ public partial class MainWindow : Window
             ViewerIconImage.Source = null;
             ViewerImage.Visibility = Visibility.Visible;
             ViewerImage.Source = bitmap;
-            ViewerFileInfo.Text = $"{pixelWidth} × {pixelHeight}   {modified:yyyy-MM-dd HH:mm}";
+            ViewerFileInfo.Text =
+                $"{pixelWidth} × {pixelHeight}  ·  {FormatFileSize(fileLength)}  ·  {modified:yyyy-MM-dd HH:mm}";
         });
     }
 
@@ -12717,7 +12722,13 @@ public partial class MainWindow : Window
             ViewerIconImage.Source = icon;
             try
             {
-                ViewerFileInfo.Text = $"{File.GetLastWriteTime(path):yyyy-MM-dd HH:mm}";
+                // Files get size · date like images do; folders just their
+                // date.
+                var fileInfo = new FileInfo(path);
+                string date = $"{File.GetLastWriteTime(path):yyyy-MM-dd HH:mm}";
+                ViewerFileInfo.Text = fileInfo.Exists
+                    ? $"{FormatFileSize(fileInfo.Length)}  ·  {date}"
+                    : date;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
