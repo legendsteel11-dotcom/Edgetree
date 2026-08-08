@@ -2094,6 +2094,23 @@
             </Setter>
         </Style>
 
+        <!-- The grab line for every resize edge (and the viewer's divider).
+             The two states carry ALPHA rather than darker greys, and that is
+             deliberate: these values are fixed across both themes, so a darker
+             grey would soften the line on the dark theme and strengthen it on
+             the light one. Alpha blends toward whatever is actually behind, so
+             it softens both the same way.
+             Softened 2026-08-09 - the opaque #FF6B6B6B / #FF9B9B9B read too
+             loud for a 1px hint, from hover onward, "눈에 좀 계속 밟히네요".
+             DRAG IS NOW FAINTER THAN HOVER, which looks backwards written down
+             and is right in the hand: hover has to say "there is something to
+             grab here", and once it IS grabbed the cursor has already turned
+             into the resize arrows and says it better than a line can. Same
+             base grey for both so the two states read as one scale; only the
+             alpha differs, and it is the only thing to touch if they ever need
+             another nudge (8C hover / 4D drag).
+             IsDragging is declared AFTER IsMouseOver on purpose - both are
+             true mid-drag, and the later trigger is the one that wins. -->
         <Style x:Key="ResizeThumbStyle"
                 TargetType="Thumb">
             <Setter Property="Background"
@@ -2112,13 +2129,13 @@
                                     Value="True">
                                 <Setter TargetName="Bar"
                                         Property="Background"
-                                        Value="#FF6B6B6B"/>
+                                        Value="#8C6B6B6B"/>
                             </Trigger>
                             <Trigger Property="IsDragging"
                                     Value="True">
                                 <Setter TargetName="Bar"
                                         Property="Background"
-                                        Value="#FF9B9B9B"/>
+                                        Value="#4D6B6B6B"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -2148,13 +2165,13 @@
                                     Value="True">
                                 <Setter TargetName="Bar"
                                         Property="Background"
-                                        Value="#FF6B6B6B"/>
+                                        Value="#8C6B6B6B"/>
                             </Trigger>
                             <Trigger Property="IsDragging"
                                     Value="True">
                                 <Setter TargetName="Bar"
                                         Property="Background"
-                                        Value="#FF9B9B9B"/>
+                                        Value="#4D6B6B6B"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

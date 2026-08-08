@@ -3155,10 +3155,28 @@ public partial class MainWindow : Window
     private void ApplyHeaderMetrics()
     {
         double width = ActualWidth > 0 ? ActualWidth : Width;
+        // Each threshold is the width its own step actually NEEDS, worked out
+        // rather than picked: the app icon's column is 34 (a 20px image with
+        // 8+6 of margin), and the seven buttons are six at size+gap*2 plus the
+        // close button at size+gap+closeGap.
+        //
+        //   32/2/6 → 34 + 6*36 + 40 = 290
+        //   28/1/4 → 34 + 6*30 + 33 = 247
+        //   24/0/2 → 34 + 6*24 + 26 = 204   (= MinExpandedWidth exactly)
+        //
+        // They used to read 250 and 210, which are smaller than what those
+        // steps need, so between 250~289 and 210~246 the last column - the
+        // CLOSE button - was pushed off the window (reported 2026-08-09, with
+        // a screenshot: wider or narrower and it came back). The arithmetic
+        // broke when the viewer made a seventh button; the smallest step still
+        // fit, which is why only the middle bands showed it.
+        //
+        // If a button is ever dropped from this strip, every number here comes
+        // down by that button's own width (36 / 30 / 24).
         var (size, gap, closeGap) = width switch
         {
-            >= 250 => (32.0, 2.0, 6.0),
-            >= 210 => (28.0, 1.0, 4.0),
+            >= 290 => (32.0, 2.0, 6.0),
+            >= 247 => (28.0, 1.0, 4.0),
             _ => (24.0, 0.0, 2.0),
         };
 
