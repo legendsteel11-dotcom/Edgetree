@@ -386,6 +386,28 @@ internal static class NativeMethods
         DwmSetWindowAttribute(hWnd, DWMWA_SYSTEMBACKDROP_TYPE, ref type, sizeof(int));
     }
 
+    // DWMWA_USE_IMMERSIVE_DARK_MODE (Windows 10 20H1+ / Win11: attribute 20).
+    // Declares the WINDOW itself dark-themed to DWM - which turns out to be
+    // what decides the color of the sheet DWM composites behind an extended
+    // glass frame during moves/resizes. The app's own brushes and
+    // DWMWA_CAPTION_COLOR provably do not (2026-08-07 rounds); with this
+    // set, the transition flash follows the app theme instead of the OS one:
+    // dark theme gets a dark sheet, light keeps the white it always matched
+    // (user request, 2026-08-08). Fails harmlessly on older builds, same
+    // rule as the corner preference below.
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+
+    public static void SetImmersiveDarkMode(IntPtr hWnd, bool dark)
+    {
+        if (hWnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        int value = dark ? 1 : 0;
+        DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref value, sizeof(int));
+    }
+
     // Docked, the window is flush against the screen edge - rounded corners
     // there would just look like a gap against the taskbar/desktop. Floating,
     // it's a normal window on the desktop like any other, so it should round

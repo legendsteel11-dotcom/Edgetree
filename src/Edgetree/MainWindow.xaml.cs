@@ -693,6 +693,13 @@ public partial class MainWindow : Window
             // icons - general chrome, not part of the 16 colors below.
             (Application.Current as App)?.ApplyChromeTheme(light);
 
+            // The DWM under-sheet that flashes on dock/undock and native
+            // resizes follows the theme DECLARED ON THE WINDOW, not the
+            // app's brushes - see SetImmersiveDarkMode. First run lands here
+            // via MainWindow_Loaded, when the handle already exists.
+            NativeMethods.SetImmersiveDarkMode(
+                new WindowInteropHelper(this).Handle, dark: !light);
+
             // Menu/context-menu drop shadow (see MenuDropShadow's own comment
             // in the XAML) - the same dark, fairly strong shadow read as too
             // heavy against a light-mode menu's white background, so light mode
