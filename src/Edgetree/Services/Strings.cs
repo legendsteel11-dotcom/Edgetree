@@ -76,7 +76,6 @@ public static class Strings
     public static string HiddenClearAllConfirmBody = "숨긴 폴더 {0}개를 모두 다시 표시하겠습니까?";
     public static string BookmarkClearAllConfirmTitle = "북마크 전체 해제";
     public static string BookmarkClearAllConfirmBody = "북마크 {0}개를 모두 해제하겠습니까?";
-    public static string BookmarkShortcutToggle = "지정 / 해제";
     public static string BookmarkShortcutNext = "다음 북마크";
     public static string BookmarkShortcutPrev = "이전 북마크";
     public static string MenuNewFolder = "새 폴더";
@@ -429,7 +428,6 @@ public static class Strings
         MenuBookmarkClearAll = "Clear all";
         BookmarkClearAllConfirmTitle = "Clear All Bookmarks";
         BookmarkClearAllConfirmBody = "Clear all {0} bookmarks?";
-        BookmarkShortcutToggle = "Set / clear";
         BookmarkShortcutNext = "Next bookmark";
         BookmarkShortcutPrev = "Previous bookmark";
         MenuNewFolder = "New Folder";

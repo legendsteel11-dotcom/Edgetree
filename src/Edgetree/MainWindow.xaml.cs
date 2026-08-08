@@ -9667,14 +9667,6 @@ public partial class MainWindow : Window
                 Header = Strings.MenuBookmarkListEmpty,
                 IsEnabled = false,
             }));
-
-            // The shortcuts belong here MOST of all. This used to stop at the
-            // "none yet" line, so the one person who needed to be told how to
-            // make a bookmark - someone who has never made one - was the only
-            // person shown nothing (2026-07-30, from a user asking whether the
-            // options menu was the only way to work with bookmarks).
-            menu.Items.Add(new Separator());
-            menu.Items.Add(BuildBookmarkShortcutHint());
             return;
         }
 
@@ -9683,8 +9675,11 @@ public partial class MainWindow : Window
             menu.Items.Add(BuildBookmarkListRow(path));
         }
 
-        menu.Items.Add(new Separator());
-        menu.Items.Add(BuildBookmarkShortcutHint());
+        // This list carried a three-line shortcut hint (added 2026-07-30 for
+        // whoever had never made a bookmark, then trimmed twice) until the
+        // user removed it outright (2026-08-08): the row context menu's 북마크
+        // submenu already states the same gestures full-size, and a
+        // small-print block here read as a different menu's furniture.
         menu.Items.Add(new Separator());
 
         menu.Items.Add(BuildListClearAllButton(
@@ -9767,74 +9762,6 @@ public partial class MainWindow : Window
             Header = grid,
             Style = (Style)FindResource("MenuButtonRowStyle"),
         };
-    }
-
-    // The shortcuts are the fast way to work with bookmarks, and this list is
-    // the one place someone is already thinking about them - so they're stated
-    // here rather than left to a help page nobody opens.
-    //
-    // Set apart by SIZE alone, never by dimming. Opacity on menu text has now
-    // gone wrong twice in this menu (the parent-folder column, then these
-    // lines): the menu foreground is already a soft grey chosen against the
-    // tree's lighter background, and knocking it down again on the menu's own
-    // darker surface leaves text the user cannot read. Anything secondary here
-    // gets a smaller font, not a fainter one.
-    private MenuItem BuildBookmarkShortcutHint()
-    {
-        var lines = new StackPanel();
-        foreach (var (gesture, label) in new[]
-                 {
-                     ("Ctrl+Alt+K", Strings.BookmarkShortcutToggle),
-                     ("Ctrl+Alt+L", Strings.BookmarkShortcutNext),
-                     ("Ctrl+Alt+J", Strings.BookmarkShortcutPrev),
-                 })
-        {
-            var line = new Grid();
-            line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            // Description first, shortcut on the right - the same order every
-            // menu row above uses, where the label leads and the gesture
-            // follows in its own column.
-            //
-            // Both in SecondaryForeground, the brush the menu template gives
-            // that gesture column. This whole block is an aside about the rows
-            // above it, so it reads as one thing rather than a label paired
-            // with something else.
-            var labelText = new TextBlock { Text = label };
-            labelText.SetResourceReference(TextBlock.ForegroundProperty, "SecondaryForeground");
-            Grid.SetColumn(labelText, 0);
-            line.Children.Add(labelText);
-
-            var gestureText = new TextBlock
-            {
-                Text = gesture,
-                Margin = new Thickness(12, 0, 0, 0),
-                HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
-            };
-            gestureText.SetResourceReference(TextBlock.ForegroundProperty, "SecondaryForeground");
-            Grid.SetColumn(gestureText, 1);
-            line.Children.Add(gestureText);
-
-            lines.Children.Add(line);
-        }
-
-        var hint = new MenuItem
-        {
-            Header = lines,
-            // Not a target: no hover highlight, no keyboard stop, nothing
-            // happens on click.
-            IsHitTestVisible = false,
-            Focusable = false,
-        };
-        // A step below even the menu's own gesture column: this block explains
-        // the rows above rather than being one of them, and the user asked for
-        // it quieter still. Computed rather than referenced, since there is no
-        // resource one size down - the floor keeps it legible at any zoom.
-        double gestureSize = Application.Current.Resources["MenuGestureFontSize"] as double? ?? 11.0;
-        hint.FontSize = Math.Max(8.0, gestureSize - 1);
-        _bookmarkWidthTargets.Add(hint);
-        return hint;
     }
 
     // The submenu's rows are made to span the options menu's own width, so the
