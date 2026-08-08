@@ -220,11 +220,11 @@ public static class Strings
     // Services/FileSearchService)
     public static string ToolTipSearch = "검색 (Ctrl+F)";
     public static string ToolTipViewer = "이미지 뷰어";
-    public static string MenuOpenInViewer = "뷰어에서 보기";
     // Viewer zoom strip - two chips wide, so both stay short in every language.
     public static string ViewerZoomFit = "맞춤";
     public static string ViewerZoomActual = "1:1";
     public static string ViewerNavigator = "내비게이터";
+    public static string ViewerClose = "뷰어 닫기";
     public static string ToolTipExitSearch = "탐색기로 (Ctrl+E)";
     public static string SearchTooltipBrowseFolder = "검색할 폴더 선택";
     public static string SearchTooltipRefresh = "다시 인덱싱";
@@ -527,10 +527,10 @@ public static class Strings
 
         ToolTipSearch = "Search (Ctrl+F)";
         ToolTipViewer = "Image Viewer";
-        MenuOpenInViewer = "Open in Viewer";
         ViewerZoomFit = "Fit";
         ViewerZoomActual = "1:1";
         ViewerNavigator = "Navigator";
+        ViewerClose = "Close viewer";
         ToolTipExitSearch = "Back to Explorer (Ctrl+E)";
         SearchTooltipBrowseFolder = "Choose folder to search";
         SearchTooltipRefresh = "Reindex";

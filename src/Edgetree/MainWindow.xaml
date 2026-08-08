@@ -903,9 +903,16 @@
                  at its fixed size the moment the menu opens - we already know
                  from the extension whether this row gets one - so the async
                  arrival of the actual picture never reflows the open menu.
-                 Clicking it opens the file, same as double-click on the row.
-                 Shown/loaded by UpdateThumbnailRow via the POSITIONAL pattern
-                 in ExplorerItemContextMenu_Opened - keep that in sync. -->
+                 Clicking it opens the picture in the VIEWER (see
+                 ThumbnailMenuItem_Click) - the thumbnail is the image, so
+                 "bigger, here" is what a click on it reads as, and the
+                 default app is still one Enter or double-click away. This
+                 replaced a "뷰어에서 보기" row that said the same thing in
+                 words directly under the picture (user, 2026-08-09).
+                 THIS ITEM AND THE SEPARATOR BELOW MUST STAY THE MENU'S FIRST
+                 TWO - TreeViewItem_PreviewMouseRightButtonDown matches them
+                 positionally (`menu.Items is [MenuItem, Separator, ..]`).
+                 Everything after them is found by Tag and can move freely. -->
             <MenuItem Visibility="Collapsed"
                     Tag="thumbnail"
                     Click="ThumbnailMenuItem_Click">
@@ -970,23 +977,6 @@
                 </MenuItem.Header>
             </MenuItem>
             <Separator Visibility="Collapsed" Tag="thumbnailSep"/>
-            <!-- Opens the image viewer panel on this file. Image rows only -
-                 shown/hidden by PrepareTreeRowContextMenu alongside the
-                 thumbnail decision above (same extension gate). Placed AFTER
-                 the thumbnail pair: that pair is matched positionally as the
-                 menu's first two items. -->
-            <!-- Checkable, because right-clicking a row already selects it and
-                 the viewer already follows the selection - so with the panel
-                 open this row was offering to do the thing it was looking at
-                 (and did nothing at all: UpdateViewerPreview returns early on
-                 the path it is already showing). A check says "this is in the
-                 viewer" instead of asking again, and clicking it closes the
-                 panel, which is the only move left to make from here. -->
-            <MenuItem Header="{x:Static services:Strings.MenuOpenInViewer}"
-                    Tag="openInViewer"
-                    IsCheckable="True"
-                    Visibility="Collapsed"
-                    Click="OpenInViewer_Click"/>
             <!-- Multi-selection header row ("N개 항목 선택됨"): shown, with its
                  separator, only while a Ctrl/Shift-click multi-selection is
                  active - text and visibility both set on every open by
@@ -2659,6 +2649,46 @@
             </Setter>
         </Style>
 
+        <!-- The little chevron that closes the viewer from the divider, so the
+             gesture is where the eye already is instead of a trip to the
+             window's top-right corner (user, 2026-08-09). Its own style rather
+             than the header's ToggleButtonStyle: this one is a tall narrow
+             plate riding a 1px line, not a square button in a row of squares.
+             Resting ink matches the footer chips (0.65) so it reads as the
+             same quiet class of control. -->
+        <Style x:Key="ViewerCollapseButtonStyle"
+                TargetType="Button">
+            <Setter Property="Focusable"
+                    Value="False"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="Opacity"
+                    Value="0.65"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{DynamicResource ViewerBackground}"
+                                CornerRadius="3"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowHoverBackground}"/>
+                                <Setter Property="Opacity"
+                                        Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="RowPathTooltip"
                 TargetType="TextBlock">
             <Setter Property="ToolTipService.InitialShowDelay"
@@ -3884,8 +3914,15 @@
                     </Path>
                 </Button>
                 <!-- The image viewer toggle - opens/closes the preview panel
-                     beside the tree (see OpenViewer/CloseViewer). An eye on
-                     the same hand-built 16-unit box as the magnifier. -->
+                     beside the tree (see OpenViewer/CloseViewer). On the same
+                     hand-built 16-unit box as the magnifier.
+                     A PICTURE, not the eye it started as: an eye is the
+                     general "preview" sign, and it promised the panel could
+                     show the contents of any file (user, 2026-08-09) - which
+                     it can't; anything that isn't an image gets its shell
+                     icon. The tooltip already said 이미지 뷰어 and that was
+                     not enough, which is the usual result of leaving the
+                     correction to a tooltip. -->
                 <Button x:Name="ViewerButton"
                         Grid.Column="4"
                         Style="{StaticResource ToggleButtonStyle}"
@@ -3894,9 +3931,9 @@
                         RenderTransform="{StaticResource ShiftUp1px}"
                         ToolTip="{x:Static services:Strings.ToolTipViewer}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Path Data="M1.5,8 C3.4,4.9 5.6,3.4 8,3.4 C10.4,3.4 12.6,4.9 14.5,8 C12.6,11.1 10.4,12.6 8,12.6 C5.6,12.6 3.4,11.1 1.5,8 Z M10.1,8 A2.1,2.1 0 1 0 5.9,8 A2.1,2.1 0 1 0 10.1,8 Z"
+                    <Path Data="M2.6,3.6 H13.4 A1.1,1.1 0 0 1 14.5,4.7 V11.3 A1.1,1.1 0 0 1 13.4,12.4 H2.6 A1.1,1.1 0 0 1 1.5,11.3 V4.7 A1.1,1.1 0 0 1 2.6,3.6 Z M12.2,6.5 A1,1 0 1 0 10.2,6.5 A1,1 0 1 0 12.2,6.5 Z M2.3,12.0 L6.0,7.9 L9.0,11.1 L10.7,9.4 L13.7,12.0"
                             Stroke="{DynamicResource ForegroundText}"
-                            StrokeThickness="1.4"
+                            StrokeThickness="1.3"
                             RenderTransformOrigin="0.5,0.5"
                             RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>
@@ -4876,6 +4913,39 @@
                     Visibility="Collapsed"
                     DragDelta="ViewerSplitThumb_DragDelta"
                     DragCompleted="ViewerSplitThumb_DragCompleted"/>
+
+            <!-- Closes the viewer, from the divider rather than the window's
+                 far corner. Above the grab zone in ZIndex so its own clicks
+                 land, which costs the drag this much of the divider's height -
+                 the same trade every splitter with a collapse button makes,
+                 and the rest of the line still drags.
+                 The chevron always points AT THE TREE, which is also the
+                 direction the window's edge actually travels when the panel
+                 closes; ApplyViewerSide flips it with the panel's side. It
+                 sits over the panel's 10px image margin, not over the picture,
+                 so it can wear theme brushes like everything else. -->
+            <Button x:Name="ViewerCollapseButton"
+                    Grid.Row="1"
+                    Grid.RowSpan="4"
+                    Grid.Column="2"
+                    Width="14"
+                    Height="40"
+                    Margin="-7,0,0,0"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Center"
+                    Panel.ZIndex="3"
+                    Visibility="Collapsed"
+                    Style="{StaticResource ViewerCollapseButtonStyle}"
+                    Click="ViewerCollapseButton_Click"
+                    ToolTip="{x:Static services:Strings.ViewerClose}">
+                <Path x:Name="ViewerCollapseGlyph"
+                        Data="M6,0 L2,5 L6,10"
+                        Stroke="{DynamicResource ForegroundText}"
+                        StrokeThickness="1.4"
+                        StrokeLineJoin="Round"
+                        StrokeStartLineCap="Round"
+                        StrokeEndLineCap="Round"/>
+            </Button>
         </Grid>
 
         <!-- What the auto-hidden sidebar actually shows: one flat colour over

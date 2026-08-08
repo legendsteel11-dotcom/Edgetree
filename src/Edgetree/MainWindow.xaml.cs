@@ -8653,22 +8653,6 @@ public partial class MainWindow : Window
                         ? file.FullPath
                         : null;
                 UpdateThumbnailRow(thumbnailItem, thumbnailSeparator, thumbnailPath);
-
-                // "뷰어에서 보기" rides the same single-file decision, gated
-                // further to actual image extensions - the viewer shows icons
-                // for anything else, so offering it on an .exe row would be
-                // a long way round to nothing.
-                if (FindTaggedMenuElement<MenuItem>(menu, "openInViewer") is { } openInViewerItem)
-                {
-                    openInViewerItem.Visibility =
-                        thumbnailPath is not null && ThumbnailExtensions.Contains(Path.GetExtension(thumbnailPath))
-                            ? Visibility.Visible
-                            : Visibility.Collapsed;
-                    // Set on every open, not bound: the panel opens and closes
-                    // from four other places and this menu only exists for the
-                    // instant it is on screen.
-                    openInViewerItem.IsChecked = _viewerOpen;
-                }
             }
         }
     }
@@ -9133,8 +9117,31 @@ public partial class MainWindow : Window
     // The thumbnail is a click target too: opening the file is the natural
     // "show me properly" follow-up to a glance, and it's why a bigger
     // preview flyout wasn't needed.
+    // Clicking the picture in the row menu opens it in the VIEWER rather than
+    // handing it to whatever app owns the extension. The thumbnail IS the
+    // image, so a click on it reads as "bigger, here", and the default app is
+    // still one Enter or double-click away on the row itself. It replaced a
+    // "뷰어에서 보기" row that said the same thing in words directly under the
+    // picture (user, 2026-08-09) - and which had nothing left to do whenever
+    // the panel was already open, since right-clicking a row selects it and
+    // the viewer follows the selection.
+    //
+    // Only for what the viewer can actually draw: a video or a PDF can carry a
+    // shell thumbnail while the panel would manage no more than its icon, so
+    // those keep opening the way they always have.
     private void ThumbnailMenuItem_Click(object sender, RoutedEventArgs e)
-        => OpenItem_Click(sender, e);
+    {
+        if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: false } file &&
+            ThumbnailExtensions.Contains(Path.GetExtension(file.FullPath)))
+        {
+            // Already open means the panel is already showing this row - the
+            // selection took it there - so there is nothing further to do.
+            OpenViewer();
+            return;
+        }
+
+        OpenItem_Click(sender, e);
+    }
 
     // "1.2 MB" style, one decimal from KB up - for the thumbnail's info line.
     private static string FormatFileSize(long bytes) => bytes switch
@@ -12436,6 +12443,12 @@ public partial class MainWindow : Window
     // to have would silently stop fitting the moment the panel changed width.
     // Non-null is a DISPLAY scale where 1.0 means the bitmap's own pixels.
     private double? _viewerZoom;
+    // Which file the zoom above belongs to. The panel reloads the SAME file
+    // whenever a width drag settles (to re-decode at the new size), and
+    // "arriving picture resets to fit" read that as a new picture - so any
+    // resize of the window threw away the zoom (reported 2026-08-08). The
+    // reset is keyed on the path changing, not on a load happening.
+    private string? _viewerZoomPath;
     // The original file's pixel size (not the decode's - DecodePixelWidth
     // rewrites the bitmap's own PixelWidth), which is what every scale here is
     // measured against.
@@ -12501,21 +12514,9 @@ public partial class MainWindow : Window
 
     private void ViewerCloseButton_Click(object sender, RoutedEventArgs e) => CloseViewer();
 
-    // The row context menu's "뷰어에서 보기", a toggle - the row is already
-    // selected by PrepareTreeRowContextMenu and the viewer follows the
-    // selection, so opening the panel shows exactly that file, and with the
-    // panel already open the only thing left for this row to do is close it.
-    private void OpenInViewer_Click(object sender, RoutedEventArgs e)
-    {
-        if (_viewerOpen)
-        {
-            CloseViewer();
-        }
-        else
-        {
-            OpenViewer();
-        }
-    }
+    // Same thing as the panel's own X, put where the hand already is: the
+    // divider, rather than the far corner of the window (user, 2026-08-09).
+    private void ViewerCollapseButton_Click(object sender, RoutedEventArgs e) => CloseViewer();
 
     private void OpenViewer()
     {
@@ -12552,6 +12553,7 @@ public partial class MainWindow : Window
         ApplyViewerSide();
         ViewerPanel.Visibility = Visibility.Visible;
         ViewerSplitThumb.Visibility = Visibility.Visible;
+        ViewerCollapseButton.Visibility = Visibility.Visible;
 
         // The band clip's state tuple carries no width (see _appliedClip), so
         // force the next pass to re-derive it against the widened window.
@@ -12585,6 +12587,7 @@ public partial class MainWindow : Window
         ViewerColumnRight.Width = new GridLength(0);
         ViewerPanel.Visibility = Visibility.Collapsed;
         ViewerSplitThumb.Visibility = Visibility.Collapsed;
+        ViewerCollapseButton.Visibility = Visibility.Collapsed;
         ViewerImage.Source = null;
         ViewerIconImage.Source = null;
 
@@ -12773,16 +12776,24 @@ public partial class MainWindow : Window
             ViewerFileInfo.Text =
                 $"{pixelWidth} × {pixelHeight}  ·  {FormatFileSize(fileLength)}  ·  {modified:yyyy-MM-dd HH:mm}";
 
-            // A new picture always arrives fitted (user's call, round 2): a
-            // zoom carried over from the last file lands somewhere arbitrary
-            // in this one, and arrow-keying a folder would show a different
-            // corner of every image.
             _viewerPixelWidth = pixelWidth;
             _viewerPixelHeight = pixelHeight;
             _viewerDecodedWidth = bitmap.PixelWidth;
-            _viewerZoom = null;
-            ViewerZoomPan.X = 0;
-            ViewerZoomPan.Y = 0;
+
+            // A new picture arrives fitted (user's call, round 2): a zoom
+            // carried over from the last file lands somewhere arbitrary in
+            // this one, and arrow-keying a folder would show a different
+            // corner of every image. A RE-load of the same file is not that -
+            // the width drags deliberately reload to re-decode at the settled
+            // size, and resetting there threw the zoom away on every resize.
+            if (!string.Equals(_viewerZoomPath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                _viewerZoomPath = path;
+                _viewerZoom = null;
+                ViewerZoomPan.X = 0;
+                ViewerZoomPan.Y = 0;
+            }
+
             ApplyViewerZoom();
         });
     }
@@ -13174,6 +13185,7 @@ public partial class MainWindow : Window
 
         // Nothing to split while the viewer is the whole window.
         ViewerSplitThumb.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        ViewerCollapseButton.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
 
         // Both crossings land at the rest state. Carrying a zoom across meant
         // going full screen after one wheel turn in the panel put you at that
@@ -13277,6 +13289,7 @@ public partial class MainWindow : Window
     private void ClearViewerZoom()
     {
         _viewerZoom = null;
+        _viewerZoomPath = null;
         _viewerPixelWidth = 0;
         _viewerPixelHeight = 0;
         _viewerDecodedWidth = 0;
@@ -13348,6 +13361,19 @@ public partial class MainWindow : Window
         ViewerSplitThumb.Margin = _viewerOnLeft
             ? new Thickness(0, 0, -4, 0)
             : new Thickness(-4, 0, 0, 0);
+
+        // The collapse chevron rides the same edge, and points at the tree -
+        // which is also the way the window's outer edge travels when the panel
+        // closes (CloseViewer narrows toward whichever side the tree is on).
+        Grid.SetColumn(ViewerCollapseButton, _viewerOnLeft ? 0 : 2);
+        ViewerCollapseButton.HorizontalAlignment = _viewerOnLeft
+            ? System.Windows.HorizontalAlignment.Right
+            : System.Windows.HorizontalAlignment.Left;
+        ViewerCollapseButton.Margin = _viewerOnLeft
+            ? new Thickness(0, 0, -7, 0)
+            : new Thickness(-7, 0, 0, 0);
+        ViewerCollapseGlyph.Data = Geometry.Parse(
+            _viewerOnLeft ? "M2,0 L6,5 L2,10" : "M6,0 L2,5 L6,10");
     }
 
     // The panel column always fits the window, whatever resized it. The
