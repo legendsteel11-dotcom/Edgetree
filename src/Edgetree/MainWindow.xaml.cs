@@ -3050,7 +3050,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e) => ApplyHeaderMetrics();
+    private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        ApplyHeaderMetrics();
+        ClampViewerColumnToWindow();
+    }
 
     private void HeaderGrid_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -12510,6 +12514,33 @@ public partial class MainWindow : Window
             ViewerImage.Source = bitmap;
             ViewerFileInfo.Text = $"{pixelWidth} × {pixelHeight}   {modified:yyyy-MM-dd HH:mm}";
         });
+    }
+
+    // The panel column always fits the window, whatever resized it. The
+    // app's own grips enforce the floors themselves, but the OS border
+    // resize on a floating window bypasses them entirely - reported
+    // 2026-08-08 as the viewer swallowing the tree AND pushing the header's
+    // buttons out past the window edge (the fixed column had made the whole
+    // grid wider than the window). Runs on every SizeChanged: the panel
+    // yields until the tree keeps its split floor, and grows back toward
+    // the REMEMBERED width when the window does - _settings.ViewerWidth is
+    // deliberately never written here, so a squeeze is temporary.
+    private void ClampViewerColumnToWindow()
+    {
+        if (!_viewerOpen)
+        {
+            return;
+        }
+
+        double available = Math.Max(0, ActualWidth - MinTreeSplitWidth);
+        double target = Math.Min(ViewerPanelWidth, available);
+        var column = _viewerOnLeft ? ViewerColumnLeft : ViewerColumnRight;
+        if (Math.Abs(column.Width.Value - target) < 0.5)
+        {
+            return;
+        }
+
+        column.Width = new GridLength(target);
     }
 
     // Dragging the tree/viewer divider re-splits the CURRENT window between
