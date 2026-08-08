@@ -12355,7 +12355,12 @@ public partial class MainWindow : Window
 
     private void OpenViewer()
     {
-        if (_viewerOpen || _settings.IsAutoHidden)
+        // Collapsed-to-sliver is the only state that declines: there is no
+        // window to widen. A REVEALED auto-hide peek is geometrically the
+        // same as pinned-open, and blocking it too made the eye button dead
+        // until the user pinned once (reported 2026-08-08) - the ride
+        // through the next hide/reveal already works either way.
+        if (_viewerOpen || (_settings.IsAutoHidden && !_isAutoHideRevealed))
         {
             return;
         }
