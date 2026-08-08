@@ -3216,12 +3216,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Folded across every dock transition rather than carried through it:
-        // both Dock and Undock rewrite the window's bounds from remembered
-        // tree-only values, and a panel surviving into that rewrite would be
-        // crushed or double-counted. Reopening is one click.
-        CloseViewer();
-
+        // The panel used to fold here (and in Dock) because both transitions
+        // rewrite the window's bounds from remembered values. EXPERIMENT
+        // (user, 2026-08-08): it rides through instead - the bounds rewrite
+        // happens as before, and ApplyViewerSide + the SizeChanged clamp
+        // reconcile the columns to whatever window comes out, with the
+        // remembered panel width intact.
         _isDocked = false;
 
         // Aero-snap (dragging the header to the screen edge, or Win+Up) can
@@ -3274,6 +3274,10 @@ public partial class MainWindow : Window
         Height = bandHeight;
         _appliedClip = (ClipNone, 0, 0);
         NativeMethods.ClearWindowRegion(new WindowInteropHelper(this).Handle);
+
+        // Floating always carries the panel on the right; a panel that was
+        // on the interior-left of a right-docked window swings over here.
+        ApplyViewerSide();
 
         // Floors for the native resize borders, which answer to nothing else -
         // without them the frame can be dragged down to a sliver that is
@@ -3401,9 +3405,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Same reason as Undock's - see the note there.
-        CloseViewer();
-
         // Same Aero-snap reset as Undock() - matters here too, otherwise the
         // floating bounds snapshotted right below would be the maximized
         // (full-screen) ones instead of the window's actual floating size.
@@ -3453,7 +3454,53 @@ public partial class MainWindow : Window
         ShowInTaskbar = false;
         ApplyTopmostState("dock");
 
-        Width = ClampExpandedWidth(_settings.ExpandedWidth);
+        // The park (PositionToWorkArea below) writes Width, Top and Height
+        // straight through to the real window and only applies the band clip
+        // at its end - and DWM can composite a frame in between, which with
+        // a short BOTTOM band meant the whole floating window painted once
+        // at the TOP of the screen on every dock (user report with
+        // screenshots, 2026-08-08; same family as the 08-07 park findings).
+        // Applying the TARGET band's region before anything moves closes the
+        // gap: the region's rows lie outside the still-floating window, so
+        // the in-between frames clip to nothing - the window simply leaves
+        // for the edge. The region spans effectively infinite width (see
+        // SetBandRegion), so the width change that follows is covered too,
+        // and _appliedClip is set to the same tuple ApplyWindowClipRegion
+        // will want, making its own pass a no-op rather than a re-cut.
+        // Full-height docks (no band margins) skip this and keep their old
+        // one-frame arrival, which was never the complaint.
+        var dockWorkArea = GetCurrentMonitorWorkArea();
+        var (dockBandTop, dockBandHeight) = DockedBand(dockWorkArea);
+        double dockTopMargin = Math.Max(0, dockBandTop - dockWorkArea.Top);
+        double dockBottomMargin = Math.Max(0, dockWorkArea.Bottom - (dockBandTop + dockBandHeight));
+        if (dockTopMargin > 0.5 || dockBottomMargin > 0.5)
+        {
+            var dockDpi = VisualTreeHelper.GetDpi(this);
+            var wanted = (ClipBand,
+                (int)Math.Round(dockTopMargin * dockDpi.DpiScaleY),
+                (int)Math.Round((dockWorkArea.Height - dockBottomMargin) * dockDpi.DpiScaleY));
+            _appliedClip = wanted;
+            NativeMethods.SetBandRegion(hwnd, wanted.Item2, wanted.Item3);
+        }
+
+        // The tree's remembered width plus the panel riding along (the
+        // experiment note in Undock), capped to the work area so docking a
+        // wide floating window can't hang the sidebar off the screen edge -
+        // the panel column yields the difference (ClampViewerColumnToWindow)
+        // and keeps its remembered width for the next roomier window. The
+        // split-floor clamp on the tree share is the usual preservation
+        // rule.
+        double dockTreeWidth = _viewerOpen
+            ? Math.Clamp(_settings.ExpandedWidth, MinTreeSplitWidth, MaxExpandedWidth)
+            : ClampExpandedWidth(_settings.ExpandedWidth);
+        Width = Math.Min(dockTreeWidth + CurrentViewerPanelWidth,
+            GetCurrentMonitorWorkArea().Width);
+        // Columns BEFORE the park: ApplyViewerSide after PositionToWorkArea
+        // meant one more layout pass landing on the already-parked
+        // full-height window - a single top-of-screen flash on every dock
+        // with the panel open (user report, 2026-08-08). This way the park
+        // and its band clip are the last geometry to land.
+        ApplyViewerSide();
         PositionToWorkArea();
 
         UpdateResizeThumbVisibility();
@@ -6479,17 +6526,16 @@ public partial class MainWindow : Window
     {
         if (sender is MenuItem menuItem)
         {
-            // The panel's "screen-interior" side flips with the dock edge;
-            // folding it keeps this handler's PositionToWorkArea call working
-            // on the tree-only width it always has.
-            CloseViewer();
-
             _settings.DockOnRight = menuItem.IsChecked;
             UpdateResizeThumbVisibility();
             UpdatePinButtonVisibility();
             if (_isDocked)
             {
+                // Total width unchanged - the window jumps edges whole, and
+                // the panel swings to the new screen-interior side (part of
+                // the ride-through experiment, see Undock).
                 PositionToWorkArea();
+                ApplyViewerSide();
             }
         }
     }
@@ -12300,29 +12346,10 @@ public partial class MainWindow : Window
         }
 
         _viewerOpen = true;
-        _viewerOnLeft = _isDocked && _settings.DockOnRight;
 
+        bool onLeft = _isDocked && _settings.DockOnRight;
         double panelWidth = ViewerPanelWidth;
-        ViewerColumnLeft.Width = new GridLength(_viewerOnLeft ? panelWidth : 0);
-        ViewerColumnRight.Width = new GridLength(_viewerOnLeft ? 0 : panelWidth);
-        Grid.SetColumn(ViewerPanel, _viewerOnLeft ? 0 : 2);
-        // The divider faces the tree.
-        ViewerPanel.BorderThickness = _viewerOnLeft
-            ? new Thickness(0, 0, 1, 0)
-            : new Thickness(1, 0, 0, 0);
-        ViewerPanel.Visibility = Visibility.Visible;
-
-        // The split grab zone rides the panel's tree-side edge.
-        Grid.SetColumn(ViewerSplitThumb, _viewerOnLeft ? 0 : 2);
-        ViewerSplitThumb.HorizontalAlignment = _viewerOnLeft
-            ? System.Windows.HorizontalAlignment.Right
-            : System.Windows.HorizontalAlignment.Left;
-        ViewerSplitThumb.Margin = _viewerOnLeft
-            ? new Thickness(0, 0, -4, 0)
-            : new Thickness(-4, 0, 0, 0);
-        ViewerSplitThumb.Visibility = Visibility.Visible;
-
-        if (_viewerOnLeft)
+        if (onLeft)
         {
             Left -= panelWidth;
         }
@@ -12337,6 +12364,10 @@ public partial class MainWindow : Window
                 Left = Math.Max(workArea.Left, workArea.Right - Width);
             }
         }
+
+        ApplyViewerSide();
+        ViewerPanel.Visibility = Visibility.Visible;
+        ViewerSplitThumb.Visibility = Visibility.Visible;
 
         // The band clip's state tuple carries no width (see _appliedClip), so
         // force the next pass to re-derive it against the widened window.
@@ -12516,6 +12547,40 @@ public partial class MainWindow : Window
             ViewerImage.Source = bitmap;
             ViewerFileInfo.Text = $"{pixelWidth} × {pixelHeight}   {modified:yyyy-MM-dd HH:mm}";
         });
+    }
+
+    // Re-aims the panel at the side the current mode wants - screen-interior
+    // (left column) when docked on the right edge, the right column
+    // otherwise - and sizes the columns to match, clamped so the tree keeps
+    // its split floor. One place instead of inline setup in OpenViewer,
+    // because the panel now SURVIVES dock/undock/side changes (experiment,
+    // 2026-08-08) and each of those has to re-aim it.
+    private void ApplyViewerSide()
+    {
+        if (!_viewerOpen)
+        {
+            return;
+        }
+
+        _viewerOnLeft = _isDocked && _settings.DockOnRight;
+        double panelWidth = Math.Min(ViewerPanelWidth, Math.Max(0, Width - MinTreeSplitWidth));
+
+        ViewerColumnLeft.Width = new GridLength(_viewerOnLeft ? panelWidth : 0);
+        ViewerColumnRight.Width = new GridLength(_viewerOnLeft ? 0 : panelWidth);
+        Grid.SetColumn(ViewerPanel, _viewerOnLeft ? 0 : 2);
+        // The divider faces the tree.
+        ViewerPanel.BorderThickness = _viewerOnLeft
+            ? new Thickness(0, 0, 1, 0)
+            : new Thickness(1, 0, 0, 0);
+
+        // The split grab zone rides the panel's tree-side edge.
+        Grid.SetColumn(ViewerSplitThumb, _viewerOnLeft ? 0 : 2);
+        ViewerSplitThumb.HorizontalAlignment = _viewerOnLeft
+            ? System.Windows.HorizontalAlignment.Right
+            : System.Windows.HorizontalAlignment.Left;
+        ViewerSplitThumb.Margin = _viewerOnLeft
+            ? new Thickness(0, 0, -4, 0)
+            : new Thickness(-4, 0, 0, 0);
     }
 
     // The panel column always fits the window, whatever resized it. The
