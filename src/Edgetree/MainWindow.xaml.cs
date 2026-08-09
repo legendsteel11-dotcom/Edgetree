@@ -11730,6 +11730,30 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Where the selection lands AFTER the delete: the nearest surviving
+        // sibling below the selected row, else the nearest above - what
+        // Explorer does, and what walking a folder of pictures in the viewer
+        // needs (delete = "next picture, this one gone"). Left to itself, WPF
+        // moves the selection to the PARENT folder when the selected row is
+        // removed, which yanked the viewer from the picture to a folder icon
+        // (user report, 2026-08-09). Computed before anything is deleted -
+        // the positions only exist while the rows are all still there.
+        FileSystemItem? successor = null;
+        var goingAway = new HashSet<FileSystemItem>(items);
+        if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false } anchor &&
+            anchor.Parent is { } anchorParent)
+        {
+            var rows = anchorParent.Children
+                .Where(c => !c.IsPlaceholder && !c.IsShowMore)
+                .ToList();
+            int anchorIndex = rows.IndexOf(anchor);
+            if (anchorIndex >= 0)
+            {
+                successor = rows.Skip(anchorIndex + 1).FirstOrDefault(r => !goingAway.Contains(r))
+                    ?? rows.Take(anchorIndex).LastOrDefault(r => !goingAway.Contains(r));
+            }
+        }
+
         // Every failure is collected and shown once at the end rather than
         // popping a box per item mid-loop. A selection can also contain both a
         // folder and something inside it - deleting the folder first makes the
@@ -11737,6 +11761,7 @@ public partial class MainWindow : Window
         // already-gone path), which is the right outcome.
         var failures = new List<string>();
         var parentsToRefresh = new HashSet<FileSystemItem>();
+        bool anchorDeleted = false;
         foreach (var item in items)
         {
             if (!FileOperationService.TryDeleteToRecycleBin(item.FullPath, out var error))
@@ -11748,6 +11773,10 @@ public partial class MainWindow : Window
                 continue;
             }
 
+            if (ReferenceEquals(item, ExplorerTree.SelectedItem))
+            {
+                anchorDeleted = true;
+            }
             if (item.Parent is { } parent)
             {
                 parentsToRefresh.Add(parent);
@@ -11765,6 +11794,17 @@ public partial class MainWindow : Window
             // Merge drops exactly the deleted rows and leaves every surviving
             // sibling - and whatever was expanded under them - untouched.
             RefreshFolderPreservingState(parent);
+        }
+
+        // Only when the selected row actually went away (a failed delete
+        // leaves it standing, and moving the selection off a row that still
+        // exists would be its own surprise). The merge above reuses surviving
+        // item instances, so the successor captured pre-delete is still the
+        // live row. No successor (the folder emptied out) falls through to
+        // WPF's own parent selection, which is right there.
+        if (anchorDeleted && successor is not null)
+        {
+            SelectVisibleItem(successor);
         }
 
         if (failures.Count > 0)
