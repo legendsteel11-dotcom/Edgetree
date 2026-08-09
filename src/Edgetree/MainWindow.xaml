@@ -1387,6 +1387,10 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="hideTitleBarTitle"
                         Click="HideTitleBarTitleMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuShowPathBar}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="showPathBar"
+                        Click="ShowPathBarMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="{x:Static services:Strings.MenuAutoCollapse}"
                         IsCheckable="True"
@@ -4432,27 +4436,75 @@
                     Grid.Column="1"
                     BorderThickness="0,1,0,0"
                     BorderBrush="{DynamicResource PanelDividerBrush}">
-                <!-- The version, and then one toggle per file-kind filter
-                     (built in code from the same table the menus use - see
-                     RebuildFooterFilterChips). Putting them here rather than
-                     only in the menus is the point: this strip is where a
-                     filter announces itself, so it is where the hand already
-                     is when it needs changing.
+                <!-- The path strip rides INSIDE the footer border rather than
+                     in a Grid row of its own. A new row would have meant
+                     renumbering the footer and bumping RowSpan on all five
+                     elements that span rows 1-4 (search overlay, viewer panel,
+                     its split thumb and both chevrons) - five chances to leave
+                     one behind, for a strip that is anchored to the bottom
+                     edge either way. Stacking it here also gets the rest for
+                     free: SetExpandedContentVisibility already hides this
+                     border and zeroes the row, and the search overlay already
+                     covers it. -->
+                <StackPanel Orientation="Vertical">
+                    <!-- Collapsed unless the option is on (ApplyPathBarVisibility) -
+                         a StackPanel child at Collapsed takes no height, so the
+                         footer keeps being exactly the chip strip when it's off. -->
+                    <Grid x:Name="PathBarRow"
+                            Margin="6,5,6,5"
+                            Height="24"
+                            Visibility="Collapsed">
+                        <!-- Same outline-only treatment as the search box: a
+                             border, not a filled field. -->
+                        <Border Background="Transparent"
+                                BorderBrush="{DynamicResource ControlBorder}"
+                                BorderThickness="1"
+                                CornerRadius="3"/>
+                        <TextBlock x:Name="PathBarPlaceholder"
+                                Text="{x:Static services:Strings.PathBarPlaceholder}"
+                                Foreground="{DynamicResource SecondaryForeground}"
+                                Opacity="0.55"
+                                FontSize="12"
+                                IsHitTestVisible="False"
+                                VerticalAlignment="Center"
+                                Margin="7,0,0,0"/>
+                        <TextBox x:Name="PathBarBox"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Foreground="{DynamicResource DialogForeground}"
+                                CaretBrush="{DynamicResource ForegroundText}"
+                                FontSize="12"
+                                Padding="6,0"
+                                VerticalContentAlignment="Center"
+                                TextChanged="PathBarBox_TextChanged"
+                                PreviewKeyDown="PathBarBox_PreviewKeyDown"
+                                PreviewMouseLeftButtonDown="PathBarBox_PreviewMouseLeftButtonDown"
+                                GotKeyboardFocus="PathBarBox_GotKeyboardFocus"
+                                LostKeyboardFocus="PathBarBox_LostKeyboardFocus"/>
+                    </Grid>
 
-                     WrapPanel, so a narrow window costs a second line instead
-                     of cutting chips off the end. -->
-                <!-- The gap BETWEEN wrapped rows is a top margin on the chips
-                     themselves (see AddFooterFilterChip) - a panel's margin
-                     sits outside all of them and leaves two lines touching.
-                     Top rather than bottom so this panel keeps owning the space
-                     under the last row: the two together read as one strip with
-                     even air above and below, which a chip-side bottom margin
-                     could not do without this going to zero and the strip
-                     sitting on the window's edge. -->
-                <WrapPanel x:Name="VersionFooterPanel"
-                        Orientation="Horizontal"
-                        Margin="8,1,4,3">
-                </WrapPanel>
+                    <!-- The version, and then one toggle per file-kind filter
+                         (built in code from the same table the menus use - see
+                         RebuildFooterFilterChips). Putting them here rather than
+                         only in the menus is the point: this strip is where a
+                         filter announces itself, so it is where the hand already
+                         is when it needs changing.
+
+                         WrapPanel, so a narrow window costs a second line instead
+                         of cutting chips off the end. -->
+                    <!-- The gap BETWEEN wrapped rows is a top margin on the chips
+                         themselves (see AddFooterFilterChip) - a panel's margin
+                         sits outside all of them and leaves two lines touching.
+                         Top rather than bottom so this panel keeps owning the space
+                         under the last row: the two together read as one strip with
+                         even air above and below, which a chip-side bottom margin
+                         could not do without this going to zero and the strip
+                         sitting on the window's edge. -->
+                    <WrapPanel x:Name="VersionFooterPanel"
+                            Orientation="Horizontal"
+                            Margin="8,1,4,3">
+                    </WrapPanel>
+                </StackPanel>
             </Border>
 
             <!-- File-search view. Overlays the whole content area below the

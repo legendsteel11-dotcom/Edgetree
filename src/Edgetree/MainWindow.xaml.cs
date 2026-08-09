@@ -149,6 +149,25 @@ public partial class MainWindow : Window
     private System.Windows.Threading.DispatcherTimer? _pendingRenameTimer;
     private FileSystemItem? _pendingRenameItem;
 
+    // Set the moment the user changes the path bar's text themselves, and
+    // cleared by every route back out of that edit (Enter, Esc, focus loss).
+    // While it is set the box stops following the tree, so a selection change
+    // arriving mid-typing cannot overwrite what is being typed - the one real
+    // hazard of a box that both displays and accepts a path.
+    private bool _isPathBarDirty;
+
+    // Bumped on every Enter in the path bar. The existence walk runs on a
+    // worker (a sleeping NAS can hold it for tens of seconds), so an answer
+    // that comes back after a newer Enter has already been pressed has to be
+    // dropped rather than dragging the tree backwards.
+    private int _pathBarCommitToken;
+
+    // Set only while the code itself is assigning the box's Text. Assigning
+    // Text raises TextChanged, which is where the flag above is set, so
+    // without this the box would mark itself dirty the first time the tree
+    // moved and never follow it again.
+    private bool _isSettingPathBarText;
+
     // Bumped once at the start of every favorites navigation (NavigateToPath),
     // and nowhere else - notably NOT on plain selection changes, which the walk
     // itself triggers (see ExplorerTree_SelectedItemChanged). RevealChainStep
@@ -407,6 +426,19 @@ public partial class MainWindow : Window
         // themselves need to already be in the right Grid.Row by then, not
         // just left at their XAML-default (top) positions.
         ApplyFavoritesPosition();
+
+        // Before SetExpandedContentVisibility too: the footer row is Auto and
+        // measures whatever the strip currently is, so the path bar has to
+        // already be showing or hidden when that height is taken.
+        OvertypeGuard.Disable(PathBarBox);
+        ApplyPathBarVisibility();
+
+        // handledEventsToo: the tree, the splitters and the footer chips all
+        // mark their own mouse-downs handled, and an abandoned path edit has to
+        // be dropped by those clicks just the same.
+        AddHandler(PreviewMouseDownEvent,
+            new MouseButtonEventHandler(Window_PreviewMouseDownForPathBar),
+            handledEventsToo: true);
 
         // A stored tree width below the window floor is legal exactly when
         // the viewer is about to reopen on top of it (the split floor is the
@@ -5397,6 +5429,7 @@ public partial class MainWindow : Window
                 FindMenuItem(generalSettings, "showFolderIcons") is { } showFolderIcons &&
                 FindMenuItem(generalSettings, "showFileIcons") is { } showFileIcons &&
                 FindMenuItem(generalSettings, "hideTitleBarTitle") is { } hideTitleBarTitle &&
+                FindMenuItem(generalSettings, "showPathBar") is { } showPathBar &&
                 FindMenuItem(generalSettings, "autoCollapse") is { } autoCollapse &&
                 FindMenuItem(generalSettings, "autoHideCloseOnLeave") is { } autoHideCloseOnLeave &&
                 FindMenuItem(generalSettings, "autoHideUseHandle") is { } autoHideUseHandle &&
@@ -5409,6 +5442,7 @@ public partial class MainWindow : Window
                 showFolderIcons.IsChecked = _settings.ShowFolderIcons;
                 showFileIcons.IsChecked = _settings.ShowFileIcons;
                 hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
+                showPathBar.IsChecked = _settings.ShowPathBar;
                 autoCollapse.IsChecked = _settings.AutoCollapseFolders;
                 autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
                 autoHideUseHandle.IsChecked = _settings.AutoHideUseHandle;
@@ -6829,6 +6863,305 @@ public partial class MainWindow : Window
             _settings.HideTitleBarTitle = menuItem.IsChecked;
             ApplyTitleTextVisibility();
         }
+    }
+
+    private void ShowPathBarMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.ShowPathBar = menuItem.IsChecked;
+            ApplyPathBarVisibility();
+        }
+    }
+
+    // ---- 경로 표시줄 -------------------------------------------------------
+    //
+    // Two halves sharing one box. Downwards it MIRRORS the tree: whenever the
+    // selection moves, the box shows the folder that selection is in (the
+    // folder itself, or a file's parent - so the box always names a folder,
+    // which also settles what to show for a multi-selection). Upwards it takes
+    // a typed or pasted path and jumps there on Enter.
+    //
+    // The rule that keeps the two from fighting, and the reason there is no
+    // live navigation: NOTHING happens until Enter. Editing the text moves
+    // nothing, an unresolvable path does nothing at all (no red border, no
+    // message - the wrong text is still sitting in the box, which is the whole
+    // answer), and Esc or leaving the box puts the current selection's path
+    // back. Backspacing past a folder or two therefore costs nothing: the tree
+    // has not moved, so there is nothing to undo.
+    private void ApplyPathBarVisibility()
+    {
+        PathBarRow.Visibility = _settings.ShowPathBar ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_settings.ShowPathBar)
+        {
+            // Turning it on mid-session has to fill it immediately - waiting
+            // for the next selection change would show an empty box under a
+            // tree that is plainly sitting somewhere.
+            UpdatePathBarFromSelection();
+        }
+        else
+        {
+            // An abandoned edit must not survive being hidden and shown again.
+            _isPathBarDirty = false;
+        }
+    }
+
+    // The folder the box should be naming right now: the selected row when it
+    // is a folder, its parent when it is a file, and nothing at all when the
+    // tree has no selection (startup, before the last path is restored).
+    private string? CurrentPathBarFolder()
+    {
+        var item = _selectedItem;
+        if (item is null || item.IsPlaceholder)
+        {
+            return null;
+        }
+
+        var folder = item.IsDirectory ? item : item.Parent;
+        return folder?.FullPath;
+    }
+
+    private void UpdatePathBarFromSelection()
+    {
+        // The user is mid-edit - their typing outranks the tree. Every route
+        // back out of the edit (Enter, Esc, focus loss) clears this flag and
+        // re-syncs, so the box can't get stuck showing a stale path.
+        if (_isPathBarDirty)
+        {
+            return;
+        }
+
+        SetPathBarText(CurrentPathBarFolder() ?? string.Empty);
+    }
+
+    private void SetPathBarText(string text)
+    {
+        // Guarded because assigning Text raises TextChanged, which is where the
+        // dirty flag is set - without this the box would mark itself dirty the
+        // first time the tree moved and then stop following it forever.
+        _isSettingPathBarText = true;
+        try
+        {
+            PathBarBox.Text = text;
+            // The tail is the part that matters (the folder's own name) and it
+            // is also where the editing happens, so a path too long for the
+            // strip shows its end rather than its drive letter.
+            PathBarBox.CaretIndex = text.Length;
+            PathBarBox.ScrollToHorizontalOffset(double.MaxValue);
+        }
+        finally
+        {
+            _isSettingPathBarText = false;
+        }
+
+        _isPathBarDirty = false;
+        PathBarPlaceholder.Visibility = text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void PathBarBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        PathBarPlaceholder.Visibility = PathBarBox.Text.Length == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        if (!_isSettingPathBarText)
+        {
+            _isPathBarDirty = true;
+        }
+    }
+
+    private void PathBarBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            CommitPathBar();
+        }
+        else if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+            _isPathBarDirty = false;
+            UpdatePathBarFromSelection();
+            // Back to the tree, which is where the keys were going before the
+            // box was clicked into.
+            ExplorerTree.Focus();
+        }
+    }
+
+    // A TextBox given focus by a click puts the caret where the click landed
+    // and selects nothing, so the usual gesture - click, paste over what's
+    // there - needs the old path removed by hand first. Swallowing that first
+    // click and focusing the box instead lets GotKeyboardFocus below select
+    // the lot. Only the FIRST click: once the box already has focus, clicking
+    // inside it places the caret normally, which is what editing one segment
+    // of the path needs.
+    private void PathBarBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!PathBarBox.IsKeyboardFocusWithin)
+        {
+            e.Handled = true;
+            PathBarBox.Focus();
+        }
+    }
+
+    private void PathBarBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        => PathBarBox.SelectAll();
+
+    private void PathBarBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        // Same as Esc: an edit that was never committed is discarded rather
+        // than left sitting there disagreeing with the tree.
+        _isPathBarDirty = false;
+        UpdatePathBarFromSelection();
+    }
+
+    // Walks up from the typed path until something on disk answers, and hands
+    // back that ancestor - the deepest part of what was typed that is actually
+    // true. Null when even the drive isn't there.
+    //
+    // Runs on a worker thread only: every Exists on the way can be a network
+    // round trip.
+    private static string? ResolveDeepestExistingPath(string path)
+    {
+        // Rooted paths only. A bare word would otherwise be resolved against
+        // the process's working directory and jump somewhere with no visible
+        // relationship to what was typed.
+        if (!Path.IsPathFullyQualified(path))
+        {
+            return null;
+        }
+
+        for (string? current = path; !string.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
+        {
+            try
+            {
+                if (Directory.Exists(current) || File.Exists(current))
+                {
+                    return current;
+                }
+            }
+            catch
+            {
+                // An unreadable level says nothing about its parent, so this
+                // keeps climbing rather than giving up on the whole path.
+            }
+        }
+
+        return null;
+    }
+
+    // Clicking away from the box cancels the edit, the same as Esc. This can't
+    // ride on LostKeyboardFocus alone: WPF only raises that when something
+    // else TAKES keyboard focus, and much of this window - the footer strip,
+    // the tree's empty space below the last row - isn't focusable, so those
+    // clicks used to leave a half-finished path sitting in the box (reported
+    // 2026-08-10).
+    private void Window_PreviewMouseDownForPathBar(object sender, MouseButtonEventArgs e)
+    {
+        if (!PathBarBox.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
+        for (var element = e.OriginalSource as DependencyObject; element is not null;)
+        {
+            if (ReferenceEquals(element, PathBarRow))
+            {
+                return;
+            }
+            element = element is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(element)
+                : null;
+        }
+
+        _isPathBarDirty = false;
+        UpdatePathBarFromSelection();
+    }
+
+    private void CommitPathBar()
+    {
+        string input = PathBarBox.Text.Trim().Trim('"');
+        if (input.Length == 0)
+        {
+            return;
+        }
+
+        string expanded;
+        try
+        {
+            // A path copied out of a shell or a script may still be written
+            // with %USERPROFILE% and friends.
+            expanded = Environment.ExpandEnvironmentVariables(input).Trim();
+        }
+        catch
+        {
+            return;
+        }
+
+        // A path typed or edited by hand is wrong in its TAIL far more often
+        // than in its head - the drive and the first folder or two are usually
+        // right and the deep end is a guess or a leftover. So an unresolvable
+        // path is not a dead end: the walk goes up until something exists and
+        // lands there. Four levels deep with the last two wrong puts the
+        // selection on level two; a wrong first level lands on the drive.
+        //
+        // This is also the feedback that replaces the error message we
+        // deliberately don't show. The box re-fills with wherever it got to,
+        // so how far the path was right is visible rather than described.
+        // A path with nothing valid in it at all (a drive that isn't there)
+        // still does nothing.
+        int token = ++_pathBarCommitToken;
+
+        // Existence is asked on a worker: a sleeping NAS answers this in tens
+        // of seconds, and doing it inline is exactly how the 21~59s freezes of
+        // v1.3.2 happened. Same shape as JumpToBookmarkPath. A file resolves
+        // as happily as a folder - NavigateToPath selects it, and the box then
+        // shows the folder it sits in like any other selection.
+        Task.Run(() =>
+        {
+            string? resolved = ResolveDeepestExistingPath(expanded);
+            if (resolved is null)
+            {
+                return;
+            }
+
+            Dispatcher.BeginInvoke(() =>
+            {
+                // A second Enter while this one was still asking the disk wins:
+                // the older answer would drag the tree back to where the user
+                // has already moved on from.
+                if (token != _pathBarCommitToken)
+                {
+                    return;
+                }
+
+                // The one thing NavigateToPath cannot do is reach a path whose
+                // drive has no root row - a drive the user has hidden. It
+                // returns silently in that case, so it is checked here instead
+                // of being discovered as a dead Enter. Hidden FOLDERS along the
+                // way are handled inside it and are not this case.
+                bool reachable = _roots.Any(r => resolved.TrimEnd('\\')
+                    .StartsWith(r.FullPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
+                if (!reachable)
+                {
+                    return;
+                }
+
+                NavigateToPath(resolved, source: "pathbar");
+
+                // The typed text has done its job; the box goes back to
+                // mirroring the tree. The walk is asynchronous, so this first
+                // sync may still show the old folder - the selection change at
+                // the end of the walk puts the landed folder in.
+                //
+                // Nothing here runs when the path didn't resolve: the text the
+                // user typed stays exactly where they left it, which is what
+                // makes "고쳐서 다시 Enter" possible.
+                _isPathBarDirty = false;
+                UpdatePathBarFromSelection();
+            });
+        });
     }
 
     // Only ever called while the window's content is already expanded (at
@@ -9064,6 +9397,12 @@ public partial class MainWindow : Window
         // it most needs to answer. Re-marking the row it is already on costs
         // nothing.
         SyncBookmarkPanelToSelection();
+
+        // Same reasoning as the bookmark panel: the path bar has to answer for
+        // every way the selection can move, including the walks that run with
+        // the favorites guard held. It has its own guard for the only case it
+        // needs to sit out (the user is mid-edit).
+        UpdatePathBarFromSelection();
     }
 
     private void RevealInExplorer_Click(object sender, RoutedEventArgs e)
@@ -15433,7 +15772,8 @@ public partial class MainWindow : Window
     {
         SearchResultsList.ItemsSource = _searchRows;
 
-        // The other text box in the app (the rename box is handled per row, in
+        // One of the app's fixed text boxes (the path bar is done in the
+        // constructor; the rename box is handled per row, in
         // RenameTextBox_Loaded) - see OvertypeGuard.
         OvertypeGuard.Disable(SearchBox);
 

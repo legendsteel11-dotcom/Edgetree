@@ -335,6 +335,16 @@ public class AppSettings
     // Strings.Initialize) - that's a separate, unrelated concern.
     public bool HideTitleBarTitle { get; set; } = false;
 
+    // The path strip above the footer's filter chips: shows the folder the
+    // selection is in, and takes a pasted path + Enter to jump there.
+    //
+    // On by default. It does cost a permanent tree row, which is the thing a
+    // 1080p laptop is short of - but a strip nobody finds is worth nothing,
+    // and the install base is still small enough that changing the default
+    // layout under existing users is cheap (user's call, 2026-08-10). Anyone
+    // who wants the row back turns it off in 기본 설정.
+    public bool ShowPathBar { get; set; } = true;
+
     // Swaps the favorites panel and the tree between the top and bottom Grid
     // row - see MainWindow.xaml's Row1/Row3 comment and
     // MainWindow.xaml.cs's ApplyFavoritesPosition.

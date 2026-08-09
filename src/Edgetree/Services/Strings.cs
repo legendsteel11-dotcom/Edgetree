@@ -113,6 +113,11 @@ public static class Strings
     public static string MenuShowFolderIcons = "폴더 아이콘";
     public static string MenuShowFileIcons = "파일 아이콘";
     public static string MenuHideTitleBarTitle = "제목 표시줄 타이틀 제거";
+    // Named after what it SHOWS, not what it accepts: the strip spends almost
+    // all its time displaying where the tree currently is, and typing into it
+    // is the occasional half. "경로" rather than "주소" because that is the
+    // word the rest of the app already uses (경로 복사, the full-path tooltips).
+    public static string MenuShowPathBar = "경로 표시줄";
     // Named after the PANEL, not favorites: it now holds either list. Lives
     // inside the 패널 표시 submenu, under the three modes.
     public static string MenuFavoritesAtBottom = "아래에 표시";
@@ -250,6 +255,11 @@ public static class Strings
     public static string SearchBrowseFolderDialogTitle = "검색할 폴더를 선택하세요";
     public static string SearchScopeNone = "검색할 폴더를 선택하세요 →";
     public static string SearchBoxPlaceholder = "검색";
+    // Only ever seen with nothing selected (startup before the last selection
+    // is restored) - the box is otherwise full of the current folder's path.
+    // That one moment is where "you can type in here" has to be said, since
+    // the menu label deliberately doesn't say it.
+    public static string PathBarPlaceholder = "경로 입력 후 Enter";
     // {0} = files scanned so far. The "검색 가능" half is the whole point:
     // results stream in while the scan runs, but nothing said so - and the
     // pulsing bar that used to sit under this line actively implied the
@@ -498,6 +508,7 @@ public static class Strings
         MenuShowFolderIcons = "Show Folder Icons";
         MenuShowFileIcons = "Show File Icons";
         MenuHideTitleBarTitle = "Hide Title Bar Text";
+        MenuShowPathBar = "Path Bar";
         MenuFavoritesAtBottom = "Show at Bottom";
         MenuDockOnRight = "Pin to Right Edge";
         MenuAutoHideCloseOnLeave = "Close on Mouse Leave";
@@ -575,6 +586,7 @@ public static class Strings
         SearchBrowseFolderDialogTitle = "Choose a folder to search";
         SearchScopeNone = "Choose a folder to search →";
         SearchBoxPlaceholder = "Search";
+        PathBarPlaceholder = "Type a path, press Enter";
         SearchStatusScanning = "Indexing… ({0}) · you can search now";
         SearchStatusResults = "{0} results";
         SearchStatusResultsCapped = "Showing {0} of {1} results";
