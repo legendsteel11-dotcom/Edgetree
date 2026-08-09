@@ -12833,6 +12833,7 @@ public partial class MainWindow : Window
         ViewerSplitThumb.Visibility = Visibility.Collapsed;
         ViewerCollapseButton.Visibility = Visibility.Collapsed;
         UpdateViewerExpandButton();
+        StopViewerGif();
         ViewerImage.Source = null;
         ViewerIconImage.Source = null;
 
@@ -12891,6 +12892,7 @@ public partial class MainWindow : Window
         if (item is null || item.IsPlaceholder || item.IsShowMore)
         {
             _pendingViewerPath = null;
+            StopViewerGif();
             ViewerImage.Source = null;
             _viewerShowingDecodedImage = false;
             ViewerIconImage.Source = null;
@@ -12907,6 +12909,10 @@ public partial class MainWindow : Window
             return;
         }
         _pendingViewerPath = path;
+        // A new file always ends the old animation; the same-path early
+        // return above is what lets a playing GIF survive its row being
+        // re-selected.
+        StopViewerGif();
 
         ViewerFileName.Text = item.Name;
         ViewerFileInfo.Text = string.Empty;
@@ -12915,28 +12921,41 @@ public partial class MainWindow : Window
         bool isImage = !item.IsDirectory && ThumbnailExtensions.Contains(Path.GetExtension(path));
         if (isImage)
         {
-            // Decode at the size of the slot it lands in, not full size: an 8K
-            // wallpaper decoded whole is ~100MB of pixels for a ~400px slot,
-            // and nothing is drawn bigger than the slot until someone zooms
-            // (which asks for the full-resolution pass separately).
-            //
-            // The slot is the HOST, not the remembered panel width, whenever
-            // the two differ - full screen the panel width is still the little
-            // number from the windowed split, so every picture arrived
-            // decoded for a 960px slot and sat there soft on a 4K screen
-            // (reported 2026-08-08). Getting it right here means the second
-            // pass usually isn't needed at all.
-            double slotWidth = ViewerImageHost.ActualWidth > 0
-                ? Math.Max(ViewerImageHost.ActualWidth, ViewerPanelWidth)
-                : ViewerPanelWidth;
-            int decodeWidth = (int)Math.Ceiling(
-                Math.Max(200, slotWidth) * VisualTreeHelper.GetDpi(this).DpiScaleX);
-            Task.Run(() => LoadViewerImage(path, decodeWidth));
+            if (string.Equals(Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase))
+            {
+                // Animated: its own loader, which falls back to the still
+                // path for single-frame and broken files.
+                LoadViewerGif(path);
+            }
+            else
+            {
+                int decodeWidth = ViewerDecodeWidth();
+                Task.Run(() => LoadViewerImage(path, decodeWidth));
+            }
         }
         else
         {
             ShowViewerIcon(path);
         }
+    }
+
+    // Decode at the size of the slot it lands in, not full size: an 8K
+    // wallpaper decoded whole is ~100MB of pixels for a ~400px slot, and
+    // nothing is drawn bigger than the slot until someone zooms (which asks
+    // for the full-resolution pass separately).
+    //
+    // The slot is the HOST, not the remembered panel width, whenever the two
+    // differ - full screen the panel width is still the little number from
+    // the windowed split, so every picture arrived decoded for a 960px slot
+    // and sat there soft on a 4K screen (reported 2026-08-08). Getting it
+    // right here means the second pass usually isn't needed at all.
+    private int ViewerDecodeWidth()
+    {
+        double slotWidth = ViewerImageHost.ActualWidth > 0
+            ? Math.Max(ViewerImageHost.ActualWidth, ViewerPanelWidth)
+            : ViewerPanelWidth;
+        return (int)Math.Ceiling(
+            Math.Max(200, slotWidth) * VisualTreeHelper.GetDpi(this).DpiScaleX);
     }
 
     // Background thread. Header first (original dimensions - DecodePixelWidth
@@ -13047,6 +13066,317 @@ public partial class MainWindow : Window
 
             ApplyViewerZoom();
         });
+    }
+
+    // ----- GIF 재생 --------------------------------------------------------
+    //
+    // WPF's Image draws a GIF's first frame and stops, so the panel plays one
+    // by hand with the codec Windows already ships (GifBitmapDecoder) - no
+    // dependency taken. What runs per TICK, at the GIF's own frame rate and
+    // only while one is showing: decode the next frame (OnDemand, from the
+    // in-memory copy of the file), blend its rectangle into a byte canvas,
+    // one WritePixels. Ticks stand down while a window resize is in flight -
+    // the resize-frame rule stays two doubles.
+    //
+    // Composition covers the spec's living parts: per-frame rectangle
+    // (left/top), transparency (alpha-0 pixels leave the canvas as it was),
+    // disposal 2 (clear the rectangle back to transparent). Disposal 3
+    // (restore-previous) is approximated as clear - it is practically
+    // extinct. The loop count is ignored: the panel loops forever, like
+    // every viewer. Zoom, pan, navigator and full screen ride on top
+    // unchanged, because the Source is ONE WriteableBitmap whose pixels
+    // change; _viewerDecodedWidth is set to the full width so the
+    // full-resolution second pass never tries to reload a playing GIF.
+
+    private System.Windows.Threading.DispatcherTimer? _viewerGifTimer;
+    private GifBitmapDecoder? _viewerGifDecoder;
+    private MemoryStream? _viewerGifStream;
+    private WriteableBitmap? _viewerGifCanvas;
+    private byte[]? _viewerGifPixels;
+    private List<ViewerGifFrame>? _viewerGifFrames;
+    private int _viewerGifNextFrame;
+
+    private readonly record struct ViewerGifFrame(int Left, int Top, int DelayMs, int Disposal);
+
+    private void LoadViewerGif(string path)
+    {
+        Task.Run(() =>
+        {
+            byte[] bytes;
+            DateTime modified;
+            try
+            {
+                bytes = File.ReadAllBytes(path);
+                modified = File.GetLastWriteTime(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (_viewerOpen && string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ShowViewerIcon(path);
+                    }
+                });
+                return;
+            }
+
+            Dispatcher.BeginInvoke(() => SetUpViewerGif(path, bytes, modified));
+        });
+    }
+
+    // UI thread on purpose: BitmapDecoder is a DispatcherObject, and the
+    // per-tick decode has to touch it from here anyway. Creation itself is
+    // cheap - DelayCreation/OnDemand defers the actual pixel work.
+    private void SetUpViewerGif(string path, byte[] bytes, DateTime modified)
+    {
+        if (!_viewerOpen || !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var stream = new MemoryStream(bytes);
+        GifBitmapDecoder decoder;
+        try
+        {
+            decoder = new GifBitmapDecoder(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.OnDemand);
+            if (decoder.Frames.Count <= 1)
+            {
+                throw new FileFormatException();
+            }
+        }
+        catch (Exception ex) when (ex is IOException or FileFormatException or NotSupportedException
+                                       or ArgumentException or InvalidOperationException)
+        {
+            // Single-frame or undecodable - the still path knows what to do
+            // with both.
+            stream.Dispose();
+            int decodeWidth = ViewerDecodeWidth();
+            Task.Run(() => LoadViewerImage(path, decodeWidth));
+            return;
+        }
+
+        StopViewerGif();
+        _viewerGifStream = stream;
+        _viewerGifDecoder = decoder;
+
+        // The logical screen from the header - a frame is allowed to be
+        // smaller than the screen it plays on, so frame 0 is only a fallback.
+        int width = 0, height = 0;
+        try
+        {
+            if (decoder.Metadata?.GetQuery("/logscrdesc/Width") is ushort w)
+            {
+                width = w;
+            }
+            if (decoder.Metadata?.GetQuery("/logscrdesc/Height") is ushort h)
+            {
+                height = h;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or InvalidOperationException
+                                       or System.Runtime.InteropServices.COMException)
+        {
+        }
+        if (width <= 0 || height <= 0)
+        {
+            width = decoder.Frames[0].PixelWidth;
+            height = decoder.Frames[0].PixelHeight;
+        }
+
+        var frames = new List<ViewerGifFrame>(decoder.Frames.Count);
+        foreach (var frame in decoder.Frames)
+        {
+            int left = 0, top = 0, delay = 10, disposal = 0;
+            try
+            {
+                if (frame.Metadata is BitmapMetadata meta)
+                {
+                    if (meta.GetQuery("/imgdesc/Left") is ushort l)
+                    {
+                        left = l;
+                    }
+                    if (meta.GetQuery("/imgdesc/Top") is ushort t)
+                    {
+                        top = t;
+                    }
+                    if (meta.GetQuery("/grctlext/Delay") is ushort d)
+                    {
+                        delay = d;
+                    }
+                    if (meta.GetQuery("/grctlext/Disposal") is byte dp)
+                    {
+                        disposal = dp;
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is IOException or NotSupportedException or InvalidOperationException
+                                           or System.Runtime.InteropServices.COMException)
+            {
+            }
+            // Delay is in 1/100s; 0 means "as fast as possible", which every
+            // real viewer reads as the de-facto 100ms.
+            frames.Add(new ViewerGifFrame(left, top, delay == 0 ? 100 : delay * 10, disposal));
+        }
+        _viewerGifFrames = frames;
+
+        _viewerGifCanvas = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgra32, null);
+        _viewerGifPixels = new byte[width * height * 4];
+        _viewerGifNextFrame = 0;
+
+        // Mirror of LoadViewerImage's arrival block.
+        ViewerIconImage.Visibility = Visibility.Collapsed;
+        ViewerIconImage.Source = null;
+        ViewerImage.Visibility = Visibility.Visible;
+        ViewerImage.Source = _viewerGifCanvas;
+        _viewerShowingDecodedImage = true;
+        ViewerFileInfo.Text =
+            $"{width} × {height}  ·  {FormatFileSize(bytes.LongLength)}  ·  {modified:yyyy-MM-dd HH:mm}";
+
+        _viewerPixelWidth = width;
+        _viewerPixelHeight = height;
+        _viewerDecodedWidth = width;
+
+        if (!string.Equals(_viewerZoomPath, path, StringComparison.OrdinalIgnoreCase))
+        {
+            _viewerZoomPath = path;
+            _viewerZoom = ViewerRestZoom;
+            ViewerZoomPan.X = 0;
+            ViewerZoomPan.Y = 0;
+        }
+        ApplyViewerZoom();
+
+        AdvanceViewerGifFrame();
+    }
+
+    private void AdvanceViewerGifFrame()
+    {
+        if (_viewerGifDecoder is null || _viewerGifCanvas is null ||
+            _viewerGifPixels is null || _viewerGifFrames is null)
+        {
+            return;
+        }
+
+        int index = _viewerGifNextFrame;
+        var info = _viewerGifFrames[index];
+        int canvasWidth = _viewerGifCanvas.PixelWidth;
+        int canvasHeight = _viewerGifCanvas.PixelHeight;
+
+        try
+        {
+            var frame = _viewerGifDecoder.Frames[index];
+            var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+            int frameWidth = converted.PixelWidth;
+            int frameHeight = converted.PixelHeight;
+            var framePixels = new byte[frameWidth * 4 * frameHeight];
+            converted.CopyPixels(framePixels, frameWidth * 4, 0);
+
+            for (int y = 0; y < frameHeight; y++)
+            {
+                int canvasY = info.Top + y;
+                if (canvasY < 0 || canvasY >= canvasHeight)
+                {
+                    continue;
+                }
+                for (int x = 0; x < frameWidth; x++)
+                {
+                    int canvasX = info.Left + x;
+                    if (canvasX < 0 || canvasX >= canvasWidth)
+                    {
+                        continue;
+                    }
+                    int src = (y * frameWidth + x) * 4;
+                    if (framePixels[src + 3] == 0)
+                    {
+                        continue;
+                    }
+                    int dst = (canvasY * canvasWidth + canvasX) * 4;
+                    _viewerGifPixels[dst] = framePixels[src];
+                    _viewerGifPixels[dst + 1] = framePixels[src + 1];
+                    _viewerGifPixels[dst + 2] = framePixels[src + 2];
+                    _viewerGifPixels[dst + 3] = framePixels[src + 3];
+                }
+            }
+
+            _viewerGifCanvas.WritePixels(new Int32Rect(0, 0, canvasWidth, canvasHeight),
+                _viewerGifPixels, canvasWidth * 4, 0);
+
+            // Disposal prepares the BUFFER for the next frame, after this one
+            // has been shown.
+            if (info.Disposal is 2 or 3)
+            {
+                int clearLeft = Math.Max(0, info.Left);
+                int clearRight = Math.Min(canvasWidth, info.Left + frameWidth);
+                if (clearRight > clearLeft)
+                {
+                    for (int y = 0; y < frameHeight; y++)
+                    {
+                        int canvasY = info.Top + y;
+                        if (canvasY < 0 || canvasY >= canvasHeight)
+                        {
+                            continue;
+                        }
+                        Array.Clear(_viewerGifPixels,
+                            (canvasY * canvasWidth + clearLeft) * 4,
+                            (clearRight - clearLeft) * 4);
+                    }
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or FileFormatException or NotSupportedException
+                                       or ArgumentException or InvalidOperationException)
+        {
+            // A frame that won't decode ends the animation on whatever is
+            // showing - the keep-the-good-image rule, animated edition.
+            StopViewerGif();
+            return;
+        }
+
+        _viewerGifNextFrame = (index + 1) % _viewerGifFrames.Count;
+        ScheduleViewerGifTick(info.DelayMs);
+    }
+
+    private void ScheduleViewerGifTick(int delayMs)
+    {
+        if (_viewerGifTimer is null)
+        {
+            _viewerGifTimer = new System.Windows.Threading.DispatcherTimer();
+            _viewerGifTimer.Tick += (_, _) =>
+            {
+                _viewerGifTimer!.Stop();
+                if (_viewerGifDecoder is null)
+                {
+                    return;
+                }
+                // Stand down while a resize is in flight; try again once the
+                // settle window has passed.
+                if (_viewerResizing)
+                {
+                    _viewerGifTimer.Interval = TimeSpan.FromMilliseconds(160);
+                    _viewerGifTimer.Start();
+                    return;
+                }
+                AdvanceViewerGifFrame();
+            };
+        }
+
+        _viewerGifTimer.Stop();
+        _viewerGifTimer.Interval = TimeSpan.FromMilliseconds(delayMs);
+        _viewerGifTimer.Start();
+    }
+
+    // Safe to call at any time; the Source keeps showing the last composed
+    // frame until whatever replaces it lands.
+    private void StopViewerGif()
+    {
+        _viewerGifTimer?.Stop();
+        _viewerGifDecoder = null;
+        _viewerGifFrames = null;
+        _viewerGifCanvas = null;
+        _viewerGifPixels = null;
+        _viewerGifNextFrame = 0;
+        _viewerGifStream?.Dispose();
+        _viewerGifStream = null;
     }
 
     // Fit is a ratio, so it moves with the panel - and a zoom held at, say,
@@ -13972,8 +14302,14 @@ public partial class MainWindow : Window
 
         // A panel widened past its decode width would keep showing the
         // narrow decode upscaled soft - reload once at the settled width.
-        _pendingViewerPath = null;
-        UpdateViewerPreview();
+        // Not while a GIF is playing: it decodes at its own natural size, so
+        // the settled width changes nothing, and the reload would restart
+        // the animation from frame 0.
+        if (_viewerGifDecoder is null)
+        {
+            _pendingViewerPath = null;
+            UpdateViewerPreview();
+        }
     }
 
     // The OUTER edge drag resizes the viewer too now (tree-hold policy in
@@ -13987,8 +14323,12 @@ public partial class MainWindow : Window
         }
 
         _settingsService.Save(_settings);
-        _pendingViewerPath = null;
-        UpdateViewerPreview();
+        // Same GIF exemption as the split thumb's settle above.
+        if (_viewerGifDecoder is null)
+        {
+            _pendingViewerPath = null;
+            UpdateViewerPreview();
+        }
     }
 
     // Non-image selections (and images whose decode failed). Two steps, in
