@@ -620,14 +620,26 @@ public partial class ColorSettingsWindow : Window
             ? Wrap(baseHue + (rng.Next(2) == 0 ? -1 : 1) * (25 + rng.NextDouble() * 20))
             : baseHue;
 
-        double surfaceSat = (light ? 0.02 : 0.03) + rng.NextDouble() * (light ? 0.07 : 0.10);
-        double accentSat = 0.16 + rng.NextDouble() * 0.22;
+        // Roughly one roll in four is a BOLD one: same rules, saturation
+        // ceilings lifted. The calm band alone read as "소극적인 느낌 ...
+        // 살짝씩만 차이를 준다" and starved the blues in particular - a blue
+        // at low saturation greys out sooner than a warm hue does, so
+        // uniformly-drawn blue rolls kept arriving invisible (user,
+        // 2026-08-09, asking for "가끔 살짝만 더 튀는 놈들"). The readability
+        // floors below are what make a bolder ceiling safe to sell.
+        bool bold = rng.NextDouble() < 0.28;
+        double surfaceSat = light
+            ? (bold ? 0.05 + rng.NextDouble() * 0.11 : 0.02 + rng.NextDouble() * 0.07)
+            : (bold ? 0.06 + rng.NextDouble() * 0.16 : 0.03 + rng.NextDouble() * 0.10);
+        double accentSat = bold
+            ? 0.34 + rng.NextDouble() * 0.26
+            : 0.16 + rng.NextDouble() * 0.22;
 
         if (!light)
         {
             double bgVal = 0.07 + rng.NextDouble() * 0.08;
             var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
-            var hover = FromHsv(neighborHue, Math.Min(0.22, surfaceSat + 0.06), bgVal + 0.08, 255);
+            var hover = FromHsv(neighborHue, Math.Min(bold ? 0.30 : 0.22, surfaceSat + 0.06), bgVal + 0.08, 255);
             var selection = FromHsv(accentHue, accentSat, bgVal + 0.13, 255);
             // Text is checked against HOVER, the lightest surface a name
             // actually sits on in the dark theme - passing there passes
@@ -651,8 +663,9 @@ public partial class ColorSettingsWindow : Window
         {
             double bgVal = 0.95 + rng.NextDouble() * 0.04;
             var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
-            var hover = FromHsv(neighborHue, Math.Min(0.16, surfaceSat + 0.05), bgVal - 0.07, 255);
-            var selection = FromHsv(accentHue, 0.14 + rng.NextDouble() * 0.14, 0.88, 255);
+            var hover = FromHsv(neighborHue, Math.Min(bold ? 0.24 : 0.16, surfaceSat + 0.05), bgVal - 0.07, 255);
+            var selection = FromHsv(accentHue,
+                bold ? 0.26 + rng.NextDouble() * 0.20 : 0.14 + rng.NextDouble() * 0.14, 0.88, 255);
             var text = EnsureContrast(baseHue, 0.10 + rng.NextDouble() * 0.10, 0.27, hover, 4.5, towardLight: false);
             return new RandomPalette(
                 Background: background,
