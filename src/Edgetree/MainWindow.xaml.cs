@@ -3252,6 +3252,13 @@ public partial class MainWindow : Window
     // way to MinExpandedWidth (204), where 7 buttons at 24px + the app icon
     // still fit. Read via DynamicResource by ToggleButtonStyle and the header
     // buttons' own margins.
+    // The step ApplyHeaderMetrics last wrote, so it can tell a real change
+    // from the same value arriving again on the next resize frame. -1 so the
+    // first call always writes (gap is legitimately 0).
+    private double _headerStepSize = -1;
+    private double _headerStepGap = -1;
+    private double _headerStepCloseGap = -1;
+
     private void ApplyHeaderMetrics()
     {
         double width = ActualWidth > 0 ? ActualWidth : Width;
@@ -3280,9 +3287,32 @@ public partial class MainWindow : Window
             _ => (24.0, 0.0, 2.0),
         };
 
-        Resources["HeaderButtonSize"] = size;
-        Resources["HeaderButtonMargin"] = new Thickness(gap);
-        Resources["HeaderCloseButtonMargin"] = new Thickness(gap, gap, closeGap, gap);
+        // Written ONLY when the step actually changes, which is three times
+        // across the whole width range - it used to be written on every
+        // SizeChanged, i.e. every frame of a drag, with the same values.
+        //
+        // That is not a free no-op: REPLACING a resource-dictionary entry
+        // makes WPF walk the visual tree invalidating everything that
+        // resolves the key, whatever the value is. This file already records
+        // the lesson for brushes (see SetBrushColor, which recolours in place
+        // rather than replacing "twenty replacements per frame during a
+        // picker drag is twenty such walks, and that is what the stutter was
+        // made of") - the header metrics were doing the same thing on every
+        // resize frame, so the bill grew with the tree.
+        //
+        // This is what made the top-edge resize shake scale with window size
+        // (2026-08-09, photographed): moving the window's origin is what
+        // makes a late frame VISIBLE, but a full-tree invalidation per frame
+        // is what made the frame late.
+        if (_headerStepSize != size || _headerStepGap != gap || _headerStepCloseGap != closeGap)
+        {
+            _headerStepSize = size;
+            _headerStepGap = gap;
+            _headerStepCloseGap = closeGap;
+            Resources["HeaderButtonSize"] = size;
+            Resources["HeaderButtonMargin"] = new Thickness(gap);
+            Resources["HeaderCloseButtonMargin"] = new Thickness(gap, gap, closeGap, gap);
+        }
 
         // The glyph-only enlargement steps back to its original size on
         // narrow windows (user call, 2026-07-22: "224 이하"), where the
