@@ -12502,15 +12502,11 @@ public partial class MainWindow : Window
             viewerWidth = Math.Clamp(newWidth - treeShare, MinViewerWidth, MaxViewerWidth);
             newWidth = treeShare + viewerWidth;
 
+            // No column write: the tree's share is unchanged by this gesture
+            // (that is the rule this whole branch exists for), and the panel
+            // is the star column, so it simply takes the window's new
+            // remainder on its own.
             _settings.ViewerWidth = viewerWidth;
-            if (_viewerOnLeft)
-            {
-                ViewerColumnLeft.Width = new GridLength(viewerWidth);
-            }
-            else
-            {
-                ViewerColumnRight.Width = new GridLength(viewerWidth);
-            }
         }
         else
         {
@@ -12962,8 +12958,8 @@ public partial class MainWindow : Window
         _viewerTreeShare = null;
 
         double panelWidth = ViewerPanelWidth;
-        ViewerColumnLeft.Width = new GridLength(0);
-        ViewerColumnRight.Width = new GridLength(0);
+        // Back to the closed shape: tree star, both panel columns 0.
+        SetViewerColumns(null);
         ViewerPanel.Visibility = Visibility.Collapsed;
         ViewerSplitThumb.Visibility = Visibility.Collapsed;
         ViewerCollapseButton.Visibility = Visibility.Collapsed;
@@ -14398,10 +14394,12 @@ public partial class MainWindow : Window
         SetViewerFullscreen(false);
 
         _viewerOnLeft = _isDocked && _settings.DockOnRight;
-        double panelWidth = Math.Min(ViewerPanelWidth, Math.Max(0, Width - MinTreeSplitWidth));
+        double sideWidth = double.IsNaN(Width) ? ActualWidth : Width;
+        double panelWidth = Math.Min(ViewerPanelWidth, Math.Max(0, sideWidth - MinTreeSplitWidth));
 
-        ViewerColumnLeft.Width = new GridLength(_viewerOnLeft ? panelWidth : 0);
-        ViewerColumnRight.Width = new GridLength(_viewerOnLeft ? 0 : panelWidth);
+        // The tree's fixed share; the panel's own column is the star one and
+        // takes whatever is left (see SetViewerColumns).
+        SetViewerColumns(Math.Max(MinTreeSplitWidth, sideWidth - panelWidth));
 
         // Re-anchor the tree here and only here among the app's own width
         // writes: every caller (open, dock, undock, side change) has already
@@ -14445,15 +14443,72 @@ public partial class MainWindow : Window
         UpdateViewerExpandButton();
     }
 
-    // The panel column always fits the window, whatever resized it. The
-    // app's own grips enforce the floors themselves, but the OS border
-    // resize on a floating window bypasses them entirely - reported
-    // 2026-08-08 as the viewer swallowing the tree AND pushing the header's
-    // buttons out past the window edge (the fixed column had made the whole
-    // grid wider than the window). Runs on every SizeChanged: the panel
-    // yields until the tree keeps its split floor, and grows back toward
-    // the REMEMBERED width when the window does - _settings.ViewerWidth is
-    // deliberately never written here, so a squeeze is temporary.
+    private static readonly GridLength StarColumn = new(1, GridUnitType.Star);
+
+    // THE ONE PLACE the three content columns are written, and the reason the
+    // roles invert the moment the viewer opens.
+    //
+    // Closed (treeWidth null): tree STAR, both panels 0 - the original
+    // single-column measurement, untouched.
+    //
+    // Open: the TREE takes a fixed width and the open panel becomes the STAR
+    // column. It used to be the other way round, with the panel fixed and
+    // this method rewriting it on every SizeChanged, and that cost was
+    // enormous and invisible: a width change handed the whole delta to the
+    // star TREE first, re-measuring every realized row (each row's own name
+    // cell is a star column, so that is text trimming per row), and then our
+    // write moved it back and the grid measured the lot AGAIN. Two full tree
+    // measures per frame, scaling with how many rows were realized - which is
+    // exactly why a diagonal drag toward fullscreen was "지진이 난 것 같은"
+    // while a top-edge drag (width unchanged, so this method wrote nothing)
+    // was merely rough (user, 2026-08-09).
+    //
+    // Inverted, a window resize costs nothing here: the grid hands the delta
+    // to the star panel by itself, the tree's width never changes so its rows
+    // never re-measure, and this method is not called at all. It also states
+    // the standing rule structurally - only the middle divider moves the tree.
+    //
+    // Fullscreen passes 0: the tree yields entirely, the panel's star takes
+    // the window, and _viewerTreeShare is left alone so leaving the mode
+    // restores the split exactly.
+    private void SetViewerColumns(double? treeWidth)
+    {
+        if (treeWidth is not { } tree)
+        {
+            Apply(TreeColumn, StarColumn);
+            Apply(ViewerColumnLeft, new GridLength(0));
+            Apply(ViewerColumnRight, new GridLength(0));
+            return;
+        }
+
+        Apply(TreeColumn, new GridLength(Math.Max(0, tree)));
+        Apply(ViewerColumnLeft, _viewerOnLeft ? StarColumn : new GridLength(0));
+        Apply(ViewerColumnRight, _viewerOnLeft ? new GridLength(0) : StarColumn);
+
+        // Assigning an unchanged GridLength still invalidates the grid's
+        // layout, and this app has now paid for that lesson twice (see
+        // ApplyHeaderMetrics and SetBrushColor).
+        static void Apply(ColumnDefinition column, GridLength value)
+        {
+            if (column.Width != value)
+            {
+                column.Width = value;
+            }
+        }
+    }
+
+    // The split has to survive a window that can no longer hold it: the app's
+    // own grips enforce the floors themselves, but the OS border resize on a
+    // floating window bypasses them entirely - reported 2026-08-08 as the
+    // viewer swallowing the tree AND pushing the header's buttons out past the
+    // window edge.
+    //
+    // With the panel as the star column that is now the ONLY thing left to do
+    // here, and it is a rare path: while the window can hold the tree share
+    // plus a viewer floor, this method writes nothing at all and a resize
+    // costs no layout of ours. _viewerTreeShare is deliberately never
+    // rewritten here - a squeeze is transient and the remembered split has to
+    // survive it intact.
     private void ClampViewerColumnToWindow()
     {
         if (!_viewerOpen)
@@ -14461,47 +14516,19 @@ public partial class MainWindow : Window
             return;
         }
 
-        double windowWidth = ActualWidth > 0 ? ActualWidth : Width;
-
-        // The full cover takes the whole window, tree floor and viewer cap
-        // both stood down - they are rules about a SPLIT, and there isn't one
-        // here. _viewerTreeShare is left untouched, so leaving the mode puts
-        // the split back exactly as it was.
         if (_viewerFullscreen)
         {
-            var covered = _viewerOnLeft ? ViewerColumnLeft : ViewerColumnRight;
-            if (Math.Abs(covered.Width.Value - windowWidth) > 0.5)
-            {
-                covered.Width = new GridLength(windowWidth);
-            }
+            SetViewerColumns(0);
             return;
         }
 
-        double available = Math.Max(0, windowWidth - MinTreeSplitWidth);
+        double windowWidth = ActualWidth > 0 ? ActualWidth : Width;
+        double treeShare = _viewerTreeShare ?? Math.Max(MinTreeSplitWidth, windowWidth - ViewerPanelWidth);
 
-        // The tree column is the STAR one, so left alone it absorbs every
-        // pixel the window gains or loses - which is what a maximize looked
-        // like on a 4K screen (reported 2026-08-08): a wall of tree and a
-        // viewer still sitting at the width it had in a 1246px window. The
-        // same arithmetic moved the tree on an ordinary border resize, which
-        // the standing rule says only the middle divider may do. So the
-        // TREE is what gets held here and the panel takes the whole delta,
-        // in both directions, clamped so the tree keeps its split floor and
-        // the panel its cap. _settings.ViewerWidth is still deliberately
-        // never written from this method: a maximize, an auto-hide collapse
-        // and a work-area squeeze are all transient, and the remembered
-        // width has to survive them intact.
-        double target = _viewerTreeShare is { } treeShare
-            ? Math.Clamp(windowWidth - treeShare, 0, Math.Min(MaxViewerWidth, available))
-            : Math.Min(ViewerPanelWidth, available);
-
-        var column = _viewerOnLeft ? ViewerColumnLeft : ViewerColumnRight;
-        if (Math.Abs(column.Width.Value - target) < 0.5)
-        {
-            return;
-        }
-
-        column.Width = new GridLength(target);
+        // Only when the window is too narrow to seat both floors does the
+        // tree give way, and never below its own.
+        double maxTree = Math.Max(MinTreeSplitWidth, windowWidth - MinViewerWidth);
+        SetViewerColumns(Math.Min(treeShare, maxTree));
     }
 
     // Dragging the tree/viewer divider re-splits the CURRENT window between
@@ -14524,9 +14551,15 @@ public partial class MainWindow : Window
         // hold the remembered panel (a squeeze) or holds more than it (a
         // maximize), and reading the stored one there made the first delta
         // jump the divider to somewhere the cursor wasn't.
-        var draggedColumn = _viewerOnLeft ? ViewerColumnLeft : ViewerColumnRight;
-        double target = draggedColumn.Width.Value
-            + (_viewerOnLeft ? e.HorizontalChange : -e.HorizontalChange);
+        // Measured from the TREE's column, which is the fixed one now. Reading
+        // the panel's would be meaningless: it is the STAR column, and a star
+        // GridLength's Value is its star FACTOR (1), not a width - so every
+        // delta started from 1 and the divider slammed to the viewer's floor
+        // on the first move (2026-08-09). The tree's own last written value is
+        // also immune to layout timing, which an ActualWidth read would not be
+        // during a fast drag.
+        double treeTarget = TreeColumn.Width.Value
+            + (_viewerOnLeft ? -e.HorizontalChange : e.HorizontalChange);
 
         // The tree keeps its split floor (see MinTreeSplitWidth - a column
         // floor, not the window one) of the fixed window width. A floating
@@ -14543,13 +14576,16 @@ public partial class MainWindow : Window
         // fullscreen split at the restore width's remainder, a wall of dead
         // space to the divider's right (reported 2026-08-08, screenshot).
         double windowWidth = ActualWidth > 0 ? ActualWidth : Width;
-        double maxAllowed = Math.Max(MinViewerWidth,
-            Math.Min(MaxViewerWidth, windowWidth - MinTreeSplitWidth));
-        double panelWidth = Math.Clamp(target, MinViewerWidth, maxAllowed);
+        // Both floors and the panel's cap, expressed as bounds on the TREE.
+        // Max(min, ...) so a window too narrow for both floors can't hand
+        // Math.Clamp an inverted range (which throws).
+        double minTree = Math.Max(MinTreeSplitWidth, windowWidth - MaxViewerWidth);
+        double maxTree = Math.Max(minTree, windowWidth - MinViewerWidth);
 
         // This is the one gesture allowed to move the tree, so it is the one
         // that re-anchors the share every window resize afterwards holds to.
-        _viewerTreeShare = Math.Max(MinTreeSplitWidth, windowWidth - panelWidth);
+        _viewerTreeShare = Math.Clamp(treeTarget, minTree, maxTree);
+        double panelWidth = Math.Max(MinViewerWidth, windowWidth - _viewerTreeShare.Value);
 
         // Maximized, the width under the cursor belongs to a window that stops
         // existing at the next restore, so it must not become the remembered
@@ -14562,14 +14598,9 @@ public partial class MainWindow : Window
             _settings.ViewerWidth = panelWidth;
         }
 
-        if (_viewerOnLeft)
-        {
-            ViewerColumnLeft.Width = new GridLength(panelWidth);
-        }
-        else
-        {
-            ViewerColumnRight.Width = new GridLength(panelWidth);
-        }
+        // The divider is the one gesture that MOVES the tree, so it is the one
+        // that writes its column - every other path leaves it alone.
+        SetViewerColumns(_viewerTreeShare);
     }
 
     private void ViewerSplitThumb_DragCompleted(object sender, DragCompletedEventArgs e)

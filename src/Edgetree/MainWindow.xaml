@@ -3756,17 +3756,23 @@
         </Grid.RenderTransform>
         <Grid Background="{DynamicResource SidebarBackground}">
             <!-- Three columns for the image viewer panel: the sidebar content
-                 lives in the middle (*) column, and the two zero-width outer
-                 columns are where the viewer opens - right column normally,
-                 LEFT column when docked on the screen's right edge, so the
-                 panel always grows toward the screen's interior and the tree
-                 stays put at the edge (see OpenViewer). Both stay 0 while the
-                 viewer is closed, so this grid measures exactly as the
-                 original single-column layout did. -->
+                 lives in the middle column, and the two outer columns are
+                 where the viewer opens - right column normally, LEFT column
+                 when docked on the screen's right edge, so the panel always
+                 grows toward the screen's interior and the tree stays put at
+                 the edge (see OpenViewer). Both stay 0 while the viewer is
+                 closed, so this grid measures exactly as the original
+                 single-column layout did - which is why the tree is declared
+                 STAR here.
+                 While the viewer is OPEN the roles invert: the tree takes a
+                 fixed width and the open panel becomes the star column. See
+                 SetViewerColumns, which owns every write to these three and
+                 explains why. -->
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="ViewerColumnLeft"
                         Width="0"/>
-                <ColumnDefinition Width="*"/>
+                <ColumnDefinition x:Name="TreeColumn"
+                        Width="*"/>
                 <ColumnDefinition x:Name="ViewerColumnRight"
                         Width="0"/>
             </Grid.ColumnDefinitions>
