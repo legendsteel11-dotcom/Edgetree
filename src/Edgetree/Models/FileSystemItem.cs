@@ -382,6 +382,35 @@ public class FileSystemItem : INotifyPropertyChanged
         Children.Add(CreateShowMore(this, _overflow.Count));
     }
 
+    // The full loaded listing with the reveal state ignored: the revealed
+    // rows plus whatever still waits in _overflow behind "더 보기" (which are
+    // the SAME instances Children gains when it is clicked - _overflow is
+    // never cleared by the reveal, so the two must not be concatenated
+    // blindly). The viewer's carousel counts pictures against this, because
+    // "35 / 447" is a claim about the FOLDER, and a total that grew when
+    // 더 보기 was clicked read as the counter being wrong (user,
+    // 2026-08-09). The "더 보기" row itself is not a child and is skipped.
+    public IEnumerable<FileSystemItem> AllLoadedChildren
+    {
+        get
+        {
+            foreach (var child in Children)
+            {
+                if (!child.IsShowMore)
+                {
+                    yield return child;
+                }
+            }
+            if (!_showingAll)
+            {
+                foreach (var child in _overflow)
+                {
+                    yield return child;
+                }
+            }
+        }
+    }
+
     // "더 보기" clicked: drop that row and append everything held back. Only
     // adds to Children, so the first DisplayCap rows - and any subtrees
     // expanded within them - keep their state.

@@ -4949,13 +4949,19 @@
                              35 → 36 → 100 never changes the row's width and
                              the chevron under the cursor never moves mid-run
                              (same trick as ViewerZoomText's fixed width). -->
+                        <!-- 13px where the zoom strip sits at 11: the carousel
+                             is the caption's primary control and read too
+                             small at the strip's own size (user, 2026-08-09).
+                             The chevron buttons carry the same size locally -
+                             their style's 11 is the footer's. -->
                         <StackPanel x:Name="ViewerCarouselBar"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
-                                Margin="0,0,0,7"
+                                Margin="0,0,0,6"
                                 Visibility="Collapsed">
                             <Button x:Name="ViewerPrevButton"
                                     Style="{StaticResource FooterActionChipStyle}"
+                                    FontSize="13"
                                     Content="&lt;"
                                     Click="ViewerPrevButton_Click"
                                     ToolTip="{x:Static services:Strings.ViewerPrevImage}"/>
@@ -4963,9 +4969,9 @@
                                     Margin="6,0">
                                 <TextBlock x:Name="ViewerCarouselMaxText"
                                         Visibility="Hidden"
-                                        FontSize="11"/>
+                                        FontSize="13"/>
                                 <TextBlock x:Name="ViewerCarouselText"
-                                        FontSize="11"
+                                        FontSize="13"
                                         Foreground="{DynamicResource ForegroundText}"
                                         Opacity="0.65"
                                         TextAlignment="Center"
@@ -4973,6 +4979,7 @@
                             </Grid>
                             <Button x:Name="ViewerNextButton"
                                     Style="{StaticResource FooterActionChipStyle}"
+                                    FontSize="13"
                                     Content="&gt;"
                                     Click="ViewerNextButton_Click"
                                     ToolTip="{x:Static services:Strings.ViewerNextImage}"/>
@@ -4982,12 +4989,17 @@
                                 FontSize="{DynamicResource MenuFontSize}"
                                 TextTrimming="CharacterEllipsis"
                                 TextAlignment="Center"/>
+                        <!-- 9 → 4 and the zoom strip's 7 → 4 below: with the
+                             carousel row on top, the caption's three lines
+                             read as drifting apart at the old gaps - the
+                             user asked for them pulled back together
+                             (2026-08-09). -->
                         <TextBlock x:Name="ViewerFileInfo"
                                 Foreground="{DynamicResource ForegroundText}"
                                 Opacity="0.65"
                                 FontSize="{DynamicResource MenuThumbnailInfoFontSize}"
                                 TextAlignment="Center"
-                                Margin="0,9,0,0"/>
+                                Margin="0,4,0,0"/>
                         <!-- Its own centred row rather than the right end of
                              the metadata line: both caption lines are centred,
                              and hanging controls off one end of a centred line
@@ -4999,7 +5011,7 @@
                         <StackPanel x:Name="ViewerZoomBar"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
-                                Margin="0,7,-2,0">
+                                Margin="0,4,-2,0">
                             <ToggleButton x:Name="ViewerFitChip"
                                     Style="{StaticResource FooterFilterChipStyle}"
                                     Content="{x:Static services:Strings.ViewerZoomFit}"

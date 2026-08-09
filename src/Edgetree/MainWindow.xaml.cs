@@ -13996,18 +13996,24 @@ public partial class MainWindow : Window
         Task.Run(() => ShellFileService.TrySetDesktopWallpaper(path));
     }
 
-    // The carousel row's world: the folder's image ROWS as the tree currently
-    // shows them - its sort order, its filters, and (in an overflow-capped
-    // folder) only what "더 보기" has revealed, exactly the rows ↑↓ can reach.
-    // Images only, by extension: "35 / 257" is a claim about pictures, and a
-    // mixed folder's videos and documents still step fine on ↑↓.
+    // The carousel row's world: the folder's image rows in the tree's current
+    // sort order and filters - INCLUDING the ones still parked behind
+    // "더 보기" (AllLoadedChildren). The count is a claim about the FOLDER:
+    // counting only revealed rows made the total grow when 더 보기 was
+    // clicked - and not even then, since the counter only recomputes on a
+    // selection change - which read as the counter being wrong (user,
+    // 2026-08-09). Counting the full in-memory list costs nothing and makes
+    // the total independent of reveal state entirely; the chevron pays the
+    // reveal only at the moment it actually crosses the boundary (see
+    // ViewerCarouselStep). Images only, by extension: a mixed folder's
+    // videos and documents still step fine on ↑↓.
     private static bool IsViewerCarouselImage(FileSystemItem item)
         => item is { IsDirectory: false, IsPlaceholder: false, IsShowMore: false }
            && ThumbnailExtensions.Contains(Path.GetExtension(item.FullPath));
 
     private List<FileSystemItem> GetViewerCarouselImages(FileSystemItem current)
     {
-        IEnumerable<FileSystemItem> siblings = current.Parent?.Children ?? _roots;
+        IEnumerable<FileSystemItem> siblings = current.Parent?.AllLoadedChildren ?? _roots;
         return siblings.Where(IsViewerCarouselImage).ToList();
     }
 
@@ -14062,10 +14068,21 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Crossing the reveal boundary: the counter promised this picture,
+        // so the chevron performs the same reveal the "더 보기" row would
+        // and keeps going - stopping at the cap would make the total a lie.
+        // Only > can get here (overflow rows only ever hide at the BOTTOM),
+        // and the cost is exactly a hand-click on 더 보기.
+        var target = images[next];
+        if (current.Parent is { } parent && !parent.Children.Contains(target))
+        {
+            parent.ShowAllChildren();
+        }
+
         // Selects, scrolls to and focuses the tree row; selection-follow then
         // brings the picture, so the chevrons never grow a second idea of
         // "next" to keep in sync (same reasoning as the Space key's).
-        SelectVisibleItem(images[next]);
+        SelectVisibleItem(target);
     }
 
     private void ViewerImageHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
