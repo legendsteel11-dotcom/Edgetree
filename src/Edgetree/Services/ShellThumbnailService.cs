@@ -113,43 +113,28 @@ public static class ShellThumbnailService
         // Reading the DIB's bits directly preserves the (premultiplied) alpha
         // channel that CreateBitmapSourceFromHBitmap throws away - without
         // this, a transparent PNG's thumbnail lands on a solid black square.
+        // The buffer is read as top-down, which is what GetImage's thumbnails
+        // are in practice.
         //
-        // A DIB's rows can be stored either way up, and the shell hands out
-        // BOTH: thumbnails arrive top-down (biHeight < 0), but the icon
-        // answers for some folders arrive bottom-up (biHeight > 0), and
-        // assuming top-down drew exactly those upside down ("물구나무서기",
-        // 2026-08-09 - which folders flip depends on which shell path built
-        // the bitmap, which is why it looked random). The sign in the DIB's
-        // own header is the arbiter; bottom-up rows are copied out in
-        // reverse.
+        // A HEIGHT-SIGN CHECK WAS TRIED HERE AND REMOVED (2026-08-09). The
+        // theory was that bottom-up DIBs (biHeight > 0) needed their rows
+        // reversed, which would explain the upside-down folder icons. It
+        // never demonstrated a fix - the icons kept flipping with it in
+        // place, and what actually solved them was moving the ICON path off
+        // GetImage entirely and onto an HICON from the system image list
+        // (ShellIconService.GetViewerIcon), which carries no orientation
+        // header to be wrong about. Meanwhile a video's thumbnail came back
+        // upside down WITH the check in place, i.e. the header said bottom-up
+        // for a bitmap whose rows were not. The lesson is that these headers
+        // cannot be trusted in either direction, so the code does not consult
+        // them: thumbnails are read the way they were read before the theory,
+        // which is the way that worked.
         if (GetObject(hBitmap, Marshal.SizeOf<BITMAP>(), out BITMAP bmp) != 0 &&
             bmp.bmBitsPixel == 32 && bmp.bmBits != IntPtr.Zero)
         {
-            bool bottomUp =
-                GetObject(hBitmap, Marshal.SizeOf<DIBSECTION>(), out DIBSECTION dib) == Marshal.SizeOf<DIBSECTION>() &&
-                dib.dsBmih.biHeight > 0;
-
-            BitmapSource source;
-            if (bottomUp)
-            {
-                int stride = bmp.bmWidthBytes;
-                var rows = new byte[stride * bmp.bmHeight];
-                Marshal.Copy(bmp.bmBits, rows, 0, rows.Length);
-                var flipped = new byte[rows.Length];
-                for (int y = 0; y < bmp.bmHeight; y++)
-                {
-                    Buffer.BlockCopy(rows, (bmp.bmHeight - 1 - y) * stride, flipped, y * stride, stride);
-                }
-                source = BitmapSource.Create(
-                    bmp.bmWidth, bmp.bmHeight, 96, 96, PixelFormats.Pbgra32, null,
-                    flipped, stride);
-            }
-            else
-            {
-                source = BitmapSource.Create(
-                    bmp.bmWidth, bmp.bmHeight, 96, 96, PixelFormats.Pbgra32, null,
-                    bmp.bmBits, bmp.bmWidthBytes * bmp.bmHeight, bmp.bmWidthBytes);
-            }
+            var source = BitmapSource.Create(
+                bmp.bmWidth, bmp.bmHeight, 96, 96, PixelFormats.Pbgra32, null,
+                bmp.bmBits, bmp.bmWidthBytes * bmp.bmHeight, bmp.bmWidthBytes);
             source.Freeze();
             return source;
         }
@@ -184,39 +169,6 @@ public static class ShellThumbnailService
         public IntPtr bmBits;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct BITMAPINFOHEADER
-    {
-        public uint biSize;
-        public int biWidth;
-        public int biHeight;
-        public ushort biPlanes;
-        public ushort biBitCount;
-        public uint biCompression;
-        public uint biSizeImage;
-        public int biXPelsPerMeter;
-        public int biYPelsPerMeter;
-        public uint biClrUsed;
-        public uint biClrImportant;
-    }
-
-    // Only asked for its header's biHeight sign - BITMAP.bmHeight is always
-    // the absolute value, so orientation lives here alone. GetObject fills
-    // this fully only for DIB sections (return value = DIBSECTION's size);
-    // a device-dependent bitmap gets just the BITMAP prefix, and those have
-    // no bmBits pointer and never reach the direct-read path anyway.
-    [StructLayout(LayoutKind.Sequential)]
-    private struct DIBSECTION
-    {
-        public BITMAP dsBm;
-        public BITMAPINFOHEADER dsBmih;
-        public uint dsBitfield0;
-        public uint dsBitfield1;
-        public uint dsBitfield2;
-        public IntPtr dshSection;
-        public uint dsOffset;
-    }
-
     [ComImport]
     [Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b")]
     [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -233,9 +185,6 @@ public static class ShellThumbnailService
 
     [DllImport("gdi32.dll")]
     private static extern int GetObject(IntPtr h, int c, out BITMAP pv);
-
-    [DllImport("gdi32.dll")]
-    private static extern int GetObject(IntPtr h, int c, out DIBSECTION pv);
 
     [DllImport("gdi32.dll")]
     private static extern bool DeleteObject(IntPtr hObject);
