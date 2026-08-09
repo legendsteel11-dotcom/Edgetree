@@ -12965,6 +12965,8 @@ public partial class MainWindow : Window
         ViewerCollapseButton.Visibility = Visibility.Collapsed;
         UpdateViewerExpandButton();
         StopViewerGif();
+        StopViewerVideo();
+        ViewerPlayOverlay.Visibility = Visibility.Collapsed;
         ViewerImage.Source = null;
         ViewerIconImage.Source = null;
 
@@ -13024,6 +13026,8 @@ public partial class MainWindow : Window
         {
             _pendingViewerPath = null;
             StopViewerGif();
+            StopViewerVideo();
+            ViewerPlayOverlay.Visibility = Visibility.Collapsed;
             ViewerImage.Source = null;
             _viewerShowingDecodedImage = false;
             ViewerIconImage.Source = null;
@@ -13040,10 +13044,13 @@ public partial class MainWindow : Window
             return;
         }
         _pendingViewerPath = path;
-        // A new file always ends the old animation; the same-path early
-        // return above is what lets a playing GIF survive its row being
-        // re-selected.
+        // A new file always ends the old animation - and the old playback,
+        // which is also where the previous video's file handle is released.
+        // The same-path early return above is what lets a playing GIF (or
+        // film) survive its own row being re-selected.
         StopViewerGif();
+        StopViewerVideo();
+        ViewerPlayOverlay.Visibility = Visibility.Collapsed;
 
         ViewerFileName.Text = item.Name;
         ViewerFileInfo.Text = string.Empty;
@@ -13526,6 +13533,491 @@ public partial class MainWindow : Window
         _viewerGifStream = null;
     }
 
+    // ----- 동영상 재생 ------------------------------------------------------
+    //
+    // A PREVIEW that moves, not a media player. The line, decided before any
+    // of it was written (2026-08-09): playback and a transport strip yes;
+    // playlist, speed, subtitles, audio-only files no. The panel's job is to
+    // tell you what a file is - and for a two-hour film, a single frozen
+    // frame was only half an answer once the panel had grown big enough to
+    // show it properly.
+    //
+    // Playback is NEVER automatic. Selection-follow means arrow-keying a
+    // folder walks every row, and starting a film on each one would be
+    // chaos - so a video shows its still frame with a play button on it, and
+    // that click is the whole opt-in.
+    //
+    // Codec coverage is Windows', not ours: MediaElement plays what Media
+    // Foundation can open. mp4/H.264 does; mkv and HEVC frequently do not,
+    // which was known before this started (the shell's own property store
+    // draws the same line - it publishes an mkv's duration but not its frame
+    // size). MediaFailed is therefore a first-class outcome here, not an
+    // error path: the still frame comes back and the caption says so.
+    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp4", ".m4v", ".mov", ".avi", ".wmv", ".mkv", ".webm",
+        ".mpg", ".mpeg", ".m2ts", ".mts", ".ts", ".flv", ".3gp"
+    };
+
+    private static bool IsViewerVideo(string path)
+        => VideoExtensions.Contains(Path.GetExtension(path));
+
+    // The file currently handed to MediaElement - null whenever nothing is
+    // loaded, which is also the app's promise that the file is not held open.
+    private string? _viewerVideoPath;
+    private bool _viewerVideoPlaying;
+    private bool _viewerMediaSeeking;
+    // Where a seek was aimed, held until the element reports arriving there -
+    // see SeekViewerMedia.
+    private double? _viewerSeekTargetSeconds;
+    private int _viewerSeekWaitTicks;
+    // True while the app itself is writing the bar, so ValueChanged can tell
+    // the readout's own updates from the user moving it.
+    private bool _viewerSliderSelfWrite;
+    private System.Windows.Threading.DispatcherTimer? _viewerMediaTimer;
+    private System.Windows.Threading.DispatcherTimer? _viewerSeekDebounce;
+
+    private void SetViewerMediaSliderValue(double seconds)
+    {
+        _viewerSliderSelfWrite = true;
+        try
+        {
+            ViewerMediaPosition.Value = seconds;
+        }
+        finally
+        {
+            _viewerSliderSelfWrite = false;
+        }
+    }
+
+    private void ViewerPlayOverlay_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pendingViewerPath is not { } path || !IsViewerVideo(path))
+        {
+            return;
+        }
+
+        StopViewerGif();
+        _viewerVideoPath = path;
+        ViewerMedia.Volume = _viewerMediaMuted ? 0 : ViewerMediaVolume.Value;
+        // See LoadViewerImage's note on Uri: a path is not a URL. MediaElement
+        // takes nothing but a Uri, so this is the one place left that has to
+        // build one - if a video with a '#' in its name ever fails to open,
+        // this line is why.
+        ViewerMedia.Source = new Uri(path);
+        ViewerMedia.Visibility = Visibility.Visible;
+        ViewerImage.Visibility = Visibility.Collapsed;
+        ViewerIconImage.Visibility = Visibility.Collapsed;
+        ViewerPlayOverlay.Visibility = Visibility.Collapsed;
+        ViewerNavigatorPlate.Visibility = Visibility.Collapsed;
+        // The two strips describe the same picture in ways that cannot both
+        // apply, so they take turns rather than stack.
+        ViewerZoomBar.Visibility = Visibility.Collapsed;
+        ViewerMediaBar.Visibility = Visibility.Visible;
+        ViewerMedia.Play();
+        SetViewerVideoPlaying(true);
+    }
+
+    private void ViewerMedia_MediaOpened(object sender, RoutedEventArgs e)
+    {
+        ViewerMediaPosition.Maximum = ViewerMedia.NaturalDuration.HasTimeSpan
+            ? ViewerMedia.NaturalDuration.TimeSpan.TotalSeconds
+            : 0;
+        UpdateViewerMediaReadout();
+    }
+
+    private void ViewerMedia_MediaEnded(object sender, RoutedEventArgs e)
+    {
+        // Back to the first frame, paused - a preview that vanished at the
+        // end would leave the panel empty with no way to tell what it had
+        // been showing.
+        ViewerMedia.Position = TimeSpan.Zero;
+        ViewerMedia.Pause();
+        SetViewerVideoPlaying(false);
+        UpdateViewerMediaReadout();
+    }
+
+    private void ViewerMedia_MediaFailed(object sender, ExceptionRoutedEventArgs e)
+    {
+        // Expected, not exceptional: Windows has no codec for this file. Put
+        // the still frame back and say what the panel can still do about it.
+        string? path = _viewerVideoPath;
+        StopViewerVideo();
+        if (path is not null && string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+        {
+            ViewerFileInfo.Text = Strings.ViewerPlaybackUnsupported;
+        }
+    }
+
+    private void ViewerMediaPlayPause_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewerVideoPath is null)
+        {
+            return;
+        }
+
+        if (_viewerVideoPlaying)
+        {
+            ViewerMedia.Pause();
+            SetViewerVideoPlaying(false);
+        }
+        else
+        {
+            ViewerMedia.Play();
+            SetViewerVideoPlaying(true);
+        }
+    }
+
+    private void ViewerMediaStop_Click(object sender, RoutedEventArgs e)
+    {
+        string? path = _viewerVideoPath;
+        StopViewerVideo();
+        // Stop means "back to the still", so the preview is rebuilt from the
+        // same row rather than left blank.
+        if (path is not null && string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+        {
+            _pendingViewerPath = null;
+            UpdateViewerPreview();
+        }
+    }
+
+    // The position bar takes its own capture instead of leaving the gesture
+    // to the Slider's thumb. WPF's move-to-point CLICK is marked handled by
+    // the Slider's class handler, and the thumb never picks the drag up from
+    // there - so clicking to jump and then continuing to drag left the bar
+    // unheld while the value kept changing, which the element answered by
+    // seeking again and again over a few seconds of film ("짧은 구간의 화면이
+    // 반복", 2026-08-09). Owning press, move and release removes the whole
+    // class of it: one gesture, one capture, one seek at the end.
+    private void ViewerMediaPosition_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_viewerVideoPath is null)
+        {
+            return;
+        }
+
+        _viewerMediaSeeking = true;
+        ViewerMediaPosition.CaptureMouse();
+        MoveViewerSeekBarTo(e.GetPosition(ViewerMediaPosition).X);
+        e.Handled = true;
+    }
+
+    private void ViewerMediaPosition_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_viewerMediaSeeking && ViewerMediaPosition.IsMouseCaptured)
+        {
+            MoveViewerSeekBarTo(e.GetPosition(ViewerMediaPosition).X);
+        }
+    }
+
+    // SAFETY DEVICE, the pan drag's own mirrored again: capture can end
+    // without a release (another window, the app's stuck-capture watchdog),
+    // and the seeking flag surviving that would freeze the bar for good -
+    // the readout would never write it again.
+    private void ViewerMediaPosition_LostMouseCapture(object sender, System.Windows.Input.MouseEventArgs e)
+        => _viewerMediaSeeking = false;
+
+    // The thumb's own width is dead travel at both ends, so the track maps
+    // the value across what is left; without that a click at either end
+    // lands a minute or so off on a feature-length file.
+    private void MoveViewerSeekBarTo(double x)
+    {
+        const double thumbWidth = 12;
+        double usable = Math.Max(1, ViewerMediaPosition.ActualWidth - thumbWidth);
+        double ratio = Math.Clamp((x - thumbWidth / 2) / usable, 0, 1);
+        double seconds = ratio * ViewerMediaPosition.Maximum;
+
+        SetViewerMediaSliderValue(seconds);
+        ShowViewerMediaTime(TimeSpan.FromSeconds(seconds));
+    }
+
+    // EVERY user-driven change to the bar comes through here - a drag, a
+    // click that jumps the thumb, the wheel - and none of it depends on
+    // seeing a mouse-up. Relying on the release was what left the plain
+    // CLICK broken while dragging worked: WPF's move-to-point click hands
+    // the gesture to the thumb itself, and the release never reached the
+    // handler that was supposed to commit the seek, so nothing was ever
+    // asked for and the readout tick walked the bar back to where playback
+    // actually still was (2026-08-09).
+    //
+    // The seek is debounced instead: the readout follows the hand
+    // immediately, and one seek is issued once the value stops moving.
+    // Asking a 4K stream to jump on every ValueChanged made it thrash
+    // through stills for seconds - one seek per gesture is what it can
+    // honour.
+    private void ViewerMediaPosition_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_viewerSliderSelfWrite || _viewerVideoPath is null)
+        {
+            return;
+        }
+
+        // Marked here rather than on mouse-down: WPF's move-to-point CLICK is
+        // marked handled by the Slider's own class handler, so a
+        // PreviewMouseLeftButtonDown handler never runs for it - only for a
+        // grab on the thumb. That gap was the whole bug: with the flag still
+        // clear, the readout tick fired inside the debounce window and wrote
+        // the real playback position back over the clicked one, so the seek
+        // that followed 150ms later aimed at where it had started
+        // (2026-08-09, "깜빡깜빡 제자리로 계속 회귀"). Value changing IS the
+        // gesture, whatever produced it.
+        _viewerMediaSeeking = true;
+        ShowViewerMediaTime(TimeSpan.FromSeconds(e.NewValue));
+        _viewerSeekDebounce ??= CreateViewerSeekDebounce();
+        _viewerSeekDebounce.Stop();
+        _viewerSeekDebounce.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateViewerSeekDebounce()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(150)
+        };
+        timer.Tick += (_, _) =>
+        {
+            // Still holding it - a hand that pauses mid-drag has not let go.
+            // Committing on the pause was what made the bar feel like it
+            // slipped out of the fingers ("놓친 기분", 2026-08-09): the seek
+            // landed, the flag cleared, and the readout tick took the bar
+            // back while the hand was still on it. The ticks keep coming and
+            // do nothing until the capture ends, which is also the way out if
+            // a mouse-up never arrives at all.
+            if (ViewerMediaPosition.IsMouseCaptureWithin)
+            {
+                return;
+            }
+
+            timer.Stop();
+            _viewerMediaSeeking = false;
+            if (_viewerVideoPath is not null)
+            {
+                SeekViewerMedia(ViewerMediaPosition.Value);
+            }
+        };
+        return timer;
+    }
+
+    // Letting go commits at once rather than waiting out the debounce - the
+    // release IS the decision, and 150ms of nothing after it reads as lag.
+    private void ViewerMediaPosition_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!ViewerMediaPosition.IsMouseCaptured)
+        {
+            return;
+        }
+
+        ViewerMediaPosition.ReleaseMouseCapture();
+        _viewerSeekDebounce?.Stop();
+        _viewerMediaSeeking = false;
+        if (_viewerVideoPath is not null)
+        {
+            SeekViewerMedia(ViewerMediaPosition.Value);
+        }
+        e.Handled = true;
+    }
+
+    private void SeekViewerMedia(double seconds)
+    {
+        seconds = Math.Clamp(seconds, 0, Math.Max(0, ViewerMediaPosition.Maximum));
+        SetViewerMediaSliderValue(seconds);
+        ViewerMedia.Position = TimeSpan.FromSeconds(seconds);
+        ShowViewerMediaTime(TimeSpan.FromSeconds(seconds));
+
+        // MediaElement.Position keeps REPORTING the pre-seek time until the
+        // seek actually lands - seconds, on a large file - and the readout
+        // tick wrote that stale number straight back into the bar, dragging
+        // it home again ("한번 클릭하면 왔다가 다시 제자리로"). So the bar is
+        // LATCHED at what was asked for and left alone until the element
+        // reports somewhere near it. The tick cap is a way out for a seek
+        // that never lands at all rather than a timing guess.
+        _viewerSeekTargetSeconds = seconds;
+        _viewerSeekWaitTicks = 80;
+    }
+
+    // The volume bar gets the position bar's gesture, for the same reason and
+    // with the same three handlers - the Slider's own click-then-drag has the
+    // identical hole in it, and a 80px control makes it easier to fall into.
+    // No seeking flag here: the value IS the volume, so it can be applied as
+    // it moves.
+    private void ViewerMediaVolume_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        ViewerMediaVolume.CaptureMouse();
+        MoveViewerVolumeTo(e.GetPosition(ViewerMediaVolume).X);
+        e.Handled = true;
+    }
+
+    private void ViewerMediaVolume_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (ViewerMediaVolume.IsMouseCaptured)
+        {
+            MoveViewerVolumeTo(e.GetPosition(ViewerMediaVolume).X);
+        }
+    }
+
+    private void ViewerMediaVolume_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (ViewerMediaVolume.IsMouseCaptured)
+        {
+            ViewerMediaVolume.ReleaseMouseCapture();
+            e.Handled = true;
+        }
+    }
+
+    private void MoveViewerVolumeTo(double x)
+    {
+        const double thumbWidth = 12;
+        double usable = Math.Max(1, ViewerMediaVolume.ActualWidth - thumbWidth);
+        ViewerMediaVolume.Value = Math.Clamp((x - thumbWidth / 2) / usable, 0, 1);
+    }
+
+    // The wheel over either strip: a way to land exactly that never asks the
+    // hand to hit a 12px circle. 5 seconds and 5% a notch.
+    private void ViewerMediaPosition_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        e.Handled = true;
+        if (_viewerVideoPath is not null)
+        {
+            SeekViewerMedia(ViewerMediaPosition.Value + Math.Sign(e.Delta) * 5);
+        }
+    }
+
+    private void ViewerMediaVolume_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        e.Handled = true;
+        ViewerMediaVolume.Value = Math.Clamp(
+            ViewerMediaVolume.Value + Math.Sign(e.Delta) * 0.05, 0, 1);
+    }
+
+    private void ViewerMediaVolume_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        // Reachable before the element exists (the slider carries a value from
+        // XAML), so this is null-guarded rather than assumed.
+        if (ViewerMedia is null)
+        {
+            return;
+        }
+
+        // Moving the slider un-mutes: reaching for the volume is the clearest
+        // statement there is that you want to hear it. Zero is the exception -
+        // dragging to the bottom means silence, and flipping the icon back on
+        // there would be arguing with the hand.
+        if (_viewerMediaMuted && e.NewValue > 0)
+        {
+            SetViewerMediaMuted(false);
+        }
+        ViewerMedia.Volume = _viewerMediaMuted ? 0 : e.NewValue;
+    }
+
+    private bool _viewerMediaMuted;
+
+    private void ViewerMediaMute_Click(object sender, RoutedEventArgs e)
+        => SetViewerMediaMuted(!_viewerMediaMuted);
+
+    // The slider keeps its own position while muted rather than dropping to
+    // zero, so un-muting returns to the level that was set - which is what
+    // makes it a toggle rather than a second volume control.
+    private void SetViewerMediaMuted(bool muted)
+    {
+        _viewerMediaMuted = muted;
+        ViewerMediaMuteSlash.Visibility = muted ? Visibility.Visible : Visibility.Collapsed;
+        ViewerMedia.Volume = muted ? 0 : ViewerMediaVolume.Value;
+    }
+
+    private void SetViewerVideoPlaying(bool playing)
+    {
+        _viewerVideoPlaying = playing;
+        ViewerMediaPlayPause.Content = playing ? "❚❚" : "▶";
+        ViewerMediaPlayPause.ToolTip = playing ? Strings.ViewerPause : Strings.ViewerPlay;
+
+        // The readout ticks only while something is moving - four times a
+        // second, two property reads and a string. Nothing runs while paused,
+        // stopped, or with no video loaded at all.
+        _viewerMediaTimer ??= CreateViewerMediaTimer();
+        if (playing)
+        {
+            _viewerMediaTimer.Start();
+        }
+        else
+        {
+            _viewerMediaTimer.Stop();
+        }
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateViewerMediaTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(250)
+        };
+        timer.Tick += (_, _) => UpdateViewerMediaReadout();
+        return timer;
+    }
+
+    private void UpdateViewerMediaReadout()
+    {
+        if (_viewerVideoPath is null)
+        {
+            return;
+        }
+
+        var position = ViewerMedia.Position;
+
+        // A seek is outstanding: leave the bar where the user put it until the
+        // element reports arriving (within a second), and say the time they
+        // asked for rather than the one it is still reporting.
+        if (_viewerSeekTargetSeconds is { } target)
+        {
+            if (Math.Abs(position.TotalSeconds - target) < 1.0 || --_viewerSeekWaitTicks <= 0)
+            {
+                _viewerSeekTargetSeconds = null;
+            }
+            else
+            {
+                ShowViewerMediaTime(TimeSpan.FromSeconds(target));
+                return;
+            }
+        }
+
+        // Never while the user is dragging it: writing the slider under the
+        // cursor is how a seek bar fights the hand holding it.
+        if (!_viewerMediaSeeking)
+        {
+            SetViewerMediaSliderValue(Math.Min(position.TotalSeconds, ViewerMediaPosition.Maximum));
+        }
+        ShowViewerMediaTime(position);
+    }
+
+    private void ShowViewerMediaTime(TimeSpan position)
+    {
+        var total = ViewerMedia.NaturalDuration.HasTimeSpan
+            ? ViewerMedia.NaturalDuration.TimeSpan
+            : TimeSpan.Zero;
+        ViewerMediaTime.Text = $"{FormatDuration(position)} / {FormatDuration(total)}";
+    }
+
+    // Safe from anywhere, including when nothing is loaded. Clearing Source is
+    // the part that matters beyond tidiness: a MediaElement holding a file
+    // open would make this app's own rename and delete fail on it.
+    private void StopViewerVideo()
+    {
+        _viewerMediaTimer?.Stop();
+        _viewerSeekDebounce?.Stop();
+        _viewerMediaSeeking = false;
+        _viewerSeekTargetSeconds = null;
+
+        if (_viewerVideoPath is not null)
+        {
+            ViewerMedia.Stop();
+            ViewerMedia.Source = null;
+            _viewerVideoPath = null;
+        }
+
+        _viewerVideoPlaying = false;
+        ViewerMedia.Visibility = Visibility.Collapsed;
+        ViewerMediaBar.Visibility = Visibility.Collapsed;
+    }
+
     // Fit is a ratio, so it moves with the panel - and a zoom held at, say,
     // 200% has to STAY 200% while the window resizes, which means recomputing
     // the transform (it is stored relative to fit) on every frame of it.
@@ -13681,7 +14173,10 @@ public partial class MainWindow : Window
 
     private void UpdateViewerZoomBar()
     {
-        bool hasImage = _viewerPixelWidth > 0 && ViewerImage.Source is not null;
+        // Never while a video is loaded: the transport strip stands in this
+        // strip's place, and the two would otherwise both appear the moment
+        // anything called in here mid-playback.
+        bool hasImage = _viewerPixelWidth > 0 && ViewerImage.Source is not null && _viewerVideoPath is null;
         ViewerZoomBar.Visibility = hasImage ? Visibility.Visible : Visibility.Collapsed;
         if (!hasImage)
         {
@@ -14083,7 +14578,14 @@ public partial class MainWindow : Window
         // band of background across the top of the picture (reported with a
         // screenshot, 2026-08-08). The height has to go too.
         HeaderRow.Height = on ? new GridLength(0) : new GridLength(36);
-        ViewerCaptionPanel.Visibility = chrome;
+        // The caption is the ONE piece of chrome a playing video keeps: the
+        // transport strip lives in it, and a full screen with no way to pause
+        // or seek is a worse trade than the strip's own height. It is also
+        // what the viewers this was modelled on do - their fullscreen carries
+        // the same bar. A still picture gives it up as before.
+        ViewerCaptionPanel.Visibility = on && _viewerVideoPath is not null
+            ? Visibility.Visible
+            : chrome;
         ViewerCloseButton.Visibility = chrome;
         ViewerImage.Margin = on ? default : new Thickness(10);
         ViewerPanel.BorderThickness = on
@@ -14650,7 +15152,10 @@ public partial class MainWindow : Window
         // Not while a GIF is playing: it decodes at its own natural size, so
         // the settled width changes nothing, and the reload would restart
         // the animation from frame 0.
-        if (_viewerGifDecoder is null)
+        // Neither a playing GIF nor a playing video: both would be torn down
+        // and restarted from the beginning by the reload, and a width drag is
+        // not a request to start the film again (2026-08-09).
+        if (_viewerGifDecoder is null && _viewerVideoPath is null)
         {
             _pendingViewerPath = null;
             UpdateViewerPreview();
@@ -14669,7 +15174,10 @@ public partial class MainWindow : Window
 
         _settingsService.Save(_settings);
         // Same GIF exemption as the split thumb's settle above.
-        if (_viewerGifDecoder is null)
+        // Neither a playing GIF nor a playing video: both would be torn down
+        // and restarted from the beginning by the reload, and a width drag is
+        // not a request to start the film again (2026-08-09).
+        if (_viewerGifDecoder is null && _viewerVideoPath is null)
         {
             _pendingViewerPath = null;
             UpdateViewerPreview();
@@ -14749,6 +15257,13 @@ public partial class MainWindow : Window
                 // property store fills in what it knows on top - a video's
                 // duration and true frame size.
                 SetViewerFileInfo(path, pixelWidth, pixelHeight, withMediaInfo: true);
+
+                // A video's still frame gets the one affordance that turns it
+                // into a promise the panel can keep.
+                if (IsViewerVideo(path))
+                {
+                    ViewerPlayOverlay.Visibility = Visibility.Visible;
+                }
                 return;
             }
 

@@ -234,6 +234,13 @@ public static class Strings
     public static string MenuSetWallpaper = "바탕 화면 배경으로 설정";
     public static string ViewerPrevImage = "이전 이미지";
     public static string ViewerNextImage = "다음 이미지";
+    public static string ViewerPlay = "재생";
+    public static string ViewerPause = "일시정지";
+    public static string ViewerStop = "정지";
+    public static string ViewerMute = "음소거";
+    // Shown in the caption when Windows has no codec for the file - the panel
+    // says what happened and what still works, rather than sitting blank.
+    public static string ViewerPlaybackUnsupported = "이 형식은 재생할 수 없습니다 · Enter로 기본 프로그램에서 열기";
     public static string ToolTipExitSearch = "탐색기로 (Ctrl+E)";
     public static string SearchTooltipBrowseFolder = "검색할 폴더 선택";
     public static string SearchTooltipRefresh = "다시 인덱싱";
@@ -554,6 +561,11 @@ public static class Strings
         MenuSetWallpaper = "Set as desktop background";
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
+        ViewerPlay = "Play";
+        ViewerPause = "Pause";
+        ViewerStop = "Stop";
+        ViewerMute = "Mute";
+        ViewerPlaybackUnsupported = "This format can't be played here · Enter opens it in the default app";
         ToolTipExitSearch = "Back to Explorer (Ctrl+E)";
         SearchTooltipBrowseFolder = "Choose folder to search";
         SearchTooltipRefresh = "Reindex";
