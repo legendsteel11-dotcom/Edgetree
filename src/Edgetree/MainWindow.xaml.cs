@@ -7753,19 +7753,32 @@ public partial class MainWindow : Window
             return;
         }
 
-        treeViewItem.BringIntoView();
-        container.UpdateLayout();
-
         if (index == chain.Count - 1)
         {
             treeViewItem.IsSelected = true;
             treeViewItem.BringIntoView();
             treeViewItem.Focus();
+            return;
         }
-        else
+
+        // An ancestor is scrolled into view ONLY when the next level's
+        // container doesn't exist yet - forcing realization is the one thing
+        // that scroll is for. Bringing every ancestor in unconditionally (as
+        // this walk originally did) sent the viewport UP to the folder and
+        // then back DOWN to the target, and that return trip parks the target
+        // on the viewport's bottom edge every time - so each carousel step
+        // pinned the selected row to the bottom of the tree even when the row
+        // it stepped to was already comfortably on screen (user report,
+        // 2026-08-09). With the skip, a step between two visible rows moves
+        // the viewport not at all, and a step past the edge scrolls the one
+        // row the ↓ key would.
+        treeViewItem.UpdateLayout();
+        if (treeViewItem.ItemContainerGenerator.ContainerFromItem(chain[index + 1]) is null)
         {
-            SelectVisibleItemStep(chain, index + 1, treeViewItem);
+            treeViewItem.BringIntoView();
+            container.UpdateLayout();
         }
+        SelectVisibleItemStep(chain, index + 1, treeViewItem);
     }
 
     // The context menu advertises these shortcuts via InputGestureText, but an
@@ -12800,6 +12813,7 @@ public partial class MainWindow : Window
             ViewerFileName.Text = string.Empty;
             ViewerFileInfo.Text = string.Empty;
             ClearViewerZoom();
+            UpdateViewerCarousel();
             return;
         }
 
@@ -12812,6 +12826,7 @@ public partial class MainWindow : Window
 
         ViewerFileName.Text = item.Name;
         ViewerFileInfo.Text = string.Empty;
+        UpdateViewerCarousel();
 
         bool isImage = !item.IsDirectory && ThumbnailExtensions.Contains(Path.GetExtension(path));
         if (isImage)
@@ -13467,6 +13482,78 @@ public partial class MainWindow : Window
         // original. Nothing to report either way - the desktop itself is the
         // feedback, and the quiet default is this app's standing rule.
         Task.Run(() => ShellFileService.TrySetDesktopWallpaper(path));
+    }
+
+    // The carousel row's world: the folder's image ROWS as the tree currently
+    // shows them - its sort order, its filters, and (in an overflow-capped
+    // folder) only what "더 보기" has revealed, exactly the rows ↑↓ can reach.
+    // Images only, by extension: "35 / 257" is a claim about pictures, and a
+    // mixed folder's videos and documents still step fine on ↑↓.
+    private static bool IsViewerCarouselImage(FileSystemItem item)
+        => item is { IsDirectory: false, IsPlaceholder: false, IsShowMore: false }
+           && ThumbnailExtensions.Contains(Path.GetExtension(item.FullPath));
+
+    private List<FileSystemItem> GetViewerCarouselImages(FileSystemItem current)
+    {
+        IEnumerable<FileSystemItem> siblings = current.Parent?.Children ?? _roots;
+        return siblings.Where(IsViewerCarouselImage).ToList();
+    }
+
+    // Recomputed on every selection change rather than cached: the list is one
+    // Where() over a folder's realized rows, and a cache would go stale on
+    // every rename/delete/sort for nothing.
+    private void UpdateViewerCarousel()
+    {
+        if (!_viewerOpen
+            || _selectedItem is not { } current
+            || !IsViewerCarouselImage(current))
+        {
+            ViewerCarouselBar.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var images = GetViewerCarouselImages(current);
+        int index = images.IndexOf(current);
+        if (index < 0)
+        {
+            ViewerCarouselBar.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        ViewerCarouselBar.Visibility = Visibility.Visible;
+        ViewerCarouselText.Text = $"{index + 1} / {images.Count}";
+        // The invisible twin reserves the folder's widest possible string so
+        // the chevron buttons hold still while the number walks.
+        ViewerCarouselMaxText.Text = $"{images.Count} / {images.Count}";
+        ViewerPrevButton.IsEnabled = index > 0;
+        ViewerNextButton.IsEnabled = index < images.Count - 1;
+    }
+
+    // No wrap-around: a disabled chevron at either end says "you are at the
+    // edge" more honestly than silently jumping 257 → 1 would.
+    private void ViewerPrevButton_Click(object sender, RoutedEventArgs e) => ViewerCarouselStep(-1);
+
+    private void ViewerNextButton_Click(object sender, RoutedEventArgs e) => ViewerCarouselStep(+1);
+
+    private void ViewerCarouselStep(int direction)
+    {
+        if (_selectedItem is not { } current || !IsViewerCarouselImage(current))
+        {
+            return;
+        }
+
+        var images = GetViewerCarouselImages(current);
+        int index = images.IndexOf(current);
+        int next = index + direction;
+        if (index < 0 || next < 0 || next >= images.Count)
+        {
+            return;
+        }
+
+        // Selects, scrolls to and focuses the tree row; selection-follow then
+        // brings the picture, so the chevrons never grow a second idea of
+        // "next" to keep in sync (same reasoning as the Space key's).
+        SelectVisibleItem(images[next]);
     }
 
     private void ViewerImageHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

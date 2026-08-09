@@ -228,6 +228,8 @@ public static class Strings
     // Explorer's own wording for the same action, so it reads as the familiar
     // thing rather than a new feature.
     public static string MenuSetWallpaper = "바탕 화면 배경으로 설정";
+    public static string ViewerPrevImage = "이전 이미지";
+    public static string ViewerNextImage = "다음 이미지";
     public static string ToolTipExitSearch = "탐색기로 (Ctrl+E)";
     public static string SearchTooltipBrowseFolder = "검색할 폴더 선택";
     public static string SearchTooltipRefresh = "다시 인덱싱";
@@ -540,6 +542,8 @@ public static class Strings
         ViewerNavigator = "Navigator";
         ViewerClose = "Close viewer";
         MenuSetWallpaper = "Set as desktop background";
+        ViewerPrevImage = "Previous image";
+        ViewerNextImage = "Next image";
         ToolTipExitSearch = "Back to Explorer (Ctrl+E)";
         SearchTooltipBrowseFolder = "Choose folder to search";
         SearchTooltipRefresh = "Reindex";

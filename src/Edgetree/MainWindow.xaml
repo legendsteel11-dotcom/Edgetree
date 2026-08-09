@@ -4915,6 +4915,52 @@
                     <StackPanel x:Name="ViewerCaptionPanel"
                             Grid.Row="1"
                             Margin="10,0,10,10">
+                        <!-- Carousel row, < 35 / 257 > ABOVE the caption - the
+                             user's own placement (2026-08-09), and the one that
+                             dissolves the recorded conflict: chevrons OVER the
+                             picture would sit exactly where the pan drag lives
+                             and couldn't take the navigator's hit-test escape,
+                             because unlike it they must take clicks. Up here
+                             they are plain buttons. The count walks the
+                             folder's IMAGE rows in the tree's current order
+                             (what a carousel of pictures means - mixed-media
+                             stepping stays on ↑↓), and a chevron simply selects
+                             that row, so selection-follow does the rest.
+                             Shown/hidden instantly, only while the file on
+                             screen is one of those rows.
+                             The Hidden twin under the counter carries the
+                             folder's widest string (257 / 257), so stepping
+                             35 → 36 → 100 never changes the row's width and
+                             the chevron under the cursor never moves mid-run
+                             (same trick as ViewerZoomText's fixed width). -->
+                        <StackPanel x:Name="ViewerCarouselBar"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,7"
+                                Visibility="Collapsed">
+                            <Button x:Name="ViewerPrevButton"
+                                    Style="{StaticResource FooterActionChipStyle}"
+                                    Content="&lt;"
+                                    Click="ViewerPrevButton_Click"
+                                    ToolTip="{x:Static services:Strings.ViewerPrevImage}"/>
+                            <Grid VerticalAlignment="Center"
+                                    Margin="6,0">
+                                <TextBlock x:Name="ViewerCarouselMaxText"
+                                        Visibility="Hidden"
+                                        FontSize="11"/>
+                                <TextBlock x:Name="ViewerCarouselText"
+                                        FontSize="11"
+                                        Foreground="{DynamicResource ForegroundText}"
+                                        Opacity="0.65"
+                                        TextAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                            </Grid>
+                            <Button x:Name="ViewerNextButton"
+                                    Style="{StaticResource FooterActionChipStyle}"
+                                    Content="&gt;"
+                                    Click="ViewerNextButton_Click"
+                                    ToolTip="{x:Static services:Strings.ViewerNextImage}"/>
+                        </StackPanel>
                         <TextBlock x:Name="ViewerFileName"
                                 Foreground="{DynamicResource FileNameForeground}"
                                 FontSize="{DynamicResource MenuFontSize}"
