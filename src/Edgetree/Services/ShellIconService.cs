@@ -210,6 +210,128 @@ public static class ShellIconService
         });
     }
 
+    // The viewer panel's icon-size fallback (folders, and files with no
+    // thumbnail): the system image list's jumbo slot via an HICON, NOT
+    // IShellItemImageFactory::GetImage. GetImage's freshly-generated ICON
+    // answers sometimes arrive upside down - the DIB's height sign doesn't
+    // match how its rows were actually written, so no header-side fix
+    // catches them all (observed 2026-08-09: "물구나무서기", righting itself
+    // on the second, cache-served ask). An HICON has no orientation header
+    // to lie with.
+    //
+    // onCompleted lands on the UI thread, null when the shell has nothing.
+    public static void GetViewerIcon(string path, Action<ImageSource?> onCompleted)
+    {
+        Task.Run(() =>
+        {
+            var icon = ExtractJumboIcon(path);
+            Application.Current?.Dispatcher.BeginInvoke(() => onCompleted(icon));
+        });
+    }
+
+    private static ImageSource? ExtractJumboIcon(string path)
+    {
+        // No USEFILEATTRIBUTES: the real item's icon index (a folder with a
+        // custom icon, an .exe) - disk I/O, which is why this whole path is
+        // off the UI thread.
+        var info = new SHFILEINFO();
+        try
+        {
+            if (SHGetFileInfo(path, 0, ref info, (uint)Marshal.SizeOf<SHFILEINFO>(),
+                    SHGFI_SYSICONINDEX) == IntPtr.Zero)
+            {
+                return null;
+            }
+        }
+        catch (Exception e) when (e is ExternalException or ArgumentException)
+        {
+            return null;
+        }
+
+        var iid = typeof(IImageList).GUID;
+        if (SHGetImageList(SHIL_JUMBO, ref iid, out var list) != 0 || list is null)
+        {
+            return null;
+        }
+
+        IntPtr hIcon = IntPtr.Zero;
+        try
+        {
+            if (list.GetIcon(info.iIcon, ILD_TRANSPARENT, out hIcon) != 0 || hIcon == IntPtr.Zero)
+            {
+                return null;
+            }
+
+            var source = Imaging.CreateBitmapSourceFromHIcon(
+                hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            // The jumbo list's own quirk: a type with no 256px icon comes
+            // back as the SMALLER icon parked in the top-left corner of a
+            // mostly-transparent 256px canvas, which Uniform-stretched into
+            // the viewer slot reads as a tiny off-centre icon. Cropping to
+            // the opaque bounding box returns exactly the icon whatever size
+            // it actually came as.
+            return CropToOpaqueBounds(source);
+        }
+        catch (Exception e) when (e is ExternalException or ArgumentException)
+        {
+            return null;
+        }
+        finally
+        {
+            if (hIcon != IntPtr.Zero)
+            {
+                DestroyIcon(hIcon);
+            }
+            Marshal.ReleaseComObject(list);
+        }
+    }
+
+    private static ImageSource? CropToOpaqueBounds(BitmapSource source)
+    {
+        BitmapSource bgra = source.Format == PixelFormats.Bgra32
+            ? source
+            : new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
+        int width = bgra.PixelWidth, height = bgra.PixelHeight;
+        int stride = width * 4;
+        var pixels = new byte[stride * height];
+        bgra.CopyPixels(pixels, stride, 0);
+
+        int minX = width, minY = height, maxX = -1, maxY = -1;
+        for (int y = 0; y < height; y++)
+        {
+            int row = y * stride;
+            for (int x = 0; x < width; x++)
+            {
+                if (pixels[row + x * 4 + 3] != 0)
+                {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+
+        if (maxX < 0)
+        {
+            // Fully transparent - nothing worth showing.
+            return null;
+        }
+
+        int cropWidth = maxX - minX + 1, cropHeight = maxY - minY + 1;
+        int cropStride = cropWidth * 4;
+        var cropped = new byte[cropStride * cropHeight];
+        for (int y = 0; y < cropHeight; y++)
+        {
+            Buffer.BlockCopy(pixels, (minY + y) * stride + minX * 4, cropped, y * cropStride, cropStride);
+        }
+
+        var result = BitmapSource.Create(
+            cropWidth, cropHeight, 96, 96, PixelFormats.Bgra32, null, cropped, cropStride);
+        result.Freeze();
+        return result;
+    }
+
     // The one place native icon handles exist: extracted, converted, and
     // destroyed before returning. 32px (SHGFI_LARGEICON) rather than the 16px
     // small size because the app scales icons up with the tree font size
@@ -262,6 +384,9 @@ public static class ShellIconService
     private const uint SHGFI_LARGEICON = 0x000000000;
     private const uint SHGFI_OPENICON = 0x000000002;
     private const uint SHGFI_USEFILEATTRIBUTES = 0x000000010;
+    private const uint SHGFI_SYSICONINDEX = 0x000004000;
+    private const int SHIL_JUMBO = 0x4;
+    private const uint ILD_TRANSPARENT = 0x1;
     private const uint FILE_ATTRIBUTE_NORMAL = 0x00000080;
     private const uint FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
 
@@ -277,9 +402,32 @@ public static class ShellIconService
         public string szTypeName;
     }
 
+    // Truncated after GetIcon on purpose: COM dispatches by vtable slot, so
+    // only the order and count of the methods BEFORE the one being called
+    // must match the real interface - and nothing past GetIcon is ever
+    // called here.
+    [ComImport]
+    [Guid("46EB5926-582E-4017-9FDF-E8998DAA0950")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IImageList
+    {
+        [PreserveSig] int Add(IntPtr hbmImage, IntPtr hbmMask, ref int pi);
+        [PreserveSig] int ReplaceIcon(int i, IntPtr hicon, ref int pi);
+        [PreserveSig] int SetOverlayImage(int iImage, int iOverlay);
+        [PreserveSig] int Replace(int i, IntPtr hbmImage, IntPtr hbmMask);
+        [PreserveSig] int AddMasked(IntPtr hbmImage, uint crMask, ref int pi);
+        [PreserveSig] int Draw(IntPtr pimldp);
+        [PreserveSig] int Remove(int i);
+        [PreserveSig] int GetIcon(int i, uint flags, out IntPtr picon);
+    }
+
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes,
         ref SHFILEINFO psfi, uint cbFileInfo, uint uFlags);
+
+    [DllImport("shell32.dll")]
+    private static extern int SHGetImageList(int iImageList, ref Guid riid,
+        [MarshalAs(UnmanagedType.Interface)] out IImageList? ppv);
 
     [DllImport("user32.dll")]
     private static extern bool DestroyIcon(IntPtr hIcon);

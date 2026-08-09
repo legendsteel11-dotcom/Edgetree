@@ -13967,6 +13967,18 @@ public partial class MainWindow : Window
     // renderer stays a separate question (a new dependency, see TODO).
     private void ShowViewerIcon(string path)
     {
+        // A folder skips the thumbnail ask outright: the shell answers
+        // THUMBNAILONLY for a directory with its big folder ICON, and that
+        // answer then rides the zoomable-picture branch below - where 맞춤
+        // stretches a ~256px icon across the whole panel ("갑자기 아이콘이
+        // 굉장히 커졌어요", 2026-08-09). The icon-at-icon-size fallback is
+        // the honest rendering for a folder.
+        if (Directory.Exists(path))
+        {
+            ShowViewerFileTypeIcon(path);
+            return;
+        }
+
         int slotSize = (int)Math.Ceiling(
             Math.Clamp(ViewerImageHost.ActualWidth, 256, 2048) *
             VisualTreeHelper.GetDpi(this).DpiScaleX);
@@ -14009,22 +14021,33 @@ public partial class MainWindow : Window
                 return;
             }
 
-            ShellThumbnailService.GetPreview(path, 96, thumbnailOnly: false, (icon, _, _) =>
-            {
-                if (!_viewerOpen || !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
+            ShowViewerFileTypeIcon(path);
+        });
+    }
 
-                ViewerImage.Visibility = Visibility.Collapsed;
-                ViewerImage.Source = null;
-                _viewerShowingDecodedImage = false;
-                ViewerIconImage.Visibility = Visibility.Visible;
-                ViewerIconImage.Source = icon;
-                // A file-type icon has nothing to zoom, so the strip goes too.
-                ClearViewerZoom();
-                SetViewerFileInfo(path, 0, 0);
-            });
+    // The last resort (and a folder's first): the file-type icon at icon
+    // size, centered - a .txt has no thumbnail and never will, and a
+    // blown-up icon is worse than a small one. Served via an HICON from the
+    // system image list (see GetViewerIcon), not GetImage - GetImage's
+    // freshly-rendered icon answers sometimes arrive upside down, which is
+    // what the intermittent "물구나무서기" folders were (2026-08-09).
+    private void ShowViewerFileTypeIcon(string path)
+    {
+        ShellIconService.GetViewerIcon(path, icon =>
+        {
+            if (!_viewerOpen || !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            ViewerImage.Visibility = Visibility.Collapsed;
+            ViewerImage.Source = null;
+            _viewerShowingDecodedImage = false;
+            ViewerIconImage.Visibility = Visibility.Visible;
+            ViewerIconImage.Source = icon;
+            // A file-type icon has nothing to zoom, so the strip goes too.
+            ClearViewerZoom();
+            SetViewerFileInfo(path, 0, 0);
         });
     }
 
