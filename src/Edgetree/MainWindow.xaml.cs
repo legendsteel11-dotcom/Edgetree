@@ -810,6 +810,7 @@ public partial class MainWindow : Window
         SetBrushColor("ViewerBackground", light ? _settings.LightViewerBackgroundColorHex : _settings.ViewerBackgroundColorHex);
         SetBrushColor("HeaderBackground", light ? _settings.LightHeaderBackgroundColorHex : _settings.HeaderBackgroundColorHex);
         SetBrushColor("AutoHideHandleBackground", light ? _settings.LightAutoHideHandleColorHex : _settings.AutoHideHandleColorHex);
+        UpdateDerivedEdgeInks(light);
 
         // The results sort button's icon has its own light/dark variants (same
         // as the folder override icon) - re-resolve it now that IsLightMode
@@ -818,6 +819,98 @@ public partial class MainWindow : Window
         if (themeChanged)
         {
             UpdateSearchSortIcon();
+        }
+    }
+
+    // ----- 배경 따라가는 가장자리 잉크 (2026-08-09) --------------------------
+    //
+    // The viewer caption strip (name, info line, carousel, zoom chips), the
+    // close X and the two edge chevrons all wore theme-fixed or tree-side
+    // inks on USER-SET backgrounds, so a palette could swallow them whole -
+    // the chevron's glyph was invisible until hover, and the caption clashed
+    // outright once 랜덤 existed (user reports, 2026-08-09). The caption
+    // originally matching the tree's name colours was the user's spec, made
+    // when the viewer background always equalled the tree's; splitting the
+    // backgrounds broke that premise, and the user asked for a way out that
+    // adds NO colour rows.
+    //
+    // So these inks are DERIVED, never picked: each surface takes whichever
+    // of two candidate inks carries more contrast against the background it
+    // actually sits on. Implemented as LOCAL resource overrides scoped to
+    // the viewer panel and the two chevron buttons - the shared chip/button
+    // styles resolve the very same keys to their ordinary meanings
+    // everywhere else. Fills carry ALPHA rather than greys so they blend
+    // toward whatever they cover (the grab-line rule); text inks stay solid.
+    private void UpdateDerivedEdgeInks(bool light)
+    {
+        Color viewerBg = ColorConverter.ConvertFromString(
+            light ? _settings.LightViewerBackgroundColorHex : _settings.ViewerBackgroundColorHex)
+            is Color v ? v : Colors.Black;
+        Color treeBg = ColorConverter.ConvertFromString(
+            light ? _settings.LightBackgroundColorHex : _settings.BackgroundColorHex)
+            is Color t ? t : Colors.Black;
+
+        ApplyEdgeInkOverrides(ViewerPanel.Resources, viewerBg);
+        // The collapse chevron sits over the viewer's margin; the expand
+        // chevron over the tree's own edge - each follows its actual ground.
+        ApplyEdgeInkOverrides(ViewerCollapseButton.Resources, viewerBg);
+        ApplyEdgeInkOverrides(ViewerExpandButton.Resources, treeBg);
+    }
+
+    private static void ApplyEdgeInkOverrides(ResourceDictionary resources, Color background)
+    {
+        var lightInk = Color.FromRgb(0xE8, 0xEA, 0xEE);
+        var darkInk = Color.FromRgb(0x26, 0x28, 0x2C);
+        // Not a fixed luminance threshold: a mid-grey background sits in the
+        // band where the threshold answer and the best-contrast answer
+        // disagree, and the comparison is two multiplies more.
+        bool useLightInk = ContrastRatio(lightInk, background) >= ContrastRatio(darkInk, background);
+
+        SetLocalBrush(resources, "ForegroundText",
+            useLightInk ? lightInk : darkInk);
+        SetLocalBrush(resources, "FileNameForeground",
+            useLightInk ? Color.FromRgb(0xF0, 0xF2, 0xF6) : Color.FromRgb(0x1A, 0x1A, 0x1A));
+        var hoverFill = useLightInk
+            ? Color.FromArgb(0x2E, 0xFF, 0xFF, 0xFF)
+            : Color.FromArgb(0x24, 0x00, 0x00, 0x00);
+        SetLocalBrush(resources, "TreeRowHoverBackground", hoverFill);
+        SetLocalBrush(resources, "HoverBackground", hoverFill);
+        SetLocalBrush(resources, "FooterChipCheckedBackground",
+            useLightInk ? Color.FromArgb(0x46, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x38, 0x00, 0x00, 0x00));
+        SetLocalBrush(resources, "FooterChipCheckedForeground",
+            useLightInk ? Colors.White : Colors.Black);
+    }
+
+    // Same recolour-in-place discipline as SetBrushColor, for the same
+    // reason - this path runs on every frame of a picker drag.
+    private static void SetLocalBrush(ResourceDictionary resources, string key, Color color)
+    {
+        if (resources[key] is SolidColorBrush { IsFrozen: false } existing)
+        {
+            if (existing.Color != color)
+            {
+                existing.Color = color;
+            }
+            return;
+        }
+        resources[key] = new SolidColorBrush(color);
+    }
+
+    private static double ContrastRatio(Color a, Color b)
+    {
+        double la = RelativeLuminance(a);
+        double lb = RelativeLuminance(b);
+        return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
+    }
+
+    private static double RelativeLuminance(Color c)
+    {
+        return 0.2126 * Channel(c.R) + 0.7152 * Channel(c.G) + 0.0722 * Channel(c.B);
+
+        static double Channel(byte value)
+        {
+            double s = value / 255.0;
+            return s <= 0.03928 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4);
         }
     }
 
