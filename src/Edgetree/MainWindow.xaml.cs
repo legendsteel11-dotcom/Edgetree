@@ -12561,6 +12561,12 @@ public partial class MainWindow : Window
     // can ask for the full-resolution one exactly once.
     private int _viewerDecodedWidth;
     private bool _viewerFullResPending;
+    // Whether the picture on screen came out of WIC's own decode - as opposed
+    // to a shell preview (video frame, PSD, PDF page) riding in the same Image
+    // element, or the icon fallback. The context menu's 배경 설정 row is only
+    // offered on the former: the shell preview is a downsized stand-in for a
+    // file Windows can't use as a wallpaper anyway.
+    private bool _viewerShowingDecodedImage;
     // True from the first frame of a window resize until it settles - see
     // ViewerImageHost_SizeChanged.
     private bool _viewerResizing;
@@ -12789,6 +12795,7 @@ public partial class MainWindow : Window
         {
             _pendingViewerPath = null;
             ViewerImage.Source = null;
+            _viewerShowingDecodedImage = false;
             ViewerIconImage.Source = null;
             ViewerFileName.Text = string.Empty;
             ViewerFileInfo.Text = string.Empty;
@@ -12915,6 +12922,7 @@ public partial class MainWindow : Window
             ViewerIconImage.Source = null;
             ViewerImage.Visibility = Visibility.Visible;
             ViewerImage.Source = bitmap;
+            _viewerShowingDecodedImage = true;
             ViewerFileInfo.Text =
                 $"{pixelWidth} × {pixelHeight}  ·  {FormatFileSize(fileLength)}  ·  {modified:yyyy-MM-dd HH:mm}";
 
@@ -13413,6 +13421,54 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    // Gate for the picture's context menu. Its file actions are the row
+    // menu's handlers, and those all act on the SELECTION - so the menu may
+    // only open while the picture on screen is that selection: something is
+    // actually on the picture surface (not the icon fallback or an empty
+    // panel) and the selected row's path is the one being shown. An active
+    // multi-selection is collapsed to the shown file rather than blocking
+    // the menu (user's call, 2026-08-09): the hand that right-clicked one
+    // picture means that one, and the rows un-highlighting says so.
+    private void ViewerImageHost_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (ViewerImage.Visibility != Visibility.Visible
+            || ViewerImage.Source is null
+            || ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsShowMore: false } item
+            || !string.Equals(item.FullPath, _pendingViewerPath, StringComparison.OrdinalIgnoreCase))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        // Count > 0, not > 1: with any multi-selection alive the handlers act
+        // on that list (GetEffectiveSelection), and even a single Ctrl-clicked
+        // row in it need not be the row being shown.
+        if (_multiSelection.Count > 0)
+        {
+            ClearMultiSelection();
+        }
+
+        ViewerSetWallpaperItem.Visibility = _viewerShowingDecodedImage
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        // A folder can land here via its shell thumbnail; the picker is a
+        // file-only verb (same rule the row menu applies).
+        ViewerOpenWithItem.IsEnabled = !item.IsDirectory;
+    }
+
+    private void ViewerSetWallpaper_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pendingViewerPath is not string path)
+        {
+            return;
+        }
+
+        // Off the UI thread: the fallback inside re-encodes the full-size
+        // original. Nothing to report either way - the desktop itself is the
+        // feedback, and the quiet default is this app's standing rule.
+        Task.Run(() => ShellFileService.TrySetDesktopWallpaper(path));
+    }
+
     private void ViewerImageHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount == 2)
@@ -13801,6 +13857,7 @@ public partial class MainWindow : Window
                 ViewerIconImage.Source = null;
                 ViewerImage.Visibility = Visibility.Visible;
                 ViewerImage.Source = frame;
+                _viewerShowingDecodedImage = false;
 
                 // The thumbnail's own pixels are all there is, so they are what
                 // the zoom measures against - and marking them as the decoded
@@ -13834,6 +13891,7 @@ public partial class MainWindow : Window
 
                 ViewerImage.Visibility = Visibility.Collapsed;
                 ViewerImage.Source = null;
+                _viewerShowingDecodedImage = false;
                 ViewerIconImage.Visibility = Visibility.Visible;
                 ViewerIconImage.Source = icon;
                 // A file-type icon has nothing to zoom, so the strip goes too.

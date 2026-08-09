@@ -4774,7 +4774,57 @@
                             MouseLeftButtonDown="ViewerImageHost_MouseLeftButtonDown"
                             MouseMove="ViewerImageHost_MouseMove"
                             MouseLeftButtonUp="ViewerImageHost_MouseLeftButtonUp"
-                            LostMouseCapture="ViewerImageHost_LostMouseCapture">
+                            LostMouseCapture="ViewerImageHost_LostMouseCapture"
+                            ContextMenuOpening="ViewerImageHost_ContextMenuOpening">
+                        <!-- The picture's own right-click menu. Every file
+                             action is the ROW menu's handler unchanged - the
+                             viewer shows the tree's selection, so the row they
+                             act on IS the picture on screen; the opening
+                             handler suppresses the menu whenever that stops
+                             being true (empty panel, icon fallback, or a
+                             multi-selection, whose count the tree menu is the
+                             one to announce). 배경 설정 is the one item of its
+                             own, and only offered on a picture WIC actually
+                             decoded (not a shell preview of a video/PSD). -->
+                        <Border.ContextMenu>
+                            <ContextMenu Style="{StaticResource DarkContextMenuStyle}"
+                                    Opened="AnyMenu_Opened"
+                                    Closed="AnyMenu_Closed"
+                                    PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
+                                <!-- No "Enter" gesture on 열기: while a decoded
+                                     image is showing, Enter is the full-screen
+                                     toggle. -->
+                                <MenuItem Header="{x:Static services:Strings.MenuOpen}"
+                                        Click="OpenItem_Click"/>
+                                <MenuItem x:Name="ViewerOpenWithItem"
+                                        Header="{x:Static services:Strings.MenuOpenWith}"
+                                        Click="OpenWithPicker_Click"/>
+                                <MenuItem x:Name="ViewerSetWallpaperItem"
+                                        Header="{x:Static services:Strings.MenuSetWallpaper}"
+                                        Click="ViewerSetWallpaper_Click"/>
+                                <Separator/>
+                                <MenuItem Header="{x:Static services:Strings.MenuCut}"
+                                        InputGestureText="Ctrl+X"
+                                        Click="CutItem_Click"/>
+                                <MenuItem Header="{x:Static services:Strings.MenuCopy}"
+                                        InputGestureText="Ctrl+C"
+                                        Click="CopyItem_Click"/>
+                                <MenuItem Header="{x:Static services:Strings.MenuRename}"
+                                        InputGestureText="F2"
+                                        Click="RenameItem_Click"/>
+                                <MenuItem Header="{x:Static services:Strings.MenuDelete}"
+                                        InputGestureText="Del"
+                                        Click="DeleteItem_Click"/>
+                                <Separator/>
+                                <MenuItem Header="{x:Static services:Strings.MenuCopyPath}"
+                                        InputGestureText="Ctrl+Shift+C"
+                                        Click="CopyPath_Click"/>
+                                <MenuItem Header="{x:Static services:Strings.MenuRevealInExplorer}"
+                                        Click="RevealInExplorer_Click"/>
+                                <MenuItem Header="{x:Static services:Strings.MenuProperties}"
+                                        Click="ShowProperties_Click"/>
+                            </ContextMenu>
+                        </Border.ContextMenu>
                         <!-- Uniform with no StretchDirection cap: the user
                              asked for no size ceiling, so a small image may
                              scale up - HighQuality keeps that acceptable. -->

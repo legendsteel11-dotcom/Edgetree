@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using SidebarExplorer.App.Native;
 
@@ -92,6 +93,47 @@ public static class ShellFileService
     {
         NativeMethods.AllowNextWindowToActivate();
         NativeMethods.TryOpenWithShellVerb(path, "properties");
+    }
+
+    // Call off the UI thread: the fallback decodes the picture at full size.
+    //
+    // The original file goes to Windows as-is first - jpg/png/bmp are taken
+    // directly, nothing is copied and the wallpaper points at the user's own
+    // file. Only when that is refused (a format WIC decodes but the wallpaper
+    // path won't take - webp/heic with the store codec, ico) the ORIGINAL is
+    // re-encoded as a PNG under %AppData%\Edgetree and Windows pointed at the
+    // copy. The original, never the panel's bitmap: the viewer decodes at
+    // panel width, and a wallpaper made from that would be soft on purpose.
+    public static bool TrySetDesktopWallpaper(string path)
+    {
+        if (NativeMethods.TrySetDesktopWallpaper(path))
+        {
+            return true;
+        }
+
+        try
+        {
+            var frame = BitmapFrame.Create(
+                new Uri(path), BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(frame);
+
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            string copy = Path.Combine(dir, "wallpaper.png");
+            using (var stream = File.Create(copy))
+            {
+                encoder.Save(stream);
+            }
+
+            return NativeMethods.TrySetDesktopWallpaper(copy);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException
+                                       or FileFormatException or ArgumentException or UriFormatException)
+        {
+            return false;
+        }
     }
 
     public static void OpenTerminal(string folderPath)

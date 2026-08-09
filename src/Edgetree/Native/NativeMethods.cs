@@ -178,6 +178,18 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
 
+    // SPIF_UPDATEINIFILE persists the change; SPIF_SENDWININICHANGE is what
+    // makes every open Explorer window repaint its desktop right away.
+    private const uint SPI_SETDESKWALLPAPER = 0x0014;
+    private const uint SPIF_UPDATEINIFILE = 0x0001;
+    private const uint SPIF_SENDWININICHANGE = 0x0002;
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, string pvParam, uint fWinIni);
+
+    public static bool TrySetDesktopWallpaper(string path)
+        => SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, path, SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint RegisterWindowMessage(string lpString);
 
