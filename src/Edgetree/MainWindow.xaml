@@ -2129,6 +2129,14 @@
              true mid-drag, and the later trigger is the one that wins. -->
         <Style x:Key="ResizeThumbStyle"
                 TargetType="Thumb">
+            <!-- Mouse-only, like every other grip and chip in this app: a
+                 Thumb takes keyboard focus by default, and dragging one left
+                 the focus sitting on a grab strip - so the arrow keys stopped
+                 reaching the tree, and hiding the strip (entering full screen)
+                 stranded the focus entirely (2026-08-09). Nothing here has a
+                 keyboard gesture to lose. -->
+            <Setter Property="Focusable"
+                    Value="False"/>
             <Setter Property="Background"
                     Value="Transparent"/>
             <Setter Property="Template">

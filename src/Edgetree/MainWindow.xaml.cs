@@ -14109,6 +14109,27 @@ public partial class MainWindow : Window
         // follows re-applies this - but not when the column was already the
         // width it wanted, so do it here too rather than depend on a resize.
         ApplyViewerZoom();
+
+        // ↑↓ walk the folder in this mode, and they only reach the tree while
+        // the tree holds keyboard focus - which it may not, since anything
+        // can have taken it before the mode was entered (an undock, a divider
+        // drag, a click on the picture). Reported as "가끔 상하키가 안 먹는다",
+        // and the tell was that it followed those gestures rather than the
+        // mode itself. Handing focus back on BOTH crossings makes the keys
+        // work the same way every time.
+        //
+        // At Input priority so it lands after the layout this method just
+        // triggered: the container being focused may only exist after it.
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input, new Action(() =>
+        {
+            if (ExplorerTree.SelectedItem is FileSystemItem selected &&
+                FindRealizedContainer(selected) is { } container)
+            {
+                container.Focus();
+                return;
+            }
+            ExplorerTree.Focus();
+        }));
     }
 
     private void ViewerImageHost_MouseDown(object sender, MouseButtonEventArgs e)
