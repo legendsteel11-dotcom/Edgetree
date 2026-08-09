@@ -322,6 +322,11 @@ public static class Strings
     public static string ColorImportFailedBody = "이 파일에는 색상이 없습니다.";
     public static string ColorThemeDarkMode = "🌙 다크 모드";
     public static string ColorThemeLightMode = "☀️ 라이트 모드";
+    public static string ButtonRandomColors = "랜덤";
+    // "되돌리기" over the more precise "랜덤 전으로", which read oddly
+    // (user, 2026-08-09); the button lives beside 랜덤, which carries the
+    // context the label dropped.
+    public static string ButtonUndoRandom = "되돌리기";
     // Plain (no emoji) versions for use inside a sentence - see
     // ColorResetConfirmBody.
     public static string ColorThemeDarkLabel = "다크 모드";
@@ -604,6 +609,8 @@ public static class Strings
         ColorImportFailedBody = "That file holds no colours.";
         ColorThemeDarkMode = "🌙 Dark Mode";
         ColorThemeLightMode = "☀️ Light Mode";
+        ButtonRandomColors = "Random";
+        ButtonUndoRandom = "Undo";
         ColorThemeDarkLabel = "Dark Mode";
         ColorThemeLightLabel = "Light Mode";
         ColorResetConfirmTitle = "Reset Colors";

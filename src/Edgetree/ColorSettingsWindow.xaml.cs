@@ -124,10 +124,15 @@ public partial class ColorSettingsWindow : Window
             RefreshHexBox(box);
         }
 
-        // Labels the mode the button will switch TO (the action), not the one
-        // currently active - "☀️ 라이트 모드" while in dark mode reads as "click
-        // to go light", which is clearer than restating the current state.
-        ThemeToggleButton.Content = _settings.IsLightMode ? Strings.ColorThemeDarkMode : Strings.ColorThemeLightMode;
+        // The active mode's own button is disabled - nothing to switch to,
+        // and the 0.4-opacity disabled look doubles as the "you are here"
+        // marker without inventing a checked style. The dice go the other
+        // way (user's call, 2026-08-09): only the theme being looked at can
+        // be rolled, so each zone has exactly one live button.
+        DarkModeButton.IsEnabled = _settings.IsLightMode;
+        LightModeButton.IsEnabled = !_settings.IsLightMode;
+        DarkRandomButton.IsEnabled = !_settings.IsLightMode;
+        LightRandomButton.IsEnabled = _settings.IsLightMode;
         RefreshLabelPreviews();
         UpdateResetButtonEnabled();
     }
@@ -312,9 +317,18 @@ public partial class ColorSettingsWindow : Window
         set { if (_settings.IsLightMode) _settings.LightAutoHideHandleColorHex = value; else _settings.AutoHideHandleColorHex = value; }
     }
 
-    private void ThemeToggle_Click(object sender, RoutedEventArgs e)
+    private void DarkMode_Click(object sender, RoutedEventArgs e) => SetThemeMode(light: false);
+
+    private void LightMode_Click(object sender, RoutedEventArgs e) => SetThemeMode(light: true);
+
+    private void SetThemeMode(bool light)
     {
-        _settings.IsLightMode = !_settings.IsLightMode;
+        if (_settings.IsLightMode == light)
+        {
+            return;
+        }
+
+        _settings.IsLightMode = light;
         RefreshSwatches();
         _onChanged();
     }
@@ -499,6 +513,225 @@ public partial class ColorSettingsWindow : Window
             _isFileDialogOpen = false;
         }
     }
+
+    // ----- 랜덤 배색 ---------------------------------------------------------
+    //
+    // One die per theme (user's design, 2026-08-09). A roll doesn't pick 16
+    // random colors - it picks 1~3 HUES and derives every slot from role
+    // rules, which is what keeps a roll wearable: surfaces are a near-neutral
+    // tint of the base hue on a brightness ladder, text is forced through a
+    // readability floor against the surface it actually sits on (4.5:1
+    // WCAG-style for names, 3:1 for the secondary "더 보기" row), and only
+    // the accent hue - selection, active guide line, highlight names - gets
+    // real saturation. Rolling again is the intended gesture; the rules only
+    // guarantee "wearable", the user's eye does the rest.
+
+    private static readonly Random PaletteRandom = new();
+
+    // Both themes' colors as they stood before the FIRST roll of this window
+    // session - 랜덤 전으로 returns to exactly that state however many rolls
+    // happened in between, and closing the window is what commits. Captured
+    // via the same reflection set export/import use, so a color added later
+    // is covered without anyone remembering this exists.
+    private Dictionary<string, string>? _preRandomSnapshot;
+
+    private void RandomDark_Click(object sender, RoutedEventArgs e) => ApplyRandomPalette(light: false);
+
+    private void RandomLight_Click(object sender, RoutedEventArgs e) => ApplyRandomPalette(light: true);
+
+    private void UndoRandom_Click(object sender, RoutedEventArgs e)
+    {
+        if (_preRandomSnapshot is null)
+        {
+            return;
+        }
+
+        ClosePicker(keep: true);
+        foreach (var property in ColorProperties())
+        {
+            if (_preRandomSnapshot.TryGetValue(property.Name, out string? hex))
+            {
+                property.SetValue(_settings, hex);
+            }
+        }
+
+        // The snapshot survives the undo: roll → undo → roll again → undo
+        // still lands on the pre-first-roll palette.
+        RefreshSwatches();
+        _onChanged();
+    }
+
+    private void ApplyRandomPalette(bool light)
+    {
+        // The inactive theme's die is disabled (see RefreshSwatches), so this
+        // guard is belt-and-braces: rolling a theme that isn't showing would
+        // write the Current* slots of the WRONG theme.
+        if (_settings.IsLightMode != light)
+        {
+            return;
+        }
+
+        ClosePicker(keep: true);
+        _preRandomSnapshot ??= ColorProperties().ToDictionary(
+            p => p.Name, p => (string?)p.GetValue(_settings) ?? string.Empty);
+        UndoRandomButton.IsEnabled = true;
+
+        var palette = GenerateRandomPalette(light, PaletteRandom);
+        CurrentBackgroundColorHex = Hex(palette.Background);
+        CurrentHeaderBackgroundColorHex = Hex(palette.Header);
+        CurrentHistoryBackgroundColorHex = Hex(palette.History);
+        CurrentViewerBackgroundColorHex = Hex(palette.Viewer);
+        CurrentHoverBackgroundColorHex = Hex(palette.Hover);
+        CurrentSelectionColorHex = Hex(palette.Selection);
+        CurrentGuideLineColorHex = Hex(palette.Guide);
+        CurrentGuideLineActiveColorHex = Hex(palette.GuideActive);
+        CurrentPanelDividerColorHex = Hex(palette.Guide);
+        CurrentFolderNameColorHex = Hex(palette.Text);
+        CurrentFileNameColorHex = Hex(palette.Text);
+        CurrentFolderNameHoverColorHex = Hex(palette.TextHover);
+        CurrentFileNameHoverColorHex = Hex(palette.TextHover);
+        CurrentFolderNameHighlightColorHex = Hex(palette.Highlight);
+        CurrentFileNameHighlightColorHex = Hex(palette.Highlight);
+        CurrentShowMoreColorHex = Hex(palette.ShowMore);
+        // The handle keeps its follow-the-background default behaviour's
+        // LOOK by simply being given the rolled background.
+        CurrentAutoHideHandleColorHex = Hex(palette.Background);
+
+        RefreshSwatches();
+        _onChanged();
+    }
+
+    private readonly record struct RandomPalette(
+        Color Background, Color Header, Color History, Color Viewer,
+        Color Hover, Color Selection, Color Guide, Color GuideActive,
+        Color Text, Color TextHover, Color Highlight, Color ShowMore);
+
+    private static RandomPalette GenerateRandomPalette(bool light, Random rng)
+    {
+        // 1~3 hues: base always; a rough complement (150~210° away) when two;
+        // an analogous neighbour (25~45°) as the third. Everything else in a
+        // roll is derived, never independently random.
+        double baseHue = rng.NextDouble() * 360;
+        int hueCount = 1 + rng.Next(3);
+        double accentHue = hueCount >= 2
+            ? Wrap(baseHue + (rng.Next(2) == 0 ? -1 : 1) * (150 + rng.NextDouble() * 60))
+            : baseHue;
+        double neighborHue = hueCount == 3
+            ? Wrap(baseHue + (rng.Next(2) == 0 ? -1 : 1) * (25 + rng.NextDouble() * 20))
+            : baseHue;
+
+        double surfaceSat = (light ? 0.02 : 0.03) + rng.NextDouble() * (light ? 0.07 : 0.10);
+        double accentSat = 0.16 + rng.NextDouble() * 0.22;
+
+        if (!light)
+        {
+            double bgVal = 0.07 + rng.NextDouble() * 0.08;
+            var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
+            var hover = FromHsv(neighborHue, Math.Min(0.22, surfaceSat + 0.06), bgVal + 0.08, 255);
+            var selection = FromHsv(accentHue, accentSat, bgVal + 0.13, 255);
+            // Text is checked against HOVER, the lightest surface a name
+            // actually sits on in the dark theme - passing there passes
+            // everywhere.
+            var text = EnsureContrast(baseHue, 0.05 + rng.NextDouble() * 0.05, 0.76, hover, 4.5, towardLight: true);
+            return new RandomPalette(
+                Background: background,
+                Header: FromHsv(baseHue, surfaceSat, bgVal + 0.025, 255),
+                History: FromHsv(baseHue, surfaceSat, bgVal + 0.015, 255),
+                Viewer: background,
+                Hover: hover,
+                Selection: selection,
+                Guide: FromHsv(baseHue, surfaceSat, bgVal + 0.10, 255),
+                GuideActive: FromHsv(accentHue, accentSat * 0.55, bgVal + 0.30, 255),
+                Text: text,
+                TextHover: Emphasize(text, towardLight: true),
+                Highlight: EnsureContrast(accentHue, accentSat * 0.45, 0.93, selection, 4.5, towardLight: true),
+                ShowMore: EnsureContrast(baseHue, 0.06, 0.60, background, 3.0, towardLight: true));
+        }
+        else
+        {
+            double bgVal = 0.95 + rng.NextDouble() * 0.04;
+            var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
+            var hover = FromHsv(neighborHue, Math.Min(0.16, surfaceSat + 0.05), bgVal - 0.07, 255);
+            var selection = FromHsv(accentHue, 0.14 + rng.NextDouble() * 0.14, 0.88, 255);
+            var text = EnsureContrast(baseHue, 0.10 + rng.NextDouble() * 0.10, 0.27, hover, 4.5, towardLight: false);
+            return new RandomPalette(
+                Background: background,
+                Header: FromHsv(baseHue, surfaceSat, bgVal - 0.035, 255),
+                History: FromHsv(baseHue, surfaceSat, bgVal - 0.02, 255),
+                Viewer: background,
+                Hover: hover,
+                Selection: selection,
+                Guide: FromHsv(baseHue, surfaceSat + 0.02, bgVal - 0.13, 255),
+                GuideActive: FromHsv(accentHue, accentSat * 0.5, bgVal - 0.38, 255),
+                Text: text,
+                TextHover: Emphasize(text, towardLight: false),
+                Highlight: EnsureContrast(accentHue, Math.Min(0.6, accentSat + 0.15), 0.22, selection, 4.5, towardLight: false),
+                ShowMore: EnsureContrast(baseHue, 0.08, 0.45, background, 3.0, towardLight: false));
+        }
+    }
+
+    // Hover names get one visible step MORE presence than resting ones
+    // (user, 2026-08-09: "hover시 텍스트가 살짝 좀 더 강조"): a 15% blend
+    // toward the theme's bright end (white in dark, black in light). A blend
+    // can only ADD contrast over the already-enforced resting text, so no
+    // re-check is needed, and it degrades gracefully when the resting text is
+    // already near the end of the range.
+    private static Color Emphasize(Color c, bool towardLight)
+    {
+        byte target = towardLight ? (byte)255 : (byte)0;
+        return Color.FromArgb(c.A, Mix(c.R), Mix(c.G), Mix(c.B));
+
+        byte Mix(byte channel) => (byte)Math.Round(channel + (target - channel) * 0.15);
+    }
+
+    private static double Wrap(double hue) => (hue % 360 + 360) % 360;
+
+    // Walks brightness toward the readable end (bleeding saturation out once
+    // brightness runs out) until the WCAG-style contrast ratio clears the
+    // target. Terminates: each step moves monotonically and both walks have
+    // hard bounds.
+    private static Color EnsureContrast(double hue, double sat, double val,
+        Color against, double target, bool towardLight)
+    {
+        var color = FromHsv(hue, sat, val, 255);
+        for (int i = 0; i < 60 && ContrastRatio(color, against) < target; i++)
+        {
+            if (towardLight ? val < 1 : val > 0)
+            {
+                val = towardLight ? Math.Min(1, val + 0.025) : Math.Max(0, val - 0.025);
+            }
+            else if (sat > 0)
+            {
+                sat = Math.Max(0, sat - 0.05);
+            }
+            else
+            {
+                break;
+            }
+            color = FromHsv(hue, sat, val, 255);
+        }
+        return color;
+    }
+
+    private static double Luminance(Color c)
+    {
+        return 0.2126 * Channel(c.R) + 0.7152 * Channel(c.G) + 0.0722 * Channel(c.B);
+
+        static double Channel(byte value)
+        {
+            double s = value / 255.0;
+            return s <= 0.03928 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4);
+        }
+    }
+
+    private static double ContrastRatio(Color a, Color b)
+    {
+        double la = Luminance(a);
+        double lb = Luminance(b);
+        return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
+    }
+
+    private static string Hex(Color c) => $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}";
 
     private void ResetDefaults_Click(object sender, RoutedEventArgs e)
     {

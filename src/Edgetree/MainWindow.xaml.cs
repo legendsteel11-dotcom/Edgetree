@@ -7160,6 +7160,11 @@ public partial class MainWindow : Window
         // Korean ones lost (2026-08-02). The user gave up the width knowingly -
         // this window is opened rarely and read carefully.
         appResources["DialogWidth"] = Math.Round(330.0 * scale);
+        // The colour window alone outgrew the shared width when its top
+        // gained the two theme zones with dice and its bottom row a fourth
+        // button - 랜덤 전으로 was clipping at 330 (user, 2026-08-09, with
+        // the widening their own suggestion). The other dialogs stay at 330.
+        appResources["ColorDialogWidth"] = Math.Round(390.0 * scale);
         // The colour window's hex box and the line under it. Wide enough for
         // "#RRGGBB" with room to spare, and the hint a step smaller - set apart
         // by size, never by fading.

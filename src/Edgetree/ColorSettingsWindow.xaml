@@ -4,7 +4,7 @@
         xmlns:services="clr-namespace:SidebarExplorer.App.Services"
         Title="{x:Static services:Strings.ColorSettingsTitle}"
         SizeToContent="Height"
-        Width="{DynamicResource DialogWidth}"
+        Width="{DynamicResource ColorDialogWidth}"
         WindowStartupLocation="Manual"
         ResizeMode="NoResize"
         WindowStyle="None"
@@ -225,14 +225,48 @@
                 </Button>
             </Grid>
 
-            <!-- Content text (dark/light label) set in code-behind - it names
-                 the mode this button will switch TO, not the current one (see
-                 RefreshSwatches). -->
-            <Button x:Name="ThemeToggleButton"
-                    Grid.Row="1"
-                    Style="{StaticResource DialogButtonStyle}"
-                    Margin="16,12,16,0"
-                    Click="ThemeToggle_Click"/>
+            <!-- The top splits into a dark zone and a light zone (the user's
+                 own design, 2026-08-09), replacing the single toggle that
+                 named the mode it would switch TO. Each zone names its own
+                 mode - the active one is disabled, which is also what marks
+                 it as "you are here" - and carries its own 랜덤 die at its
+                 right. The die rolls only the theme being LOOKED AT (the
+                 user's call): the inactive zone's die is disabled with it,
+                 so each zone always has exactly one live button - switch
+                 there, or roll here. -->
+            <Grid Grid.Row="1"
+                    Margin="16,12,16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="DarkModeButton"
+                        Content="{x:Static services:Strings.ColorThemeDarkMode}"
+                        Style="{StaticResource DialogButtonStyle}"
+                        Click="DarkMode_Click"/>
+                <Button x:Name="DarkRandomButton"
+                        Grid.Column="1"
+                        Content="{x:Static services:Strings.ButtonRandomColors}"
+                        Style="{StaticResource DialogButtonStyle}"
+                        Padding="10,0"
+                        Margin="4,0,0,0"
+                        Click="RandomDark_Click"/>
+                <Button x:Name="LightModeButton"
+                        Grid.Column="3"
+                        Content="{x:Static services:Strings.ColorThemeLightMode}"
+                        Style="{StaticResource DialogButtonStyle}"
+                        Click="LightMode_Click"/>
+                <Button x:Name="LightRandomButton"
+                        Grid.Column="4"
+                        Content="{x:Static services:Strings.ButtonRandomColors}"
+                        Style="{StaticResource DialogButtonStyle}"
+                        Padding="10,0"
+                        Margin="4,0,0,0"
+                        Click="RandomLight_Click"/>
+            </Grid>
 
             <Grid Grid.Row="2"
                     Margin="16">
@@ -601,6 +635,19 @@
                                 Padding="10,0"
                                 Margin="6,0,0,0"
                                 Click="ImportColors_Click"/>
+                        <!-- Alive only after a 랜덤 roll, and it returns BOTH
+                             themes to what they were before the FIRST roll of
+                             this window session - closing the window is what
+                             commits a roll. Stands with the other
+                             whole-palette actions for the same reason they
+                             stand together. -->
+                        <Button x:Name="UndoRandomButton"
+                                Content="{x:Static services:Strings.ButtonUndoRandom}"
+                                Style="{StaticResource DialogButtonStyle}"
+                                Padding="10,0"
+                                Margin="6,0,0,0"
+                                IsEnabled="False"
+                                Click="UndoRandom_Click"/>
                     </StackPanel>
                     <!-- No 닫기 here. The title bar already carries an X, and a
                          second way out was crowding the three buttons that do
