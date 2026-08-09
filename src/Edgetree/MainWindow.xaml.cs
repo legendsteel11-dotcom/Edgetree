@@ -1082,8 +1082,15 @@ public partial class MainWindow : Window
         // in the system photo app by keyboard, while that same image is
         // already on screen here. Double-click and the row menu's 열기 both
         // still do it.
+        //
+        // "A decoded picture" is _viewerShowingDecodedImage, not merely a
+        // Source: a video's or a PSD's SHELL PREVIEW rides in the same Image
+        // element, and testing the Source alone stole Enter from those rows
+        // too - pressing it toggled a fullscreen still frame instead of
+        // playing the file (2026-08-09 review).
         if (_viewerOpen &&
             _viewerPixelWidth > 0 &&
+            _viewerShowingDecodedImage &&
             ViewerImage.Source is not null &&
             Keyboard.Modifiers == ModifierKeys.None &&
             e.Key is Key.Enter or Key.Return &&
@@ -13874,8 +13881,10 @@ public partial class MainWindow : Window
             }
         }
 
+        // ApplyViewerZoom is the funnel and asks for the full-resolution pass
+        // itself - this used to call it again right here, from before that
+        // move, which ran the whole guard chain twice per notch.
         ApplyViewerZoom();
-        RequestViewerFullResolution();
     }
 
     // One rung of the ladder, with fit as the floor: stepping down past the
@@ -13943,7 +13952,31 @@ public partial class MainWindow : Window
         }
 
         _viewerFullResPending = true;
-        Task.Run(() => LoadViewerImage(path, int.MaxValue, fullResolution: true));
+        // SAFETY DEVICE: the flag is normally cleared inside LoadViewerImage's
+        // own dispatcher callback - but that callback never runs at all if the
+        // decode dies from something the loader's catch filter doesn't name.
+        // This pass decodes with NO DecodePixelWidth, so OutOfMemoryException
+        // on a huge picture is the realistic one. The flag would then stay
+        // true for the rest of the session and every later picture would
+        // silently stop asking for its sharp decode. What this hides: any
+        // failure of the full-resolution pass other than the ones the loader
+        // handles - the picture on screen stays the good one either way
+        // (2026-08-09 review).
+        Task.Run(() =>
+        {
+            try
+            {
+                LoadViewerImage(path, int.MaxValue, fullResolution: true);
+            }
+            catch (Exception ex) when (ex is OutOfMemoryException
+                                           or System.Runtime.InteropServices.COMException)
+            {
+            }
+            finally
+            {
+                Dispatcher.BeginInvoke(() => _viewerFullResPending = false);
+            }
+        });
     }
 
     private void ViewerImageHost_MouseWheel(object sender, MouseWheelEventArgs e)
