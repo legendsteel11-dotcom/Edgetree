@@ -4867,9 +4867,13 @@
                          so the host stays a Border with one child and its clip
                          is untouched; it sizes itself to the picture's aspect
                          in code.
-                         IsHitTestVisible=False on purpose - read-only for now,
-                         and without it the corner it sits in would be a dead
-                         patch where the pan drag stops working.
+                         The plate is a MAP now, not read-only (user,
+                         2026-08-09 - they kept grabbing the white box and
+                         getting a whole-image pan instead): press anywhere on
+                         it and the view centres there, then follows the drag.
+                         It only shows while a pan is possible, so it is never
+                         an inert click target; a pan drag that STARTED on the
+                         picture keeps its capture and never lands here.
                          Fixed colours, the one place in this app that ignores
                          the theme: what shows through behind it is the PHOTO,
                          so a light-theme plate would vanish on a bright image
@@ -4882,7 +4886,11 @@
                             VerticalAlignment="Bottom"
                             Margin="0,0,10,10"
                             Visibility="Collapsed"
-                            IsHitTestVisible="False"
+                            Cursor="SizeAll"
+                            MouseLeftButtonDown="ViewerNavigatorPlate_MouseLeftButtonDown"
+                            MouseMove="ViewerNavigatorPlate_MouseMove"
+                            MouseLeftButtonUp="ViewerNavigatorPlate_MouseLeftButtonUp"
+                            LostMouseCapture="ViewerNavigatorPlate_LostMouseCapture"
                             Background="#CC181818"
                             BorderBrush="#59FFFFFF"
                             BorderThickness="1"

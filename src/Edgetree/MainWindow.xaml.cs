@@ -13744,6 +13744,79 @@ public partial class MainWindow : Window
         UpdateViewerNavigator();
     }
 
+    // The navigator as a MAP (user, 2026-08-09: they kept grabbing the white
+    // box and getting a whole-image pan): press anywhere on the plate and
+    // the view CENTRES on that point, then follows the drag - absolute per
+    // event, never accumulated, for the pan drag's own reason. The
+    // arithmetic is UpdateViewerNavigator's run backwards, and collapses
+    // nicely: centring the viewport on image point c makes the pan simply
+    // (pixelCentre − c) · displayScale, with the standing clamp doing the
+    // rest. Per frame this is two doubles, a clamp, and the navigator's own
+    // transform update - the same bill as a picture pan frame.
+    private bool _viewerNavigatorDragging;
+
+    private void ViewerNavigatorPlate_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!ViewerCanPan)
+        {
+            return;
+        }
+
+        _viewerNavigatorDragging = true;
+        ViewerNavigatorPlate.CaptureMouse();
+        CenterViewerOnNavigatorPoint(e.GetPosition(ViewerNavigatorPlate));
+        e.Handled = true;
+    }
+
+    private void ViewerNavigatorPlate_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_viewerNavigatorDragging)
+        {
+            return;
+        }
+
+        CenterViewerOnNavigatorPoint(e.GetPosition(ViewerNavigatorPlate));
+    }
+
+    private void ViewerNavigatorPlate_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_viewerNavigatorDragging)
+        {
+            return;
+        }
+
+        _viewerNavigatorDragging = false;
+        ViewerNavigatorPlate.ReleaseMouseCapture();
+    }
+
+    // SAFETY DEVICE, the pan's own mirrored here: capture can end without a
+    // mouse-up (another window, the stuck-capture watchdog), and the flag
+    // surviving that would glue the view to every bare mouse move over the
+    // plate. What it hides: any path that ends this drag other than the
+    // user letting go.
+    private void ViewerNavigatorPlate_LostMouseCapture(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        _viewerNavigatorDragging = false;
+    }
+
+    private void CenterViewerOnNavigatorPoint(System.Windows.Point platePoint)
+    {
+        double plateWidth = ViewerNavigatorPlate.ActualWidth;
+        if (plateWidth <= 0 || _viewerPixelWidth <= 0)
+        {
+            return;
+        }
+
+        // One scale for both axes, exactly as UpdateViewerNavigator maps -
+        // mixing per-axis scales here would disagree with the box it draws.
+        double mapScale = plateWidth / _viewerPixelWidth;
+        double display = ViewerDisplayScale;
+        ViewerZoomPan.X = (_viewerPixelWidth / 2.0 - platePoint.X / mapScale) * display;
+        ViewerZoomPan.Y = (_viewerPixelHeight / 2.0 - platePoint.Y / mapScale) * display;
+        ClampViewerPan();
+        UpdateViewerNavigator();
+    }
+
     // zoom == null means fit. The anchor is a point in the host's coordinates
     // that should keep showing the same pixel of the picture across the change
     // - the cursor for a wheel turn, nothing for a button (which zooms about
