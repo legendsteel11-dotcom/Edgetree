@@ -14745,8 +14745,10 @@ public partial class MainWindow : Window
 
                 // The ORIGINAL dimensions when the header could be read (see
                 // the service); for a PSD or an SVG it can't, and printing the
-                // thumbnail's size there would be a plain lie.
-                SetViewerFileInfo(path, pixelWidth, pixelHeight);
+                // thumbnail's size there would be a plain lie. The shell's own
+                // property store fills in what it knows on top - a video's
+                // duration and true frame size.
+                SetViewerFileInfo(path, pixelWidth, pixelHeight, withMediaInfo: true);
                 return;
             }
 
@@ -14782,7 +14784,15 @@ public partial class MainWindow : Window
 
     // Size · date, with the pixel dimensions in front when they are actually
     // known. Files get size · date; a folder just its date.
-    private void SetViewerFileInfo(string path, int pixelWidth, int pixelHeight)
+    //
+    // withMediaInfo asks the shell's property store for a duration and frame
+    // size afterwards, on a background hop. Only the shell-PREVIEW branch
+    // passes it: that is where a video lands, and it is the one case where
+    // the panel knows the file is something more than the picture it drew -
+    // showing a 2-hour film as a single frame with nothing but a file size
+    // said less than the panel actually knew (2026-08-09). A folder or a .txt
+    // has nothing to answer with, so they don't pay for the call.
+    private void SetViewerFileInfo(string path, int pixelWidth, int pixelHeight, bool withMediaInfo = false)
     {
         try
         {
@@ -14794,12 +14804,45 @@ public partial class MainWindow : Window
             ViewerFileInfo.Text = pixelWidth > 0 && pixelHeight > 0
                 ? $"{pixelWidth} × {pixelHeight}  ·  {body}"
                 : body;
+
+            if (!withMediaInfo)
+            {
+                return;
+            }
+
+            ShellMediaInfoService.GetAsync(path, media =>
+            {
+                if (media.IsEmpty ||
+                    !_viewerOpen ||
+                    !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                // The property store's frame size beats the thumbnail's own -
+                // the thumbnail is a scaled still, so its pixels are never the
+                // video's. Duration sits between size and file size, which is
+                // the order every player's own info line uses.
+                string head = media.HasFrameSize
+                    ? $"{media.Width} × {media.Height}"
+                    : pixelWidth > 0 && pixelHeight > 0 ? $"{pixelWidth} × {pixelHeight}" : string.Empty;
+                string duration = media.Duration is { } span ? FormatDuration(span) : string.Empty;
+
+                ViewerFileInfo.Text = string.Join("  ·  ",
+                    new[] { head, duration, body }.Where(part => part.Length > 0));
+            });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
             ViewerFileInfo.Text = string.Empty;
         }
     }
+
+    // h:mm:ss once there is an hour to show, m:ss below that - what a player's
+    // own readout does, and what the file's length is actually compared against.
+    private static string FormatDuration(TimeSpan span) => span.TotalHours >= 1
+        ? $"{(int)span.TotalHours}:{span.Minutes:00}:{span.Seconds:00}"
+        : $"{span.Minutes}:{span.Seconds:00}";
 
     // ===================================================================
     // File search (Ctrl+F view). Phase 1: one folder scope, an in-memory,
