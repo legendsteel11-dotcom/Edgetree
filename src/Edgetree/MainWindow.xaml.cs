@@ -6420,6 +6420,23 @@ public partial class MainWindow : Window
         }
     }
 
+    // The recovery lever: when something feels off - and the fault may be
+    // another program's, not ours (the user's own framing, 2026-08-09) - one
+    // click brings the app back clean. Same restart the language change
+    // performs, minus its prompt: clicking 다시 시작 IS the intent. State is
+    // flushed first (SaveCurrentWidth also persists expanded folders,
+    // selection and the settings file) for the same reason the language path
+    // saves eagerly - the new instance starts reading the file immediately,
+    // possibly before the old instance's normal on-close flush would have
+    // run.
+    private void RestartMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        SaveCurrentWidth();
+        ExitLog.Record("restart requested by the user (restart menu)");
+        System.Diagnostics.Process.Start(Environment.ProcessPath!);
+        Application.Current.Shutdown();
+    }
+
     private void IconStyleMenuItem_Click(object sender, RoutedEventArgs e)
     {
         bool useShellIcons = sender is MenuItem { Tag: "shell" };

@@ -126,6 +126,10 @@ public static class Strings
     // stated somewhere the hand is already resting, or it may as well not exist.
     public static string ColorSwatchTooltip = "클릭: 색 선택기 · 우클릭: 색상 코드 입력";
     public static string ColorHexInputHint = "#RRGGBB · Enter 적용, Esc 취소";
+    // The recovery lever for "뭔가 이상하다" - the user's own framing: the
+    // fault may not even be this app's (another program fighting over the
+    // same edge/hooks), and a restart clears both kinds at once.
+    public static string MenuRestart = "다시 시작";
     public static string MenuAbout = "앱 정보";
 
     // Fixed, deliberately not switched by Initialize() below - shown the same
@@ -491,6 +495,7 @@ public static class Strings
         MenuColorSettings = "Color Settings";
         ColorSwatchTooltip = "Click: color picker · Right-click: enter a color code";
         ColorHexInputHint = "#RRGGBB · Enter to apply, Esc to cancel";
+        MenuRestart = "Restart";
         MenuAbout = "About";
         MenuIconStyle = "Icon Style";
         MenuIconStyleDefault = "Default";

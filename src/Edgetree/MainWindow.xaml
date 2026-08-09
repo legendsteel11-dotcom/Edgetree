@@ -1785,6 +1785,14 @@
             <MenuItem Header="{x:Static services:Strings.MenuResetSettings}"
                     Click="ResetSettingsMenuItem_Click"/>
             <Separator/>
+            <!-- The recovery lever (user, 2026-08-09): when something feels
+                 off - possibly another program fighting this one, not even
+                 our fault - a restart clears it without hunting the tray
+                 icon or changing the language just to reach one. No
+                 confirmation: clicking it IS the intent, and the app is
+                 back in a second. -->
+            <MenuItem Header="{x:Static services:Strings.MenuRestart}"
+                    Click="RestartMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuAbout}"
                     Click="AboutMenuItem_Click"/>
         </ContextMenu>
