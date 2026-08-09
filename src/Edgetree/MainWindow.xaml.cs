@@ -13082,24 +13082,40 @@ public partial class MainWindow : Window
             var fileInfo = new FileInfo(path);
             fileLength = fileInfo.Length;
             modified = fileInfo.LastWriteTime;
+
+            // ONE open for both the header and the decode: rewind the same
+            // stream rather than handing the decoder a Uri, which opened the
+            // file a second time (two open/read passes per picture, and the
+            // browsing hot path pays it on every arrow key - worst on a NAS).
+            //
+            // The Uri also had to be right, and a path is not a URL: a file
+            // named "photo#1.jpg" was cut off at the '#' and one named
+            // "a%20b.png" went looking for "a b.png", so a perfectly good
+            // picture failed to decode and fell back to its file-type icon
+            // with nothing said (2026-08-09 review). A stream has no such
+            // grammar. The GIF path already read its bytes this way.
+            //
+            // CacheOption.OnLoad is what makes closing the stream right after
+            // EndInit safe - the pixels are already in the bitmap.
             using (var stream = File.OpenRead(path))
             {
                 var frame = BitmapDecoder.Create(stream,
                     BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0];
                 pixelWidth = frame.PixelWidth;
                 pixelHeight = frame.PixelHeight;
-            }
 
-            bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.UriSource = new Uri(path);
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            if (pixelWidth > decodeWidth)
-            {
-                bitmap.DecodePixelWidth = decodeWidth;
+                stream.Position = 0;
+                bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.StreamSource = stream;
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                if (pixelWidth > decodeWidth)
+                {
+                    bitmap.DecodePixelWidth = decodeWidth;
+                }
+                bitmap.EndInit();
+                bitmap.Freeze();
             }
-            bitmap.EndInit();
-            bitmap.Freeze();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException
                                        or FileFormatException or ArgumentException or UriFormatException)
