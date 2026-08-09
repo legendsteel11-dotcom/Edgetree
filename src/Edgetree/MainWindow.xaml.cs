@@ -9261,6 +9261,33 @@ public partial class MainWindow : Window
         }
     }
 
+    // The empty-space menu's 새로고침: the GLOBAL one, drive list included (a
+    // plugged USB stick is exactly the kind of change you reach for a global
+    // refresh over). Heaviest operation in the app, which is fine for an
+    // explicit click.
+    //
+    // The viewport is put back by OFFSET, not left to the selection restore:
+    // reloadRoots replaces the root instances, which throws the scroll state
+    // away outright, and the selection reveal walk then parks the selected
+    // row at the viewport's bottom edge - reported as the whole tree
+    // "jumping to the bottom" on every refresh (2026-08-09). The tree
+    // scrolls in pixels (ScrollUnit="Pixel"), so the saved offset is exact;
+    // ContextIdle runs only after the reveal walk's Background-priority
+    // chain has fully drained, so nothing scrolls after the restore.
+    private void RefreshAll_Click(object sender, RoutedEventArgs e)
+    {
+        var scrollViewer = FindTreeScrollViewer();
+        double offset = scrollViewer?.VerticalOffset ?? 0;
+
+        RefreshAllLoadedFolders(pinSelectionToTop: false, reloadRoots: true);
+
+        if (scrollViewer is not null)
+        {
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle,
+                new Action(() => scrollViewer.ScrollToVerticalOffset(offset)));
+        }
+    }
+
     // One recursive FileSystemWatcher per drive root, covering the whole
     // drive regardless of expand state - see _driveWatchers' own comment for
     // why this replaced one-watcher-per-expanded-folder. Started once at

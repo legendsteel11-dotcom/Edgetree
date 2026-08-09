@@ -865,6 +865,14 @@
                 Opened="AnyMenu_Opened"
                 Closed="AnyMenu_Closed"
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
+            <!-- The GLOBAL refresh - drive list plus every loaded folder -
+                 which had no mouse path at all (user request 2026-08-09):
+                 the row menu's 새로고침 needs a row and reads only that
+                 folder. Explorer's empty-space menu leads with refresh too.
+                 No F5 gesture text on purpose - F5 is the row refresh. -->
+            <MenuItem Header="{x:Static services:Strings.MenuRefresh}"
+                    Click="RefreshAll_Click"/>
+            <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuNewFolder}"
                     InputGestureText="F7"
                     Click="NewFolder_Click"/>
