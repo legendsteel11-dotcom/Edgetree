@@ -13660,8 +13660,17 @@ public partial class MainWindow : Window
     // right beside a 900px panel doesn't become a postage stamp once the
     // viewer has the whole 4K screen (user, 2026-08-08). The ceiling is what
     // keeps "bigger screen" from turning into "map instead of picture".
+    // The FLOOR is relative too: a fixed 56px left a postage stamp exactly
+    // where precision is scarcest, the small panel (user, 2026-08-09) - so
+    // small panels floor at MinSideShare of the shorter side, capped at
+    // MinSide. Note `side` is the plate's LONGER edge: a wide picture's
+    // plate height is this divided by the aspect again, which is why the
+    // first bump (120) still read "아까랑 비슷한데요" on a 16:9 image - the
+    // floor has to be generous to survive that division. The 0.22 ratio
+    // takes over past ~773px; large panels are unchanged.
     private const double ViewerNavigatorSideRatio = 0.22;
-    private const double ViewerNavigatorMinSide = 56;
+    private const double ViewerNavigatorMinSide = 170;
+    private const double ViewerNavigatorMinSideShare = 0.45;
     private const double ViewerNavigatorMaxSide = 280;
 
     // The whole picture, small, with a box around the part the panel is
@@ -13688,10 +13697,11 @@ public partial class MainWindow : Window
             ViewerNavigatorImage.Source = ViewerImage.Source;
         }
 
+        double shorter = Math.Min(ViewerImageHost.ActualWidth, ViewerImageHost.ActualHeight);
         double side = Math.Clamp(
-            Math.Min(ViewerImageHost.ActualWidth, ViewerImageHost.ActualHeight)
-                * ViewerNavigatorSideRatio,
-            ViewerNavigatorMinSide, ViewerNavigatorMaxSide);
+            shorter * ViewerNavigatorSideRatio,
+            Math.Min(shorter * ViewerNavigatorMinSideShare, ViewerNavigatorMinSide),
+            ViewerNavigatorMaxSide);
         double plateWidth, plateHeight;
         if (_viewerPixelWidth >= _viewerPixelHeight)
         {
@@ -13708,8 +13718,15 @@ public partial class MainWindow : Window
         ViewerNavigatorPlate.Height = plateHeight;
         ViewerNavigatorPlate.Visibility = Visibility.Visible;
 
+        // The plate's 1px border sits OUTSIDE the content the box lives in,
+        // so every map computation runs on the inner size - mapping against
+        // the outer one pushed the box past the right/bottom edge by the
+        // border's width (user, 2026-08-09: "살짝 벗어나네요").
+        double innerWidth = Math.Max(1, plateWidth - 2);
+        double innerHeight = Math.Max(1, plateHeight - 2);
+
         double display = ViewerDisplayScale;
-        double mapScale = plateWidth / _viewerPixelWidth;
+        double mapScale = innerWidth / _viewerPixelWidth;
         double visibleWidth = ViewerImageHost.ActualWidth / display;
         double visibleHeight = ViewerImageHost.ActualHeight / display;
         // Pan moves the picture, so the viewport travels the other way.
@@ -13718,8 +13735,8 @@ public partial class MainWindow : Window
         double visibleTop =
             _viewerPixelHeight / 2.0 - (ViewerZoomPan.Y + ViewerImageHost.ActualHeight / 2) / display;
 
-        double boxWidth = Math.Min(plateWidth, visibleWidth * mapScale);
-        double boxHeight = Math.Min(plateHeight, visibleHeight * mapScale);
+        double boxWidth = Math.Min(innerWidth, visibleWidth * mapScale);
+        double boxHeight = Math.Min(innerHeight, visibleHeight * mapScale);
 
         // NaN on the first pass, and every comparison against NaN is false -
         // so ask about NaN explicitly or the box never gets its first size.
@@ -13732,9 +13749,16 @@ public partial class MainWindow : Window
         }
 
         ViewerNavigatorBoxOffset.X = Math.Clamp(
-            visibleLeft * mapScale, 0, Math.Max(0, plateWidth - boxWidth));
+            visibleLeft * mapScale, 0, Math.Max(0, innerWidth - boxWidth));
         ViewerNavigatorBoxOffset.Y = Math.Clamp(
-            visibleTop * mapScale, 0, Math.Max(0, plateHeight - boxHeight));
+            visibleTop * mapScale, 0, Math.Max(0, innerHeight - boxHeight));
+
+        // The scrim darkens everything BUT the box - same numbers, so the
+        // hole and the border always agree. Geometry Rect writes are
+        // render-only, the same per-frame bill as the transform above.
+        ViewerNavigatorScrimOuter.Rect = new Rect(0, 0, innerWidth, innerHeight);
+        ViewerNavigatorScrimHole.Rect = new Rect(
+            ViewerNavigatorBoxOffset.X, ViewerNavigatorBoxOffset.Y, boxWidth, boxHeight);
     }
 
     private void ViewerNavigatorChip_Click(object sender, RoutedEventArgs e)
@@ -13801,18 +13825,20 @@ public partial class MainWindow : Window
 
     private void CenterViewerOnNavigatorPoint(System.Windows.Point platePoint)
     {
-        double plateWidth = ViewerNavigatorPlate.ActualWidth;
-        if (plateWidth <= 0 || _viewerPixelWidth <= 0)
+        // Inner size and a 1px inset, exactly as UpdateViewerNavigator maps -
+        // the plate's border is outside the content, and one scale serves
+        // both axes; disagreeing with the drawn box on either would make the
+        // drag drift off the cursor.
+        double innerWidth = ViewerNavigatorPlate.ActualWidth - 2;
+        if (innerWidth <= 0 || _viewerPixelWidth <= 0)
         {
             return;
         }
 
-        // One scale for both axes, exactly as UpdateViewerNavigator maps -
-        // mixing per-axis scales here would disagree with the box it draws.
-        double mapScale = plateWidth / _viewerPixelWidth;
+        double mapScale = innerWidth / _viewerPixelWidth;
         double display = ViewerDisplayScale;
-        ViewerZoomPan.X = (_viewerPixelWidth / 2.0 - platePoint.X / mapScale) * display;
-        ViewerZoomPan.Y = (_viewerPixelHeight / 2.0 - platePoint.Y / mapScale) * display;
+        ViewerZoomPan.X = (_viewerPixelWidth / 2.0 - (platePoint.X - 1) / mapScale) * display;
+        ViewerZoomPan.Y = (_viewerPixelHeight / 2.0 - (platePoint.Y - 1) / mapScale) * display;
         ClampViewerPan();
         UpdateViewerNavigator();
     }

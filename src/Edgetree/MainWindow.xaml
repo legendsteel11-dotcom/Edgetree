@@ -4877,9 +4877,9 @@
                          Fixed colours, the one place in this app that ignores
                          the theme: what shows through behind it is the PHOTO,
                          so a light-theme plate would vanish on a bright image
-                         and a dark one on a dark image. The dimmed thumbnail
-                         under a white box is what keeps the box readable over
-                         any picture. -->
+                         and a dark one on a dark image. The dark scrim over
+                         everything OUTSIDE the box is what keeps the box
+                         readable over any picture. -->
                     <Border x:Name="ViewerNavigatorPlate"
                             Grid.Row="0"
                             HorizontalAlignment="Right"
@@ -4896,21 +4896,44 @@
                             BorderThickness="1"
                             SnapsToDevicePixels="True">
                         <Grid>
+                            <!-- Full strength, dimmed by the SCRIM below and
+                                 only OUTSIDE the box - the first design
+                                 dimmed the whole thumbnail and brightened
+                                 the box's fill, and the user asked for the
+                                 inverse (2026-08-09): the part you are
+                                 looking at stays true, the rest steps back. -->
                             <Image x:Name="ViewerNavigatorImage"
                                     Stretch="Fill"
-                                    Opacity="0.65"
                                     RenderOptions.BitmapScalingMode="LowQuality"/>
+                            <!-- A dark plate with a hole where the box is.
+                                 Geometry Rects are render-only updates, so
+                                 tracking the pan frame by frame costs the
+                                 same as the box's own transform. -->
+                            <Path Fill="#59000000">
+                                <Path.Data>
+                                    <CombinedGeometry GeometryCombineMode="Exclude">
+                                        <CombinedGeometry.Geometry1>
+                                            <RectangleGeometry x:Name="ViewerNavigatorScrimOuter"/>
+                                        </CombinedGeometry.Geometry1>
+                                        <CombinedGeometry.Geometry2>
+                                            <RectangleGeometry x:Name="ViewerNavigatorScrimHole"/>
+                                        </CombinedGeometry.Geometry2>
+                                    </CombinedGeometry>
+                                </Path.Data>
+                            </Path>
                             <!-- Moved by a TranslateTransform, never by Margin:
                                  this box tracks the pan drag frame by frame,
                                  and a margin would run a layout pass on each
                                  one. Width/Height do change on a zoom STEP,
-                                 which is once per notch, not once per frame. -->
+                                 which is once per notch, not once per frame.
+                                 No fill of its own any more - the clear
+                                 window through the scrim IS the fill. -->
                             <Border x:Name="ViewerNavigatorBox"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top"
                                     BorderBrush="#FFFFFFFF"
                                     BorderThickness="1"
-                                    Background="#26FFFFFF"
+                                    Background="Transparent"
                                     SnapsToDevicePixels="True">
                                 <Border.RenderTransform>
                                     <TranslateTransform x:Name="ViewerNavigatorBoxOffset"/>
