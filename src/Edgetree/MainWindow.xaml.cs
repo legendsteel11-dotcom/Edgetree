@@ -6288,7 +6288,18 @@ public partial class MainWindow : Window
     // bring (user, 2026-08-06 - the two lines were touching). It goes on their
     // TOP, so the panel's own bottom margin still holds the strip off the
     // window's edge and the air above and below comes out even.
-    private const double FooterChipRowGap = 2;
+    //
+    // ONE number for both axes: the air beside a chip and the air above it are
+    // the same air, and a strip whose two gaps disagree reads as a grid that
+    // slipped. It is also why the margin is built HERE instead of arriving as
+    // an argument - three call sites each writing their own Thickness is how
+    // the custom-extension chip came to be the only one in the strip with no
+    // row gap at all, sitting 2px above the two chips beside it whenever the
+    // line wrapped (user, with a screenshot, 2026-08-10).
+    private const double FooterChipGap = 2;
+
+    private static readonly Thickness FooterChipMargin =
+        new(0, FooterChipGap, FooterChipGap, 0);
 
     private void BuildFooterFilterChips()
     {
@@ -6314,8 +6325,7 @@ public partial class MainWindow : Window
         {
             AddFooterFilterChip(
                 category == FileTypeFilter.Executable ? Strings.FilterChipExecutable : label(),
-                category,
-                new Thickness(0, FooterChipRowGap, 2, 0));
+                category);
         }
 
         // Last, and only once it holds something. It carries the extensions
@@ -6330,7 +6340,6 @@ public partial class MainWindow : Window
             AddFooterFilterChip(
                 Shorten(described, 14),
                 FileTypeFilter.Custom,
-                new Thickness(0, 0, 2, 0),
                 described);
         }
 
@@ -6356,7 +6365,7 @@ public partial class MainWindow : Window
             Content = label,
             Tag = FileFilterExcludeTag,
             Style = (Style)FindResource("FooterExcludeChipStyle"),
-            Margin = new Thickness(0, FooterChipRowGap, 2, 0),
+            Margin = FooterChipMargin,
             ToolTip = tooltip,
         };
 
@@ -6390,14 +6399,14 @@ public partial class MainWindow : Window
         BuildFooterFilterChips();
     }
 
-    private void AddFooterFilterChip(string label, string category, Thickness margin, string? tooltip = null)
+    private void AddFooterFilterChip(string label, string category, string? tooltip = null)
     {
         var chip = new ToggleButton
         {
             Content = label,
             Tag = category,
             Style = (Style)FindResource("FooterFilterChipStyle"),
-            Margin = margin,
+            Margin = FooterChipMargin,
             ToolTip = tooltip,
         };
 
