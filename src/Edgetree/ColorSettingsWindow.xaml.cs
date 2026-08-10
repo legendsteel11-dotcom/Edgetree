@@ -593,9 +593,9 @@ public partial class ColorSettingsWindow : Window
         CurrentFolderNameHighlightColorHex = Hex(palette.Highlight);
         CurrentFileNameHighlightColorHex = Hex(palette.Highlight);
         CurrentShowMoreColorHex = Hex(palette.ShowMore);
-        // The handle keeps its follow-the-background default behaviour's
-        // LOOK by simply being given the rolled background.
-        CurrentAutoHideHandleColorHex = Hex(palette.Background);
+        // The handle is the roll's one loud voice - see RollHandle for why it
+        // is no longer just the rolled background.
+        CurrentAutoHideHandleColorHex = Hex(palette.Handle);
 
         RefreshSwatches();
         _onChanged();
@@ -604,7 +604,8 @@ public partial class ColorSettingsWindow : Window
     private readonly record struct RandomPalette(
         Color Background, Color Header, Color History, Color Viewer,
         Color Hover, Color Selection, Color Guide, Color GuideActive,
-        Color Text, Color TextHover, Color Highlight, Color ShowMore);
+        Color Text, Color TextHover, Color Highlight, Color ShowMore,
+        Color Handle);
 
     private static RandomPalette GenerateRandomPalette(bool light, Random rng)
     {
@@ -637,10 +638,18 @@ public partial class ColorSettingsWindow : Window
 
         if (!light)
         {
-            double bgVal = 0.07 + rng.NextDouble() * 0.08;
+            // 0.07~0.15 -> 0.05~0.11 (user, 2026-08-10). Dark rolls were
+            // landing at the pale end of dark and reading as charcoal rather
+            // than as a dark theme. Everything else on this branch is derived
+            // from bgVal by fixed offsets, so the surfaces keep their
+            // relationships to each other and only the ground moves down.
+            double bgVal = 0.05 + rng.NextDouble() * 0.06;
             var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
             var hover = FromHsv(neighborHue, Math.Min(bold ? 0.30 : 0.22, surfaceSat + 0.06), bgVal + 0.08, 255);
-            var selection = FromHsv(accentHue, accentSat, bgVal + 0.13, 255);
+            // A step up in both saturation and brightness (user: "선택박스를
+            // 살짝 강하게"). Capped so a bold roll's already-high accent
+            // saturation can't be multiplied into a shout.
+            var selection = FromHsv(accentHue, Math.Min(0.72, accentSat * 1.18), bgVal + 0.17, 255);
             // Text is checked against HOVER, the lightest surface a name
             // actually sits on in the dark theme - passing there passes
             // everywhere.
@@ -656,16 +665,22 @@ public partial class ColorSettingsWindow : Window
                 GuideActive: FromHsv(accentHue, accentSat * 0.55, bgVal + 0.30, 255),
                 Text: text,
                 TextHover: Emphasize(text, towardLight: true),
-                Highlight: EnsureContrast(accentHue, accentSat * 0.45, 0.93, selection, 4.5, towardLight: true),
-                ShowMore: EnsureContrast(baseHue, 0.06, 0.60, background, 3.0, towardLight: true));
+                // Raised with the selection it sits on, so the pair moves
+                // together rather than the box getting stronger under a name
+                // that stayed where it was ("맞춰서 살짝 강하게").
+                Highlight: EnsureContrast(accentHue, accentSat * 0.5, 0.96, selection, 5.0, towardLight: true),
+                ShowMore: EnsureContrast(baseHue, 0.06, 0.60, background, 3.0, towardLight: true),
+                Handle: RollHandle(accentHue, accentSat, background, rng, towardLight: true));
         }
         else
         {
             double bgVal = 0.95 + rng.NextDouble() * 0.04;
             var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
             var hover = FromHsv(neighborHue, Math.Min(bold ? 0.24 : 0.16, surfaceSat + 0.05), bgVal - 0.07, 255);
+            // Same step up the dark branch takes - more saturation, and one
+            // notch further from the background it sits on.
             var selection = FromHsv(accentHue,
-                bold ? 0.26 + rng.NextDouble() * 0.20 : 0.14 + rng.NextDouble() * 0.14, 0.88, 255);
+                bold ? 0.31 + rng.NextDouble() * 0.21 : 0.18 + rng.NextDouble() * 0.15, 0.855, 255);
             var text = EnsureContrast(baseHue, 0.10 + rng.NextDouble() * 0.10, 0.27, hover, 4.5, towardLight: false);
             return new RandomPalette(
                 Background: background,
@@ -678,9 +693,34 @@ public partial class ColorSettingsWindow : Window
                 GuideActive: FromHsv(accentHue, accentSat * 0.5, bgVal - 0.38, 255),
                 Text: text,
                 TextHover: Emphasize(text, towardLight: false),
-                Highlight: EnsureContrast(accentHue, Math.Min(0.6, accentSat + 0.15), 0.22, selection, 4.5, towardLight: false),
-                ShowMore: EnsureContrast(baseHue, 0.08, 0.45, background, 3.0, towardLight: false));
+                Highlight: EnsureContrast(accentHue, Math.Min(0.62, accentSat + 0.18), 0.19, selection, 5.0, towardLight: false),
+                ShowMore: EnsureContrast(baseHue, 0.08, 0.45, background, 3.0, towardLight: false),
+                Handle: RollHandle(accentHue, accentSat, background, rng, towardLight: false));
         }
+    }
+
+    // THE ONE THING IN A ROLL THAT IS MEANT TO BE LOUD (user, 2026-08-10:
+    // "손잡이나 바 컬러는 좀 튀어야 할거 같습니다", while everything else stays
+    // quiet). It used to be handed the rolled BACKGROUND, which reproduced the
+    // handle's follow-the-background default - correct as a default, and
+    // exactly wrong for a die roll, since the one control the palette could
+    // show off with came out invisible.
+    //
+    // The accent hue at a saturation floor rather than the roll's own: a calm
+    // roll's accent is deliberately washed out, and a handle drawn at that
+    // saturation is the thing this is fixing. Brightness goes the OPPOSITE way
+    // from the theme so it separates from the ground either way - bright on a
+    // dark sidebar, deep on a light one - and the contrast walk is the same
+    // guarantee the text colours get, so a hue whose natural brightness fights
+    // the background is pushed until it clears it.
+    private static Color RollHandle(
+        double accentHue, double accentSat, Color background, Random rng, bool towardLight)
+    {
+        double sat = Math.Clamp(accentSat + 0.24, 0.45, 0.85);
+        double val = towardLight
+            ? 0.72 + rng.NextDouble() * 0.16
+            : 0.52 + rng.NextDouble() * 0.16;
+        return EnsureContrast(accentHue, sat, val, background, 3.0, towardLight);
     }
 
     // Hover names get one visible step MORE presence than resting ones
