@@ -6103,10 +6103,24 @@ public partial class MainWindow : Window
 
     private void BuildFooterFilterChips()
     {
-        // 전체 first and set apart by a wider gap: it is not one of the kinds,
-        // it is the empty selection - the same asymmetry the menu draws with a
-        // separator, which a single row has no room for.
-        AddFooterFilterChip(Strings.MenuFileFilterAll, FileFilterAllTag, new Thickness(0, FooterChipRowGap, 8, 0));
+        // 전체 is deliberately NOT a chip, and it is the only one missing from
+        // the strip - every kind the menu offers has one here (user, 2026-08-10).
+        //
+        // It was the odd one out twice over. Alone among identical-looking chips
+        // it behaved as a radio rather than a toggle - one row, two rules. Worse,
+        // it was LIT precisely when nothing was filtered, so the strip's single
+        // signal (a lit chip means something is being hidden) read backwards in
+        // the state that matters most: a light on while everything was showing.
+        // Turning every chip off already IS 전체, so the way back was never in
+        // the chip.
+        //
+        // That last sentence is the rule this row now stands on, and it is why
+        // no OTHER kind may be left out. 기타 was taken out with 전체 in the
+        // first pass and the strip immediately started lying: switched on from
+        // the menu it had no chip here, so clearing every visible chip left a
+        // filter running with nothing on screen saying so, and 전체 looked
+        // broken (user, with a screenshot, 2026-08-10). A kind the menu can
+        // switch on is a kind this strip has to be able to switch off.
         foreach (var (category, label) in FileFilterRows)
         {
             AddFooterFilterChip(
@@ -6231,7 +6245,9 @@ public partial class MainWindow : Window
     // and then the app looks like it lost your files. The footer answers that,
     // and since 2026-08-02 it also FIXES it: the strip where a filter announces
     // itself is where the hand already is when it needs changing, so each kind
-    // is a toggle rather than a word. 전체 is lit exactly when nothing else is.
+    // is a toggle rather than a word. A strip with nothing lit is the
+    // unfiltered state, which is why 전체 is no longer a chip - see
+    // BuildFooterFilterChips.
     //
     // The app name and version used to sit at the head of this strip and were
     // dropped when the toggles arrived (user's call): a row of controls is not
