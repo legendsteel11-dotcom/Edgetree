@@ -16249,50 +16249,96 @@ public partial class MainWindow : Window
     // showing a 2-hour film as a single frame with nothing but a file size
     // said less than the panel actually knew (2026-08-09). A folder or a .txt
     // has nothing to answer with, so they don't pay for the call.
+    // The stat itself goes to a background thread, which on a local disk looks
+    // like ceremony for two field reads. Local disks are not what it is for: a
+    // file's length and its write time are separate round trips to an SMB
+    // share, and one that has spun down answers in whole seconds - on the UI
+    // thread, with the entire app stopped, to caption a preview. Every other
+    // file read the panel makes already hops (the decode, the shell thumbnail,
+    // the property store); this was the last one standing on the UI thread.
     private void SetViewerFileInfo(string path, int pixelWidth, int pixelHeight, bool withMediaInfo = false)
     {
-        try
+        Task.Run(() =>
         {
-            var fileInfo = new FileInfo(path);
-            string date = $"{File.GetLastWriteTime(path):yyyy-MM-dd HH:mm}";
-            string body = fileInfo.Exists
-                ? $"{FormatFileSize(fileInfo.Length)}  ·  {date}"
-                : date;
-            ViewerFileInfo.Text = pixelWidth > 0 && pixelHeight > 0
-                ? $"{pixelWidth} × {pixelHeight}  ·  {body}"
-                : body;
+            long length = -1;
+            DateTime modified;
+            try
+            {
+                // ONE stat, not two: FileInfo caches the directory entry on
+                // first touch, so the write time comes off the same trip that
+                // File.GetLastWriteTime used to make on its own.
+                var info = new FileInfo(path);
+                if (info.Exists)
+                {
+                    length = info.Length;
+                }
+                modified = info.LastWriteTime;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                Dispatcher.BeginInvoke(() => ClearViewerFileInfo(path));
+                return;
+            }
 
-            if (!withMediaInfo)
+            Dispatcher.BeginInvoke(() =>
+                ApplyViewerFileInfo(path, pixelWidth, pixelHeight, withMediaInfo, length, modified));
+        });
+    }
+
+    private void ClearViewerFileInfo(string path)
+    {
+        if (_viewerOpen && string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+        {
+            ViewerFileInfo.Text = string.Empty;
+        }
+    }
+
+    private void ApplyViewerFileInfo(
+        string path, int pixelWidth, int pixelHeight, bool withMediaInfo, long length, DateTime modified)
+    {
+        // The selection can have moved on while the stat was out - the same
+        // staleness guard every other background arrival in the panel carries.
+        if (!_viewerOpen || !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        string date = $"{modified:yyyy-MM-dd HH:mm}";
+        string body = length >= 0 ? $"{FormatFileSize(length)}  ·  {date}" : date;
+        string head = pixelWidth > 0 && pixelHeight > 0 ? $"{pixelWidth} × {pixelHeight}" : string.Empty;
+
+        // NoAudioNote is re-applied rather than assumed away. Now that the
+        // stat is a hop, MediaOpened can land FIRST and append the note to a
+        // caption this line then rewrites - so this line has to carry it too.
+        // Same "whichever arrives second says it" arrangement the note already
+        // ran on (see ViewerMedia_MediaOpened), with one more arrival in it.
+        ViewerFileInfo.Text = string.Join("  ·  ",
+            new[] { head, body, NoAudioNote() }.Where(part => part.Length > 0));
+
+        if (!withMediaInfo)
+        {
+            return;
+        }
+
+        ShellMediaInfoService.GetAsync(path, media =>
+        {
+            if (media.IsEmpty ||
+                !_viewerOpen ||
+                !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
 
-            ShellMediaInfoService.GetAsync(path, media =>
-            {
-                if (media.IsEmpty ||
-                    !_viewerOpen ||
-                    !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
+            // The property store's frame size beats the thumbnail's own - the
+            // thumbnail is a scaled still, so its pixels are never the
+            // video's. Duration sits between size and file size, which is the
+            // order every player's own info line uses.
+            string mediaHead = media.HasFrameSize ? $"{media.Width} × {media.Height}" : head;
+            string duration = media.Duration is { } span ? FormatDuration(span) : string.Empty;
 
-                // The property store's frame size beats the thumbnail's own -
-                // the thumbnail is a scaled still, so its pixels are never the
-                // video's. Duration sits between size and file size, which is
-                // the order every player's own info line uses.
-                string head = media.HasFrameSize
-                    ? $"{media.Width} × {media.Height}"
-                    : pixelWidth > 0 && pixelHeight > 0 ? $"{pixelWidth} × {pixelHeight}" : string.Empty;
-                string duration = media.Duration is { } span ? FormatDuration(span) : string.Empty;
-
-                ViewerFileInfo.Text = string.Join("  ·  ",
-                    new[] { head, duration, body, NoAudioNote() }.Where(part => part.Length > 0));
-            });
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            ViewerFileInfo.Text = string.Empty;
-        }
+            ViewerFileInfo.Text = string.Join("  ·  ",
+                new[] { mediaHead, duration, body, NoAudioNote() }.Where(part => part.Length > 0));
+        });
     }
 
     // h:mm:ss once there is an hour to show, m:ss below that - what a player's
