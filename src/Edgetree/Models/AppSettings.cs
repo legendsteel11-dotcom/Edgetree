@@ -37,6 +37,21 @@ public class AppSettings
     public bool ViewerFilmstrip { get; set; } = false;
     public double ViewerFilmstripCellHeight { get; set; } = 64;
 
+    // Playback marks: places in a film someone wanted to be able to come back
+    // to, kept per file and shown as ticks over the position bar.
+    //
+    // A LIST rather than a dictionary, and that is deliberate: it has to be
+    // pruned, and pruning needs an order. Newest first, so the cap drops the
+    // file nobody has touched in longest rather than whichever one the
+    // serializer happened to put last (see MainWindow's VideoMark* region for
+    // the caps).
+    //
+    // Nothing here is load-bearing. A path that has moved simply never matches
+    // again and ages out on its own - the same tolerance the other
+    // remembered-path settings carry, and the reason there is no pruning pass
+    // that touches the disk.
+    public List<VideoMarkEntry> VideoMarks { get; set; } = new();
+
     // Collapsed to a bare sliver at the screen edge that peeks open on
     // mouse-over - see MainWindow.xaml.cs's EnterAutoHide/ExitAutoHide.
     // Entered by a single click on the app icon while docked and expanded.

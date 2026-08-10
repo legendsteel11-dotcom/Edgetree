@@ -5075,7 +5075,8 @@
                     Visibility="Collapsed"
                     Background="{DynamicResource ViewerBackground}"
                     BorderBrush="{DynamicResource PanelDividerBrush}"
-                    BorderThickness="1,0,0,0">
+                    BorderThickness="1,0,0,0"
+                    PreviewMouseDown="ViewerPanel_PreviewMouseDown">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
@@ -5136,17 +5137,163 @@
                                 <MenuItem x:Name="ViewerSetWallpaperItem"
                                         Header="{x:Static services:Strings.MenuSetWallpaper}"
                                         Click="ViewerSetWallpaper_Click"/>
+                                <!-- The playback group, shown only while a film
+                                     is up. Play/pause and back-to-start are
+                                     here as well as in the strip because a
+                                     right-click is where a hand already is when
+                                     the strip is at the other end of a tall
+                                     panel - and because a menu that offers to
+                                     mark a position while offering no way to
+                                     start the film again reads as half a menu. -->
+                                <Separator x:Name="ViewerPlaybackSeparator"
+                                        Visibility="Collapsed"/>
+                                <MenuItem x:Name="ViewerPlayPauseItem"
+                                        Header="{x:Static services:Strings.ViewerPlay}"
+                                        InputGestureText="Space"
+                                        Click="ViewerMediaPlayPause_Click"
+                                        Visibility="Collapsed"/>
+                                <MenuItem x:Name="ViewerRewindItem"
+                                        Header="{x:Static services:Strings.ViewerRewind}"
+                                        Click="ViewerMediaRewind_Click"
+                                        Visibility="Collapsed"/>
+                                <!-- The film's zoom, HERE and not in the strip:
+                                     the transport row is full, and the zoom
+                                     strip it would have joined is the one the
+                                     transport row replaces (the two describe
+                                     the same picture in ways that can't both
+                                     apply). A menu row costs nothing until it
+                                     is opened. StaysOpenOnClick so stepping
+                                     through 50 → 75 → 100 is one visit rather
+                                     than three; the numpad's +/- do the same
+                                     job without opening anything. -->
+                                <MenuItem x:Name="ViewerMediaZoomItem"
+                                        StaysOpenOnClick="True"
+                                        Focusable="False"
+                                        Padding="{DynamicResource MenuStepperRowPadding}"
+                                        Visibility="Collapsed">
+                                    <!-- MenuRowActionButtonStyle, not the
+                                         footer's chip style: a chip carries the
+                                         footer's own ink at 0.65, and inside a
+                                         popup that resolves against the VIEWER
+                                         panel's derived inks - so the row came
+                                         out barely legible on the menu's own
+                                         surface (user, with a screenshot,
+                                         2026-08-10). This style is the one the
+                                         other in-menu buttons already use, and
+                                         it takes MenuForeground.
+                                         The leading label went with it: it said
+                                         맞춤, which is also what the button at
+                                         the far end says, so the row read as
+                                         two of the same word around a number. -->
+                                    <!-- Built exactly like the options menu's
+                                         own steppers (글꼴 크기, 최대 항목 수):
+                                         label on the left, the two boxed
+                                         glyphs hard against each other on the
+                                         right, MenuStepperButtonStyle for both.
+                                         A first attempt used the menu's plain
+                                         text-button style and it read as a
+                                         different kind of control in the same
+                                         menu (user, with a screenshot,
+                                         2026-08-10) - one app, one stepper.
+
+                                         No percentage between them, which is
+                                         the one place this row departs from
+                                         those two. The row stays open while it
+                                         is stepped, and the readout is written
+                                         by the zoom STRIP's update - which does
+                                         not run while a film is up, because
+                                         that strip is not on screen. A number
+                                         that holds still while the picture
+                                         grows is worse than no number, and the
+                                         film itself is the readout. -->
+                                    <MenuItem.Header>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                    Text="{x:Static services:Strings.ViewerZoom}"
+                                                    Foreground="{DynamicResource MenuForeground}"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,8,0"/>
+                                            <!-- 맞춤 sits in the slot the other
+                                                 steppers give to the value, and
+                                                 that is the right place for it:
+                                                 what those rows READ OUT there,
+                                                 this row lets you GO to. A
+                                                 separate 맞춤 line underneath
+                                                 was tried first and the pair
+                                                 read as two unrelated controls
+                                                 (user, 2026-08-10). Auto width
+                                                 on the middle one - the style's
+                                                 square box is cut for a single
+                                                 glyph. -->
+                                            <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal">
+                                                <Button Content="−"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerZoomOutButton_Click"/>
+                                                <!-- A step below the menu font,
+                                                     the same one every other
+                                                     in-menu action word takes
+                                                     (MenuChipFontSize): at the
+                                                     stepper's own size the word
+                                                     sat heavier than the two
+                                                     glyphs it stands between. -->
+                                                <Button Content="{x:Static services:Strings.ViewerZoomFit}"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Width="Auto"
+                                                        Padding="8,0"
+                                                        FontWeight="Normal"
+                                                        FontSize="{DynamicResource MenuChipFontSize}"
+                                                        Margin="4,0"
+                                                        Click="ViewerFitChip_Click"/>
+                                                <Button Content="+"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerZoomInButton_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </MenuItem.Header>
+                                </MenuItem>
+                                <MenuItem x:Name="ViewerMarkAddItem"
+                                        Header="{x:Static services:Strings.ViewerMarkAdd}"
+                                        Click="ViewerMediaMark_Click"
+                                        Visibility="Collapsed"/>
+                                <!-- The film's own marks. Built when the menu
+                                     opens (ViewerMarkSubmenu_Opened) and shown
+                                     only for a video that has any - a submenu
+                                     that is always there and usually empty is a
+                                     row of nothing to read past. -->
+                                <MenuItem x:Name="ViewerMarkListItem"
+                                        Header="{x:Static services:Strings.ViewerMarkList}"
+                                        SubmenuOpened="ViewerMarkSubmenu_Opened"
+                                        Visibility="Collapsed">
+                                    <MenuItem Header=""/>
+                                </MenuItem>
                                 <Separator/>
-                                <MenuItem Header="{x:Static services:Strings.MenuCut}"
+                                <!-- All four are refused while a film is loaded:
+                                     a playing MediaElement holds the file OPEN,
+                                     so rename and delete fail at the OS and cut
+                                     leaves a file marked for a move that can't
+                                     happen. Greyed rather than hidden - the rows
+                                     every other selection has should not vanish
+                                     and move everything under them (user,
+                                     2026-08-10). -->
+                                <MenuItem x:Name="ViewerCutItem"
+                                        Header="{x:Static services:Strings.MenuCut}"
                                         InputGestureText="Ctrl+X"
                                         Click="CutItem_Click"/>
-                                <MenuItem Header="{x:Static services:Strings.MenuCopy}"
+                                <MenuItem x:Name="ViewerCopyItem"
+                                        Header="{x:Static services:Strings.MenuCopy}"
                                         InputGestureText="Ctrl+C"
                                         Click="CopyItem_Click"/>
-                                <MenuItem Header="{x:Static services:Strings.MenuRename}"
+                                <MenuItem x:Name="ViewerRenameItem"
+                                        Header="{x:Static services:Strings.MenuRename}"
                                         InputGestureText="F2"
                                         Click="RenameItem_Click"/>
-                                <MenuItem Header="{x:Static services:Strings.MenuDelete}"
+                                <MenuItem x:Name="ViewerDeleteItem"
+                                        Header="{x:Static services:Strings.MenuDelete}"
                                         InputGestureText="Del"
                                         Click="DeleteItem_Click"/>
                                 <Separator/>
@@ -5272,20 +5419,41 @@
                          selection leaves - a playing MediaElement holds the
                          file open, and this app's own rename and delete are
                          two rows away. -->
+                    <!-- The clip the zoom made necessary. ViewerImage has always
+                         had one (ViewerImageHost is the Border that carries it);
+                         the media element is that Border's SIBLING, so nothing
+                         held it in and a zoomed film simply grew out over the
+                         tree (user, with a screenshot, 2026-08-10). Its own
+                         Border, rather than clipping the row's Grid, so the play
+                         overlay and the navigator keep the bounds they had. -->
+                    <Border Grid.Row="0"
+                            ClipToBounds="True">
                     <MediaElement x:Name="ViewerMedia"
-                            Grid.Row="0"
                             Margin="10"
                             Visibility="Collapsed"
                             Stretch="Uniform"
                             LoadedBehavior="Manual"
                             UnloadedBehavior="Manual"
                             ScrubbingEnabled="True"
+                            RenderTransformOrigin="0.5,0.5"
                             MouseDown="ViewerImageHost_MouseDown"
                             MediaOpened="ViewerMedia_MediaOpened"
                             MediaEnded="ViewerMedia_MediaEnded"
                             MediaFailed="ViewerMedia_MediaFailed"
                             BufferingStarted="ViewerMedia_BufferingStarted"
-                            BufferingEnded="ViewerMedia_BufferingEnded"/>
+                            BufferingEnded="ViewerMedia_BufferingEnded">
+                        <!-- Scale only, and centred. The picture's transform
+                             group carries a pan as well; a film does not, by
+                             the user's own call (2026-08-10) - left-drag is
+                             already play/pause here, and splitting it by
+                             whether the film happens to be zoomed would be the
+                             conditional gesture this app keeps refusing. So the
+                             film grows about its middle and stays there. -->
+                        <MediaElement.RenderTransform>
+                            <ScaleTransform x:Name="ViewerMediaScale"/>
+                        </MediaElement.RenderTransform>
+                    </MediaElement>
+                    </Border>
                     <!-- The one affordance that turns a still frame into a
                          promise the panel can keep. Only up for a video that
                          isn't playing; clicking the picture itself is left
@@ -5706,10 +5874,16 @@
                                  belongs to. The gap sets it apart from the two
                                  chevrons, which act on the picture rather than
                                  on the row itself. -->
+                            <!-- Three boxes in a row, which is what a strip of
+                                 frames looks like. It was ▤ (a square with
+                                 lines through it) and that read as a transport
+                                 control - "재생정지 아이콘 같이 보인다" (user,
+                                 2026-08-10) - which is the one thing a chip
+                                 sitting beside a film must not look like. -->
                             <ToggleButton x:Name="ViewerFilmstripChip"
                                     Style="{StaticResource FooterFilterChipStyle}"
                                     Margin="10,0,0,0"
-                                    Content="&#x25A4;"
+                                    Content="&#x25AF;&#x25AF;&#x25AF;"
                                     Click="ViewerFilmstripChip_Click"
                                     ToolTip="{x:Static services:Strings.ViewerFilmstrip}"/>
                         </StackPanel>
@@ -5784,16 +5958,31 @@
                              media player. -->
                         <StackPanel x:Name="ViewerMediaBar"
                                 Visibility="Collapsed">
-                            <Slider x:Name="ViewerMediaPosition"
-                                    Style="{StaticResource ViewerMediaSliderStyle}"
-                                    Minimum="0"
-                                    Maximum="1"
-                                    PreviewMouseLeftButtonDown="ViewerMediaPosition_PreviewMouseLeftButtonDown"
-                                    PreviewMouseMove="ViewerMediaPosition_PreviewMouseMove"
-                                    PreviewMouseLeftButtonUp="ViewerMediaPosition_PreviewMouseLeftButtonUp"
-                                    LostMouseCapture="ViewerMediaPosition_LostMouseCapture"
-                                    MouseWheel="ViewerMediaPosition_MouseWheel"
-                                    ValueChanged="ViewerMediaPosition_ValueChanged"/>
+                            <!-- The marks ride WITH the bar rather than beside
+                                 it: a tick is only meaningful against the
+                                 position it points at. Underneath rather than
+                                 on top (user, 2026-08-10) - above, they sat in
+                                 the space the thumb travels through and read as
+                                 part of the control being dragged. Hit-testing
+                                 off, so the whole bar stays one seek target and
+                                 a mark can never swallow a click meant for the
+                                 film. -->
+                            <Grid SizeChanged="ViewerMediaMarks_SizeChanged">
+                                <Slider x:Name="ViewerMediaPosition"
+                                        Style="{StaticResource ViewerMediaSliderStyle}"
+                                        Minimum="0"
+                                        Maximum="1"
+                                        PreviewMouseLeftButtonDown="ViewerMediaPosition_PreviewMouseLeftButtonDown"
+                                        PreviewMouseMove="ViewerMediaPosition_PreviewMouseMove"
+                                        PreviewMouseLeftButtonUp="ViewerMediaPosition_PreviewMouseLeftButtonUp"
+                                        LostMouseCapture="ViewerMediaPosition_LostMouseCapture"
+                                        MouseWheel="ViewerMediaPosition_MouseWheel"
+                                        ValueChanged="ViewerMediaPosition_ValueChanged"/>
+                                <Canvas x:Name="ViewerMediaMarks"
+                                        Height="4"
+                                        VerticalAlignment="Bottom"
+                                        IsHitTestVisible="False"/>
+                            </Grid>
                             <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
                                     Margin="0,4,-2,0">
@@ -5808,6 +5997,21 @@
                                         Margin="2,0"
                                         Click="ViewerMediaStop_Click"
                                         ToolTip="{x:Static services:Strings.ViewerStop}"/>
+                                <!-- Back to the beginning. The strip had a mark
+                                     button here and this replaced it (user,
+                                     2026-08-10): marking a position is a thing
+                                     you do occasionally and can reach for in a
+                                     menu, while starting over is the control
+                                     every player has in front of you - and the
+                                     blue ribbon was the one loud thing in a row
+                                     of quiet glyphs. -->
+                                <Button x:Name="ViewerMediaRewind"
+                                        Style="{StaticResource FooterActionChipStyle}"
+                                        FontSize="13"
+                                        Content="&#x23EE;"
+                                        Margin="0,0,2,0"
+                                        Click="ViewerMediaRewind_Click"
+                                        ToolTip="{x:Static services:Strings.ViewerRewind}"/>
                                 <!-- Fixed width by the same hidden-twin trick
                                      the carousel counter uses: the readout's
                                      text changes width as it counts, and in a

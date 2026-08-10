@@ -248,6 +248,14 @@ public static class Strings
     public static string ViewerPrevImage = "이전 이미지";
     public static string ViewerNextImage = "다음 이미지";
     public static string ViewerFilmstrip = "필름스트립";
+    public static string ViewerMarkAdd = "위치 기록";
+    public static string ViewerMarkList = "위치 목록";
+    public static string ViewerRewind = "처음으로";
+    // "영상 크기" rather than "확대": the row's middle button is 맞춤, which is
+    // not a magnification - the row is about what SIZE the film is shown at,
+    // and one of the three answers is "as big as it fits" (user, 2026-08-10).
+    public static string ViewerZoom = "영상 크기";
+    public static string ViewerMarkClear = "기록 전부 지우기";
     public static string ViewerPlay = "재생";
     public static string ViewerPause = "일시정지";
     public static string ViewerStop = "정지";
@@ -255,6 +263,9 @@ public static class Strings
     // Shown in the caption when Windows has no codec for the file - the panel
     // says what happened and what still works, rather than sitting blank.
     public static string ViewerPlaybackUnsupported = "이 형식은 재생할 수 없습니다 · Enter로 기본 프로그램에서 열기";
+    // Said only when playback had ALREADY started - "형식을 재생할 수 없다"는 말은
+    // 20초를 잘 재생한 뒤에 나오면 거짓이고, 있지도 않은 코덱을 찾으러 가게 만듦.
+    public static string ViewerPlaybackInterrupted = "재생이 중단되었습니다 · 다시 누르면 이어서, Enter로 기본 프로그램에서 열기";
     // Some files play their picture and nothing else - DTS and TrueHD sound
     // are both undecodable on Windows, and the engine simply drops the track.
     // Silence with no explanation reads as the app being broken, so the
@@ -594,11 +605,17 @@ public static class Strings
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
         ViewerFilmstrip = "Filmstrip";
+        ViewerMarkAdd = "Mark position";
+        ViewerMarkList = "Marked positions";
+        ViewerRewind = "Back to start";
+        ViewerZoom = "Video size";
+        ViewerMarkClear = "Clear all marks";
         ViewerPlay = "Play";
         ViewerPause = "Pause";
         ViewerStop = "Stop";
         ViewerMute = "Mute";
         ViewerPlaybackUnsupported = "This format can't be played here · Enter opens it in the default app";
+        ViewerPlaybackInterrupted = "Playback stopped · press play to resume, Enter opens it in the default app";
         ViewerNoAudio = "No sound";
         ViewerOpenExternally = "Open in default app";
         ToolTipExitSearch = "Back to Explorer (Ctrl+E)";

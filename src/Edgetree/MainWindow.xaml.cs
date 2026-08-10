@@ -369,6 +369,8 @@ public partial class MainWindow : Window
         FileSystemService.SortDescending = _settings.SortDescending;
         FileSystemItem.DisplayCap = Math.Clamp(_settings.MaxItemsPerFolder, 1, 50);
 
+        AttachViewerMediaContextMenu();
+
         // Alongside the other listing rules, and for the same reason: a saved
         // filter has to be in force for the FIRST folder read, not from the
         // first time it is changed.
@@ -1231,27 +1233,95 @@ public partial class MainWindow : Window
             return;
         }
 
-        // ←/→ step the carousel, which is what the filmstrip made people reach
-        // for: a row of frames laid out sideways asks for the sideways keys,
-        // and not having them "적응이 안 된다" (user, 2026-08-10). Same call the
-        // chevrons make, so there is still one idea of what next means.
+        // THE RULE THE ARROWS SETTLED ON (user, 2026-08-10, after trying
+        // several combinations): ↑↓ move BETWEEN items, ←→ move INSIDE the
+        // current one. A film has an inside - its timeline - so there the
+        // sideways keys seek. A picture has none, so they fall through to the
+        // carousel, which is the nearest thing to moving inside a folder of
+        // them.
         //
-        // Deliberately only while the STRIP IS OPEN, and only on a row the
-        // carousel walks. The tree's own ←/→ (collapse/expand, and stepping out
-        // to the parent from a leaf) is untouched everywhere else, so nobody
-        // who never opens the strip loses a key - and the strip being on screen
-        // is a visible reason for the keys to mean something else.
+        // Stated that way it is one rule rather than two exceptions, and it is
+        // why the video branch is tested first rather than being folded into
+        // the filmstrip's condition.
         if (Keyboard.Modifiers == ModifierKeys.None &&
             _viewerOpen &&
-            _settings.ViewerFilmstrip &&
             (e.Key == Key.Left || e.Key == Key.Right) &&
-            _selectedItem is { } carouselRow &&
-            IsViewerCarouselItem(carouselRow) &&
             Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
         {
-            ViewerCarouselStep(e.Key == Key.Right ? +1 : -1);
-            e.Handled = true;
-            return;
+            if (_viewerVideoPath is not null)
+            {
+                // 5 seconds, where the mouse's back/forward buttons take 10 -
+                // a keyboard tap is the fine adjustment and the thumb buttons
+                // are the coarse one, which is the division every player draws.
+                SeekViewerMedia(ViewerMedia.Position.TotalSeconds + (e.Key == Key.Right ? 5 : -5));
+                e.Handled = true;
+                return;
+            }
+
+            // Only while the STRIP IS OPEN, and only on a row the carousel
+            // walks. The tree's own ←/→ (collapse/expand, and stepping out to
+            // the parent from a leaf) is untouched everywhere else, so nobody
+            // who never opens the strip loses a key - and the strip being on
+            // screen is a visible reason for the keys to mean something else.
+            if (_settings.ViewerFilmstrip &&
+                _selectedItem is { } carouselRow &&
+                IsViewerCarouselItem(carouselRow))
+            {
+                ViewerCarouselStep(e.Key == Key.Right ? +1 : -1);
+                e.Handled = true;
+                return;
+            }
+        }
+
+        // ↑↓ AND A FILM: the rule the user arrived at after living with both
+        // extremes (2026-08-10).
+        //
+        // WHILE IT IS PLAYING the keys do nothing at all. Walking the folder
+        // mid-film is a gesture nobody makes on purpose, and the cost of the
+        // one time it happens by accident is the whole film's place - "잘못
+        // 누르면 참 곤란한 상황". Refused, not redirected: a key that does
+        // something else is still a surprise.
+        //
+        // ONCE IT IS PAUSED OR STOPPED they walk the folder again, which is
+        // what the panel is for the rest of the time. Pausing is the gesture
+        // that says "I am done watching for a moment", so it is the right thing
+        // to hang this on - it needs no new control and nothing to remember.
+        //
+        // The position is kept either way (RememberResumePosition), so leaving
+        // a paused film costs nothing at all: selecting it again carries on.
+        if (Keyboard.Modifiers == ModifierKeys.None &&
+            _viewerOpen &&
+            _viewerVideoPath is not null &&
+            (e.Key == Key.Up || e.Key == Key.Down) &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            if (_viewerVideoPlaying)
+            {
+                // Swallowed even when the keyboard is in the TREE - that is
+                // where it usually is, and letting the TreeView's own handling
+                // through there would leave the guard covering only the case it
+                // was not written for.
+                e.Handled = true;
+                return;
+            }
+
+            // Paused: only when the keyboard is NOT already in the tree, since
+            // there the TreeView's own handling is the one that should run and
+            // stepping in front of it would double every press.
+            if ((Keyboard.FocusedElement as DependencyObject)
+                ?.FindAncestor<System.Windows.Controls.TreeView>() is null)
+            {
+                if (e.Key == Key.Down)
+                {
+                    SelectNextVisibleRow();
+                }
+                else
+                {
+                    SelectPreviousVisibleRow();
+                }
+                e.Handled = true;
+                return;
+            }
         }
 
         // BARE +/- is the viewer's zoom (Ctrl+/- stays the app's font size -
@@ -5013,6 +5083,75 @@ public partial class MainWindow : Window
         else
         {
             NavigateToPath(next.FullPath, pinToTop: false, source: "space-next");
+        }
+    }
+
+    // The mirror of SelectNextVisibleRow, added when ↑↓ had to keep working
+    // while a film was playing (user, 2026-08-10). Focus is not in the tree
+    // then - it is wherever the click that started playback left it - so the
+    // tree's own arrow handling never sees the key, and the folder became
+    // unwalkable exactly while the panel was most in use.
+    private void SelectPreviousVisibleRow()
+    {
+        if (_selectedItem is not { } current || PreviousVisibleRow(current) is not { } previous)
+        {
+            return;
+        }
+
+        if (FindRealizedContainer(previous) is { } container)
+        {
+            container.IsSelected = true;
+            container.Focus();
+        }
+        else
+        {
+            NavigateToPath(previous.FullPath, pinToTop: false, source: "arrow-prev");
+        }
+    }
+
+    // The walk has no backward form, so this remembers the row before the one
+    // it is looking for - cheaper than writing a second recursion that has to
+    // get expansion and placeholders right all over again.
+    private FileSystemItem? PreviousVisibleRow(FileSystemItem current)
+    {
+        FileSystemItem? previous = null;
+        bool found = false;
+        foreach (var root in _roots)
+        {
+            Walk(root);
+            if (found)
+            {
+                break;
+            }
+        }
+        return found ? previous : null;
+
+        void Walk(FileSystemItem item)
+        {
+            if (found)
+            {
+                return;
+            }
+            if (ReferenceEquals(item, current))
+            {
+                found = true;
+                return;
+            }
+            if (!item.IsPlaceholder && !item.IsShowMore)
+            {
+                previous = item;
+            }
+            if (item.IsExpanded)
+            {
+                foreach (var child in item.Children)
+                {
+                    Walk(child);
+                    if (found)
+                    {
+                        return;
+                    }
+                }
+            }
         }
     }
 
@@ -10168,7 +10307,7 @@ public partial class MainWindow : Window
         dateText.Text = string.Empty;
 
         bool show = filePath is not null &&
-            ThumbnailExtensions.Contains(Path.GetExtension(filePath)) &&
+            HasViewerPreview(filePath) &&
             File.Exists(filePath);
 
         thumbnailItem.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
@@ -13831,7 +13970,7 @@ public partial class MainWindow : Window
             !_viewerOpen &&
             !(_settings.IsAutoHidden && !_isAutoHideRevealed) &&
             _selectedItem is { IsPlaceholder: false, IsShowMore: false, IsDirectory: false } item &&
-            ThumbnailExtensions.Contains(Path.GetExtension(item.FullPath));
+            HasViewerPreview(item.FullPath);
 
         ViewerExpandButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         if (!show)
@@ -14540,6 +14679,19 @@ public partial class MainWindow : Window
     private static bool IsViewerVideo(string path)
         => VideoExtensions.Contains(Path.GetExtension(path));
 
+    // "The panel can show this" - pictures and films together. Films arrived in
+    // this answer on 2026-08-10 with the filmstrip, and two places were still
+    // asking the picture-only question afterwards: the row menu's thumbnail
+    // slot, and the chevron that offers to open the panel. Both went quiet on a
+    // film, which is the opposite of true - the panel draws a film's still and
+    // then plays it (reported 2026-08-10).
+    //
+    // The shell answers for a video the same way it does for a PSD, so nothing
+    // else had to change to make the thumbnail appear.
+    private static bool HasViewerPreview(string path)
+        => ThumbnailExtensions.Contains(Path.GetExtension(path))
+           || VideoExtensions.Contains(Path.GetExtension(path));
+
     // The file currently handed to MediaElement - null whenever nothing is
     // loaded, which is also the app's promise that the file is not held open.
     private string? _viewerVideoPath;
@@ -14636,12 +14788,24 @@ public partial class MainWindow : Window
             $"buffering {ViewerMedia.BufferingProgress:P0}  download {ViewerMedia.DownloadProgress:P0}");
     }
 
+    // Set by the failure handler so the flush that follows says how the run
+    // ENDED. Without it every block closed with "stopped" - the same word a
+    // user pressing ■ produces - and the one thing worth knowing about a block
+    // was the one thing it did not record (2026-08-10).
+    private string? _videoLogEndReason;
+
     [System.Diagnostics.Conditional("DEBUG")]
     private void VideoLogFlush(string reason)
     {
         if (_videoLogClock is null)
         {
             return;
+        }
+
+        if (_videoLogEndReason is { } forced)
+        {
+            reason = forced;
+            _videoLogEndReason = null;
         }
 
         VideoLog($"--- {reason} ---");
@@ -14702,9 +14866,27 @@ public partial class MainWindow : Window
         // apply, so they take turns rather than stack.
         ViewerZoomBar.Visibility = Visibility.Collapsed;
         ViewerMediaBar.Visibility = Visibility.Visible;
+        // Picked up here and applied in MediaOpened: Position means nothing
+        // until the engine knows what it has opened.
+        _pendingResumeSeconds = FindVideoMarks(path)?.Resume ?? 0;
         ViewerMedia.Play();
         SetViewerVideoPlaying(true);
         VideoLogStart(path);
+    }
+
+    // Where the film should pick up, held between the click and MediaOpened.
+    private double _pendingResumeSeconds;
+
+    // The picture's menu, handed to the media element as well - the SAME
+    // instance, so there is one menu to keep in step rather than two that drift.
+    // Done here rather than in XAML because a ContextMenu declared inline
+    // belongs to the element that declares it; sharing it would have meant
+    // lifting the whole thing into a resource dictionary and referencing it
+    // twice, which is a lot of moving for what is two assignments.
+    private void AttachViewerMediaContextMenu()
+    {
+        ViewerMedia.ContextMenu = ViewerImageHost.ContextMenu;
+        ViewerMedia.ContextMenuOpening += ViewerImageHost_ContextMenuOpening;
     }
 
     private void ViewerMedia_MediaOpened(object sender, RoutedEventArgs e)
@@ -14720,6 +14902,48 @@ public partial class MainWindow : Window
         ViewerMediaPosition.Maximum = ViewerMedia.NaturalDuration.HasTimeSpan
             ? ViewerMedia.NaturalDuration.TimeSpan.TotalSeconds
             : 0;
+        // Only now: a tick's position is a fraction of the duration, which is
+        // exactly what this line has just found out.
+        DrawViewerMediaMarks();
+
+        // Carries on from where it left off, and the ONE way back to the start
+        // is the ⏮ button that was put in the strip for exactly this. Clamped
+        // against the duration this line has just learned, so a file that was
+        // replaced by a shorter one under the same name can't resume past its
+        // own end.
+        if (_pendingResumeSeconds > 0)
+        {
+            double resume = Math.Min(
+                _pendingResumeSeconds,
+                Math.Max(0, ViewerMediaPosition.Maximum - ResumeEndGuardSeconds));
+            _pendingResumeSeconds = 0;
+            if (resume > 0)
+            {
+                SeekViewerMedia(resume);
+            }
+        }
+
+        // THE FILM'S REAL SIZE, replacing the shell thumbnail's. Until now the
+        // panel's idea of "how big is this" came from the still it drew before
+        // playback - a 1024px stand-in for a 1280×536 film - so a zoom readout
+        // would have said 100% at the wrong scale, and 맞춤 would have fitted
+        // the wrong rectangle (user, 2026-08-10). NaturalVideoWidth is the only
+        // honest answer and it is not knowable until here.
+        //
+        // The decoded width is set to match so the full-resolution pass stays
+        // out of it: there is nothing for it to re-read, and it is guarded on
+        // exactly this comparison.
+        if (ViewerMedia.NaturalVideoWidth > 0 && ViewerMedia.NaturalVideoHeight > 0)
+        {
+            _viewerPixelWidth = (int)ViewerMedia.NaturalVideoWidth;
+            _viewerPixelHeight = (int)ViewerMedia.NaturalVideoHeight;
+            _viewerDecodedWidth = _viewerPixelWidth;
+            // Arrives fitted, like every other file - a zoom carried over from
+            // the picture before it would drop the viewer into a corner of the
+            // film.
+            _viewerZoom = ViewerRestZoom;
+            ApplyViewerZoom();
+        }
 
         // A file whose SOUND is the part Windows can't decode plays silently
         // with no sign of it - DTS and TrueHD both land here - and a preview
@@ -14776,14 +15000,31 @@ public partial class MainWindow : Window
 
     private void ViewerMedia_MediaFailed(object sender, ExceptionRoutedEventArgs e)
     {
-        // Expected, not exceptional: Windows has no codec for this file. Put
-        // the still frame back and say what the panel can still do about it.
-        string? path = _viewerVideoPath;
-        LogViewerMediaFailure(path, e.ErrorException);
-        StopViewerVideo();
-        if (path is not null && string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+        // Clearing the Source below makes the engine raise this again, with
+        // nothing loaded - a second failure in the same millisecond, and in the
+        // log it looked like the file had failed twice (seen 2026-08-10). The
+        // echo is dropped here rather than tolerated, so what is recorded is
+        // what actually happened.
+        if (_viewerVideoPath is not { } path)
         {
-            ViewerFileInfo.Text = Strings.ViewerPlaybackUnsupported;
+            return;
+        }
+
+        // The distinction the caption used to get wrong: a file that never
+        // opened is a CODEC answer, and a file that played for a while and then
+        // stopped is not - telling someone the format is unsupported after
+        // twenty seconds of it playing sends them looking for a codec they
+        // already have. MediaOpened is what tells the two apart.
+        bool wasPlaying = ViewerMedia.NaturalDuration.HasTimeSpan;
+        LogViewerMediaFailure(path, e.ErrorException);
+        VideoLog($"FAILED  hr=0x{e.ErrorException?.HResult ?? 0:X8}  playing={wasPlaying}");
+        _videoLogEndReason = $"FAILED after playing (hr=0x{e.ErrorException?.HResult ?? 0:X8})";
+        StopViewerVideo();
+        if (string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
+        {
+            ViewerFileInfo.Text = wasPlaying
+                ? Strings.ViewerPlaybackInterrupted
+                : Strings.ViewerPlaybackUnsupported;
         }
     }
 
@@ -14824,6 +15065,199 @@ public partial class MainWindow : Window
             SetViewerVideoPlaying(true);
             VideoLogStart(_viewerVideoPath);
         }
+    }
+
+    // ----- 재생 위치 기록 -------------------------------------------------------
+    //
+    // The tree's bookmark, one level down: that one marks a file, this marks a
+    // place inside one. Kept per path in the settings file, drawn as ticks over
+    // the position bar, and listed in the picture's right-click menu.
+    //
+    // Two caps, because this is the one setting that grows on its own. Neither
+    // is a guess about what is useful - they are what keeps a settings file
+    // that is read at every launch from becoming a log.
+    private const int MaxMarkedVideos = 200;
+    private const int MaxMarksPerVideo = 24;
+    // Two marks a second apart would draw as one tick and read as a bug in the
+    // drawing rather than as two marks.
+    private const double MarkMergeSeconds = 1.0;
+
+    private VideoMarkEntry? FindVideoMarks(string path)
+        => _settings.VideoMarks.FirstOrDefault(entry =>
+            string.Equals(entry.Path, path, StringComparison.OrdinalIgnoreCase));
+
+    private void ViewerMediaMark_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewerVideoPath is not { } path)
+        {
+            return;
+        }
+
+        double seconds = ViewerMedia.Position.TotalSeconds;
+        var entry = FindVideoMarks(path);
+        if (entry is null)
+        {
+            entry = new VideoMarkEntry { Path = path };
+            _settings.VideoMarks.Add(entry);
+        }
+
+        // Newest file first, so the cap below drops whichever film has gone
+        // longest without being touched rather than whichever one happens to
+        // sit at the end of the list.
+        _settings.VideoMarks.Remove(entry);
+        _settings.VideoMarks.Insert(0, entry);
+
+        // Pressing it twice at the same place TAKES THE MARK AWAY. The button
+        // is the only control there is room for in that strip, and a mark you
+        // can add but not remove is the worse half of the pair - this is the
+        // tree's ribbon behaving the way it already does when clicked again.
+        int existing = entry.Seconds.FindIndex(s => Math.Abs(s - seconds) <= MarkMergeSeconds);
+        if (existing >= 0)
+        {
+            entry.Seconds.RemoveAt(existing);
+        }
+        else
+        {
+            entry.Seconds.Add(seconds);
+            entry.Seconds.Sort();
+            if (entry.Seconds.Count > MaxMarksPerVideo)
+            {
+                entry.Seconds.RemoveAt(0);
+            }
+        }
+
+        if (entry.Seconds.Count == 0)
+        {
+            _settings.VideoMarks.Remove(entry);
+        }
+        while (_settings.VideoMarks.Count > MaxMarkedVideos)
+        {
+            _settings.VideoMarks.RemoveAt(_settings.VideoMarks.Count - 1);
+        }
+
+        // Saved at once, the same reasoning the file bookmarks and the colours
+        // use: marking a place is a deliberate act whose whole point is that it
+        // outlives the session.
+        _settingsService.Save(_settings);
+        DrawViewerMediaMarks();
+    }
+
+    private void ViewerMediaMarks_SizeChanged(object sender, SizeChangedEventArgs e)
+        => DrawViewerMediaMarks();
+
+    // Back to the beginning, WITHOUT changing whether it is playing: a film
+    // that was running keeps running from the top, and one that was paused
+    // stays paused on the first frame. Through the same seek every other route
+    // takes, so the bar's latch and the readout behave identically.
+    private void ViewerMediaRewind_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewerVideoPath is not null)
+        {
+            SeekViewerMedia(0);
+        }
+    }
+
+    // The mouse's back/forward buttons, ±10 seconds. Free to take: nothing in
+    // this app had them, and no browser is involved - checked before binding
+    // rather than after (the note this came from asked for exactly that).
+    //
+    // Scoped to the VIEWER PANEL rather than the window. Those buttons carry a
+    // meaning the user's mouse driver may have given them everywhere else, and
+    // claiming them app-wide for a film that may not even be loaded is a bigger
+    // claim than the feature is worth. Over the panel they are unambiguous.
+    private void ViewerPanel_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_viewerVideoPath is null)
+        {
+            return;
+        }
+
+        int direction = e.ChangedButton switch
+        {
+            MouseButton.XButton1 => -1,
+            MouseButton.XButton2 => +1,
+            _ => 0,
+        };
+        if (direction == 0)
+        {
+            return;
+        }
+
+        // Through the same seek every other route takes, so the bar's latch and
+        // the readout behave identically however the jump was asked for.
+        SeekViewerMedia(ViewerMedia.Position.TotalSeconds + direction * 10);
+        e.Handled = true;
+    }
+
+    // Redrawn rather than moved: a handful of 2px rectangles is cheaper to
+    // rebuild than to track, and this runs on a mark being added, on the bar
+    // being resized and on a film being opened - never per frame.
+    private void DrawViewerMediaMarks()
+    {
+        ViewerMediaMarks.Children.Clear();
+        if (_viewerVideoPath is not { } path ||
+            ViewerMediaPosition.Maximum <= 0 ||
+            FindVideoMarks(path) is not { } entry)
+        {
+            return;
+        }
+
+        // The same dead travel the seek arithmetic accounts for: the thumb has
+        // width, so the track's usable span is narrower than the control and a
+        // tick drawn against the full width drifts from the position it means.
+        const double thumbWidth = 12;
+        double usable = Math.Max(1, ViewerMediaPosition.ActualWidth - thumbWidth);
+        foreach (double seconds in entry.Seconds)
+        {
+            double ratio = Math.Clamp(seconds / ViewerMediaPosition.Maximum, 0, 1);
+            var tick = new System.Windows.Shapes.Rectangle
+            {
+                Width = 2,
+                Height = 5,
+                Fill = new SolidColorBrush(Color.FromRgb(0x4A, 0x90, 0xE2)),
+            };
+            Canvas.SetLeft(tick, thumbWidth / 2 + ratio * usable - 1);
+            Canvas.SetTop(tick, 0);
+            ViewerMediaMarks.Children.Add(tick);
+        }
+    }
+
+    // Built on open, never kept: the list changes from the button beside it and
+    // from this menu's own 지우기, and a stale copy of a list that short is not
+    // worth the machinery to keep in step.
+    private void ViewerMarkSubmenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menu || _viewerVideoPath is not { } path)
+        {
+            return;
+        }
+
+        menu.Items.Clear();
+        var entry = FindVideoMarks(path);
+        foreach (double seconds in entry?.Seconds ?? new List<double>())
+        {
+            double target = seconds;
+            var row = FollowMenuFont(new MenuItem { Header = FormatDuration(TimeSpan.FromSeconds(target)) });
+            row.Click += (_, _) => SeekViewerMedia(target);
+            menu.Items.Add(row);
+        }
+
+        menu.Items.Add(new Separator());
+        var clear = FollowMenuFont(new MenuItem
+        {
+            Header = Strings.ViewerMarkClear,
+            IsEnabled = entry is { Seconds.Count: > 0 },
+        });
+        clear.Click += (_, _) =>
+        {
+            if (FindVideoMarks(path) is { } current)
+            {
+                _settings.VideoMarks.Remove(current);
+                _settingsService.Save(_settings);
+                DrawViewerMediaMarks();
+            }
+        };
+        menu.Items.Add(clear);
     }
 
     private void ViewerMediaStop_Click(object sender, RoutedEventArgs e)
@@ -15185,8 +15619,59 @@ public partial class MainWindow : Window
     // Safe from anywhere, including when nothing is loaded. Clearing Source is
     // the part that matters beyond tidiness: a MediaElement holding a file
     // open would make this app's own rename and delete fail on it.
+    // Below this a film had not really started, and within this of the end it
+    // had effectively finished - resuming into either is landing somewhere
+    // nobody asked to be.
+    private const double MinResumeSeconds = 20;
+    private const double ResumeEndGuardSeconds = 30;
+
+    // Written on the way OUT, wherever that came from - a stop, a new
+    // selection, the panel closing, or the ↑↓ mis-hit this exists for. One
+    // place, because the ways out are many and a resume point that only some
+    // of them recorded would be worse than none.
+    private void RememberResumePosition()
+    {
+        if (_viewerVideoPath is not { } path || !ViewerMedia.NaturalDuration.HasTimeSpan)
+        {
+            return;
+        }
+
+        double seconds = ViewerMedia.Position.TotalSeconds;
+        double duration = ViewerMedia.NaturalDuration.TimeSpan.TotalSeconds;
+        double resume = seconds >= MinResumeSeconds && seconds <= duration - ResumeEndGuardSeconds
+            ? seconds
+            : 0;
+
+        var entry = FindVideoMarks(path);
+        if (entry is null)
+        {
+            if (resume <= 0)
+            {
+                return;
+            }
+            entry = new VideoMarkEntry { Path = path };
+            _settings.VideoMarks.Add(entry);
+        }
+
+        entry.Resume = resume;
+        // Newest first, and dropped entirely once it holds nothing - the same
+        // housekeeping the mark button does, so the list has one set of rules.
+        _settings.VideoMarks.Remove(entry);
+        if (entry.Resume > 0 || entry.Seconds.Count > 0)
+        {
+            _settings.VideoMarks.Insert(0, entry);
+        }
+        while (_settings.VideoMarks.Count > MaxMarkedVideos)
+        {
+            _settings.VideoMarks.RemoveAt(_settings.VideoMarks.Count - 1);
+        }
+
+        _settingsService.Save(_settings);
+    }
+
     private void StopViewerVideo()
     {
+        RememberResumePosition();
         VideoLogFlush("stopped");
         _viewerMediaTimer?.Stop();
         _viewerSeekDebounce?.Stop();
@@ -15204,6 +15689,9 @@ public partial class MainWindow : Window
         _viewerVideoHasNoAudio = false;
         ViewerMedia.Visibility = Visibility.Collapsed;
         ViewerMediaBar.Visibility = Visibility.Collapsed;
+        // After _viewerVideoPath is cleared, so this empties the canvas rather
+        // than redrawing the film that just left.
+        DrawViewerMediaMarks();
     }
 
     // Fit is a ratio, so it moves with the panel - and a zoom held at, say,
@@ -15322,6 +15810,12 @@ public partial class MainWindow : Window
         double relative = fit > 0 ? display / fit : 1;
         ViewerZoomScale.ScaleX = relative;
         ViewerZoomScale.ScaleY = relative;
+        // The film takes the same number. Both are written unconditionally
+        // rather than branching: only one of the two elements is ever visible,
+        // and a stale scale left on the hidden one is what would show up as a
+        // picture arriving already zoomed.
+        ViewerMediaScale.ScaleX = relative;
+        ViewerMediaScale.ScaleY = relative;
 
         ClampViewerPan();
     }
@@ -15850,6 +16344,20 @@ public partial class MainWindow : Window
 
     private void ViewerImageHost_MouseDown(object sender, MouseButtonEventArgs e)
     {
+        // Clicking the FILM toggles it, which is the gesture every player has
+        // and the one thing the panel's picture area did not answer once
+        // playback had started (the play button is gone by then). Only on the
+        // media element: over a still, a left press is the start of a pan.
+        // Middle-click keeps full screen on both, so the two never collide.
+        if (ReferenceEquals(sender, ViewerMedia) &&
+            e.ChangedButton == MouseButton.Left &&
+            _viewerVideoPath is not null)
+        {
+            ViewerMediaPlayPause_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
         if (e.ChangedButton != MouseButton.Middle)
         {
             return;
@@ -15869,14 +16377,44 @@ public partial class MainWindow : Window
     // picture means that one, and the rows un-highlighting says so.
     private void ViewerImageHost_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
-        if (ViewerImage.Visibility != Visibility.Visible
-            || ViewerImage.Source is null
+        // A PLAYING film qualifies too, and it has to: the media element covers
+        // the picture while it plays, so the menu that every other row has was
+        // simply unreachable there - and it is the film that has something
+        // extra to offer (its marked positions). ViewerImage is Collapsed in
+        // that state, which is why the first test can't stand alone.
+        bool showingVideo = _viewerVideoPath is not null;
+        if ((!showingVideo && (ViewerImage.Visibility != Visibility.Visible || ViewerImage.Source is null))
             || ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsShowMore: false } item
             || !string.Equals(item.FullPath, _pendingViewerPath, StringComparison.OrdinalIgnoreCase))
         {
             e.Handled = true;
             return;
         }
+
+        // The playback group, only for a film.
+        var playbackRows = showingVideo ? Visibility.Visible : Visibility.Collapsed;
+        ViewerPlaybackSeparator.Visibility = playbackRows;
+        ViewerPlayPauseItem.Visibility = playbackRows;
+        ViewerPlayPauseItem.Header = _viewerVideoPlaying ? Strings.ViewerPause : Strings.ViewerPlay;
+        ViewerRewindItem.Visibility = playbackRows;
+        ViewerMediaZoomItem.Visibility = playbackRows;
+        ViewerMarkAddItem.Visibility = playbackRows;
+        // Only when it has marks: a submenu that is always there and usually
+        // empty is a row of nothing to read past.
+        ViewerMarkListItem.Visibility = showingVideo && FindVideoMarks(item.FullPath) is { Seconds.Count: > 0 }
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        // A loaded MediaElement holds the file open, so the OS refuses these -
+        // rename and delete fail outright, and a cut marks a file for a move
+        // that cannot happen. Copy goes with them: it copies the PATH into a
+        // file-drop, and pasting it while the source is held is the same trap
+        // one step later. Better refused visibly than failing after the fact.
+        bool fileActions = !showingVideo;
+        ViewerCutItem.IsEnabled = fileActions;
+        ViewerCopyItem.IsEnabled = fileActions;
+        ViewerRenameItem.IsEnabled = fileActions;
+        ViewerDeleteItem.IsEnabled = fileActions;
 
         // Count > 0, not > 1: with any multi-selection alive the handlers act
         // on that list (GetEffectiveSelection), and even a single Ctrl-clicked
