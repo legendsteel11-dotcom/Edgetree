@@ -16089,19 +16089,7 @@ public partial class MainWindow : Window
         }
         _settingsService.Save(_settings);
 
-        // A panel widened past its decode width would keep showing the
-        // narrow decode upscaled soft - reload once at the settled width.
-        // Not while a GIF is playing: it decodes at its own natural size, so
-        // the settled width changes nothing, and the reload would restart
-        // the animation from frame 0.
-        // Neither a playing GIF nor a playing video: both would be torn down
-        // and restarted from the beginning by the reload, and a width drag is
-        // not a request to start the film again (2026-08-09).
-        if (_viewerGifDecoder is null && _viewerVideoPath is null)
-        {
-            _pendingViewerPath = null;
-            UpdateViewerPreview();
-        }
+        ReloadViewerAtSettledWidth();
     }
 
     // The OUTER edge drag resizes the viewer too now (tree-hold policy in
@@ -16115,15 +16103,42 @@ public partial class MainWindow : Window
         }
 
         _settingsService.Save(_settings);
-        // Same GIF exemption as the split thumb's settle above.
-        // Neither a playing GIF nor a playing video: both would be torn down
-        // and restarted from the beginning by the reload, and a width drag is
-        // not a request to start the film again (2026-08-09).
-        if (_viewerGifDecoder is null && _viewerVideoPath is null)
+        ReloadViewerAtSettledWidth();
+    }
+
+    // The tail both width drags end on, in one place rather than two copies of
+    // the same lines and the same comment.
+    //
+    // A panel widened past its decode width would keep showing the narrow
+    // decode upscaled soft, so the picture is read again at the width the drag
+    // finally landed at. Three things are exempt, for three different reasons.
+    //
+    // A playing GIF or a playing video would be torn down and restarted from
+    // the beginning, and a width drag is not a request to start the film again
+    // (2026-08-09).
+    //
+    // A still ALREADY decoded at its own full size has nothing to gain: the
+    // reload reads every byte of the file again - which on a NAS is the entire
+    // cost of the gesture - to produce the identical bitmap. Deliberately
+    // restricted to WIC's own decodes: a SHELL preview's "decoded width" is
+    // its thumbnail's, and that is exactly the number a wider panel asks the
+    // shell to grow, so a PSD or a video's still frame must keep asking.
+    private void ReloadViewerAtSettledWidth()
+    {
+        if (_viewerGifDecoder is not null || _viewerVideoPath is not null)
         {
-            _pendingViewerPath = null;
-            UpdateViewerPreview();
+            return;
         }
+
+        if (_viewerShowingDecodedImage &&
+            _viewerPixelWidth > 0 &&
+            _viewerDecodedWidth >= _viewerPixelWidth)
+        {
+            return;
+        }
+
+        _pendingViewerPath = null;
+        UpdateViewerPreview();
     }
 
     // Non-image selections (and images whose decode failed). Two steps, in
