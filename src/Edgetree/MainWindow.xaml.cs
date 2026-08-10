@@ -1220,6 +1220,48 @@ public partial class MainWindow : Window
             return;
         }
 
+        // F1 from anywhere, including out of a text box: it is the one key on a
+        // keyboard that means the same thing in every program, and someone
+        // reaching for it is by definition unsure where they are.
+        if (e.Key == Key.F1 && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            ShowHelpWindow();
+            e.Handled = true;
+            return;
+        }
+
+        // The two transport actions that had no key, both gated on a film
+        // actually being loaded so the tree keeps these keys everywhere else -
+        // Home is "first row" in a TreeView and P starts its type-ahead.
+        //
+        // Home for 처음으로, because that is what Home means; the button it
+        // matches is the one that undoes a resumed position.
+        //
+        // TWO keys for 위치 기록, which is unusual here and deliberate: Insert
+        // is where the hand already goes to add something in this app, and P is
+        // reachable without leaving the ←→ the other hand is seeking with.
+        // Both toggle, so the same key takes a mark back the way pressing the
+        // same second twice does.
+        if (Keyboard.Modifiers == ModifierKeys.None &&
+            _viewerOpen &&
+            _viewerVideoPath is not null &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            if (e.Key == Key.Home)
+            {
+                ViewerMediaRewind_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key is Key.P or Key.Insert)
+            {
+                ViewerMediaMark_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+                return;
+            }
+        }
+
         if (Keyboard.Modifiers == ModifierKeys.None &&
             _viewerOpen &&
             e.Key == Key.Space &&
@@ -8582,7 +8624,26 @@ public partial class MainWindow : Window
         // The "해제" chip on a list row (MenuRowActionButtonStyle). Follows the
         // zoom like everything else, one step down and floored so it stays
         // legible at the smallest tree font.
-        appResources["MenuChipFontSize"] = Math.Max(9.0, ExplorerTree.FontSize - 2.0);
+        double menuChipFontSize = Math.Max(9.0, ExplorerTree.FontSize - 2.0);
+        appResources["MenuChipFontSize"] = menuChipFontSize;
+        // The middle of every stepper row in a menu, whether it holds a number
+        // or a mark. ONE width, so the − and + land in the same two places on
+        // every row of a group - they were 26 for a size, 38 for a signed
+        // offset and auto for a word, which put three pairs of buttons in three
+        // different columns down one menu. Sized for the widest thing any of
+        // them shows (a signed offset, "-3.0s") and scaled with the font, since
+        // a literal would start clipping the moment Ctrl+ was pressed.
+        double stepperValueWidth = Math.Round(menuChipFontSize * 2.9);
+        appResources["MenuStepperValueWidth"] = stepperValueWidth;
+        // A mark in that middle slot is a BUTTON, so it draws a box, and a box
+        // stretched to the width a "-3.0s" needs is a slab beside two neat
+        // square ones. It takes the same box as its neighbours instead and
+        // makes the slot up in margin, so the − and + still land where the rows
+        // below put them - the alignment lives in the SLOT, not in the button.
+        double stepperButtonSize = Math.Max(20.0, Math.Round(20.0 * scale));
+        appResources["MenuStepperMarkMargin"] =
+            new Thickness(Math.Max(0, (stepperValueWidth - stepperButtonSize) / 2), 0,
+                          Math.Max(0, (stepperValueWidth - stepperButtonSize) / 2), 0);
         appResources["MenuGestureFontSize"] = Math.Max(8.0, Math.Round(11.0 * scale));
         // The dialogs (색상 설정, 앱 정보) live in their own windows, so nothing
         // of the tree's zoom reached them - they stayed at a hardcoded 12pt in a
@@ -8601,6 +8662,12 @@ public partial class MainWindow : Window
         // button - 랜덤 전으로 was clipping at 330 (2026-08-09; the
         // widening was the suggested fix). The other dialogs stay at 330.
         appResources["ColorDialogWidth"] = Math.Round(390.0 * scale);
+        // Help is two columns of text, so it needs the width the other dialogs
+        // do not - at 390 the gesture column would wrap every phrase in it. But
+        // not so much that the window comes out square: 620 against a 640-tall
+        // first size read as a box rather than a page. Long gesture labels were
+        // shortened instead of the window widened.
+        appResources["HelpDialogWidth"] = Math.Round(540.0 * scale);
         // The colour window's hex box and the line under it. Wide enough for
         // "#RRGGBB" with room to spare, and the hint a step smaller - set apart
         // by size, never by fading.
@@ -8776,6 +8843,28 @@ public partial class MainWindow : Window
         // Same immediate-save reasoning as the language change.
         _settingsService.Save(_settings);
     }
+
+    // One at a time. F1 is easy to lean on, and a stack of identical help
+    // windows is the kind of thing that only shows up on someone else's machine.
+    private HelpWindow? _helpWindow;
+
+    private void ShowHelpWindow()
+    {
+        if (_helpWindow is { IsLoaded: true })
+        {
+            _helpWindow.Activate();
+            return;
+        }
+
+        // NOT ShowDialog, unlike the other dialogs here: help is read WHILE
+        // trying the thing it describes, so it must not lock the tree behind it.
+        _helpWindow = new HelpWindow(_settings, () => _settingsService.Save(_settings)) { Owner = this };
+        _helpWindow.Closed += (_, _) => _helpWindow = null;
+        PositionNearOptionsButton(_helpWindow);
+        _helpWindow.Show();
+    }
+
+    private void HelpMenuItem_Click(object sender, RoutedEventArgs e) => ShowHelpWindow();
 
     private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -15782,7 +15871,7 @@ public partial class MainWindow : Window
     private int _subtitleToken;
 
     private const double MinSubtitleFontSize = 10;
-    private const double MaxSubtitleFontSize = 40;
+    private const double MaxSubtitleFontSize = 48;
 
     // Half a second a press: small enough to land on, large enough that a real
     // drift takes a few presses rather than twenty. Bounded well past anything
@@ -16723,8 +16812,19 @@ public partial class MainWindow : Window
     // what makes a 3840 picture on a 3840 screen land at exactly 1:1: the raw
     // fit works out a hair over 1.0, because a maximized WPF window is a few
     // pixels wider than the screen it covers, and the ceiling swallows it.
+    //
+    // A FILM IS EXEMPT FROM THE CEILING (2026-08-11). The rule above was
+    // written for photographs and is right for them; applied to a film it says
+    // a 1080p one should be watched as a 1920-wide rectangle in the middle of a
+    // 4K screen, which is not what full screen means and not what any player
+    // does. The reason the two differ: a photo blown up 2x shows its own
+    // pixels, and that is a worse picture than a smaller sharp one - a film is
+    // MOVING, its frames are already lossy, and the upscale costs nothing the
+    // eye is looking for.
     private double ViewerRestScale =>
-        _viewerFullscreen ? Math.Min(1, ViewerFitScale) : ViewerFitScale;
+        _viewerFullscreen && _viewerVideoPath is null
+            ? Math.Min(1, ViewerFitScale)
+            : ViewerFitScale;
 
     private double ViewerDisplayScale => _viewerZoom ?? ViewerRestScale;
 
@@ -17233,15 +17333,38 @@ public partial class MainWindow : Window
         // band of background across the top of the picture (reported with a
         // screenshot, 2026-08-08). The height has to go too.
         HeaderRow.Height = on ? new GridLength(0) : new GridLength(36);
-        // The caption is the ONE piece of chrome a playing video keeps: the
-        // transport strip lives in it, and a full screen with no way to pause
-        // or seek is a worse trade than the strip's own height. It is also
-        // what the viewers this was modelled on do - their fullscreen carries
-        // the same bar. A still picture gives it up as before.
-        ViewerCaptionPanel.Visibility = on && _viewerVideoPath is not null
-            ? Visibility.Visible
-            : chrome;
+        // Leaving full screen takes the overlay with it - otherwise the caption
+        // would come back still wearing its overlay row and plate.
+        if (!on)
+        {
+            HideFullScreenTransport();
+        }
+
+        // A film gives the caption up too, 2026-08-11. It used to be kept for
+        // one reason - the transport strip lives in it, and a full screen with
+        // no way to pause or seek looked like the worse trade - but full screen
+        // on a film is the case where nothing but the film should be on the
+        // screen, and the strip sat across the bottom of it saying so.
+        //
+        // Nothing is actually lost, because the transport was never the only
+        // way to work the film: a left-click on the picture toggles play,
+        // space does the same, ←→ seek and Esc or Enter comes back out. The
+        // subtitle line stays - it is part of watching, not chrome, and it
+        // lives outside this panel already for that reason.
+        ViewerCaptionPanel.Visibility = chrome;
         ViewerImage.Margin = on ? default : new Thickness(10);
+
+        // BLACK behind the picture in full screen, and only there. The panel's
+        // own backdrop is a colour someone chose to sit beside their tree, and
+        // it is the right one there - a picture in a sidebar is an object on a
+        // surface. Full screen is not that: the letterbox bars are the only
+        // thing left around the picture, and any colour at all in them is a
+        // frame the picture is being shown inside. Black is the absence of one.
+        // Restored rather than switched, so a picker change made while full
+        // screen still lands correctly on the way out.
+        ViewerPanel.Background = on
+            ? System.Windows.Media.Brushes.Black
+            : (System.Windows.Media.Brush)FindResource("ViewerBackground");
         ViewerPanel.BorderThickness = on
             ? default
             : (_viewerOnLeft ? new Thickness(0, 0, 1, 0) : new Thickness(1, 0, 0, 0));
@@ -18392,6 +18515,13 @@ public partial class MainWindow : Window
 
         if (!ViewerCanPan)
         {
+            // Nothing to pan, so the same drag can mean the other obvious
+            // thing. The condition is the whole design: while the picture IS
+            // bigger than the panel, sideways drag has to stay pan or there is
+            // no way to reach the sides of it. At fit - which is where anyone
+            // walking a folder actually is - dragging can only have meant the
+            // next picture.
+            StartViewerFlick(e);
             return;
         }
 
@@ -18404,8 +18534,206 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    // ---- The film's transport, on call in full screen -----------------------
+    //
+    // Full screen on a film shows the film and nothing else, which is right
+    // until you want to know how far in you are. So the transport comes back
+    // when the pointer goes looking for it - the bottom of the screen, where
+    // every player keeps it - and goes away again when it leaves.
+    //
+    // The panel is not re-parented to do this. It is MOVED to the picture's own
+    // grid row and aligned to the bottom, which is the same trick the subtitle
+    // plate has always used, and it means the one instance keeps its handlers,
+    // its capture and its bindings. Grid.Row goes back on the way out.
+    private const double FullScreenTransportBandHeight = 140;
+    private bool _fullScreenTransportShown;
+
+    private void ViewerPanel_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_viewerFullscreen || _viewerVideoPath is null)
+        {
+            return;
+        }
+
+        double y = e.GetPosition(ViewerPanel).Y;
+        if (y >= ViewerPanel.ActualHeight - FullScreenTransportBandHeight)
+        {
+            ShowFullScreenTransport();
+        }
+        else
+        {
+            HideFullScreenTransport();
+        }
+    }
+
+    private void ViewerPanel_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        => HideFullScreenTransport();
+
+    private void ShowFullScreenTransport()
+    {
+        if (_fullScreenTransportShown)
+        {
+            return;
+        }
+
+        _fullScreenTransportShown = true;
+        Grid.SetRow(ViewerCaptionPanel, 0);
+        ViewerCaptionPanel.VerticalAlignment = VerticalAlignment.Bottom;
+        // Its own plate, because it is now sitting on the film rather than on
+        // the panel's backdrop, and a seek bar drawn straight onto a bright
+        // frame cannot be read at all.
+        ViewerCaptionPanel.Background = new SolidColorBrush(Color.FromArgb(0xB4, 0, 0, 0));
+        // The PLATE runs to the edges of the screen; the CONTROLS keep their
+        // room inside it. Two cuts got here: edge to edge with 2px underneath
+        // read as cut off, and insetting the whole plate fixed that but left a
+        // floating card with film showing under it, which is not what a bar
+        // across the bottom of a screen looks like. StackPanel has no Padding,
+        // so the plate takes no margin at all and the air comes from the
+        // transport row's own.
+        ViewerCaptionPanel.Margin = new Thickness(0);
+        ViewerMediaBar.Margin = new Thickness(16, 10, 16, 14);
+        ViewerCaptionPanel.Visibility = Visibility.Visible;
+
+        // ONLY the transport. The name, the metadata and the counter are the
+        // information full screen was asked to get rid of; what was asked for
+        // back is the bar.
+        ViewerCarouselBar.Visibility = Visibility.Collapsed;
+        ViewerFileName.Visibility = Visibility.Collapsed;
+        ViewerFileInfo.Visibility = Visibility.Collapsed;
+
+        // The subtitle line lives at the bottom too, so it steps up out of the
+        // way rather than being covered by what just arrived.
+        ViewerSubtitlePlate.Margin = new Thickness(16, 0, 16, 18 + FullScreenSubtitleLift);
+    }
+
+    private const double FullScreenSubtitleLift = 64;
+
+    private void HideFullScreenTransport()
+    {
+        if (!_fullScreenTransportShown)
+        {
+            return;
+        }
+
+        _fullScreenTransportShown = false;
+        Grid.SetRow(ViewerCaptionPanel, 2);
+        ViewerCaptionPanel.VerticalAlignment = VerticalAlignment.Stretch;
+        ViewerCaptionPanel.Background = null;
+        ViewerCaptionPanel.Margin = new Thickness(10, 0, 10, 10);
+        ViewerMediaBar.Margin = new Thickness(0);
+        ViewerCaptionPanel.Visibility = _viewerFullscreen
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+
+        // Put back for the panel, where UpdateViewerCarousel and the caption
+        // builder own them again.
+        ViewerCarouselBar.Visibility = Visibility.Visible;
+        ViewerFileName.Visibility = Visibility.Visible;
+        ViewerFileInfo.Visibility = Visibility.Visible;
+        ViewerSubtitlePlate.Margin = new Thickness(16, 0, 16, 18);
+    }
+
+    // Drag across a fitted picture to walk the folder.
+    //
+    // Deliberately NOT a video gesture: a left-click on a film already toggles
+    // play, and a film is the one thing in this panel you stay on rather than
+    // page through.
+    private bool _viewerFlicking;
+    private bool _viewerFlickFired;
+    private System.Windows.Point _viewerFlickOrigin;
+
+    private void StartViewerFlick(MouseButtonEventArgs e)
+    {
+        if (_viewerVideoPath is not null || !_viewerShowingDecodedImage)
+        {
+            return;
+        }
+
+        _viewerFlicking = true;
+        _viewerFlickFired = false;
+        _viewerFlickOrigin = e.GetPosition(ViewerImageHost);
+        // Captured, so the gesture survives the pointer leaving the picture -
+        // and NOT marked handled, so the click underneath it goes on doing
+        // whatever it did before.
+        ViewerImageHost.CaptureMouse();
+    }
+
+    // A share of the panel rather than a fixed number of pixels: the same 60px
+    // is a quarter of the narrowest panel and a twentieth of a wide one, and
+    // the gesture should ask for about the same amount of hand either way.
+    //
+    // Raised hard from 12% (2026-08-11): at that distance a shake of the hand
+    // looked like it turned the page, which makes every ordinary click on the
+    // picture feel unsafe. A gesture that moves to another file has to want a
+    // real push, and the cost of asking for one is only that the deliberate
+    // case takes a moment longer.
+    private double ViewerFlickThreshold
+        => Math.Clamp(ViewerImageHost.ActualWidth * 0.28, 110, 260);
+
+
+    // Fired the moment the threshold is crossed, not on release: the picture
+    // changing under the hand is what says the gesture worked. Once per drag,
+    // so a long sweep is one picture rather than a scroll through the folder.
+    private void UpdateViewerFlick(System.Windows.Input.MouseEventArgs e)
+    {
+        if (_viewerFlickFired)
+        {
+            return;
+        }
+
+        var point = e.GetPosition(ViewerImageHost);
+        double dx = point.X - _viewerFlickOrigin.X;
+        double dy = point.Y - _viewerFlickOrigin.Y;
+
+        // NO follow-the-hand feedback, tried and dropped the same day
+        // (2026-08-11). The picture moved a third of the drag's distance to
+        // show the gesture was being taken, and it read as the picture being
+        // unsteady rather than as the control resisting - worse than nothing.
+        // Raising the threshold and adding a dead zone did not rescue it, so
+        // both went with it. The gesture works without it:
+        // the picture changing IS the feedback, and until it does, nothing
+        // moving is the correct answer for a click that was never a drag.
+        //
+        // Sideways has to WIN, not merely happen - otherwise a downward drag
+        // with any lean to it pages the folder.
+        if (Math.Abs(dx) < ViewerFlickThreshold || Math.Abs(dx) <= Math.Abs(dy))
+        {
+            return;
+        }
+
+        _viewerFlickFired = true;
+        // Home before the next picture arrives, so it is never drawn offset.
+        ViewerZoomPan.X = 0;
+        // Dragging left pulls the next picture in from the right, which is the
+        // direction every photo app on a phone has taught. It is also what the
+        // hand is literally doing - pushing this one out of the way.
+        ViewerCarouselStep(dx < 0 ? 1 : -1);
+    }
+
+    private void EndViewerFlick()
+    {
+        if (!_viewerFlicking)
+        {
+            return;
+        }
+
+        _viewerFlicking = false;
+        // Straight back, not eased back. An animation here would be the app
+        // moving the picture on its own, which is the one kind of motion this
+        // app does not do - and the snap reads as the control being released
+        // rather than as something being undone.
+        ViewerZoomPan.X = 0;
+        ViewerImageHost.ReleaseMouseCapture();
+    }
+
     private void ViewerImageHost_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        if (_viewerFlicking)
+        {
+            UpdateViewerFlick(e);
+            return;
+        }
+
         if (!_viewerPanning)
         {
             return;
@@ -18426,6 +18754,7 @@ public partial class MainWindow : Window
 
     private void ViewerImageHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
+        EndViewerFlick();
         if (!_viewerPanning)
         {
             return;
@@ -18443,6 +18772,11 @@ public partial class MainWindow : Window
     // hides: any path that ends a pan other than the user letting go.
     private void ViewerImageHost_LostMouseCapture(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        // The flick shares the same hazard and the same answer: left set, a
+        // bare mouse move with no button held would page the folder.
+        _viewerFlicking = false;
+        ViewerZoomPan.X = 0;
+
         if (!_viewerPanning)
         {
             return;

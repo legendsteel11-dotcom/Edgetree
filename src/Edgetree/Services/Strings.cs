@@ -143,7 +143,9 @@ public static class Strings
     // fault may not even be this app's (another program fighting over the
     // same edge/hooks), and a restart clears both kinds at once.
     public static string MenuRestart = "다시 시작";
+    public static string MenuHelp = "도움말";
     public static string MenuAbout = "앱 정보";
+    public static string HelpTitle = "Edgetree 도움말";
 
     // Fixed, deliberately not switched by Initialize() below - shown the same
     // in either language rather than "언어 / Language", since the word
@@ -578,7 +580,9 @@ public static class Strings
         ColorSwatchTooltip = "Click: color picker · Right-click: enter a color code";
         ColorHexInputHint = "#RRGGBB · Enter to apply, Esc to cancel";
         MenuRestart = "Restart";
+        MenuHelp = "Help";
         MenuAbout = "About";
+        HelpTitle = "Edgetree help";
         MenuIconStyle = "Icon Style";
         MenuIconStyleDefault = "Default";
         MenuIconStyleShell = "Windows Explorer";

@@ -45,6 +45,14 @@ public class AppSettings
     // glancing at a folder, which is exactly the shape a setting is for.
     public bool ViewerPrecacheThumbnails { get; set; } = false;
 
+    // The help window's size, because it is the one dialog here that can be
+    // resized and therefore the one someone can have an opinion about. 0 means
+    // "never sized by hand" - the window works out its own first size then, and
+    // deliberately not from the content: the document is several screens long,
+    // so sizing to it opens a window as tall as the monitor.
+    public double HelpWindowWidth { get; set; } = 0;
+    public double HelpWindowHeight { get; set; } = 0;
+
     // Playback marks: places in a film someone wanted to be able to come back
     // to, kept per file and shown as ticks over the position bar.
     //

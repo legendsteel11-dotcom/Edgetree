@@ -1945,6 +1945,13 @@
                  back in a second. -->
             <MenuItem Header="{x:Static services:Strings.MenuRestart}"
                     Click="RestartMenuItem_Click"/>
+            <!-- F1 is the real way in and this row is how anyone finds out
+                 that F1 is. Above 앱 정보 because it answers a question about
+                 using the app, which is what someone opening this menu is
+                 doing; the version and the licences are what they read once. -->
+            <MenuItem Header="{x:Static services:Strings.MenuHelp}"
+                    InputGestureText="F1"
+                    Click="HelpMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuAbout}"
                     Click="AboutMenuItem_Click"/>
         </ContextMenu>
@@ -2362,305 +2369,8 @@
             </Setter>
         </Style>
 
-        <!-- A thin, translucent scrollbar thumb (VS Code style) instead of the
-             stock Windows scrollbar chrome. Implicit (no x:Key) so it applies to
-             every ScrollBar in scope, including the TreeView's internal one. -->
-        <Style x:Key="MinimalScrollBarThumb"
-                TargetType="Thumb">
-            <Setter Property="Background"
-                    Value="#33FFFFFF"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Thumb">
-                        <Border x:Name="ThumbBorder"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="2"
-                                Margin="1"/>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver"
-                                    Value="True">
-                                <Setter TargetName="ThumbBorder"
-                                        Property="Background"
-                                        Value="#55FFFFFF"/>
-                            </Trigger>
-                            <Trigger Property="IsDragging"
-                                    Value="True">
-                                <Setter TargetName="ThumbBorder"
-                                        Property="Background"
-                                        Value="#70FFFFFF"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
 
-        <!-- Keyed explicitly (not implicit-by-TargetType) and wired directly onto
-             PART_VerticalScrollBar/PART_HorizontalScrollBar below - relying on
-             implicit TargetType resolution here previously lost to the theme's
-             own ScrollBar styling inside ScrollViewer's default template. -->
-        <Style x:Key="MinimalScrollBarStyle" TargetType="{x:Type ScrollBar}">
-            <Setter Property="Background"
-                    Value="Transparent"/>
-            <!-- Hidden at rest; hit-testing still works at Opacity 0, so moving the
-                 mouse toward the edge is enough to reveal it (VS Code / overlay-
-                 scrollbar style), and it fades back out once the mouse leaves. -->
-            <Setter Property="Opacity"
-                    Value="0"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ScrollBar}">
-                        <Grid Background="Transparent">
-                            <!-- Track defaults to Vertical and ignores the ScrollBar's own
-                                 Orientation unless explicitly bound - without this, a
-                                 horizontal scrollbar renders as a stray vertical sliver. -->
-                            <Track x:Name="PART_Track"
-                                    IsDirectionReversed="True"
-                                   Orientation="{TemplateBinding Orientation}">
-                                <Track.Thumb>
-                                    <Thumb x:Name="ScrollBarThumb"
-                                            Style="{StaticResource MinimalScrollBarThumb}"/>
-                                </Track.Thumb>
-                                <Track.DecreaseRepeatButton>
-                                    <RepeatButton Command="ScrollBar.PageUpCommand"
-                                            Opacity="0"
-                                            Focusable="False"/>
-                                </Track.DecreaseRepeatButton>
-                                <Track.IncreaseRepeatButton>
-                                    <RepeatButton Command="ScrollBar.PageDownCommand"
-                                            Opacity="0"
-                                            Focusable="False"/>
-                                </Track.IncreaseRepeatButton>
-                            </Track>
-                        </Grid>
-                        <!-- A floor on the grab area. Track sizes the thumb
-                             purely as viewport ÷ content, with no minimum of
-                             its own, so a long tree in a short window shrank it
-                             to a few pixels - visible, but not something you
-                             can catch with a mouse (2026-08-10, with the
-                             window pulled down to about six rows).
-                             Set per orientation because the thumb's long axis
-                             is the one being squeezed; forcing the other one
-                             would push it out of a bar that is only
-                             ScrollBarThickness across. -->
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="Orientation"
-                                    Value="Vertical">
-                                <Setter TargetName="ScrollBarThumb"
-                                        Property="MinHeight"
-                                        Value="28"/>
-                            </Trigger>
-                            <Trigger Property="Orientation"
-                                    Value="Horizontal">
-                                <Setter TargetName="ScrollBarThumb"
-                                        Property="MinWidth"
-                                        Value="28"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <!-- The "thickness" dimension is Width for a vertical scrollbar but
-                 Height for a horizontal one; a single fixed Width made the
-                 horizontal scrollbar's own Track (now orientation-aware) collapse
-                 into a sliver instead of spanning the bottom edge. -->
-            <Style.Triggers>
-                <Trigger Property="Orientation"
-                        Value="Vertical">
-                    <Setter Property="Width"
-                            Value="{DynamicResource ScrollBarThickness}"/>
-                </Trigger>
-                <Trigger Property="Orientation"
-                        Value="Horizontal">
-                    <Setter Property="Height"
-                            Value="{DynamicResource ScrollBarThickness}"/>
-                </Trigger>
-            </Style.Triggers>
-            <!-- Revealing this used to be driven from the bar's own
-                 MouseEnter/MouseLeave, which meant it only appeared once the
-                 cursor was already inside a 5px invisible strip - you had to
-                 find a thing you couldn't see in order to make it visible. It
-                 is now driven by the ScrollViewer's hover instead (see
-                 MinimalScrollViewerTemplate's triggers), so the thumb shows as
-                 soon as the pointer is anywhere over the list and can simply be
-                 aimed at. Widened from 5 to 8 for the same reason: the search
-                 results were the worst case, where a click meant for the
-                 scrollbar landed on a result row instead and navigated away to
-                 that file - a miss with a consequence, not just an annoyance. -->
-        </Style>
 
-        <!-- ScrollViewer's own default template creates PART_VerticalScrollBar /
-             PART_HorizontalScrollBar with no explicit Style, which should resolve
-             our style implicitly - but empirically it kept losing to the theme's
-             own ScrollBar styling. Replacing ScrollViewer's template too, with
-             Style="{StaticResource MinimalScrollBarStyle}" set directly on the
-             parts, removes any ambiguity about which style wins. -->
-        <ControlTemplate x:Key="MinimalScrollViewerTemplate" TargetType="ScrollViewer">
-            <!-- Single-cell overlay, not a Grid with a dedicated Auto column/row for
-                 each ScrollBar: a reserved column stayed reserved (5px wide) even
-                 while the bar itself sat at Opacity 0 between scrolls, so content
-                 never actually reached the container's right/bottom edge - a
-                 permanent sliver-wide gap, most visible once the sidebar became a
-                 free-floating window surrounded by other content instead of flush
-                 against the screen edge. Right/Bottom-aligned ScrollBars drawn on
-                 top of the full-bleed content instead give the true VS Code-style
-                 overlay the styling elsewhere already intended. -->
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <!-- Zero until there is actually something to scroll, then
-                         widened by the trigger below. The original template
-                         overlaid the bar on the content precisely because an
-                         always-reserved column left a permanent sliver of empty
-                         space down the edge; keying the width off
-                         ComputedVerticalScrollBarVisibility keeps that fixed
-                         while still giving the bar a lane of its own whenever
-                         it appears, so long file names no longer run underneath
-                         it. -->
-                    <ColumnDefinition x:Name="ScrollGutterColumn"
-                            Width="0"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- The default ScrollViewer template wraps this in a Border with
-                     Padding="{TemplateBinding Padding}" - our replacement dropped
-                     that wrapper for the minimal scrollbar layout, which silently
-                     made every ScrollViewer.Padding (TreeView's and FavoritesList's
-                     both) a no-op. Margin here restores it. -->
-                <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
-                                         Grid.Column="0"
-                                         Content="{TemplateBinding Content}"
-                                         CanContentScroll="{TemplateBinding CanContentScroll}"
-                                         Margin="{TemplateBinding Padding}"/>
-
-                <!-- Marks where the content stops and the bar's lane begins.
-                     Shown with the lane, not with the bar's hover fade - it is
-                     the boundary that explains why the text ends there, so it
-                     has to be there whether or not the pointer is. -->
-                <Border x:Name="ScrollGutterLine"
-                        Grid.Column="1"
-                        Width="1"
-                        HorizontalAlignment="Left"
-                        Background="{DynamicResource PanelDividerBrush}"
-                        Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
-
-                <ScrollBar x:Name="PART_VerticalScrollBar"
-                           Grid.Column="1"
-                           Style="{StaticResource MinimalScrollBarStyle}"
-                           Orientation="Vertical"
-                           HorizontalAlignment="Right"
-                           Value="{TemplateBinding VerticalOffset}"
-                           Maximum="{TemplateBinding ScrollableHeight}"
-                           ViewportSize="{TemplateBinding ViewportHeight}"
-                           Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
-                <ScrollBar x:Name="PART_HorizontalScrollBar"
-                           Grid.Column="0"
-                           Grid.ColumnSpan="2"
-                           Style="{StaticResource MinimalScrollBarStyle}"
-                           Orientation="Horizontal"
-                           VerticalAlignment="Bottom"
-                           Value="{TemplateBinding HorizontalOffset}"
-                           Maximum="{TemplateBinding ScrollableWidth}"
-                           ViewportSize="{TemplateBinding ViewportWidth}"
-                           Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"/>
-
-                <!-- "There is more this way", for MENUS only. Declared here
-                     rather than in a duplicated menu template, and Collapsed
-                     for everyone: the only thing that ever shows them is
-                     MenuScrollViewer_ScrollChanged, and the only style that
-                     attaches that handler is MenuScrollViewerStyle. The tree,
-                     the favorites list and the search results carry these two
-                     Paths and never light them.
-
-                     A menu needs them because its scrollbar is hidden at rest
-                     like the tree's - so until the pointer went looking along
-                     the edge, the fact that a menu scrolled at all was
-                     invisible. Static, never blinking: a menu is a surface the
-                     user is already reading, and motion there takes the eye by
-                     force rather than informing it (agreed 2026-08-02). One
-                     look is all this has to survive. -->
-                <!-- Column 0 only, NOT spanning the gutter: centred over the
-                     rows, which is what the eye reads as the middle of the
-                     menu. Spanning both columns pushed it half the scrollbar's
-                     width off from the text it belongs to. The gutter column
-                     is 0 wide until there is something to scroll, so this is
-                     the true centre either way. -->
-                <Path x:Name="MoreAboveGlyph"
-                        Grid.Column="0"
-                        Data="M0,4 L4,0 L8,4"
-                        Stroke="{DynamicResource MenuForeground}"
-                        StrokeThickness="1.4"
-                        StrokeLineJoin="Round"
-                        StrokeStartLineCap="Round"
-                        StrokeEndLineCap="Round"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Top"
-                        Margin="0,1,0,0"
-                        IsHitTestVisible="False"
-                        Visibility="Collapsed"/>
-                <Path x:Name="MoreBelowGlyph"
-                        Grid.Column="0"
-                        Data="M0,0 L4,4 L8,0"
-                        Stroke="{DynamicResource MenuForeground}"
-                        StrokeThickness="1.4"
-                        StrokeLineJoin="Round"
-                        StrokeStartLineCap="Round"
-                        StrokeEndLineCap="Round"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Bottom"
-                        Margin="0,0,0,1"
-                        IsHitTestVisible="False"
-                        Visibility="Collapsed"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-                <!-- The user-set bar thickness plus the 1px divider - both
-                     recomputed together in ApplyLayoutMetrics. -->
-                <Trigger Property="ComputedVerticalScrollBarVisibility"
-                        Value="Visible">
-                    <Setter TargetName="ScrollGutterColumn"
-                            Property="Width"
-                            Value="{DynamicResource ScrollGutterWidth}"/>
-                </Trigger>
-                <!-- Hovering anywhere in the scrollable area reveals both bars,
-                     rather than each bar waiting for the pointer to land on its
-                     own hidden strip - see MinimalScrollBarStyle's note. The
-                     fade-out is slower and delayed so the bar doesn't vanish
-                     the instant the pointer drifts off the list on its way to
-                     the thumb. -->
-                <Trigger Property="IsMouseOver"
-                        Value="True">
-                    <Trigger.EnterActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetName="PART_VerticalScrollBar"
-                                        Storyboard.TargetProperty="Opacity"
-                                        To="1"
-                                        Duration="0:0:0.1"/>
-                                <DoubleAnimation Storyboard.TargetName="PART_HorizontalScrollBar"
-                                        Storyboard.TargetProperty="Opacity"
-                                        To="1"
-                                        Duration="0:0:0.1"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.EnterActions>
-                    <Trigger.ExitActions>
-                        <BeginStoryboard>
-                            <Storyboard>
-                                <DoubleAnimation Storyboard.TargetName="PART_VerticalScrollBar"
-                                        Storyboard.TargetProperty="Opacity"
-                                        To="0"
-                                        Duration="0:0:0.6"
-                                        BeginTime="0:0:0.3"/>
-                                <DoubleAnimation Storyboard.TargetName="PART_HorizontalScrollBar"
-                                        Storyboard.TargetProperty="Opacity"
-                                        To="0"
-                                        Duration="0:0:0.6"
-                                        BeginTime="0:0:0.3"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </Trigger.ExitActions>
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
 
         <Style x:Key="ExplorerTreeViewStyle"
                 TargetType="TreeView">
@@ -5366,7 +5076,9 @@
                     Background="{DynamicResource ViewerBackground}"
                     BorderBrush="{DynamicResource PanelDividerBrush}"
                     BorderThickness="1,0,0,0"
-                    PreviewMouseDown="ViewerPanel_PreviewMouseDown">
+                    PreviewMouseDown="ViewerPanel_PreviewMouseDown"
+                    PreviewMouseMove="ViewerPanel_PreviewMouseMove"
+                    MouseLeave="ViewerPanel_MouseLeave">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
@@ -5416,10 +5128,25 @@
                                     Opened="AnyMenu_Opened"
                                     Closed="AnyMenu_Closed"
                                     PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
-                                <!-- No "Enter" gesture on 열기: while a decoded
+                                <!-- NOT the tree's bare "열기" (2026-08-11). In
+                                     the tree that word is exactly right - it is
+                                     Explorer's own verb and the row is not
+                                     showing you anything yet. Here the file is
+                                     already open, on the screen, being watched
+                                     - so "열기" has nothing left to mean except
+                                     "open something", which reads as a file
+                                     dialog about to appear.
+                                     Naming the destination fixes it, and the
+                                     phrase is already in the app twice: the
+                                     transport row's own external button and the
+                                     line shown when a format will not play. The
+                                     row below it (연결 프로그램) then reads as
+                                     the pair it is - default, or choose.
+
+                                     No "Enter" gesture on it: while a decoded
                                      image is showing, Enter is the full-screen
                                      toggle. -->
-                                <MenuItem Header="{x:Static services:Strings.MenuOpen}"
+                                <MenuItem Header="{x:Static services:Strings.ViewerOpenExternally}"
                                         Click="OpenItem_Click"/>
                                 <MenuItem x:Name="ViewerOpenWithItem"
                                         Header="{x:Static services:Strings.MenuOpenWith}"
@@ -5444,6 +5171,7 @@
                                         Visibility="Collapsed"/>
                                 <MenuItem x:Name="ViewerRewindItem"
                                         Header="{x:Static services:Strings.ViewerRewind}"
+                                        InputGestureText="Home"
                                         Click="ViewerMediaRewind_Click"
                                         Visibility="Collapsed"/>
                                 <!-- The film's zoom, HERE and not in the strip:
@@ -5524,21 +5252,40 @@
                                                 <Button Content="−"
                                                         Style="{StaticResource MenuStepperButtonStyle}"
                                                         Click="ViewerZoomOutButton_Click"/>
-                                                <!-- A step below the menu font,
-                                                     the same one every other
-                                                     in-menu action word takes
-                                                     (MenuChipFontSize): at the
-                                                     stepper's own size the word
-                                                     sat heavier than the two
-                                                     glyphs it stands between. -->
-                                                <Button Content="{x:Static services:Strings.ViewerZoomFit}"
-                                                        Style="{StaticResource MenuStepperButtonStyle}"
-                                                        Width="Auto"
-                                                        Padding="8,0"
-                                                        FontWeight="Normal"
-                                                        FontSize="{DynamicResource MenuChipFontSize}"
-                                                        Margin="4,0"
-                                                        Click="ViewerFitChip_Click"/>
+                                                <!-- The SAME fit mark the zoom
+                                                     strip carries (Material
+                                                     Symbols "fit_screen"),
+                                                     not the word it used to
+                                                     be. One idea drawn one way
+                                                     wherever it appears: the
+                                                     chip and this row do the
+                                                     same thing and now say it
+                                                     with the same shape, and a
+                                                     word between two glyph
+                                                     steppers was the last
+                                                     place in the viewer where
+                                                     an action was spelled out
+                                                     rather than drawn. -->
+                                                <!-- Box the size of its
+                                                     neighbours, slot the width
+                                                     of the readouts below:
+                                                     MenuStepperMarkMargin is
+                                                     the difference, split in
+                                                     two. The style's own Width
+                                                     is left alone, which is
+                                                     what makes the three boxes
+                                                     in this row identical. -->
+                                                <Button Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Margin="{DynamicResource MenuStepperMarkMargin}"
+                                                        ToolTip="{x:Static services:Strings.ViewerZoomFit}"
+                                                        Click="ViewerFitChip_Click">
+                                                    <Path Data="M792-576v-120H672v-72h120q30 0 51 21.15T864-696v120h-72Zm-696 0v-120q0-30 21.15-51T168-768h120v72H168v120H96Zm576 384v-72h120v-120h72v120q0 30-21.15 51T792-192H672Zm-504 0q-30 0-51-21.15T96-264v-120h72v120h120v72H168Zm72-144v-288h480v288H240Zm72-72h336v-144H312v144Zm0 0v-144 144Z"
+                                                            Stretch="Uniform"
+                                                            Width="{DynamicResource MenuChipFontSize}"
+                                                            Height="{DynamicResource MenuChipFontSize}"
+                                                            Fill="{Binding Foreground,
+                                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                                </Button>
                                                 <Button Content="+"
                                                         Style="{StaticResource MenuStepperButtonStyle}"
                                                         Click="ViewerZoomInButton_Click"/>
@@ -5585,7 +5332,7 @@
                                                         Click="ViewerSubtitleSmaller_Click"/>
                                                 <TextBlock x:Name="ViewerSubtitleSizeText"
                                                         Foreground="{DynamicResource MenuForeground}"
-                                                        Width="26"
+                                                        Width="{DynamicResource MenuStepperValueWidth}"
                                                         TextAlignment="Center"
                                                         VerticalAlignment="Center"/>
                                                 <Button Content="+"
@@ -5622,7 +5369,7 @@
                                                         Click="ViewerSubtitleEarlier_Click"/>
                                                 <TextBlock x:Name="ViewerSubtitleOffsetText"
                                                         Foreground="{DynamicResource MenuForeground}"
-                                                        Width="38"
+                                                        Width="{DynamicResource MenuStepperValueWidth}"
                                                         TextAlignment="Center"
                                                         VerticalAlignment="Center"/>
                                                 <Button Content="+"
@@ -5634,6 +5381,7 @@
                                 </MenuItem>
                                 <MenuItem x:Name="ViewerMarkAddItem"
                                         Header="{x:Static services:Strings.ViewerMarkAdd}"
+                                        InputGestureText="P · Insert"
                                         Click="ViewerMediaMark_Click"
                                         Visibility="Collapsed"/>
                                 <!-- The film's own marks. Built when the menu
@@ -6300,6 +6048,37 @@
                                  running and takes its width from its own text,
                                  so the counter and chevrons never move because
                                  of it - they sit to the LEFT of it. -->
+                            <!-- BACK beside the counter, 2026-08-11. It spent a
+                                 day on the zoom row with the viewer's other
+                                 switches, which is the tidier grouping, and the
+                                 cost stated at the time turned out to be the
+                                 one that mattered: that row is collapsed while
+                                 a video is loaded, so the strip could not be
+                                 switched with a film open - and a folder of
+                                 films is exactly where a strip of frames earns
+                                 its keep. This row is never collapsed. It also
+                                 has an argument of its own: the counter IS the
+                                 filmstrip with the pictures taken out, so the
+                                 switch that unfolds it belongs beside it.
+
+                                 Material Symbols "view_column" (2026-08-10).
+                                 Two box-drawing characters were tried before it
+                                 and both failed the same way: ▤ read as a
+                                 transport control, and ▯▯▯ read as a broken
+                                 glyph once the eye had passed over it a few
+                                 times. -->
+                            <ToggleButton x:Name="ViewerFilmstripChip"
+                                    Style="{StaticResource FooterFilterGlyphChipStyle}"
+                                    Margin="{DynamicResource ViewerChipGroupMargin}"
+                                    Click="ViewerFilmstripChip_Click"
+                                    ToolTip="{x:Static services:Strings.ViewerFilmstrip}">
+                                <Path Data="M144-312v-336q0-29 21.15-50.5T216-720h528q29.7 0 50.85 21.5Q816-677 816-648v336q0 29-21.15 50.5T744-240H216q-29.7 0-50.85-21.5Q144-283 144-312Zm72 0h128v-336H216v336Zm200 0h128v-336H416v336Zm200 0h128v-336H616v336Z"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                            </ToggleButton>
                             <!-- A SMALLER font is what makes this the secondary
                                  thing on the row; the 0.65 is the same ink its
                                  neighbour carries, so the two read as one strip
@@ -6434,36 +6213,6 @@
                                     Click="ViewerNavigatorChip_Click"
                                     ToolTip="{x:Static services:Strings.ViewerNavigator}">
                                 <Path Data="M168-192q-29.7 0-50.85-21.16Q96-234.32 96-264.04v-432.24Q96-726 117.15-747T168-768h624q29.7 0 50.85 21.16Q864-725.68 864-695.96v432.24Q864-234 842.85-213T792-192H168Zm0-72h624v-432H168v432Zm0 0v-432 432Zm288-48h288v-216H456v216Zm72-72v-72h144v72H528Z"
-                                        Stretch="Uniform"
-                                        Width="{DynamicResource ViewerChipIconSize}"
-                                        Height="{DynamicResource ViewerChipIconSize}"
-                                        Fill="{Binding Foreground,
-                                            RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
-                            </ToggleButton>
-                            <!-- Moved here from beside the carousel counter
-                                 (2026-08-10). It used to sit next to
-                                 < 35 / 257 > on the argument that the counter IS
-                                 the filmstrip with the pictures taken out; what
-                                 outweighed it is that this row is now where the
-                                 viewer's switches live, and a switch belongs
-                                 with the other switches.
-                                 The cost, stated when it was moved: this whole
-                                 row is collapsed while a video is loaded (the
-                                 transport strip stands in its place), so the
-                                 filmstrip can no longer be turned on or off
-                                 with a film open.
-
-                                 Material Symbols "view_column" (
-                                 2026-08-10). Two box-drawing characters were
-                                 tried before it and both failed the same way:
-                                 ▤ read as a transport control, and ▯▯▯ read as
-                                 a broken glyph once the eye had passed over it
-                                 a few times. -->
-                            <ToggleButton x:Name="ViewerFilmstripChip"
-                                    Style="{StaticResource FooterFilterGlyphChipStyle}"
-                                    Click="ViewerFilmstripChip_Click"
-                                    ToolTip="{x:Static services:Strings.ViewerFilmstrip}">
-                                <Path Data="M144-312v-336q0-29 21.15-50.5T216-720h528q29.7 0 50.85 21.5Q816-677 816-648v336q0 29-21.15 50.5T744-240H216q-29.7 0-50.85-21.5Q144-283 144-312Zm72 0h128v-336H216v336Zm200 0h128v-336H416v336Zm200 0h128v-336H616v336Z"
                                         Stretch="Uniform"
                                         Width="{DynamicResource ViewerChipIconSize}"
                                         Height="{DynamicResource ViewerChipIconSize}"
