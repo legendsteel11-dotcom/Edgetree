@@ -247,6 +247,7 @@ public static class Strings
     public static string MenuSetWallpaper = "바탕 화면 배경으로 설정";
     public static string ViewerPrevImage = "이전 이미지";
     public static string ViewerNextImage = "다음 이미지";
+    public static string ViewerFilmstrip = "필름스트립";
     public static string ViewerPlay = "재생";
     public static string ViewerPause = "일시정지";
     public static string ViewerStop = "정지";
@@ -592,6 +593,7 @@ public static class Strings
         MenuSetWallpaper = "Set as desktop background";
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
+        ViewerFilmstrip = "Filmstrip";
         ViewerPlay = "Play";
         ViewerPause = "Pause";
         ViewerStop = "Stop";

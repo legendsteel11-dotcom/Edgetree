@@ -25,6 +25,18 @@ public class AppSettings
     // is actually bigger than the panel; there is nothing to navigate at fit.
     public bool ViewerNavigator { get; set; } = false;
 
+    // The filmstrip: the folder's pictures and films as a row of thumbnails
+    // under the panel. OFF by default for the same reason the navigator is -
+    // it takes height from the picture, and a sidebar has little to spare - so
+    // it waits behind the chip in the carousel row for whoever wants it.
+    //
+    // The size is the CELL's height in DIPs, not the strip's: the strip is
+    // whatever the cells plus their padding come to, so the number stays
+    // meaningful if the padding is ever changed. Cell width follows at 4:3, the
+    // shape of a film frame.
+    public bool ViewerFilmstrip { get; set; } = false;
+    public double ViewerFilmstripCellHeight { get; set; } = 64;
+
     // Collapsed to a bare sliver at the screen edge that peeks open on
     // mouse-over - see MainWindow.xaml.cs's EnterAutoHide/ExitAutoHide.
     // Entered by a single click on the app icon while docked and expanded.

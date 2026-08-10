@@ -5079,6 +5079,10 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
+                        <!-- The filmstrip. Auto, and collapsed when the strip is
+                             off, so a viewer without one lays out exactly as it
+                             did before this row existed. -->
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <!-- Zoom and pan (round 2) ride entirely on the Image's
@@ -5344,8 +5348,304 @@
                          chips' unchecked ink (ForegroundText at the chips'
                          own 0.65 - matching them is the user's spec here, so
                          the no-opacity rule yields to the pairing). -->
-                    <StackPanel x:Name="ViewerCaptionPanel"
+                    <!-- The filmstrip: the carousel counter, opened out. What
+                         < 35 / 257 > says in numbers this says in pictures, and
+                         it walks the SAME list (GetViewerCarouselItems) so the
+                         two can never disagree about what the folder holds.
+                         Films are in that list as of 2026-08-10 - a strip that
+                         emptied itself in a folder of films would be a strange
+                         thing to call a filmstrip, and the counter was widened
+                         with it rather than left counting something else.
+
+                         CanContentScroll, and the wheel handler that goes with
+                         it, are what make this move a CELL at a time instead of
+                         a pixel at a time (user's call, and the same choice the
+                         tree made for its rows). Virtualized in the same
+                         breath: it is what keeps a 257-frame folder to the
+                         dozen containers on screen, and the shell is only asked
+                         about a cell once one exists.
+
+                         No animation anywhere in here. Following the selection
+                         is an instant jump - see SyncFilmstripToSelection. -->
+                    <!-- The border is the divider the strip needed: without a
+                         line the frames simply began, and the picture and the
+                         strip read as one crowded thing. At rest it is barely
+                         there - the panel's own divider ink, one pixel - and the
+                         grip on top of it does the rest (see the Thumb below):
+                         a touch stronger under the cursor, FAINTER again while
+                         being dragged, which is this app's standing rule for
+                         grab lines (the hand is already on it; it does not need
+                         to be told twice). -->
+                    <Border x:Name="ViewerFilmstripHost"
                             Grid.Row="1"
+                            BorderThickness="0,1,0,0"
+                            BorderBrush="{DynamicResource PanelDividerBrush}"
+                            Visibility="Collapsed">
+                      <Grid>
+                        <ListBox x:Name="ViewerFilmstrip"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Padding="4,5,4,4"
+                                Focusable="False"
+                                ScrollViewer.CanContentScroll="True"
+                                ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                                ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                PreviewMouseWheel="ViewerFilmstrip_PreviewMouseWheel"
+                                PreviewMouseLeftButtonUp="ViewerFilmstrip_PreviewMouseLeftButtonUp">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="Margin" Value="0,0,3,0"/>
+                                    <Setter Property="Focusable" Value="False"/>
+                                    <!-- On the CONTAINER, not inside the cell:
+                                         the whole frame answers, including the
+                                         letterboxed margins a portrait picture
+                                         leaves, so there is no dead strip where
+                                         the name refuses to appear. Name carries
+                                         the extension, which is half of what the
+                                         strip cannot show. -->
+                                    <Setter Property="ToolTip" Value="{Binding Name}"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <!-- TWO STATES, TWO CHANNELS.
+                                                     Both were borders at first
+                                                     and they fought: the trigger
+                                                     that ran last won, so the
+                                                     selected cell could not show
+                                                     hover at all, and a row of
+                                                     outlines blinking on and off
+                                                     under the cursor sat right
+                                                     next to the one outline that
+                                                     was supposed to mean
+                                                     something ("좀 헷갈립니다",
+                                                     user 2026-08-10).
+
+                                                     Selection keeps the line -
+                                                     it is the state that must
+                                                     survive the mouse being
+                                                     somewhere else entirely.
+                                                     Hover became BRIGHTNESS,
+                                                     which is a channel the line
+                                                     does not use, so the two now
+                                                     stack instead of replacing
+                                                     each other: the selected cell
+                                                     lights up under the cursor
+                                                     like every other one and
+                                                     keeps its frame.
+
+                                                     The wash goes over the whole
+                                                     cell rather than the
+                                                     letterbox alone - a picture
+                                                     the same shape as its cell
+                                                     leaves no letterbox, and a
+                                                     hover that only some cells
+                                                     can show is worse than the
+                                                     borders were. -->
+                                                <Border x:Name="Frame"
+                                                        BorderThickness="2"
+                                                        BorderBrush="Transparent"
+                                                        Background="#14808080"
+                                                        SnapsToDevicePixels="True">
+                                                    <Grid>
+                                                        <ContentPresenter x:Name="Cell"/>
+                                                        <Border x:Name="Wash"
+                                                                Background="Transparent"
+                                                                IsHitTestVisible="False"/>
+                                                    </Grid>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <!-- Hover is TWO faint things
+                                                         rather than one strong
+                                                         one, and they cover each
+                                                         other's blind side. A
+                                                         white wash reads on a
+                                                         dark picture and vanishes
+                                                         on a bright one; taking a
+                                                         little opacity off the
+                                                         cell lets the panel's own
+                                                         dark ground through,
+                                                         which dulls a BRIGHT
+                                                         picture and barely
+                                                         touches a dark one. So
+                                                         whichever the frame is,
+                                                         something moves - and
+                                                         both are gentler than the
+                                                         single 15% wash they
+                                                         replace ("지금은 좀
+                                                         강해서요", user
+                                                         2026-08-10).
+
+                                                         Per-PIXEL adaptation - a
+                                                         wash that knows it is
+                                                         over a white sky - would
+                                                         need a blend mode, which
+                                                         in WPF means a compiled
+                                                         pixel shader on every
+                                                         cell. Not for a hover.
+
+                                                         Opacity here is a
+                                                         composition-stage
+                                                         property: no layout, no
+                                                         re-decode, nothing per
+                                                         frame. (And not the
+                                                         dimmed-text rule - this
+                                                         is a pointer state on a
+                                                         picture, not a way of
+                                                         calling something
+                                                         secondary.) -->
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Wash"
+                                                                Property="Background"
+                                                                Value="#0DFFFFFF"/>
+                                                        <Setter TargetName="Cell"
+                                                                Property="Opacity"
+                                                                Value="0.93"/>
+                                                    </Trigger>
+                                                    <!-- The tree's OWN selection
+                                                         colour, not a separate
+                                                         accent: the strip and
+                                                         the tree are showing the
+                                                         same selection, so it
+                                                         would be odd for the two
+                                                         to mark it in different
+                                                         colours - and this one
+                                                         follows 색상 설정, so it
+                                                         is the colour the user
+                                                         actually chose to mean
+                                                         "this one" (user,
+                                                         2026-08-10). A border
+                                                         here rather than a fill,
+                                                         because a fill behind a
+                                                         picture that covers its
+                                                         cell would never be
+                                                         seen. -->
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Frame"
+                                                                Property="BorderBrush"
+                                                                Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- Loaded is where the shell gets asked, so
+                                         virtualization decides what is fetched -
+                                         see FilmstripCell.Requested for why it
+                                         is only ever asked once per cell. -->
+                                    <Grid Width="{DynamicResource FilmstripCellWidth}"
+                                            Height="{DynamicResource FilmstripCellHeight}"
+                                            Background="Transparent"
+                                            Loaded="FilmstripCell_Loaded">
+                                        <Image Source="{Binding Thumbnail}"
+                                                Stretch="Uniform"
+                                                RenderOptions.BitmapScalingMode="HighQuality"/>
+                                        <!-- A film's thumbnail is just a frame,
+                                             so nothing else in the strip would
+                                             say which ones play. The panel's own
+                                             play button in miniature - same
+                                             light plate, same dark mark - in the
+                                             CENTRE, where that button is, and
+                                             fainter than it: this one is a label
+                                             saying what the frame is, not a
+                                             control asking to be pressed
+                                             (user, 2026-08-10).
+
+                                             Moving it out of the corner also
+                                             left the corner free, which is where
+                                             the bookmark ribbon went.
+
+                                             Sized from the cell rather than
+                                             fixed: the strip is resizable, and a
+                                             14px disc that reads right on a 64px
+                                             frame is a speck on a 200px one and
+                                             most of a 40px one. The Path scales
+                                             with Stretch, so the triangle keeps
+                                             its shape at every size. -->
+                                        <Border Width="{DynamicResource FilmstripBadgeSize}"
+                                                Height="{DynamicResource FilmstripBadgeSize}"
+                                                CornerRadius="{DynamicResource FilmstripBadgeRadius}"
+                                                Background="#66FFFFFF"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsVideo}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Path Data="M 5,3.5 L 10,7 L 5,10.5 Z"
+                                                    Fill="#8A000000"
+                                                    Stretch="Uniform"
+                                                    Margin="{DynamicResource FilmstripBadgeInset}"/>
+                                        </Border>
+                                        <!-- The bookmark, in the strip because it
+                                             is in the tree: a marked file has to
+                                             be recognisable in every place the
+                                             app draws it, or the mark only means
+                                             something in one of them. Bound to
+                                             the tree's OWN item, so releasing a
+                                             bookmark anywhere clears it here in
+                                             the same instant - the strip keeps no
+                                             copy of that answer.
+
+                                             The identical Material ribbon and the
+                                             identical blue the row template uses,
+                                             deliberately not restyled for this
+                                             background: the whole value of a mark
+                                             is that it is the same mark. -->
+                                        <Path Data="F1 M240-144v-672h480v672l-240-96-240 96Z"
+                                                Fill="#FF4A90E2"
+                                                Stretch="Uniform"
+                                                Height="{DynamicResource FilmstripRibbonSize}"
+                                                Margin="0,0,3,2"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Bottom">
+                                            <Path.Style>
+                                                <Style TargetType="Path">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Item.IsBookmarked}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Path.Style>
+                                        </Path>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <!-- The strip's own height grip, on its top edge - the
+                             same 6px Thumb the viewer's split and the docked
+                             band use, so the gesture is one the hand already
+                             knows. Height IS cell size here: there is nothing
+                             else in the row to give the pixels to. -->
+                        <Thumb x:Name="ViewerFilmstripThumb"
+                                Height="6"
+                                Margin="0,-3,0,0"
+                                VerticalAlignment="Top"
+                                Cursor="SizeNS"
+                                Style="{StaticResource ResizeThumbHorizontalStyle}"
+                                DragDelta="ViewerFilmstripThumb_DragDelta"
+                                DragCompleted="ViewerFilmstripThumb_DragCompleted"/>
+                      </Grid>
+                    </Border>
+                    <StackPanel x:Name="ViewerCaptionPanel"
+                            Grid.Row="2"
                             Margin="10,0,10,10">
                         <!-- Carousel row, < 35 / 257 > ABOVE the caption - the
                              user's own placement (2026-08-09), and the one that
@@ -5399,6 +5699,19 @@
                                     Content="&gt;"
                                     Click="ViewerNextButton_Click"
                                     ToolTip="{x:Static services:Strings.ViewerNextImage}"/>
+                            <!-- The strip's switch, HERE and not in the zoom
+                                 chips or a menu: < 35 / 257 > is the filmstrip
+                                 with the pictures taken out, so the control that
+                                 puts them back belongs beside the number it
+                                 belongs to. The gap sets it apart from the two
+                                 chevrons, which act on the picture rather than
+                                 on the row itself. -->
+                            <ToggleButton x:Name="ViewerFilmstripChip"
+                                    Style="{StaticResource FooterFilterChipStyle}"
+                                    Margin="10,0,0,0"
+                                    Content="&#x25A4;"
+                                    Click="ViewerFilmstripChip_Click"
+                                    ToolTip="{x:Static services:Strings.ViewerFilmstrip}"/>
                         </StackPanel>
                         <TextBlock x:Name="ViewerFileName"
                                 Foreground="{DynamicResource FileNameForeground}"

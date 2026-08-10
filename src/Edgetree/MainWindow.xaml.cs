@@ -1231,6 +1231,29 @@ public partial class MainWindow : Window
             return;
         }
 
+        // ←/→ step the carousel, which is what the filmstrip made people reach
+        // for: a row of frames laid out sideways asks for the sideways keys,
+        // and not having them "적응이 안 된다" (user, 2026-08-10). Same call the
+        // chevrons make, so there is still one idea of what next means.
+        //
+        // Deliberately only while the STRIP IS OPEN, and only on a row the
+        // carousel walks. The tree's own ←/→ (collapse/expand, and stepping out
+        // to the parent from a leaf) is untouched everywhere else, so nobody
+        // who never opens the strip loses a key - and the strip being on screen
+        // is a visible reason for the keys to mean something else.
+        if (Keyboard.Modifiers == ModifierKeys.None &&
+            _viewerOpen &&
+            _settings.ViewerFilmstrip &&
+            (e.Key == Key.Left || e.Key == Key.Right) &&
+            _selectedItem is { } carouselRow &&
+            IsViewerCarouselItem(carouselRow) &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            ViewerCarouselStep(e.Key == Key.Right ? +1 : -1);
+            e.Handled = true;
+            return;
+        }
+
         // BARE +/- is the viewer's zoom (Ctrl+/- stays the app's font size -
         // two different scales on one pair of keys, told apart by the
         // modifier). Only while the panel is open and showing something
@@ -13568,6 +13591,26 @@ public partial class MainWindow : Window
         return null;
     }
 
+    // The same walk with the name dropped - for reaching a part a template
+    // owns and does not name usefully (the filmstrip's ScrollViewer).
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        int count = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T typed)
+            {
+                return typed;
+            }
+            if (FindDescendant<T>(child) is { } found)
+            {
+                return found;
+            }
+        }
+        return null;
+    }
+
     // See MinimizeButton_Click - both tray-hide entry points (the "_" button
     // here and App's tray-menu toggle) persist state on the way out.
     public void SaveStateBeforeHiding() => SaveCurrentWidth();
@@ -15875,14 +15918,30 @@ public partial class MainWindow : Window
     // reveal only at the moment it actually crosses the boundary (see
     // ViewerCarouselStep). Images only, by extension: a mixed folder's
     // videos and documents still step fine on ↑↓.
-    private static bool IsViewerCarouselImage(FileSystemItem item)
+    // What the counter counts and what the filmstrip shows - ONE list, so the
+    // two can never disagree about what the folder holds.
+    //
+    // Films joined the pictures on 2026-08-10, and the reason is the strip
+    // rather than the counter: a filmstrip that emptied itself in a folder of
+    // films would be a strange thing to call a filmstrip, and hiding videos
+    // from the count while showing them in the strip would have been worse
+    // than either. The panel already plays them, so the set the carousel walks
+    // is now "what this panel can show", which is what it always read as.
+    //
+    // Named extensions rather than "whatever the shell can thumbnail": the
+    // shell will also answer for PSD, AI and PDF, but only where a handler
+    // happens to be installed - so the same folder would hold a different
+    // number of pictures on two machines, and the count would be unexplainable
+    // on either.
+    private static bool IsViewerCarouselItem(FileSystemItem item)
         => item is { IsDirectory: false, IsPlaceholder: false, IsShowMore: false }
-           && ThumbnailExtensions.Contains(Path.GetExtension(item.FullPath));
+           && (ThumbnailExtensions.Contains(Path.GetExtension(item.FullPath))
+               || VideoExtensions.Contains(Path.GetExtension(item.FullPath)));
 
-    private List<FileSystemItem> GetViewerCarouselImages(FileSystemItem current)
+    private List<FileSystemItem> GetViewerCarouselItems(FileSystemItem current)
     {
         IEnumerable<FileSystemItem> siblings = current.Parent?.AllLoadedChildren ?? _roots;
-        return siblings.Where(IsViewerCarouselImage).ToList();
+        return siblings.Where(IsViewerCarouselItem).ToList();
     }
 
     // Recomputed on every selection change rather than cached: the list is one
@@ -15892,17 +15951,19 @@ public partial class MainWindow : Window
     {
         if (!_viewerOpen
             || _selectedItem is not { } current
-            || !IsViewerCarouselImage(current))
+            || !IsViewerCarouselItem(current))
         {
             ViewerCarouselBar.Visibility = Visibility.Collapsed;
+            UpdateFilmstrip(null);
             return;
         }
 
-        var images = GetViewerCarouselImages(current);
+        var images = GetViewerCarouselItems(current);
         int index = images.IndexOf(current);
         if (index < 0)
         {
             ViewerCarouselBar.Visibility = Visibility.Collapsed;
+            UpdateFilmstrip(null);
             return;
         }
 
@@ -15913,6 +15974,255 @@ public partial class MainWindow : Window
         ViewerCarouselMaxText.Text = $"{images.Count} / {images.Count}";
         ViewerPrevButton.IsEnabled = index > 0;
         ViewerNextButton.IsEnabled = index < images.Count - 1;
+        UpdateFilmstrip(images);
+    }
+
+    // ----- 필름스트립 ---------------------------------------------------------
+    //
+    // The carousel counter with the pictures put back in. It walks the SAME
+    // list (GetViewerCarouselItems), so the strip and the number can never
+    // disagree, and a click hands its item to SelectVisibleItem - the route the
+    // chevrons already take - so there is no second idea of "go to this one".
+    //
+    // Thumbnails come from the shell, which means Windows' own thumbcache does
+    // the caching and this app keeps none: a folder browsed once comes back
+    // instantly, and nothing has to be invalidated when a file changes.
+    //
+    // ONE size is asked for however tall the cells are (see FilmstripFetchSize).
+    // The strip is resizable and re-fetching on every drag would be the
+    // expensive way to do a cheap thing - the shell stores thumbnails at fixed
+    // steps anyway, so asking for the step above the biggest cell and letting
+    // the Image scale down costs one fetch per file for every size.
+    private readonly System.Collections.ObjectModel.ObservableCollection<FilmstripCell> _filmstripCells = new();
+
+    // Which folder the cells were built for, so arrow-keying down a folder
+    // moves the selection instead of rebuilding 257 cells per row. The count
+    // rides along because a reveal ("더 보기") grows the list without changing
+    // the folder.
+    private (string Folder, int Count) _filmstripBuiltFor;
+
+    private const double FilmstripMinCellHeight = 40;
+    // Above this the strip is taking more from the picture than it gives back,
+    // and the fetch size below is chosen to cover it.
+    private const double FilmstripMaxCellHeight = 200;
+    // A film frame, and the shape a mixed folder of stills tolerates best.
+    private const double FilmstripAspect = 4.0 / 3.0;
+    // One step above the tallest cell, so no size the grip can reach is ever
+    // upscaled - and a step the shell actually keeps, rather than a number
+    // between two of them.
+    private const int FilmstripFetchSize = 256;
+
+    private double FilmstripCellHeight => Math.Clamp(
+        _settings.ViewerFilmstripCellHeight, FilmstripMinCellHeight, FilmstripMaxCellHeight);
+
+    // Called on every selection change (through UpdateViewerCarousel), so the
+    // common case has to be cheap: same folder, same length, nothing to do but
+    // move the highlight.
+    private void UpdateFilmstrip(List<FileSystemItem>? items)
+    {
+        bool show = _settings.ViewerFilmstrip && items is { Count: > 0 };
+        ViewerFilmstripHost.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        ViewerFilmstripChip.IsChecked = _settings.ViewerFilmstrip;
+        if (!show)
+        {
+            return;
+        }
+
+        string folder = _selectedItem?.Parent?.FullPath ?? string.Empty;
+        if (_filmstripBuiltFor != (folder, items!.Count))
+        {
+            _filmstripBuiltFor = (folder, items.Count);
+            _filmstripCells.Clear();
+            foreach (var item in items)
+            {
+                _filmstripCells.Add(new FilmstripCell(item, IsViewerVideo(item.FullPath)));
+            }
+
+            if (ViewerFilmstrip.ItemsSource is null)
+            {
+                ApplyFilmstripCellSize();
+                ViewerFilmstrip.ItemsSource = _filmstripCells;
+            }
+        }
+
+        SyncFilmstripToSelection();
+    }
+
+    // An instant jump, never a slide. The strip has to follow ↑↓ through a
+    // folder or it is useless after three rows, but this app does not move
+    // things under the eye on its own - see the standing rule on app-driven
+    // scrolling. ScrollIntoView puts the cell on screen and stops.
+    private void SyncFilmstripToSelection()
+    {
+        if (ViewerFilmstripHost.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        var match = _filmstripCells.FirstOrDefault(cell =>
+            ReferenceEquals(cell.Item, _selectedItem));
+        if (match is null || ReferenceEquals(ViewerFilmstrip.SelectedItem, match))
+        {
+            return;
+        }
+
+        _filmstripSelfSelect = true;
+        try
+        {
+            ViewerFilmstrip.SelectedItem = match;
+            ViewerFilmstrip.ScrollIntoView(match);
+        }
+        finally
+        {
+            _filmstripSelfSelect = false;
+        }
+    }
+
+    // True while the app is moving the strip's own selection to follow the
+    // tree, so the click handler can tell that from a hand.
+    private bool _filmstripSelfSelect;
+
+    // Width follows height, and both are written as resources because the cell
+    // template is inside a DataTemplate - there is no element to reach for.
+    // Only on a real change: assigning an unchanged value still invalidates
+    // every realized container, which is the lesson ApplyHeaderMetrics and
+    // SetBrushColor each paid for once.
+    private void ApplyFilmstripCellSize()
+    {
+        double height = Math.Round(FilmstripCellHeight);
+        double width = Math.Round(height * FilmstripAspect);
+        if (Resources["FilmstripCellHeight"] is double current && Math.Abs(current - height) < 0.5)
+        {
+            return;
+        }
+
+        Resources["FilmstripCellHeight"] = height;
+        Resources["FilmstripCellWidth"] = width;
+
+        // The two marks are sized from the cell, not fixed: the strip is
+        // resizable, and a badge that reads right on a 64px frame is a speck on
+        // a 200px one and swallows a 40px one (user, 2026-08-10). Floors and
+        // ceilings on both, because proportion alone stops being readable at
+        // the ends of the range - a 6px play triangle says nothing, and a 60px
+        // one is no longer a label on the picture.
+        double badge = Math.Clamp(Math.Round(height * 0.34), 14, 34);
+        Resources["FilmstripBadgeSize"] = badge;
+        Resources["FilmstripBadgeRadius"] = new CornerRadius(badge / 2);
+        // Off-centre on purpose: a triangle centred on its own bounding box
+        // looks left-heavy inside a circle, so the inset gives the flat edge
+        // more room than the point. Proportional like the rest.
+        double inset = Math.Max(2, Math.Round(badge * 0.26));
+        Resources["FilmstripBadgeInset"] = new Thickness(
+            inset + Math.Max(1, Math.Round(badge * 0.05)), inset, inset, inset);
+        // The ribbon grows far more slowly than the play badge and stops much
+        // sooner, because the two are not the same kind of thing. The badge
+        // labels the PICTURE and should stay in proportion to it; the ribbon is
+        // the tree's own mark, and a mark is only recognisable as the same mark
+        // if it stays about the same size wherever it is drawn (user, 2026-08-10
+        // - "트리쪽 아이콘 크기와 동일했으면"). The tree draws it at 9px, so the
+        // range here starts just above that and tops out before it could read
+        // as a label on the frame rather than a mark on the file.
+        Resources["FilmstripRibbonSize"] = Math.Clamp(Math.Round(height * 0.18), 10, 15);
+    }
+
+    // The shell is asked HERE - when a container is realized - rather than when
+    // the cells are built, so a 257-frame folder costs the dozen calls its
+    // visible cells need. Requested is what stops a cell being asked again
+    // every time it scrolls back into view, including the ones the shell had
+    // nothing for (which are the slowest to ask).
+    private void FilmstripCell_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: FilmstripCell cell } || cell.Requested)
+        {
+            return;
+        }
+
+        cell.Requested = true;
+        ShellThumbnailService.GetThumbnail(cell.Path, FilmstripFetchSize, (thumbnail, _, _) =>
+        {
+            if (thumbnail is not null)
+            {
+                cell.Thumbnail = thumbnail;
+            }
+        });
+    }
+
+    // A cell at a time, not a pixel at a time (user's call, 2026-08-10, and the
+    // same choice the tree made for its rows). LineLeft/LineRight move by one
+    // ITEM because the strip scrolls its content rather than its pixels
+    // (CanContentScroll) - which is also what makes the strip virtualize.
+    private void ViewerFilmstrip_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (FindDescendant<ScrollViewer>(ViewerFilmstrip) is not { } scroller)
+        {
+            return;
+        }
+
+        int steps = Math.Max(1, Math.Abs(e.Delta) / 120);
+        for (int i = 0; i < steps; i++)
+        {
+            if (e.Delta > 0)
+            {
+                scroller.LineLeft();
+            }
+            else
+            {
+                scroller.LineRight();
+            }
+        }
+
+        e.Handled = true;
+    }
+
+    // On the RELEASE, not on SelectionChanged: the strip's selection is also
+    // written by the app when the tree moves, and acting on the property would
+    // send that straight back into the tree.
+    private void ViewerFilmstrip_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_filmstripSelfSelect ||
+            ItemsControl.ContainerFromElement(ViewerFilmstrip, (DependencyObject)e.OriginalSource)
+                is not ListBoxItem { Content: FilmstripCell cell })
+        {
+            return;
+        }
+
+        // Same crossing the chevrons make: a cell past the folder's "더 보기"
+        // cap is one the strip promised, so the reveal happens rather than the
+        // click doing nothing.
+        if (cell.Item.Parent is { } parent && !parent.Children.Contains(cell.Item))
+        {
+            parent.ShowAllChildren();
+        }
+
+        SelectVisibleItem(cell.Item);
+    }
+
+    // Height IS cell size - there is nothing else in the row to give pixels to.
+    // Dragging UP grows it, which is the direction the strip grows in.
+    private void ViewerFilmstripThumb_DragDelta(object sender, DragDeltaEventArgs e)
+    {
+        _settings.ViewerFilmstripCellHeight = Math.Clamp(
+            FilmstripCellHeight - e.VerticalChange,
+            FilmstripMinCellHeight,
+            FilmstripMaxCellHeight);
+        ApplyFilmstripCellSize();
+    }
+
+    // Saved on release rather than per frame, the same as every other grip in
+    // this app. No re-fetch here: the thumbnails were asked for at a size that
+    // covers the whole range (see FilmstripFetchSize), so the drag costs no
+    // disk at all.
+    private void ViewerFilmstripThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+        => _settingsService.Save(_settings);
+
+    private void ViewerFilmstripChip_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ViewerFilmstrip = ViewerFilmstripChip.IsChecked == true;
+        _settingsService.Save(_settings);
+        // Rebuild rather than just show: the cells are only built while the
+        // strip is up, so the first switch-on has none yet.
+        _filmstripBuiltFor = default;
+        UpdateViewerCarousel();
     }
 
     // No wrap-around: a disabled chevron at either end says "you are at the
@@ -15923,12 +16233,12 @@ public partial class MainWindow : Window
 
     private void ViewerCarouselStep(int direction)
     {
-        if (_selectedItem is not { } current || !IsViewerCarouselImage(current))
+        if (_selectedItem is not { } current || !IsViewerCarouselItem(current))
         {
             return;
         }
 
-        var images = GetViewerCarouselImages(current);
+        var images = GetViewerCarouselItems(current);
         int index = images.IndexOf(current);
         int next = index + direction;
         if (index < 0 || next < 0 || next >= images.Count)
