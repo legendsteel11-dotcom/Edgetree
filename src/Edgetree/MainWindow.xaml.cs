@@ -14057,8 +14057,7 @@ public partial class MainWindow : Window
         ViewerExpandButton.HorizontalAlignment = opensOnLeft
             ? System.Windows.HorizontalAlignment.Left
             : System.Windows.HorizontalAlignment.Right;
-        ViewerExpandGlyph.Data = Geometry.Parse(
-            opensOnLeft ? "M6,0 L2,5 L6,10" : "M2,0 L6,5 L2,10");
+        ViewerExpandGlyphFlip.ScaleX = opensOnLeft ? -1 : 1;
     }
 
     private void OpenViewer()
@@ -17311,8 +17310,7 @@ public partial class MainWindow : Window
         ViewerCollapseButton.Margin = _viewerOnLeft
             ? new Thickness(0, 0, -7, 0)
             : new Thickness(-7, 0, 0, 0);
-        ViewerCollapseGlyph.Data = Geometry.Parse(
-            _viewerOnLeft ? "M2,0 L6,5 L2,10" : "M6,0 L2,5 L6,10");
+        ViewerCollapseGlyphFlip.ScaleX = _viewerOnLeft ? -1 : 1;
 
         UpdateViewerExpandButton();
     }

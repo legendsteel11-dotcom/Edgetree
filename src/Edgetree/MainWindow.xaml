@@ -6639,13 +6639,43 @@
                     Style="{StaticResource ViewerCollapseButtonStyle}"
                     Click="ViewerCollapseButton_Click"
                     ToolTip="{x:Static services:Strings.ViewerClose}">
+                <!-- Material Symbols "chevron_left" - the carousel's own
+                     previous/next mark, brought here (user, 2026-08-10) after
+                     arrow_menu_close was tried and dropped: its vertical bar
+                     ran parallel to the divider a few pixels away, and at the
+                     size this lane allows it was both small and clipped.
+
+                     THE ONE PLACE IN THE APP THAT DOES NOT CARRY THE 960 BOX,
+                     and the reason is this lane. A chevron fills only 291 of
+                     the box's 960, so with the box its ink is 30% of whatever
+                     the Path element measures - and the element cannot exceed
+                     the 14px plate without being cut off. Ink of 16 would need
+                     a box of 32 and therefore a plate of 32, on a divider. The
+                     box exists to keep icons that sit TOGETHER in a row at the
+                     family's relative sizes; this one sits alone, one at a
+                     time, so fitting its own bounds costs nothing and buys the
+                     size the lane actually has room for.
+
+                     It takes ViewerChipIconSize - the CAROUSEL's number, not a
+                     new one - because it is the carousel's mark: the user asked
+                     for the two to match (2026-08-10), and sharing the resource
+                     is what keeps them matching through Ctrl +/- rather than
+                     just today. Ink lands at 6.7 x 11 in a 14 x 40 plate.
+
+                     Mirrored by ScaleX when the panel sits on the left, so the
+                     two directions cannot drift apart. -->
                 <Path x:Name="ViewerCollapseGlyph"
-                        Data="M6,0 L2,5 L6,10"
-                        Stroke="{DynamicResource ForegroundText}"
-                        StrokeThickness="1.4"
-                        StrokeLineJoin="Round"
-                        StrokeStartLineCap="Round"
-                        StrokeEndLineCap="Round"/>
+                        Data="M576-240 336-480l240-240 51 51-189 189 189 189-51 51Z"
+                        Fill="{DynamicResource ForegroundText}"
+                        Stretch="Uniform"
+                        Width="{DynamicResource ViewerChipIconSize}"
+                        Height="{DynamicResource ViewerChipIconSize}"
+                        RenderTransformOrigin="0.5,0.5">
+                    <Path.RenderTransform>
+                        <ScaleTransform x:Name="ViewerCollapseGlyphFlip"
+                                ScaleX="1"/>
+                    </Path.RenderTransform>
+                </Path>
             </Button>
 
             <!-- The same chevron the other way round: with the panel closed and
@@ -6669,13 +6699,21 @@
                     Style="{StaticResource ViewerCollapseButtonStyle}"
                     Click="ViewerExpandButton_Click"
                     ToolTip="{x:Static services:Strings.ToolTipViewer}">
+                <!-- "chevron_right", the other half of the carousel's pair, on
+                     the same terms as the collapse glyph beside it - see there
+                     for why these two skip the 960 box. -->
                 <Path x:Name="ViewerExpandGlyph"
-                        Data="M2,0 L6,5 L2,10"
-                        Stroke="{DynamicResource ForegroundText}"
-                        StrokeThickness="1.4"
-                        StrokeLineJoin="Round"
-                        StrokeStartLineCap="Round"
-                        StrokeEndLineCap="Round"/>
+                        Data="M522-480 333-669l51-51 240 240-240 240-51-51 189-189Z"
+                        Fill="{DynamicResource ForegroundText}"
+                        Stretch="Uniform"
+                        Width="{DynamicResource ViewerChipIconSize}"
+                        Height="{DynamicResource ViewerChipIconSize}"
+                        RenderTransformOrigin="0.5,0.5">
+                    <Path.RenderTransform>
+                        <ScaleTransform x:Name="ViewerExpandGlyphFlip"
+                                ScaleX="1"/>
+                    </Path.RenderTransform>
+                </Path>
             </Button>
         </Grid>
 
