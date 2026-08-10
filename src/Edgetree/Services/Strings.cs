@@ -255,7 +255,11 @@ public static class Strings
     // not a magnification - the row is about what SIZE the film is shown at,
     // and one of the three answers is "as big as it fits" (user, 2026-08-10).
     public static string ViewerZoom = "영상 크기";
-    public static string ViewerMarkClear = "기록 전부 지우기";
+    // Safe to be this blunt because of WHERE it is: inside the 위치 목록
+    // submenu, under the positions it clears. The word 삭제 means files
+    // everywhere else in this app, and it would have needed qualifying if it
+    // sat anywhere the file rows could be mistaken for its subject.
+    public static string ViewerMarkClear = "전체 삭제";
     public static string ViewerPlay = "재생";
     public static string ViewerPause = "일시정지";
     public static string ViewerStop = "정지";
