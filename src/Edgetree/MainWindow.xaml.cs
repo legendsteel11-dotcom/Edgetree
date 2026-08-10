@@ -6369,8 +6369,6 @@ public partial class MainWindow : Window
             ToolTip = tooltip,
         };
 
-        chip.SetResourceReference(FontSizeProperty, "FooterChipFontSize");
-
         chip.Click += (_, _) =>
         {
             _settings.FileFilterExcludeEnabled = chip.IsChecked == true;
@@ -6409,10 +6407,6 @@ public partial class MainWindow : Window
             Margin = FooterChipMargin,
             ToolTip = tooltip,
         };
-
-        // Follows Ctrl +/- - see FooterChipFontSize in ApplyLayoutMetrics for
-        // why it's set here rather than in the shared style.
-        chip.SetResourceReference(FontSizeProperty, "FooterChipFontSize");
 
         chip.Click += (_, _) =>
         {
@@ -8041,6 +8035,14 @@ public partial class MainWindow : Window
     private double RowVerticalPadding
         => Math.Max(0, TreeFontScale * 3.0 + _settings.RowSpacing);
 
+    // The viewer strip's two gaps. Between neighbours, and between the three
+    // things the row does (set the zoom / step it / switch a panel on). Written
+    // out as Thicknesses below so no control has to spell one out locally - a
+    // local Margin replaces the style's whole Thickness, and that is exactly
+    // how 내비게이터 came to sit flush against 필름스트립.
+    private const double ViewerChipGap = 4;
+    private const double ViewerChipGroupGap = 10;
+
     private void ApplyLayoutMetrics()
     {
         double scale = TreeFontScale;
@@ -8150,11 +8152,14 @@ public partial class MainWindow : Window
         // from the ones between three lines of the same caption, and the user
         // asked for the three lines only.
         //
-        // The chip row's -2 right is unchanged - it cancels the trailing margin
-        // the last chip's shared style carries, so the row centres on the text
-        // rather than on the text plus a gap.
+        // The chip row's negative right cancels the trailing margin the last
+        // chip's shared style carries, so the row centres on the chips rather
+        // than on the chips plus a gap. It has to track ViewerChipMargin: the
+        // two were both 2 until the strip's gaps were widened, and a stale
+        // number here shows up as the whole row sitting off-centre.
         Resources["ViewerCaptionRowGap"] = new Thickness(0, verticalPadding, 0, 0);
-        Resources["ViewerCaptionChipRowGap"] = new Thickness(0, verticalPadding, -2, 0);
+        Resources["ViewerCaptionChipRowGap"] =
+            new Thickness(0, verticalPadding, -ViewerChipGap, 0);
 
         // Not scaled by the font like the metrics around it: this is a pointer
         // target, so it wants to stay the size the user picked regardless of
@@ -8283,23 +8288,50 @@ public partial class MainWindow : Window
         // reported as 노안, which is the same reason the tree's own zoom
         // exists (2026-08-10).
         //
-        // TWO steps below the tree, not one. One step was what the strip was
+        // THREE steps below the tree. One step was what the strip was
         // originally drawn at (11 against 12), but a single step stops reading
         // as a step at all once the tree is large - 19 beside 20 is the same
         // size to the eye, and the strip starts competing with the content it
         // is only reporting on (user, 2026-08-10, after taking the font to its
-        // largest). Two steps holds the same relationship all the way up.
+        // largest). Two held that relationship; three is where the user put it
+        // on seeing both strips side by side the same day ("살짝만 더 작게").
         //
         // Floored at 9 so the small end stays legible, which also gives the
         // user's other request for free: at the smallest tree font the two meet
         // exactly rather than the strip shrinking past readable.
         //
-        // Window-level, and applied per chip by SetResourceReference rather
-        // than in FooterFilterChipStyle: that style is shared with the
-        // viewer's zoom strip, where the readouts sit in fixed-width slots
-        // (see ViewerZoomText and the media time's hidden twin) that a growing
-        // font would overrun.
-        Resources["FooterChipFontSize"] = Math.Max(9.0, ExplorerTree.FontSize - 2.0);
+        // ONE number for both strips, and it is read in FooterFilterChipStyle /
+        // FooterActionChipStyle rather than applied per chip in code, so the
+        // viewer's zoom row takes it too (asked for, 2026-08-10). The reason it
+        // could not before was the fixed-width readouts - ViewerZoomText's 34
+        // and the media time - and both now reserve their width with a hidden
+        // twin, which grows with the font instead of being cut for one size.
+        double chipFontSize = Math.Max(9.0, ExplorerTree.FontSize - 3.0);
+        Resources["FooterChipFontSize"] = chipFontSize;
+        // One step back UP, for the two things in the viewer that were drawn
+        // deliberately larger than the strip around them: the carousel counter
+        // with its chevrons (the caption's primary control) and the transport
+        // glyphs. A literal 13 against 11 until now - same gap, expressed so it
+        // survives the zoom.
+        Resources["ViewerChipGlyphFontSize"] = chipFontSize + 2.0;
+        // The chip ICONS (맞춤, 1:1, 내비게이터, 필름스트립). A mark set at the
+        // label's own size reads smaller than the label, so it takes the glyph
+        // size.
+        double chipIconSize = chipFontSize + 2.0;
+        Resources["ViewerChipIconSize"] = chipIconSize;
+        // The box under every button in that strip - icon chips and the bare
+        // glyphs (− + < >) alike, so a row mixing the two reads as one set of
+        // controls rather than marks with text between them. The width is the
+        // icon plus its 5px sides; the height clears the icon, the outline the
+        // glyph buttons carry, and the taller line box a font leaves around a
+        // character.
+        Resources["ViewerChipBoxWidth"] = chipIconSize + 10.0;
+        Resources["ViewerChipBoxHeight"] = chipIconSize + 6.0;
+        Resources["ViewerChipMargin"] = new Thickness(0, 0, ViewerChipGap, 0);
+        Resources["ViewerChipGroupMargin"] =
+            new Thickness(ViewerChipGroupGap, 0, ViewerChipGap, 0);
+        Resources["ViewerMediaButtonRowMargin"] =
+            new Thickness(0, 4, -ViewerChipGap, 0);
 
         var appResources = Application.Current.Resources;
         appResources["MenuFontSize"] = ExplorerTree.FontSize;
@@ -15791,7 +15823,10 @@ public partial class MainWindow : Window
     private void SetViewerMediaMuted(bool muted)
     {
         _viewerMediaMuted = muted;
-        ViewerMediaMuteSlash.Visibility = muted ? Visibility.Visible : Visibility.Collapsed;
+        // Two whole marks, one shown - the muted speaker is its own shape in the
+        // icon family rather than a slash laid over the other one.
+        ViewerMediaVolumeIcon.Visibility = muted ? Visibility.Collapsed : Visibility.Visible;
+        ViewerMediaMuteIcon.Visibility = muted ? Visibility.Visible : Visibility.Collapsed;
         ViewerMedia.Volume = muted ? 0 : ViewerMediaVolume.Value;
     }
 
@@ -15799,7 +15834,8 @@ public partial class MainWindow : Window
     {
         _viewerVideoPlaying = playing;
         UpdateSubtitleTimer();
-        ViewerMediaPlayPause.Content = playing ? "❚❚" : "▶";
+        ViewerMediaPlayIcon.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
+        ViewerMediaPauseIcon.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
         ViewerMediaPlayPause.ToolTip = playing ? Strings.ViewerPause : Strings.ViewerPlay;
 
         // The readout ticks only while something is moving - four times a

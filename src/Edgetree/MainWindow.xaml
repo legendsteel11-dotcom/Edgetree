@@ -214,6 +214,50 @@
              hold until it first runs, and match AppSettings' own defaults. -->
         <system:Double x:Key="ScrollBarThickness">12</system:Double>
         <GridLength x:Key="ScrollGutterWidth">13</GridLength>
+        <!-- The chip strips - the footer's filters and the viewer's zoom/
+             transport row. All three numbers move together from one place in
+             ApplyLayoutMetrics; these are what they hold until it first runs
+             (tree at its default 12). The glyph and icon sizes are the text
+             size plus two: a ⏸ or a fit_screen mark set at the label's own
+             size reads smaller than the label beside it. -->
+        <system:Double x:Key="FooterChipFontSize">9</system:Double>
+        <system:Double x:Key="ViewerChipGlyphFontSize">11</system:Double>
+        <system:Double x:Key="ViewerChipIconSize">11</system:Double>
+        <!-- Every button in the viewer's strip draws the same box, whether it
+             holds an icon, a word or a single glyph - which is the only way a
+             row mixing all three reads as one set of controls. Derived from the
+             icon size so the box follows Ctrl +/- with everything else. -->
+        <system:Double x:Key="ViewerChipBoxWidth">21</system:Double>
+        <system:Double x:Key="ViewerChipBoxHeight">17</system:Double>
+        <!-- The outline on the strip's word-and-glyph buttons (1:1, − +, < >).
+             The icon chips beside them already read as controls because a mark
+             has a shape; a bare "1:1" or "−" reads as text until something
+             draws the box around it.
+             Mid grey at low alpha rather than a theme colour, for the reason
+             the navigator's plate takes fixed inks: what sits behind this strip
+             is the viewer's own surface in either theme, and alpha lands
+             somewhere sensible on both where a fixed grey would disappear into
+             one of them. -->
+        <SolidColorBrush x:Key="ViewerChipBorderBrush"
+                Color="#808080"
+                Opacity="0.4"/>
+        <!-- The strip's two gaps, and they are Thicknesses rather than numbers
+             for a reason worth keeping: a local Margin on a control REPLACES
+             the style's whole Thickness, it does not merge with it. Writing
+             Margin="6,0,0,0" on a chip to push it away from its neighbour
+             therefore silently dropped the style's own right margin, and the
+             two chips after it ended up touching (user, with a screenshot,
+             2026-08-10). Every chip in the row now takes one of these two, so
+             the right-hand gap is carried no matter which is applied.
+             The group gap separates the three things this row does - set the
+             zoom / step the zoom / switch a panel on. -->
+        <Thickness x:Key="ViewerChipMargin">0,0,4,0</Thickness>
+        <Thickness x:Key="ViewerChipGroupMargin">10,0,4,0</Thickness>
+        <!-- The transport row's own outer margin. Its negative right cancels
+             the last button's gap so the row centres on the buttons, exactly
+             as ViewerCaptionChipRowGap does for the zoom row - and like that
+             one it has to track the gap rather than restate it. -->
+        <Thickness x:Key="ViewerMediaButtonRowMargin">0,4,-4,0</Thickness>
         <Thickness x:Key="FolderRowIconMargin">0,0,6,0</Thickness>
         <Thickness x:Key="FileRowIconMargin">0,0,6,0</Thickness>
         <Thickness x:Key="FileNameMargin">0,0,0,0</Thickness>
@@ -2620,8 +2664,15 @@
              thing meant to catch the eye. -->
         <Style x:Key="FooterFilterChipStyle"
                 TargetType="ToggleButton">
+            <!-- Follows Ctrl +/- through the resource, and it is set HERE so
+                 that every chip in either strip takes it - the viewer's zoom
+                 row used to be the one place left at a fixed 11 (user, asked
+                 for both linked, 2026-08-10). What made that possible was
+                 giving the two fixed-width readouts (% and the media time)
+                 hidden twins instead of hardcoded widths, so a growing font
+                 widens its own slot. -->
             <Setter Property="FontSize"
-                    Value="11"/>
+                    Value="{DynamicResource FooterChipFontSize}"/>
             <Setter Property="Foreground"
                     Value="{DynamicResource ForegroundText}"/>
             <Setter Property="Opacity"
@@ -2686,11 +2737,22 @@
         <Style x:Key="FooterFilterGlyphChipStyle"
                 TargetType="ToggleButton"
                 BasedOn="{StaticResource FooterFilterChipStyle}">
+            <!-- The box every button in the viewer strip shares. Only used by
+                 the viewer, so the footer's filter chips - which size
+                 themselves to their words - are untouched by it. -->
+            <Setter Property="MinWidth"
+                    Value="{DynamicResource ViewerChipBoxWidth}"/>
+            <Setter Property="MinHeight"
+                    Value="{DynamicResource ViewerChipBoxHeight}"/>
+            <Setter Property="Margin"
+                    Value="{DynamicResource ViewerChipMargin}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
                         <Border x:Name="Bd"
                                 Background="Transparent"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="3"
                                 Padding="5,2"
                                 SnapsToDevicePixels="True">
@@ -2793,8 +2855,25 @@
              across two control types. -->
         <Style x:Key="FooterActionChipStyle"
                 TargetType="Button">
+            <!-- "Match them pixel for pixel" now includes the zoom: same
+                 resource as the toggles above. -->
             <Setter Property="FontSize"
-                    Value="11"/>
+                    Value="{DynamicResource FooterChipFontSize}"/>
+            <!-- These are the ones left carrying a bare glyph once 맞춤, 1:1 and
+                 내비게이터 became marks - − + < > and the transport row. The
+                 outline is what makes them read as buttons beside the icons,
+                 and the shared box is what keeps the row even (user, asked for
+                 both, 2026-08-10). -->
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource ViewerChipBorderBrush}"/>
+            <Setter Property="BorderThickness"
+                    Value="1"/>
+            <Setter Property="MinWidth"
+                    Value="{DynamicResource ViewerChipBoxWidth}"/>
+            <Setter Property="MinHeight"
+                    Value="{DynamicResource ViewerChipBoxHeight}"/>
+            <Setter Property="Margin"
+                    Value="{DynamicResource ViewerChipMargin}"/>
             <Setter Property="Foreground"
                     Value="{DynamicResource ForegroundText}"/>
             <Setter Property="Opacity"
@@ -2810,11 +2889,14 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd"
                                 Background="Transparent"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="3"
                                 Padding="5,1"
                                 SnapsToDevicePixels="True">
                             <TextBlock Text="{TemplateBinding Content}"
-                                    VerticalAlignment="Center"/>
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"
@@ -2845,39 +2927,29 @@
             </Setter>
         </Style>
 
-        <!-- The little chevron that closes the viewer from the divider, so the
-             gesture is where the eye already is instead of a trip to the
-             window's top-right corner (user, 2026-08-09). Its own style rather
-             than the header's ToggleButtonStyle: this one is a tall narrow
-             plate riding a 1px line, not a square button in a row of squares.
-             Resting ink matches the footer chips (0.65) so it reads as the
-             same quiet class of control. -->
-        <!-- The transport strip's icon button. The chip styles beside it draw
-             their Content through a TextBlock, so a Path handed to one of
-             those renders as nothing at all and only the hover plate shows -
-             which is exactly what the mute speaker did (2026-08-09). This one
-             carries a ContentPresenter and is otherwise the chips' twin: same
-             resting ink, same hover plate, same mouse-only Focusable. -->
-        <Style x:Key="ViewerMediaIconButtonStyle"
-                TargetType="Button">
-            <Setter Property="Foreground"
-                    Value="{DynamicResource ForegroundText}"/>
-            <Setter Property="Opacity"
-                    Value="0.65"/>
-            <Setter Property="Cursor"
-                    Value="Hand"/>
-            <Setter Property="Focusable"
-                    Value="False"/>
+        <!-- The style above, drawing a SHAPE instead of a character - the same
+             split FooterFilterGlyphChipStyle makes for the toggles, and for the
+             same reason: that template draws Content through a TextBlock, so a
+             Path put in one renders as nothing at all (which is how the mute
+             speaker came to be invisible, 2026-08-09).
+             Everything else is inherited, so the box, the outline, the hover
+             and the greyed-out step all stay the row's rather than this
+             style's. -->
+        <Style x:Key="FooterActionGlyphChipStyle"
+                TargetType="Button"
+                BasedOn="{StaticResource FooterActionChipStyle}">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd"
                                 Background="Transparent"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="3"
-                                Padding="4,2"
+                                Padding="5,2"
                                 SnapsToDevicePixels="True">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"/>
+                            <ContentPresenter VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"
@@ -2888,12 +2960,26 @@
                                 <Setter Property="Opacity"
                                         Value="1"/>
                             </Trigger>
+                            <Trigger Property="IsEnabled"
+                                    Value="False">
+                                <Setter Property="Opacity"
+                                        Value="0.3"/>
+                                <Setter Property="Cursor"
+                                        Value="Arrow"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
 
+        <!-- The little chevron that closes the viewer from the divider, so the
+             gesture is where the eye already is instead of a trip to the
+             window's top-right corner (user, 2026-08-09). Its own style rather
+             than the header's ToggleButtonStyle: this one is a tall narrow
+             plate riding a 1px line, not a square button in a row of squares.
+             Resting ink matches the footer chips (0.65) so it reads as the
+             same quiet class of control. -->
         <!-- Position and volume sliders for the viewer's transport strip. Thin
              enough to read as a readout rather than a control panel, and the
              played part wears the caption's own ink at the same 0.65 the rest
@@ -5998,72 +6084,59 @@
                              35 → 36 → 100 never changes the row's width and
                              the chevron under the cursor never moves mid-run
                              (same trick as ViewerZoomText's fixed width). -->
-                        <!-- 13px where the zoom strip sits at 11: the carousel
-                             is the caption's primary control and read too
-                             small at the strip's own size (user, 2026-08-09).
-                             The chevron buttons carry the same size locally -
-                             their style's 11 is the footer's. -->
+                        <!-- One step ABOVE the zoom strip: the carousel is the
+                             caption's primary control and read too small at the
+                             strip's own size (user, 2026-08-09). That was a
+                             literal 13 against 11 until the strip started
+                             following Ctrl +/-; it is the same relationship,
+                             now expressed as the resource that holds it at
+                             every zoom step. -->
                         <StackPanel x:Name="ViewerCarouselBar"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
                                 Margin="0,0,0,6"
                                 Visibility="Collapsed">
+                            <!-- Material Symbols "chevron_left" / "chevron_right"
+                                 (user-supplied, 2026-08-10). These two were the
+                                 last ASCII in the strip: < and > are a pair of
+                                 angle brackets doing an arrow's job, and they
+                                 kept a local FontSize purely to be legible at
+                                 it. The mark needs no such help, so the size
+                                 override goes with them. -->
                             <Button x:Name="ViewerPrevButton"
-                                    Style="{StaticResource FooterActionChipStyle}"
-                                    FontSize="13"
-                                    Content="&lt;"
+                                    Style="{StaticResource FooterActionGlyphChipStyle}"
                                     Click="ViewerPrevButton_Click"
-                                    ToolTip="{x:Static services:Strings.ViewerPrevImage}"/>
+                                    ToolTip="{x:Static services:Strings.ViewerPrevImage}">
+                                <Path Data="M576-240 336-480l240-240 51 51-189 189 189 189-51 51Z"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
                             <Grid VerticalAlignment="Center"
-                                    Margin="6,0">
+                                    Margin="{DynamicResource ViewerChipMargin}">
                                 <TextBlock x:Name="ViewerCarouselMaxText"
                                         Visibility="Hidden"
-                                        FontSize="13"/>
+                                        FontSize="{DynamicResource ViewerChipGlyphFontSize}"/>
                                 <TextBlock x:Name="ViewerCarouselText"
-                                        FontSize="13"
+                                        FontSize="{DynamicResource ViewerChipGlyphFontSize}"
                                         Foreground="{DynamicResource ForegroundText}"
                                         Opacity="0.65"
                                         TextAlignment="Center"
                                         VerticalAlignment="Center"/>
                             </Grid>
                             <Button x:Name="ViewerNextButton"
-                                    Style="{StaticResource FooterActionChipStyle}"
-                                    FontSize="13"
-                                    Content="&gt;"
+                                    Style="{StaticResource FooterActionGlyphChipStyle}"
                                     Click="ViewerNextButton_Click"
-                                    ToolTip="{x:Static services:Strings.ViewerNextImage}"/>
-                            <!-- The strip's switch, HERE and not in the zoom
-                                 chips or a menu: < 35 / 257 > is the filmstrip
-                                 with the pictures taken out, so the control that
-                                 puts them back belongs beside the number it
-                                 belongs to. The gap sets it apart from the two
-                                 chevrons, which act on the picture rather than
-                                 on the row itself. -->
-                            <!-- Material Symbols "view_column" (user-supplied,
-                                 2026-08-10), kept in its native 960 grid with
-                                 Stretch doing the fitting - the same convention
-                                 the bookmark ribbon and the header's pin follow,
-                                 and the one that keeps these paths from drawing
-                                 off the element entirely.
-
-                                 Two box-drawing characters were tried before it
-                                 and both failed the same way: ▤ read as a
-                                 transport control, and ▯▯▯ read as a broken
-                                 glyph once the eye had passed over it a few
-                                 times. A chip sitting beside a film cannot
-                                 afford either. -->
-                            <ToggleButton x:Name="ViewerFilmstripChip"
-                                    Style="{StaticResource FooterFilterGlyphChipStyle}"
-                                    Margin="10,0,0,0"
-                                    Click="ViewerFilmstripChip_Click"
-                                    ToolTip="{x:Static services:Strings.ViewerFilmstrip}">
-                                <Path Data="M144-312v-336q0-29 21.15-50.5T216-720h528q29.7 0 50.85 21.5Q816-677 816-648v336q0 29-21.15 50.5T744-240H216q-29.7 0-50.85-21.5Q144-283 144-312Zm72 0h128v-336H216v336Zm200 0h128v-336H416v336Zm200 0h128v-336H616v336Z"
+                                    ToolTip="{x:Static services:Strings.ViewerNextImage}">
+                                <Path Data="M522-480 333-669l51-51 240 240-240 240-51-51 189-189Z"
                                         Stretch="Uniform"
-                                        Width="13"
-                                        Height="13"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
                                         Fill="{Binding Foreground,
-                                            RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
-                            </ToggleButton>
+                                            RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
                         </StackPanel>
                         <TextBlock x:Name="ViewerFileName"
                                 Foreground="{DynamicResource FileNameForeground}"
@@ -6093,39 +6166,136 @@
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
                                 Margin="{DynamicResource ViewerCaptionChipRowGap}">
+                            <!-- Material Symbols "fit_screen" (user-supplied,
+                                 2026-08-10), same convention as the filmstrip
+                                 chip below: native 960 grid, Stretch doing the
+                                 fitting, Fill following the button's own
+                                 Foreground so the lit and hover states carry
+                                 it. The word it replaces moves to the tooltip.
+                                 1:1 beside it stays a WORD - it is already as
+                                 short as a mark and there is no drawing of two
+                                 pixels meeting that would say it faster. -->
                             <ToggleButton x:Name="ViewerFitChip"
-                                    Style="{StaticResource FooterFilterChipStyle}"
-                                    Content="{x:Static services:Strings.ViewerZoomFit}"
-                                    Click="ViewerFitChip_Click"/>
+                                    Style="{StaticResource FooterFilterGlyphChipStyle}"
+                                    Click="ViewerFitChip_Click"
+                                    ToolTip="{x:Static services:Strings.ViewerZoomFit}">
+                                <Path Data="M792-576v-120H672v-72h120q30 0 51 21.15T864-696v120h-72Zm-696 0v-120q0-30 21.15-51T168-768h120v72H168v120H96Zm576 384v-72h120v-120h72v120q0 30-21.15 51T792-192H672Zm-504 0q-30 0-51-21.15T96-264v-120h72v120h120v72H168Zm72-144v-288h480v288H240Zm72-72h336v-144H312v144Zm0 0v-144 144Z"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                            </ToggleButton>
+                            <!-- Material Symbols "view_real_size" (user-supplied,
+                                 2026-08-10) - a drawn 1:1, which is what the
+                                 word was. It went to an icon after the two
+                                 beside it did: a lone word between three marks
+                                 was the odd one in the row. -->
                             <ToggleButton x:Name="ViewerActualChip"
-                                    Style="{StaticResource FooterFilterChipStyle}"
-                                    Content="{x:Static services:Strings.ViewerZoomActual}"
-                                    Click="ViewerActualChip_Click"/>
+                                    Style="{StaticResource FooterFilterGlyphChipStyle}"
+                                    Click="ViewerActualChip_Click"
+                                    ToolTip="{x:Static services:Strings.ViewerZoomActual}">
+                                <Path Data="M288-288v-312h-96v-72h168v384h-72Zm156 0v-72h72v72h-72Zm204 0v-312h-96v-72h168v384h-72ZM444-456v-72h72v72h-72Z"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                            </ToggleButton>
+                            <!-- Material Symbols "remove" / "add" (user-supplied,
+                                 2026-08-10), replacing the − and + characters
+                                 they were drawn with. A minus sign and a drawn
+                                 minus look the same until the row around them
+                                 is marks, and then the character is the one
+                                 that sits at the wrong weight. -->
                             <Button x:Name="ViewerZoomOutButton"
-                                    Style="{StaticResource FooterActionChipStyle}"
-                                    Content="&#x2212;"
-                                    Margin="6,0,2,0"
-                                    Click="ViewerZoomOutButton_Click"/>
+                                    Style="{StaticResource FooterActionGlyphChipStyle}"
+                                    Margin="{DynamicResource ViewerChipGroupMargin}"
+                                    Click="ViewerZoomOutButton_Click">
+                                <Path Data="M232-444v-72h496v72H232Z"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
                             <!-- Fixed width so stepping through 25%..800%
                                  doesn't shove the + button sideways under the
-                                 cursor mid-click. -->
-                            <TextBlock x:Name="ViewerZoomText"
-                                    Width="34"
-                                    FontSize="11"
-                                    Foreground="{DynamicResource ForegroundText}"
-                                    Opacity="0.65"
-                                    TextAlignment="Center"
-                                    VerticalAlignment="Center"/>
+                                 cursor mid-click. A hidden twin carrying the
+                                 widest reading rather than a hardcoded 34,
+                                 which is what let this strip start following
+                                 Ctrl +/- at all - the number was cut for one
+                                 font size and overran at every larger one.
+                                 Same trick as the media time and the carousel
+                                 counter. -->
+                            <Grid VerticalAlignment="Center"
+                                    Margin="{DynamicResource ViewerChipMargin}">
+                                <TextBlock Text="800%"
+                                        Visibility="Hidden"
+                                        FontSize="{DynamicResource FooterChipFontSize}"/>
+                                <TextBlock x:Name="ViewerZoomText"
+                                        FontSize="{DynamicResource FooterChipFontSize}"
+                                        Foreground="{DynamicResource ForegroundText}"
+                                        Opacity="0.65"
+                                        TextAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                            </Grid>
                             <Button x:Name="ViewerZoomInButton"
-                                    Style="{StaticResource FooterActionChipStyle}"
-                                    Content="+"
-                                    Margin="2,0,0,0"
-                                    Click="ViewerZoomInButton_Click"/>
+                                    Style="{StaticResource FooterActionGlyphChipStyle}"
+                                    Click="ViewerZoomInButton_Click">
+                                <Path Data="M444-444H240v-72h204v-204h72v204h204v72H516v204h-72v-204Z"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
+                            <!-- Material Symbols "picture_in_picture_alt"
+                                 (user-supplied, 2026-08-10) - a small framed
+                                 box inside a larger one, which is the
+                                 navigator's plate drawn at chip size. -->
                             <ToggleButton x:Name="ViewerNavigatorChip"
-                                    Style="{StaticResource FooterFilterChipStyle}"
-                                    Content="{x:Static services:Strings.ViewerNavigator}"
-                                    Margin="6,0,0,0"
-                                    Click="ViewerNavigatorChip_Click"/>
+                                    Style="{StaticResource FooterFilterGlyphChipStyle}"
+                                    Margin="{DynamicResource ViewerChipGroupMargin}"
+                                    Click="ViewerNavigatorChip_Click"
+                                    ToolTip="{x:Static services:Strings.ViewerNavigator}">
+                                <Path Data="M168-192q-29.7 0-50.85-21.16Q96-234.32 96-264.04v-432.24Q96-726 117.15-747T168-768h624q29.7 0 50.85 21.16Q864-725.68 864-695.96v432.24Q864-234 842.85-213T792-192H168Zm0-72h624v-432H168v432Zm0 0v-432 432Zm288-48h288v-216H456v216Zm72-72v-72h144v72H528Z"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                            </ToggleButton>
+                            <!-- Moved here from beside the carousel counter
+                                 (user, 2026-08-10). It used to sit next to
+                                 < 35 / 257 > on the argument that the counter IS
+                                 the filmstrip with the pictures taken out; what
+                                 outweighed it is that this row is now where the
+                                 viewer's switches live, and a switch belongs
+                                 with the other switches.
+                                 The cost, stated when it was moved: this whole
+                                 row is collapsed while a video is loaded (the
+                                 transport strip stands in its place), so the
+                                 filmstrip can no longer be turned on or off
+                                 with a film open.
+
+                                 Material Symbols "view_column" (user-supplied,
+                                 2026-08-10). Two box-drawing characters were
+                                 tried before it and both failed the same way:
+                                 ▤ read as a transport control, and ▯▯▯ read as
+                                 a broken glyph once the eye had passed over it
+                                 a few times. -->
+                            <ToggleButton x:Name="ViewerFilmstripChip"
+                                    Style="{StaticResource FooterFilterGlyphChipStyle}"
+                                    Click="ViewerFilmstripChip_Click"
+                                    ToolTip="{x:Static services:Strings.ViewerFilmstrip}">
+                                <Path Data="M144-312v-336q0-29 21.15-50.5T216-720h528q29.7 0 50.85 21.5Q816-677 816-648v336q0 29-21.15 50.5T744-240H216q-29.7 0-50.85-21.5Q144-283 144-312Zm72 0h128v-336H216v336Zm200 0h128v-336H416v336Zm200 0h128v-336H616v336Z"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                            </ToggleButton>
                         </StackPanel>
                         <!-- The transport strip: stands in the zoom strip's
                              place (never beside it) while a video plays, since
@@ -6163,18 +6333,54 @@
                             </Grid>
                             <StackPanel Orientation="Horizontal"
                                     HorizontalAlignment="Center"
-                                    Margin="0,4,-2,0">
+                                    Margin="{DynamicResource ViewerMediaButtonRowMargin}">
+                                <!-- Material Symbols "play_arrow" / "pause"
+                                     (user-supplied, 2026-08-10). Both marks
+                                     live here at once and one is shown, the way
+                                     the mute toggle beside them works: swapping
+                                     a Content string was fine for two
+                                     characters, but a Path assigned from code
+                                     would put the artwork in the code-behind
+                                     and out of reach of the row's own sizing. -->
                                 <Button x:Name="ViewerMediaPlayPause"
-                                        Style="{StaticResource FooterActionChipStyle}"
-                                        FontSize="13"
-                                        Content="&#x275A;&#x275A;"
-                                        Click="ViewerMediaPlayPause_Click"/>
-                                <Button Style="{StaticResource FooterActionChipStyle}"
-                                        FontSize="13"
-                                        Content="&#x25A0;"
-                                        Margin="2,0"
+                                        Style="{StaticResource FooterActionGlyphChipStyle}"
+                                        Click="ViewerMediaPlayPause_Click">
+                                    <Grid>
+                                        <Path x:Name="ViewerMediaPlayIcon"
+                                                Data="M336-216v-528l408 264-408 264Zm73-265Zm-1 133 204-132-204-132v264Z"
+                                                Stretch="Uniform"
+                                                Width="{DynamicResource ViewerChipIconSize}"
+                                                Height="{DynamicResource ViewerChipIconSize}"
+                                                Fill="{Binding Foreground,
+                                                    RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                        <Path x:Name="ViewerMediaPauseIcon"
+                                                Data="M528-192v-576h240v576H528Zm-336 0v-576h240v576H192Zm408-72h96v-432h-96v432Zm-336 0h96v-432h-96v432Zm0-432v432-432Zm336 0v432-432Z"
+                                                Visibility="Collapsed"
+                                                Stretch="Uniform"
+                                                Width="{DynamicResource ViewerChipIconSize}"
+                                                Height="{DynamicResource ViewerChipIconSize}"
+                                                Fill="{Binding Foreground,
+                                                    RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                    </Grid>
+                                </Button>
+                                <!-- Material Symbols "stop" (user-supplied,
+                                     2026-08-10). Outlined rather than solid,
+                                     like the rest of this set - which is why
+                                     they are taken from the family rather than
+                                     drawn: a transport mark that everyone knows
+                                     as a filled square is an OUTLINED square
+                                     here, and a hand-drawn one would have been
+                                     the only solid shape in the row. -->
+                                <Button Style="{StaticResource FooterActionGlyphChipStyle}"
                                         Click="ViewerMediaStop_Click"
-                                        ToolTip="{x:Static services:Strings.ViewerStop}"/>
+                                        ToolTip="{x:Static services:Strings.ViewerStop}">
+                                    <Path Data="M336-624v288-288Zm-72 360v-432h432v432H264Zm72-72h288v-288H336v288Z"
+                                            Stretch="Uniform"
+                                            Width="{DynamicResource ViewerChipIconSize}"
+                                            Height="{DynamicResource ViewerChipIconSize}"
+                                            Fill="{Binding Foreground,
+                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
                                 <!-- Back to the beginning. The strip had a mark
                                      button here and this replaced it (user,
                                      2026-08-10): marking a position is a thing
@@ -6183,13 +6389,23 @@
                                      every player has in front of you - and the
                                      blue ribbon was the one loud thing in a row
                                      of quiet glyphs. -->
+                                <!-- Material Symbols "first_page" (user-supplied,
+                                     2026-08-10), and the right pick over
+                                     skip_previous: this button goes to the
+                                     START of the film, where skip_previous
+                                     promises a previous TRACK - and ↑↓ already
+                                     own moving between files. -->
                                 <Button x:Name="ViewerMediaRewind"
-                                        Style="{StaticResource FooterActionChipStyle}"
-                                        FontSize="13"
-                                        Content="&#x23EE;"
-                                        Margin="0,0,2,0"
+                                        Style="{StaticResource FooterActionGlyphChipStyle}"
                                         Click="ViewerMediaRewind_Click"
-                                        ToolTip="{x:Static services:Strings.ViewerRewind}"/>
+                                        ToolTip="{x:Static services:Strings.ViewerRewind}">
+                                    <Path Data="M288-288v-384h72v384h-72Zm384 0L480-480l192-192 51 51-141 141 141 141-51 51Z"
+                                            Stretch="Uniform"
+                                            Width="{DynamicResource ViewerChipIconSize}"
+                                            Height="{DynamicResource ViewerChipIconSize}"
+                                            Fill="{Binding Foreground,
+                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
                                 <!-- Fixed width by the same hidden-twin trick
                                      the carousel counter uses: the readout's
                                      text changes width as it counts, and in a
@@ -6199,12 +6415,12 @@
                                      (2026-08-09). The twin carries the widest
                                      shape this readout can take. -->
                                 <Grid VerticalAlignment="Center"
-                                        Margin="6,0,8,0">
+                                        Margin="{DynamicResource ViewerChipGroupMargin}">
                                     <TextBlock Text="0:00:00 / 0:00:00"
                                             Visibility="Hidden"
-                                            FontSize="11"/>
+                                            FontSize="{DynamicResource FooterChipFontSize}"/>
                                     <TextBlock x:Name="ViewerMediaTime"
-                                            FontSize="11"
+                                            FontSize="{DynamicResource FooterChipFontSize}"
                                             Foreground="{DynamicResource ForegroundText}"
                                             Opacity="0.65"
                                             TextAlignment="Center"
@@ -6215,23 +6431,35 @@
                                      drawn as a second Path shown only while
                                      muted, so the icon itself never has to be
                                      swapped for another shape. -->
+                                <!-- Material Symbols "volume_up" / "volume_off"
+                                     (user-supplied, 2026-08-10), replacing a
+                                     hand-drawn speaker with a stroked slash
+                                     laid over it. The family draws the muted
+                                     state as its own whole shape, so the two
+                                     are now a pair of marks like play/pause -
+                                     and the old worry about keeping a separate
+                                     slash registered against the speaker at
+                                     every size goes with it. -->
                                 <Button x:Name="ViewerMediaMute"
-                                        Style="{StaticResource ViewerMediaIconButtonStyle}"
-                                        Margin="0,0,2,0"
+                                        Style="{StaticResource FooterActionGlyphChipStyle}"
                                         Click="ViewerMediaMute_Click"
                                         ToolTip="{x:Static services:Strings.ViewerMute}">
-                                    <Grid Width="12"
-                                            Height="12">
-                                        <Path Data="M0,4 L4,4 L9,0 L9,12 L4,8 L0,8 Z"
-                                                Fill="{DynamicResource ForegroundText}"
-                                                VerticalAlignment="Center"/>
-                                        <Path x:Name="ViewerMediaMuteSlash"
-                                                Data="M0,12 L12,0"
+                                    <Grid>
+                                        <Path x:Name="ViewerMediaVolumeIcon"
+                                                Data="M552-152v-75q86-23 139-93.26 53-70.25 53-159.5 0-89.24-53.5-158.74Q637-708 552-734v-75q116 25 190 117t74 211q0 119-73.5 211.5T552-152ZM144-385v-192h144l192-192v576L288-385H144Zm408 55v-302q45.12 20.4 70.56 61.2Q648-530 648-480.52q0 48.52-25.44 89.23Q597.12-350.59 552-330ZM408-595l-90 90H216v48h102l90 90v-228Zm-91 113Z"
+                                                Stretch="Uniform"
+                                                Width="{DynamicResource ViewerChipIconSize}"
+                                                Height="{DynamicResource ViewerChipIconSize}"
+                                                Fill="{Binding Foreground,
+                                                    RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                        <Path x:Name="ViewerMediaMuteIcon"
+                                                Data="M768-90 661-197q-22 14-52.5 26.5T552-152v-74q12-5 28.5-11.5T608-250L480-378v187L288-383H144v-192h138L90-768l51-51 678 678-51 51Zm-6-209-52-52q16-29 25-61.5t9-66.5q0-89-53.5-158.5T552-733v-74q117 23 190.5 116T816-479q0 48-14 93.5T762-299ZM638-423l-86-86v-122q45 20 70.5 61.5T648-479q0 14-2 28t-8 28ZM480-581l-93-93 93-93v186Zm-72 216v-85l-72-72-18 19H216v48h102l90 90Zm-36-121Z"
                                                 Visibility="Collapsed"
-                                                Stroke="{DynamicResource ForegroundText}"
-                                                StrokeThickness="1.4"
-                                                StrokeStartLineCap="Round"
-                                                StrokeEndLineCap="Round"/>
+                                                Stretch="Uniform"
+                                                Width="{DynamicResource ViewerChipIconSize}"
+                                                Height="{DynamicResource ViewerChipIconSize}"
+                                                Fill="{Binding Foreground,
+                                                    RelativeSource={RelativeSource AncestorType=Button}}"/>
                                     </Grid>
                                 </Button>
                                 <Slider x:Name="ViewerMediaVolume"
@@ -6260,25 +6488,23 @@
                                      An arrow leaving a box, the same glyph
                                      every app uses for "opens elsewhere". -->
                                 <Button x:Name="ViewerMediaOpenExternal"
-                                        Style="{StaticResource ViewerMediaIconButtonStyle}"
-                                        Margin="8,0,0,0"
+                                        Style="{StaticResource FooterActionGlyphChipStyle}"
+                                        Margin="{DynamicResource ViewerChipGroupMargin}"
                                         Click="ViewerMediaOpenExternal_Click"
                                         ToolTip="{x:Static services:Strings.ViewerOpenExternally}">
-                                    <Grid Width="12"
-                                            Height="12">
-                                        <Path Data="M9,1 L11,1 L11,3 M11,1 L6.5,5.5"
-                                                Stroke="{DynamicResource ForegroundText}"
-                                                StrokeThickness="1.3"
-                                                StrokeStartLineCap="Round"
-                                                StrokeEndLineCap="Round"
-                                                StrokeLineJoin="Round"/>
-                                        <Path Data="M8,7.5 L8,11 L1,11 L1,4 L4.5,4"
-                                                Stroke="{DynamicResource ForegroundText}"
-                                                StrokeThickness="1.3"
-                                                StrokeStartLineCap="Round"
-                                                StrokeEndLineCap="Round"
-                                                StrokeLineJoin="Round"/>
-                                    </Grid>
+                                    <!-- Material Symbols "open_in_new"
+                                         (user-supplied, 2026-08-10), replacing
+                                         a hand-drawn pair of stroked lines.
+                                         Same glyph, drawn by the family the
+                                         rest of the row comes from - stroke
+                                         weight included, which is the part a
+                                         drawn one never quite matches. -->
+                                    <Path Data="M216-144q-29.7 0-50.85-21.15Q144-186.3 144-216v-528q0-29.7 21.15-50.85Q186.3-816 216-816h264v72H216v528h528v-264h72v264q0 29.7-21.15 50.85Q773.7-144 744-144H216Zm171-192-51-51 357-357H576v-72h240v240h-72v-117L387-336Z"
+                                            Stretch="Uniform"
+                                            Width="{DynamicResource ViewerChipIconSize}"
+                                            Height="{DynamicResource ViewerChipIconSize}"
+                                            Fill="{Binding Foreground,
+                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
                                 </Button>
                             </StackPanel>
                         </StackPanel>
