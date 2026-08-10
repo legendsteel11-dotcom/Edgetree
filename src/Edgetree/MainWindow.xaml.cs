@@ -3437,6 +3437,23 @@ public partial class MainWindow : Window
     // the reported confusion; the glyph's angle carries the state instead
     // (upright = pinned, lying = auto-hiding, the classic tool-window
     // pushpin language).
+    // The invisible box every Material glyph in this app carries, so Stretch
+    // fits the FAMILY's 960 box instead of each path's own ink and the icons
+    // keep the relative sizes they were drawn at. Two absolute horizontal
+    // segments enclosing no area: a Fill paints nothing (verified by render),
+    // the bounds become the whole box. APPENDED, never prepended - these paths
+    // mostly open with a relative "m" and would start from wherever the box
+    // left the pen. See the XAML resource HeaderGlyphBox for the long version.
+    private const string MaterialGlyphBox = " M0-960H960M0 0H960";
+
+    // Material Symbols "keep" / "keep_off", swapped onto PinButtonIcon.Data the
+    // same way the search button swaps its two. This replaced a 90 degree
+    // rotation of the one pin (2026-08-10) - see the XAML for what that trades.
+    private static readonly Geometry PinGlyphOn = Geometry.Parse(
+        "m624-480 96 96v72H516v228l-36 36-36-36v-228H240v-72l96-96v-264h-48v-72h384v72h-48v264Zm-282 96h276l-66-66v-294H408v294l-66 66Zm138 0Z" + MaterialGlyphBox);
+    private static readonly Geometry PinGlyphOff = Geometry.Parse(
+        "M672-816v72h-48v307l-72-72v-235H408v91l-90-90-30-31v-42h384ZM480-48l-36-36v-228H240v-72l96-96v-42.46L90-768l51-51 678 679-51 51-222-223h-30v228l-36 36ZM342-384h132l-66-66-66 66Zm137-192Zm-71 126Z" + MaterialGlyphBox);
+
     private void UpdatePinButtonVisibility()
     {
         PinButton.IsEnabled = true;
@@ -3447,7 +3464,7 @@ public partial class MainWindow : Window
         PinButton.Visibility = CloseButton.Visibility;
 
         bool autoHiding = _isDocked && _settings.IsAutoHidden;
-        PinIconRotation.Angle = autoHiding ? 90 : 0;
+        PinButtonIcon.Data = autoHiding ? PinGlyphOff : PinGlyphOn;
 
         // Which edge re-docking/pinning actually snaps to depends on
         // DockOnRight, so the tooltip can't be one fixed string the way the
@@ -5568,12 +5585,17 @@ public partial class MainWindow : Window
         }
     }
 
-    // Same triangle, mirrored vertically - swapped in directly (rather than
-    // rotating the "up" glyph 180 degrees) because animating that rotation
-    // visibly swings the arrow sideways mid-flip instead of reading as a
-    // clean in-place change.
-    private static readonly Geometry CollapseAllArrowUp = Geometry.Parse("M4,10 L8,5 L12,10 Z");
-    private static readonly Geometry CollapseAllArrowDown = Geometry.Parse("M4,5 L8,10 L12,5 Z");
+    // Same glyph, mirrored vertically. It used to be two hand-drawn triangles
+    // swapped into Data; since the icon became Material's chevron_line_up
+    // (2026-08-10) the mirror is a ScaleY on the one path, which is closer to
+    // what "same shape, reflected" was always meant to be - and there is no
+    // second file to keep in step with the first.
+    //
+    // Still an instant swap, not a rotation: animating a 180 turn visibly
+    // swung the old arrow sideways mid-flip instead of reading as a clean
+    // in-place change, and that is just as true of a chevron.
+    private const double CollapseAllUpright = 1;
+    private const double CollapseAllMirrored = -1;
 
     private void CollapseAllButton_Click(object sender, RoutedEventArgs e)
     {
@@ -5584,7 +5606,7 @@ public partial class MainWindow : Window
             {
                 ExpandPathIfPossible(path);
             }
-            CollapseAllArrow.Data = CollapseAllArrowUp;
+            CollapseAllFlip.ScaleY = CollapseAllUpright;
             CollapseAllButton.ToolTip = Strings.ToolTipCollapseAll;
         }
         else
@@ -5594,7 +5616,7 @@ public partial class MainWindow : Window
             {
                 CollapseRecursive(root);
             }
-            CollapseAllArrow.Data = CollapseAllArrowDown;
+            CollapseAllFlip.ScaleY = CollapseAllMirrored;
             CollapseAllButton.ToolTip = Strings.ToolTipRestoreExpanded;
         }
 
@@ -5682,7 +5704,7 @@ public partial class MainWindow : Window
         }
 
         _collapseAllRestorePaths = null;
-        CollapseAllArrow.Data = CollapseAllArrowUp;
+        CollapseAllFlip.ScaleY = CollapseAllUpright;
         CollapseAllButton.ToolTip = Strings.ToolTipCollapseAll;
         UpdateCollapseAllButtonState();
     }
@@ -17811,13 +17833,21 @@ public partial class MainWindow : Window
     private const int SearchResultDisplayCap = 1000;
     private const int SearchHistoryMax = 15;
 
-    // Swapped onto SearchButtonIcon.Data (same idea as CollapseAllArrow): a
-    // magnifier while the explorer shows, a left chevron ("back") while search
-    // is up.
+    // Swapped onto SearchButtonIcon.Data: a magnifier while the explorer
+    // shows, a left chevron ("back") while search is up. Both Material Symbols
+    // since 2026-08-10 - "search" and "chevron_left", the latter already in the
+    // app as the carousel's previous button, so the pair cost one file.
+    //
+    // Sizing note that applies to every glyph here: Stretch="Uniform" fits the
+    // path's own BOUNDS, not the 960 box, so a tall narrow shape lands narrower
+    // than a square one at the same Width/Height. The chevron is half as wide
+    // as the magnifier for exactly that reason - which is also true of the two
+    // hand-drawn glyphs this replaces, so the swap changes nothing about how
+    // the two states compare.
     private static readonly Geometry SearchGlyphMagnifier =
-        Geometry.Parse("M4,7 A3.5,3.5 0 1 0 11,7 A3.5,3.5 0 1 0 4,7 M10,10 L13.5,13.5");
+        Geometry.Parse("M765-144 526-383q-30 22-65.79 34.5-35.79 12.5-76.18 12.5Q284-336 214-406t-70-170q0-100 70-170t170-70q100 0 170 70t70 170.03q0 40.39-12.5 76.18Q599-464 577-434l239 239-51 51ZM384-408q70 0 119-49t49-119q0-70-49-119t-119-49q-70 0-119 49t-49 119q0 70 49 119t119 49Z" + MaterialGlyphBox);
     private static readonly Geometry SearchGlyphBack =
-        Geometry.Parse("M10,3 L5,8 L10,13");
+        Geometry.Parse("M576-240 336-480l240-240 51 51-189 189 189 189-51 51Z" + MaterialGlyphBox);
 
     private void InitializeSearch()
     {

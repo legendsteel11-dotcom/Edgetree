@@ -220,6 +220,22 @@
              (tree at its default 12). The glyph and icon sizes are the text
              size plus two: a ⏸ or a fit_screen mark set at the label's own
              size reads smaller than the label beside it. -->
+        <!-- The BOX every Material glyph is drawn inside, not the size of its
+             ink. Those icons are designed at different sizes within a shared
+             960-unit box - a magnifier fills 672 of it, a close X only 480, a
+             chevron 384 - and that difference is the family's own optical
+             sizing. Fitting each path's BOUNDS to a common size throws it away
+             and the row stops looking like a set (user, with a screenshot,
+             2026-08-10: "미묘하게 좀 달라보이는", and the pin, narrowest of
+             them, "좀 작다").
+             So every glyph's Data carries "M0-960H960M0 0H960" at the END: two
+             absolute horizontal segments at the box's top and bottom. They
+             enclose no area, so a Fill paints nothing (verified by rendering);
+             they only make the geometry's bounds the whole box, which is what
+             Stretch then fits. APPENDED, never prepended - most of these paths
+             open with a relative "m", which would then start from wherever the
+             box left the pen (measured: it moved the pin 624 units sideways). -->
+        <system:Double x:Key="HeaderGlyphBox">18</system:Double>
         <system:Double x:Key="FooterChipFontSize">9</system:Double>
         <system:Double x:Key="ViewerChipGlyphFontSize">11</system:Double>
         <system:Double x:Key="ViewerChipIconSize">11</system:Double>
@@ -4287,12 +4303,20 @@
                         RenderTransform="{StaticResource ShiftUp1px}"
                         ToolTip="{x:Static services:Strings.ToolTipSearch}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <!-- Material Symbols "search" (user-supplied, 2026-08-10),
+                         and the back state it swaps to is "chevron_left" - the
+                         same path the viewer's carousel already uses, so that
+                         one needed no new file. Both are FILLED now where the
+                         pair used to be stroked arcs and lines, which is what
+                         lets the two states share one Path element and take
+                         ForegroundText like the rest of the family.
+                         See SearchGlyphMagnifier / SearchGlyphBack. -->
                     <Path x:Name="SearchButtonIcon"
-                            Data="M4,7 A3.5,3.5 0 1 0 11,7 A3.5,3.5 0 1 0 4,7 M10,10 L13.5,13.5"
-                            Stroke="{DynamicResource ForegroundText}"
-                            StrokeThickness="1.5"
-                            StrokeStartLineCap="Round"
-                            StrokeEndLineCap="Round"
+                            Data="M765-144 526-383q-30 22-65.79 34.5-35.79 12.5-76.18 12.5Q284-336 214-406t-70-170q0-100 70-170t170-70q100 0 170 70t70 170.03q0 40.39-12.5 76.18Q599-464 577-434l239 239-51 51ZM384-408q70 0 119-49t49-119q0-70-49-119t-119-49q-70 0-119 49t-49 119q0 70 49 119t119 49Z M0-960H960M0 0H960"
+                            Fill="{DynamicResource ForegroundText}"
+                            Stretch="Uniform"
+                            Width="{DynamicResource HeaderGlyphBox}"
+                            Height="{DynamicResource HeaderGlyphBox}"
                             RenderTransformOrigin="0.5,0.5"
                             RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>
@@ -4303,48 +4327,37 @@
                         Margin="{DynamicResource HeaderButtonMargin}"
                         Visibility="Collapsed"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <!-- Google Material Symbols "keep", picked by the author and
-                         kept in its original 960-unit grid (the source is
-                         Resources/Icons/keepPin.svg) rather than re-plotted onto
-                         the 16-unit box the hand-built glyphs beside it use.
-                         Stretch does the fitting, so this stays byte-identical
-                         to what the design tool produced - negative Y origin and
-                         all - and only Width/Height decide how big it lands.
+                    <!-- Material Symbols "keep" / "keep_off" (user-supplied,
+                         2026-08-10). The pin was already this family's "keep",
+                         but from a separately downloaded file and shown in TWO
+                         STATES BY ROTATION: upright = pinned open, lying on its
+                         side = auto-hiding, which is the tool-window pushpin
+                         language Visual Studio and friends use.
 
-                         Filled rather than stroked, so it takes the same
-                         ForegroundText brush as the other glyphs and will follow
-                         a future theme. The leading "F1" selects the nonzero
-                         fill rule: SVG's default, but not WPF's (EvenOdd), and
-                         without it the pin's inner cut-out fills in solid.
+                         Now it is two whole shapes, the way play/pause and the
+                         mute toggle in the viewer already work. What that
+                         trades: the rotation is a convention people who use
+                         docked tool windows already know, while a struck-out
+                         pin says "not pinned" to someone who knows no
+                         convention at all - and the glyph is 13px, where a 90
+                         degree turn is a small difference to read. See
+                         UpdatePinButtonVisibility.
 
-                         Height is what sets the size: the artwork is about twice
-                         as tall as it is wide, so Stretch="Uniform" inside a
-                         square box would fit the height and leave the glyph
-                         barely half as wide as the round magnifier next to it -
-                         which read as far too small. Sized taller than that
-                         magnifier's ~10 units on purpose, since a narrow
-                         upright shape looks smaller than a circular one of the
-                         same height. -->
+                         It used to set Height alone, on the reasoning that a
+                         square box would fit this tall narrow shape by its
+                         height and leave it half the magnifier's width. The
+                         960 box makes that rule unnecessary AND wrong: every
+                         glyph now takes the same square box and Material's own
+                         proportions decide the rest, which is what finally made
+                         the pin stop reading as the small one. -->
                     <Path x:Name="PinButtonIcon"
-                            Data="F1 M632.13-488.37l96 96v83.24H521.5v227.04L480-40.59l-41.5-41.5v-227.04H231.87v-83.24l96-96v-257.78h-48v-83h400.26v83h-48v257.78Zm-283.2 96.24h262.14l-61.94-61.94v-292.08H410.87v292.08l-61.94 61.94Z"
+                            Data="m624-480 96 96v72H516v228l-36 36-36-36v-228H240v-72l96-96v-264h-48v-72h384v72h-48v264Zm-282 96h276l-66-66v-294H408v294l-66 66Zm138 0Z M0-960H960M0 0H960"
                             Fill="{DynamicResource ForegroundText}"
                             Stretch="Uniform"
-                            Height="13"
-                            RenderTransformOrigin="0.5,0.5">
-                        <!-- Upright pin = pinned open, lying pin = auto-hide -
-                             the classic tool-window pushpin state language
-                             (see UpdatePinButtonVisibility, which drives
-                             PinIconRotation). The shared grow transform stays
-                             in the group so this glyph keeps following the
-                             same size stepping as its five siblings. -->
-                        <Path.RenderTransform>
-                            <TransformGroup>
-                                <RotateTransform x:Name="PinIconRotation"
-                                        Angle="0"/>
-                                <StaticResource ResourceKey="HeaderGlyphGrow"/>
-                            </TransformGroup>
-                        </Path.RenderTransform>
-                    </Path>
+                            Width="{DynamicResource HeaderGlyphBox}"
+                            Height="{DynamicResource HeaderGlyphBox}"
+                            RenderTransformOrigin="0.5,0.5"
+                            RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>
                 <!-- The image viewer toggle - opens/closes the preview panel
                      beside the tree (see OpenViewer/CloseViewer). On the same
@@ -4387,11 +4400,11 @@
                          13, not 16: Stretch fits the path's BOUNDS, dropping
                          the padding the 960 box builds in, and the neighbouring
                          hand-drawn glyphs sit inset by about that much. -->
-                    <Path Data="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"
+                    <Path Data="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z M0-960H960M0 0H960"
                             Fill="{DynamicResource ForegroundText}"
                             Stretch="Uniform"
-                            Width="13"
-                            Height="13"
+                            Width="{DynamicResource HeaderGlyphBox}"
+                            Height="{DynamicResource HeaderGlyphBox}"
                             RenderTransformOrigin="0.5,0.5"
                             RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>
@@ -4403,11 +4416,36 @@
                         RenderTransform="{StaticResource ShiftUp1px}"
                         ToolTip="{x:Static services:Strings.ToolTipCollapseAll}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <!-- Material Symbols "chevron_line_up" (user-supplied,
+                         2026-08-10), replacing a hand-drawn filled triangle.
+                         The ceiling line is what the triangle never said: this
+                         folds everything UP TO the top, it is not a direction.
+
+                         The restore state is the SAME path mirrored, by a
+                         ScaleTransform this button owns - not a second icon.
+                         That keeps the pair exactly each other's reflection,
+                         which is what the two triangles were chosen for in the
+                         first place, and it stays an instant swap rather than
+                         an animated rotation (which visibly swung the old
+                         glyph sideways mid-flip). The shared grow transform
+                         rides in the group so this glyph keeps the size
+                         stepping its siblings have - same arrangement the pin
+                         beside it uses. -->
                     <Path x:Name="CollapseAllArrow"
-                            Data="M4,10 L8,5 L12,10 Z"
+                            Data="M288-600v-72h384v72H288Zm51 363-51-51 192-192 192 192-51 51-141-141-141 141Z M0-960H960M0 0H960"
                             Fill="{DynamicResource ForegroundText}"
-                            RenderTransformOrigin="0.5,0.5"
-                            RenderTransform="{StaticResource HeaderGlyphGrow}"/>
+                            Stretch="Uniform"
+                            Width="{DynamicResource HeaderGlyphBox}"
+                            Height="{DynamicResource HeaderGlyphBox}"
+                            RenderTransformOrigin="0.5,0.5">
+                        <Path.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform x:Name="CollapseAllFlip"
+                                        ScaleY="1"/>
+                                <StaticResource ResourceKey="HeaderGlyphGrow"/>
+                            </TransformGroup>
+                        </Path.RenderTransform>
+                    </Path>
                 </Button>
                 <Button x:Name="OptionsButton"
                         Grid.Column="6"
@@ -4418,24 +4456,19 @@
                         ContextMenu="{StaticResource OptionsMenu}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <Grid>
-                        <StackPanel Orientation="Horizontal"
-                                VerticalAlignment="Center"
-                                HorizontalAlignment="Center"
+                        <!-- Material Symbols "more_horiz" (user-supplied,
+                             2026-08-10). The same three dots the hand-built
+                             version drew, which is exactly why it is worth
+                             swapping: three Ellipses at 3px with 1px margins
+                             were a guess at the family's spacing, and this is
+                             the family's spacing. -->
+                        <Path Data="M263.79-408Q234-408 213-429.21t-21-51Q192-510 213.21-531t51-21Q294-552 315-530.79t21 51Q336-450 314.79-429t-51 21Zm216 0Q450-408 429-429.21t-21-51Q408-510 429.21-531t51-21Q510-552 531-530.79t21 51Q552-450 530.79-429t-51 21Zm216 0Q666-408 645-429.21t-21-51Q624-510 645.21-531t51-21Q726-552 747-530.79t21 51Q768-450 746.79-429t-51 21Z M0-960H960M0 0H960"
+                                Fill="{DynamicResource ForegroundText}"
+                                Stretch="Uniform"
+                                Width="{DynamicResource HeaderGlyphBox}"
+                                Height="{DynamicResource HeaderGlyphBox}"
                                 RenderTransformOrigin="0.5,0.5"
-                                RenderTransform="{StaticResource HeaderGlyphGrow}">
-                            <Ellipse Width="3"
-                                    Height="3"
-                                    Fill="{DynamicResource ForegroundText}"
-                                    Margin="1,0"/>
-                            <Ellipse Width="3"
-                                    Height="3"
-                                    Fill="{DynamicResource ForegroundText}"
-                                    Margin="1,0"/>
-                            <Ellipse Width="3"
-                                    Height="3"
-                                    Fill="{DynamicResource ForegroundText}"
-                                    Margin="1,0"/>
-                        </StackPanel>
+                                RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                         <!-- Update-available indicator: lit by
                              CheckForUpdateOnceAsync when GitHub's latest
                              release is newer than this build. Display only -
@@ -4475,11 +4508,17 @@
                         RenderTransform="{StaticResource ShiftUp2px}"
                         ToolTip="{x:Static services:Strings.ToolTipClose}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Path Data="M4,4 L12,12 M12,4 L4,12"
-                            Stroke="{DynamicResource ForegroundText}"
-                          StrokeThickness="1.5"
-                            StrokeStartLineCap="Round"
-                            StrokeEndLineCap="Round"
+                    <!-- Material Symbols "close" (user-supplied, 2026-08-10),
+                         replacing two stroked lines with round caps. A filled
+                         shape rather than a stroke, like the rest of the
+                         family - so it takes ForegroundText the same way and
+                         holds its weight at every size step instead of
+                         carrying a thickness of its own. -->
+                    <Path Data="m291-240-51-51 189-189-189-189 51-51 189 189 189-189 51 51-189 189 189 189-51 51-189-189-189 189Z M0-960H960M0 0H960"
+                            Fill="{DynamicResource ForegroundText}"
+                            Stretch="Uniform"
+                            Width="{DynamicResource HeaderGlyphBox}"
+                            Height="{DynamicResource HeaderGlyphBox}"
                             RenderTransformOrigin="0.5,0.5"
                             RenderTransform="{StaticResource HeaderGlyphGrow}"/>
                 </Button>
@@ -4836,8 +4875,17 @@
                                 Margin="4,0,0,0"
                                 Click="SearchBrowseButton_Click"
                                 ToolTip="{x:Static services:Strings.SearchTooltipBrowseFolder}">
-                            <Path Data="M1.5,4 L6,4 L7.5,5.5 L14.5,5.5 L14.5,12.5 L1.5,12.5 Z"
-                                    Fill="{DynamicResource ForegroundText}"/>
+                            <!-- Material Symbols "folder" (user-supplied,
+                                 2026-08-10), replacing a hand-drawn solid
+                                 folder. Outlined like the rest of the family,
+                                 which also stops it competing with the FILLED
+                                 folder icons the tree draws for real folders -
+                                 this button picks a folder, it is not one. -->
+                            <Path Data="M168-192q-29 0-50.5-21.5T96-264v-432q0-29.7 21.5-50.85Q139-768 168-768h216l96 96h312q29.7 0 50.85 21.15Q864-629.7 864-600v336q0 29-21.15 50.5T792-192H168Zm0-72h624v-336H450l-96-96H168v432Zm0 0v-432 432Z M0-960H960M0 0H960"
+                                    Fill="{DynamicResource ForegroundText}"
+                                    Stretch="Uniform"
+                                    Width="{DynamicResource HeaderGlyphBox}"
+                                    Height="{DynamicResource HeaderGlyphBox}"/>
                         </Button>
                         <!-- Results-only sort (folder grouping / name / date,
                              asc/desc). Click opens the menu below rather than
@@ -4917,11 +4965,18 @@
                                 Margin="0,0,3,0"
                                 Click="SearchHistoryButton_Click"
                                 ToolTip="{x:Static services:Strings.SearchTooltipHistory}">
-                            <Path Data="M3,5 L7,9 L11,5"
-                                    Stroke="{DynamicResource ForegroundText}"
-                                    StrokeThickness="1.4"
-                                    StrokeStartLineCap="Round"
-                                    StrokeEndLineCap="Round"/>
+                            <!-- Material Symbols "list_arrow" (user-supplied,
+                                 2026-08-10), replacing a bare down-chevron.
+                                 The chevron only said "down"; this says a LIST
+                                 comes down, which is what the button opens -
+                                 and it stops reading as the same caret the
+                                 tree's expanders use for something else
+                                 entirely. -->
+                            <Path Data="M240-192 96-336l50-50 58 57v-391h72v391l57-57 51 50-144 144Zm240-48v-72h384v72H480Zm0-204v-72h384v72H480Zm0-204v-72h384v72H480Z M0-960H960M0 0H960"
+                                    Fill="{DynamicResource ForegroundText}"
+                                    Stretch="Uniform"
+                                    Width="{DynamicResource HeaderGlyphBox}"
+                                    Height="{DynamicResource HeaderGlyphBox}"/>
                         </Button>
 
                         <!-- History dropdown. StaysOpen=False closes it on an
@@ -5053,13 +5108,16 @@
                                 ToolTip="{x:Static services:Strings.SearchTooltipRefresh}">
                             <Grid Width="15"
                                     Height="15">
-                                <Path Data="M12.6,7.5 A5,5 0 1 1 10.8,3.7"
-                                        Stroke="{DynamicResource ForegroundText}"
-                                        StrokeThickness="1.4"
-                                        StrokeStartLineCap="Round"
-                                        StrokeEndLineCap="Round"/>
-                                <Path Data="M9.6,1 L11.4,4.3 L7.9,4.4 Z"
-                                        Fill="{DynamicResource ForegroundText}"/>
+                                <!-- Material Symbols "refresh" (user-supplied,
+                                     2026-08-10). One path where this was an arc
+                                     plus a separate arrowhead triangle - two
+                                     shapes that had to be kept meeting each
+                                     other by hand at every size. -->
+                                <Path Data="M480-192q-120 0-204-84t-84-204q0-120 84-204t204-84q65 0 120.5 27t95.5 72v-99h72v240H528v-72h131q-29-44-76-70t-103-26q-90 0-153 63t-63 153q0 90 63 153t153 63q84 0 144-55.5T693-456h74q-9 112-91 188t-196 76Z M0-960H960M0 0H960"
+                                        Fill="{DynamicResource ForegroundText}"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource HeaderGlyphBox}"
+                                        Height="{DynamicResource HeaderGlyphBox}"/>
                                 <!-- Pushed clear of the glyph (and a touch
                                      bigger): sitting against the arc it read as
                                      part of the drawing rather than as a mark on
