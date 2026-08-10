@@ -47,6 +47,14 @@ public static class Strings
     // Under the box, only while it holds nothing: an empty box is the way to
     // remove the filter, and that is not guessable.
     public static string FilterCustomEmptyHint = "비워 두고 확인하면 사용자 지정이 없어집니다";
+    // The other direction. Same ellipsis promise as 사용자 지정… above - both
+    // rows ask, the rest switch.
+    public static string MenuFileFilterExcludeEdit = "제외…";
+    public static string FilterExcludeTitle = "제외할 확장자";
+    // Says what makes this one different in the one place it will be read: it
+    // does not join the other kinds, it overrules them.
+    public static string FilterExcludeHint = "쉼표로 구분 · 여기 적은 것은 항상 숨깁니다";
+    public static string FilterExcludeEmptyHint = "비워 두고 확인하면 제외가 없어집니다";
     public static string ButtonOk = "확인";
     public static string ButtonCancel = "취소";
 
@@ -454,6 +462,10 @@ public static class Strings
         FilterCustomTitle = "Custom Extensions";
         FilterCustomHint = "Separate with commas · psd, ai, .fig";
         FilterCustomEmptyHint = "Leaving this empty removes the custom kind";
+        MenuFileFilterExcludeEdit = "Exclude…";
+        FilterExcludeTitle = "Excluded Extensions";
+        FilterExcludeHint = "Separate with commas · these are always hidden";
+        FilterExcludeEmptyHint = "Leaving this empty removes the exclusion";
         ButtonOk = "OK";
         ButtonCancel = "Cancel";
         MenuFontWeight = "Font Weight";

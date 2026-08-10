@@ -2658,6 +2658,68 @@
             </Setter>
         </Style>
 
+        <!-- The exclusion chip. Same shape and size as the seven kind chips -
+             it belongs to that strip - but it is the only one that TAKES
+             files away rather than letting them through, and a strip where
+             every chip looks alike would say nothing about that. So it carries
+             its own ink instead of the shared ForegroundText, and its lit fill
+             is a wash of the same hue rather than the grey/blue the others
+             take. Colour, not opacity: dimming is how this app marks nothing
+             (see the 흐리게 rule) and a filter that hides files has to be the
+             most legible thing in the footer, not the least.
+
+             The two inks are theme-fixed like FooterChipChecked* above, NOT a
+             new row in 색상 설정 - one more colour to pick is a cost every
+             user pays for a strip most of them will never turn on. -->
+        <Style x:Key="FooterExcludeChipStyle"
+                TargetType="ToggleButton"
+                BasedOn="{StaticResource FooterFilterChipStyle}">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource FooterChipExcludeForeground}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd"
+                                Background="Transparent"
+                                CornerRadius="3"
+                                Padding="5,1"
+                                SnapsToDevicePixels="True">
+                            <TextBlock Text="{TemplateBinding Content}"
+                                    VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowHoverBackground}"/>
+                                <Setter Property="Opacity"
+                                        Value="1"/>
+                            </Trigger>
+                            <!-- Lit exactly the way the seven kind chips are -
+                                 a solid fill with white on it - just in this
+                                 chip's own hue instead of theirs. A tinted
+                                 wash was tried first, so that the coloured ink
+                                 could stay in both states, and the on/off
+                                 difference was too quiet to read (user,
+                                 2026-08-10). The hue alone already says which
+                                 chip this is; the fill has the other job. -->
+                            <Trigger Property="IsChecked"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource FooterChipExcludeCheckedBackground}"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource FooterChipCheckedForeground}"/>
+                                <Setter Property="Opacity"
+                                        Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- The chip above, minus the checked state: the viewer's zoom stepper
              (− and +) does something rather than IS something, so it can't be
              a ToggleButton, but it sits in the same strip as 맞춤/1:1 and has

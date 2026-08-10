@@ -134,6 +134,38 @@ public static class FileTypeFilter
         }
     }
 
+    // The exclusion list, and the switch that arms it. This is the ONE rule in
+    // this class that takes files away rather than letting them through, and
+    // it is answered before everything else - see ShouldShowFile.
+    //
+    // Kept out of SelectedCategories on purpose. An exclusion is not a kind:
+    // put it in that set and the set stops being empty, "전체" goes out, and
+    // ShouldShowFile starts asking which categories claim the file - which
+    // would empty the tree, since "not .log" claims nothing. Held apart, 전체
+    // and an exclusion can be true at the same time, which is the state most
+    // people actually want ("everything except these").
+    private static readonly HashSet<string> ExcludedExtensions =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    // The list can be kept while the rule is switched off, the same way any
+    // other chip in the footer can be switched off without being emptied.
+    private static bool _excludeEnabled = true;
+
+    public static bool HasExcludedExtensions => ExcludedExtensions.Count > 0;
+
+    public static bool IsExcluding => _excludeEnabled && ExcludedExtensions.Count > 0;
+
+    public static void SetExcludedExtensions(string storedList)
+    {
+        ExcludedExtensions.Clear();
+        foreach (string extension in Split(storedList))
+        {
+            ExcludedExtensions.Add(extension);
+        }
+    }
+
+    public static void SetExcludeEnabled(bool enabled) => _excludeEnabled = enabled;
+
     // Takes what someone actually types - ".PNG, jpg;webp" - and returns the
     // stored form: lower case, no leading dots, no blanks, no repeats, in the
     // order given. Commas are what the hint asks for; semicolons, spaces and
@@ -180,15 +212,26 @@ public static class FileTypeFilter
 
     public static bool ShouldShowFile(string fileName)
     {
+        // TrimStart('.'): GetExtension hands back ".png", the sets hold "png".
+        // A file with no extension at all gives "", which no set claims - so it
+        // lands in 기타, which is exactly where it belongs, and no exclusion
+        // list can name it either.
+        string extension = Path.GetExtension(fileName).TrimStart('.');
+
+        // First, and above everything: an excluded extension is gone whatever
+        // else is selected. It beats 전체 (which is the absence of a filter,
+        // not an override) and it beats a category or a custom list that would
+        // otherwise let the file through - including one holding the same
+        // extension, where the exclusion simply wins.
+        if (IsExcluding && ExcludedExtensions.Contains(extension))
+        {
+            return false;
+        }
+
         if (SelectedCategories.Count == 0)
         {
             return true;
         }
-
-        // TrimStart('.'): GetExtension hands back ".png", the sets hold "png".
-        // A file with no extension at all gives "", which no set claims - so it
-        // lands in 기타, which is exactly where it belongs.
-        string extension = Path.GetExtension(fileName).TrimStart('.');
 
         foreach (string category in SelectedCategories)
         {

@@ -383,6 +383,11 @@ public partial class MainWindow : Window
         FileTypeFilter.SetCustomExtensions(_settings.FileFilterCustomExtensions);
         DropCustomFilterIfEmpty();
 
+        // Same reason as the line above: an exclusion has to be in force for
+        // the FIRST folder read, not from the first time it is touched.
+        FileTypeFilter.SetExcludedExtensions(_settings.FileFilterExcludeExtensions);
+        FileTypeFilter.SetExcludeEnabled(_settings.FileFilterExcludeEnabled);
+
         // Must be set before the tree/favorites below ever read an icon, same
         // as the sort/display statics above.
         ShellIconService.UseShellIcons = _settings.UseShellIcons;
@@ -836,6 +841,21 @@ public partial class MainWindow : Window
         // in both places, rather than a second one invented for this strip.
         SetBrushColor("FooterChipCheckedBackground", light ? "#4A90E2" : "#5A5A5A");
         SetBrushColor("FooterChipCheckedForeground", "#FFFFFF");
+
+        // The exclusion chip's own ink. Warm rather than the app's blue accent
+        // because it is the one control in the strip that REMOVES, and reusing
+        // the accent would have said "another kind, selected". Muted on both
+        // themes - a footer read at a glance can carry a different hue, but not
+        // a warning colour at full strength. Darker on light and lighter on
+        // dark for the same reason every other pair here splits: each has to
+        // clear its own ground. The lit state washes the same hue behind it
+        // instead of the grey/blue fill, so the chip never trades its ink away.
+        SetBrushColor("FooterChipExcludeForeground", light ? "#B3453B" : "#E08C82");
+        // Solid, at the same weight as the other chips' lit fill on each theme -
+        // this is what says on or off, and a tint was not enough to tell them
+        // apart (user, 2026-08-10). Dark gets the muted one for the same reason
+        // the grey/blue pair above splits: it sits on a dark ground already.
+        SetBrushColor("FooterChipExcludeCheckedBackground", light ? "#B3453B" : "#8A423A");
         SetBrushColor("FolderNameHoverForeground", light ? _settings.LightFolderNameHoverColorHex : _settings.FolderNameHoverColorHex);
         SetBrushColor("FileNameHoverForeground", light ? _settings.LightFileNameHoverColorHex : _settings.FileNameHoverColorHex);
         SetBrushColor("ShowMoreForeground", light ? _settings.LightShowMoreColorHex : _settings.ShowMoreColorHex);
@@ -5681,6 +5701,12 @@ public partial class MainWindow : Window
             FileTypeFilter.SelectedCategories.Add(category);
         }
 
+        // The exclusion rides along here rather than having a path of its own:
+        // one place where the settings are mirrored into FileTypeFilter is one
+        // place that can be wrong.
+        FileTypeFilter.SetExcludedExtensions(_settings.FileFilterExcludeExtensions);
+        FileTypeFilter.SetExcludeEnabled(_settings.FileFilterExcludeEnabled);
+
         _settingsService.Save(_settings);
         UpdateFileFilterIndicator();
 
@@ -5736,6 +5762,11 @@ public partial class MainWindow : Window
     // the absence of a filter rather than a category - see AppSettings.
     private const string FileFilterAllTag = "";
 
+    // The exclusion chip's tag. Not a category key and deliberately unable to
+    // be mistaken for one - it never goes into FileFilterCategories, and
+    // IsFileFilterRowChecked would answer the wrong question about it.
+    private const string FileFilterExcludeTag = "exclude:";
+
     private static readonly (string Category, Func<string> Label)[] FileFilterRows =
     {
         (FileTypeFilter.Code, () => Strings.MenuFileFilterCode),
@@ -5787,6 +5818,82 @@ public partial class MainWindow : Window
             EditCustomFileFilter();
         };
         submenu.Items.Add(edit);
+
+        // The exclusion, below its own separator: everything above this line
+        // decides what is LET THROUGH and reads as one group, and this is the
+        // only thing in the menu that overrules them.
+        submenu.Items.Add(new Separator());
+        if (FileTypeFilter.HasExcludedExtensions)
+        {
+            submenu.Items.Add(BuildExcludeFilterRow());
+        }
+
+        var excludeEdit = FollowMenuFont(new MenuItem { Header = Strings.MenuFileFilterExcludeEdit });
+        excludeEdit.Click += (_, args) =>
+        {
+            args.Handled = true;
+            EditExcludeFileFilter();
+        };
+        submenu.Items.Add(excludeEdit);
+    }
+
+    // Deliberately carries NO Tag: SyncFileFilterMenu re-marks every tagged row
+    // from IsFileFilterRowChecked, and this row's checked state comes from
+    // somewhere else entirely (the exclusion is not one of the categories).
+    // A tag here would have it re-marked as an unselected category on the next
+    // click anywhere in the menu.
+    private MenuItem BuildExcludeFilterRow()
+    {
+        var row = FollowMenuFont(new MenuItem
+        {
+            Header = "− " + FileTypeFilter.DescribeExtensions(_settings.FileFilterExcludeExtensions),
+            IsCheckable = true,
+            IsChecked = _settings.FileFilterExcludeEnabled,
+            StaysOpenOnClick = true,
+        });
+
+        row.Click += (_, args) =>
+        {
+            args.Handled = true;
+            _settings.FileFilterExcludeEnabled = row.IsChecked;
+            ApplyFileFilter();
+            UpdateFileFilterIndicator();
+        };
+
+        return row;
+    }
+
+    // Same shape as EditCustomFileFilter, and arming the rule on the way out
+    // for the same reason: someone who has just typed "log, tmp" is asking for
+    // those to go, not asking for a switch to go and find.
+    private void EditExcludeFileFilter()
+    {
+        var window = new FilterExtensionsWindow(_settings.FileFilterExcludeExtensions, forExclusion: true)
+        {
+            Owner = this,
+        };
+        PositionNearOptionsButton(window);
+        if (window.ShowDialog() != true || window.Result is not { } extensions)
+        {
+            return;
+        }
+
+        _settings.FileFilterExcludeExtensions = extensions;
+        if (extensions.Length > 0)
+        {
+            _settings.FileFilterExcludeEnabled = true;
+        }
+
+        // BEFORE the rebuild below, not left to ApplyFileFilter afterwards:
+        // whether the chip exists at all is read off FileTypeFilter, so a
+        // rebuild that runs while the list is still the old one draws the old
+        // answer - which for a first exclusion means no chip at all.
+        FileTypeFilter.SetExcludedExtensions(extensions);
+
+        // The chip carries the extensions as its label and disappears with
+        // them, exactly like the custom kind's chip.
+        RebuildFooterFilterChips();
+        ApplyFileFilter();
     }
 
     // Asks for the extensions, then applies whatever comes back. Selecting the
@@ -5943,7 +6050,44 @@ public partial class MainWindow : Window
                 described);
         }
 
+        // Last of all, and only once there is something to exclude. Its own ink
+        // carries the meaning here - a leading "−" was tried and taken out
+        // again (user, 2026-08-10): in a strip of short words it read as
+        // clutter, and the chip is already the only coloured thing in the row.
+        // The menu's copy of this row keeps its minus, since a menu has no
+        // colour to spend.
+        if (FileTypeFilter.HasExcludedExtensions)
+        {
+            string described = FileTypeFilter.DescribeExtensions(_settings.FileFilterExcludeExtensions);
+            AddFooterExcludeChip(Shorten(described, 14), described);
+        }
+
         UpdateFileFilterIndicator();
+    }
+
+    private void AddFooterExcludeChip(string label, string tooltip)
+    {
+        var chip = new ToggleButton
+        {
+            Content = label,
+            Tag = FileFilterExcludeTag,
+            Style = (Style)FindResource("FooterExcludeChipStyle"),
+            Margin = new Thickness(0, FooterChipRowGap, 2, 0),
+            ToolTip = tooltip,
+        };
+
+        chip.SetResourceReference(FontSizeProperty, "FooterChipFontSize");
+
+        chip.Click += (_, _) =>
+        {
+            _settings.FileFilterExcludeEnabled = chip.IsChecked == true;
+            ApplyFileFilter();
+        };
+
+        // In the same list as the rest so RebuildFooterFilterChips takes it off
+        // the panel with them - it is only the tag and the style that differ.
+        _footerFilterChips.Add(chip);
+        VersionFooterPanel.Children.Add(chip);
     }
 
     private static string Shorten(string text, int limit)
@@ -6012,7 +6156,13 @@ public partial class MainWindow : Window
     {
         foreach (var chip in _footerFilterChips)
         {
-            chip.IsChecked = chip.Tag is string category && IsFileFilterRowChecked(category);
+            chip.IsChecked = chip.Tag switch
+            {
+                // Its own switch, not one of the categories - see the tag.
+                FileFilterExcludeTag => _settings.FileFilterExcludeEnabled,
+                string category => IsFileFilterRowChecked(category),
+                _ => false,
+            };
         }
     }
 

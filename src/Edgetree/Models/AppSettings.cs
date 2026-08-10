@@ -402,6 +402,18 @@ public class AppSettings
     // with 코드 or 이미지 rather than replacing them.
     public string FileFilterCustomExtensions { get; set; } = "";
 
+    // The exclusion list ("제외"), stored the same normalised way as the custom
+    // kind above. Deliberately NOT an entry in FileFilterCategories: an
+    // exclusion has to be able to hold while 전체 is on, and a category list
+    // that isn't empty means 전체 is off. See FileTypeFilter for the rest.
+    public string FileFilterExcludeExtensions { get; set; } = "";
+
+    // Whether the list above is armed. Separate from the list so the footer
+    // chip can switch the rule off for a moment without the user losing what
+    // they typed - every other chip in that strip works that way. Meaningless
+    // while the list is empty.
+    public bool FileFilterExcludeEnabled { get; set; } = true;
+
     // Folders the user has taken out of the tree ("이 폴더 숨기기"). Only the
     // tree hides them - the file search still finds what is inside, because a
     // search is a deliberate act of looking and "분명 있는데 검색이 안 된다" is

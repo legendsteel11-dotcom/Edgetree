@@ -17,9 +17,23 @@ public partial class FilterExtensionsWindow : Window
     // Empty string is a real answer - it means "remove the custom kind".
     public string? Result { get; private set; }
 
-    public FilterExtensionsWindow(string currentExtensions)
+    // Which of the two lists is being edited. The window is identical either
+    // way - one box, one hint, OK/Cancel - so it takes its words as arguments
+    // rather than being copied into a second window that would then have to be
+    // kept in step (the same reasoning as the one file-filter submenu built in
+    // code and hung off three menus).
+    private readonly string _hint;
+    private readonly string _emptyHint;
+
+    public FilterExtensionsWindow(string currentExtensions, bool forExclusion = false)
     {
         InitializeComponent();
+
+        string title = forExclusion ? Strings.FilterExcludeTitle : Strings.FilterCustomTitle;
+        Title = title;
+        TitleText.Text = title;
+        _hint = forExclusion ? Strings.FilterExcludeHint : Strings.FilterCustomHint;
+        _emptyHint = forExclusion ? Strings.FilterExcludeEmptyHint : Strings.FilterCustomEmptyHint;
 
         // Shown in the readable form, taken back in any form (see
         // FileTypeFilter.NormalizeExtensions) - what goes in the box is what
@@ -43,9 +57,7 @@ public partial class FilterExtensionsWindow : Window
         => UpdateHint();
 
     private void UpdateHint()
-        => HintText.Text = ExtensionsBox.Text.Trim().Length == 0
-            ? Strings.FilterCustomEmptyHint
-            : Strings.FilterCustomHint;
+        => HintText.Text = ExtensionsBox.Text.Trim().Length == 0 ? _emptyHint : _hint;
 
     // Enter is already the OK button (IsDefault), but only once the box has
     // given up the key - a TextBox that is not multi-line does, so this exists
