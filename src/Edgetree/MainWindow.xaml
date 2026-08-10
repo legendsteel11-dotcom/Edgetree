@@ -5415,7 +5415,7 @@
                                 Opacity="0.65"
                                 FontSize="{DynamicResource MenuThumbnailInfoFontSize}"
                                 TextAlignment="Center"
-                                Margin="0,4,0,0"/>
+                                Margin="{DynamicResource ViewerCaptionRowGap}"/>
                         <!-- Its own centred row rather than the right end of
                              the metadata line: both caption lines are centred,
                              and hanging controls off one end of a centred line
@@ -5427,7 +5427,7 @@
                         <StackPanel x:Name="ViewerZoomBar"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
-                                Margin="0,4,-2,0">
+                                Margin="{DynamicResource ViewerCaptionChipRowGap}">
                             <ToggleButton x:Name="ViewerFitChip"
                                     Style="{StaticResource FooterFilterChipStyle}"
                                     Content="{x:Static services:Strings.ViewerZoomFit}"

@@ -931,19 +931,46 @@ public partial class MainWindow : Window
         // disagree, and the comparison is two multiplies more.
         bool useLightInk = ContrastRatio(lightInk, background) >= ContrastRatio(darkInk, background);
 
+        // Stepped back from the maximum-contrast inks these used to be. The
+        // caption is four rows deep - counter, name, metadata, chips - and at
+        // full strength each of them argued for itself: "너무 자기들 주장이
+        // 강해서 좀 복잡하고 난해해 보입니다" (user, 2026-08-10). Backing the ink
+        // off is the way to quiet a whole area without opacity, which this app
+        // does not use to rank text, and without touching type sizes the user
+        // has already settled twice.
+        //
+        // The pairs stay derived - the point of this method is that the panel
+        // has its own background - they just no longer reach for the extreme.
         SetLocalBrush(resources, "ForegroundText",
-            useLightInk ? lightInk : darkInk);
+            useLightInk ? Color.FromRgb(0xC4, 0xC7, 0xCE) : Color.FromRgb(0x4C, 0x4F, 0x56));
+        // The name sits a step above the metadata line under it, not a whole
+        // tier above it (user, 2026-08-10). The comparison that matters is
+        // against what that line actually RENDERS as, not against its ink: it
+        // carries the chips' 0.65, so at these values the name lands roughly 40
+        // levels clear of it - present as the heading of the caption, quiet
+        // enough that the four rows read as one block instead of four.
         SetLocalBrush(resources, "FileNameForeground",
-            useLightInk ? Color.FromRgb(0xF0, 0xF2, 0xF6) : Color.FromRgb(0x1A, 0x1A, 0x1A));
+            useLightInk ? Color.FromRgb(0xAE, 0xB1, 0xB8) : Color.FromRgb(0x63, 0x66, 0x6D));
         var hoverFill = useLightInk
             ? Color.FromArgb(0x2E, 0xFF, 0xFF, 0xFF)
             : Color.FromArgb(0x24, 0x00, 0x00, 0x00);
         SetLocalBrush(resources, "TreeRowHoverBackground", hoverFill);
         SetLocalBrush(resources, "HoverBackground", hoverFill);
-        SetLocalBrush(resources, "FooterChipCheckedBackground",
-            useLightInk ? Color.FromArgb(0x46, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x38, 0x00, 0x00, 0x00));
-        SetLocalBrush(resources, "FooterChipCheckedForeground",
-            useLightInk ? Colors.White : Colors.Black);
+
+        // NOT overridden any more - the panel now takes the footer's own lit
+        // chip, which in light mode is the app's blue with white text (user,
+        // 2026-08-10: "파일필터 칩 on과 같이 파란색에 흰색 글씨").
+        //
+        // And it turns out that is the more consistent answer, not just the
+        // asked-for one. Everything else this method derives is a WASH - it
+        // blends toward whatever it covers, which is exactly why it has to know
+        // the background. A lit chip is the opposite kind of thing: it is a
+        // mark that has to stand clear of the background, so blending it into
+        // one was working against itself. Two translucent grey boxes in a row
+        // were most of what made this strip read as busy.
+        //
+        // lightInk/darkInk stay above because text still has to be legible on
+        // whatever colour the user chose; the chip carries its own white.
     }
 
     // Same recolour-in-place discipline as SetBrushColor, for the same
@@ -7938,6 +7965,25 @@ public partial class MainWindow : Window
         // their own comments) so the tree and favorites rows always match.
         double verticalPadding = RowVerticalPadding;
         Resources["RowPadding"] = new Thickness(4, verticalPadding, 4, verticalPadding);
+
+        // The viewer caption's three lines - name, metadata, chips - now take
+        // the SAME number the tree's rows do, instead of a hard-coded 4 each
+        // (user, 2026-08-10: "이 간격도 행간격 영향을 받게"). Two things follow
+        // from that and both are the point: it is tighter at the default (3
+        // rather than 4), and it is no longer a number only I can change - the
+        // 행 간격 option already in the menu reaches it, all the way down to 0
+        // at the negative end, and Ctrl+/- carries it too.
+        //
+        // The paging row above keeps its own 6px: that gap separates a row of
+        // CONTROLS from the caption under it, which is a different kind of gap
+        // from the ones between three lines of the same caption, and the user
+        // asked for the three lines only.
+        //
+        // The chip row's -2 right is unchanged - it cancels the trailing margin
+        // the last chip's shared style carries, so the row centres on the text
+        // rather than on the text plus a gap.
+        Resources["ViewerCaptionRowGap"] = new Thickness(0, verticalPadding, 0, 0);
+        Resources["ViewerCaptionChipRowGap"] = new Thickness(0, verticalPadding, -2, 0);
 
         // Not scaled by the font like the metrics around it: this is a pointer
         // target, so it wants to stay the size the user picked regardless of
