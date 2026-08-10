@@ -254,6 +254,14 @@ public static class Strings
     // Shown in the caption when Windows has no codec for the file - the panel
     // says what happened and what still works, rather than sitting blank.
     public static string ViewerPlaybackUnsupported = "이 형식은 재생할 수 없습니다 · Enter로 기본 프로그램에서 열기";
+    // Some files play their picture and nothing else - DTS and TrueHD sound
+    // are both undecodable on Windows, and the engine simply drops the track.
+    // Silence with no explanation reads as the app being broken, so the
+    // caption says which it is. Stated, not apologised for.
+    public static string ViewerNoAudio = "소리 없음";
+    // The transport strip's last button. Named for where it sends the file,
+    // not for the act of leaving here.
+    public static string ViewerOpenExternally = "기본 프로그램에서 열기";
     public static string ToolTipExitSearch = "탐색기로 (Ctrl+E)";
     public static string SearchTooltipBrowseFolder = "검색할 폴더 선택";
     public static string SearchTooltipRefresh = "다시 인덱싱";
@@ -589,6 +597,8 @@ public static class Strings
         ViewerStop = "Stop";
         ViewerMute = "Mute";
         ViewerPlaybackUnsupported = "This format can't be played here · Enter opens it in the default app";
+        ViewerNoAudio = "No sound";
+        ViewerOpenExternally = "Open in default app";
         ToolTipExitSearch = "Back to Explorer (Ctrl+E)";
         SearchTooltipBrowseFolder = "Choose folder to search";
         SearchTooltipRefresh = "Reindex";

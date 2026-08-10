@@ -1160,17 +1160,37 @@ public partial class MainWindow : Window
         // has no Space action of its own, so nothing is taken away - and this
         // just asks focus to move down, landing wherever the Down arrow would
         // have, rather than defining a second idea of "next" to keep in sync.
+        //
+        // EXCEPT while a video is up, where Space means play/pause in every
+        // player there has ever been (2026-08-10). The two readings never
+        // collide: "next picture" is a photo-viewer idea and there is no
+        // picture to advance to while a video is the thing being shown.
+        if (Keyboard.Modifiers == ModifierKeys.None &&
+            _viewerOpen &&
+            e.Key == Key.Space &&
+            _viewerVideoPath is not null &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            ViewerMediaPlayPause_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.Modifiers == ModifierKeys.None &&
             _viewerOpen &&
             e.Key == Key.Space &&
             Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
         {
-            if (Keyboard.FocusedElement is UIElement focused &&
-                focused.MoveFocus(new System.Windows.Input.TraversalRequest(
-                    System.Windows.Input.FocusNavigationDirection.Down)))
-            {
-                e.Handled = true;
-            }
+            // Moves the SELECTION, not the focus. Asking focus to travel down
+            // was the original implementation and it only worked while the
+            // keyboard happened to be in the tree - click a picture, then look
+            // at it, and focus is somewhere in the viewer where "down" means
+            // nothing, so the key did nothing (reported 2026-08-10; it had
+            // been like that since it shipped). The selection is what the
+            // viewer follows, so acting on it directly works from wherever the
+            // user's hands are.
+            SelectNextVisibleRow();
+            e.Handled = true;
             return;
         }
 
@@ -4899,6 +4919,71 @@ public partial class MainWindow : Window
         {
             scrollViewer.ScrollToVerticalOffset(target);
         }
+    }
+
+    // The row one below the current selection, in the order the tree is drawn -
+    // into an expanded folder, or on to the next drive when a subtree ends.
+    // Skips the rows nobody selects ("더 보기", the not-yet-loaded placeholder).
+    private void SelectNextVisibleRow()
+    {
+        if (_selectedItem is not { } current || NextVisibleRow(current) is not { } next)
+        {
+            return;
+        }
+
+        if (FindRealizedContainer(next) is { } container)
+        {
+            // Left to bring itself into view on purpose: this one IS a
+            // deliberate move to the next row, so following it is right - the
+            // opposite of the quiet refresh, which suppresses exactly this.
+            container.IsSelected = true;
+            container.Focus();
+        }
+        else
+        {
+            NavigateToPath(next.FullPath, pinToTop: false, source: "space-next");
+        }
+    }
+
+    private FileSystemItem? NextVisibleRow(FileSystemItem current)
+    {
+        bool passedCurrent = false;
+        foreach (var root in _roots)
+        {
+            if (FindNextVisibleRow(root, current, ref passedCurrent) is { } next)
+            {
+                return next;
+            }
+        }
+
+        return null;
+    }
+
+    private static FileSystemItem? FindNextVisibleRow(
+        FileSystemItem item, FileSystemItem current, ref bool passedCurrent)
+    {
+        if (passedCurrent && !item.IsPlaceholder && !item.IsShowMore)
+        {
+            return item;
+        }
+
+        if (ReferenceEquals(item, current))
+        {
+            passedCurrent = true;
+        }
+
+        if (item.IsExpanded)
+        {
+            foreach (var child in item.Children)
+            {
+                if (FindNextVisibleRow(child, current, ref passedCurrent) is { } next)
+                {
+                    return next;
+                }
+            }
+        }
+
+        return null;
     }
 
     // How many rows are drawn above this one, counting only what is actually on
@@ -14347,8 +14432,38 @@ public partial class MainWindow : Window
         ViewerMediaPosition.Maximum = ViewerMedia.NaturalDuration.HasTimeSpan
             ? ViewerMedia.NaturalDuration.TimeSpan.TotalSeconds
             : 0;
+
+        // A file whose SOUND is the part Windows can't decode plays silently
+        // with no sign of it - DTS and TrueHD both land here - and a preview
+        // that is quiet for no stated reason reads as the app being broken
+        // rather than as the file being unusual (2026-08-10). Said once, in the
+        // caption, in the same breath as the rest of the file's facts.
+        _viewerVideoHasNoAudio = !ViewerMedia.HasAudio;
+
+        // Appended here as well as in the caption builder, because the two
+        // arrive in either order: the file's size/duration come from a
+        // background property-store read, and whether the sound decoded is
+        // only known once the engine has opened the file. Whichever lands
+        // second adds the note; the guard keeps it from being said twice.
+        if (_viewerVideoHasNoAudio && !ViewerFileInfo.Text.Contains(Strings.ViewerNoAudio, StringComparison.Ordinal))
+        {
+            ViewerFileInfo.Text = ViewerFileInfo.Text.Length == 0
+                ? Strings.ViewerNoAudio
+                : $"{ViewerFileInfo.Text}  ·  {Strings.ViewerNoAudio}";
+        }
+
         UpdateViewerMediaReadout();
     }
+
+    // Set when the opened video turned out to carry no playable sound - see
+    // ViewerMedia_MediaOpened. Cleared by StopViewerVideo along with the rest.
+    private bool _viewerVideoHasNoAudio;
+
+    // Appended to the caption's own facts rather than replacing them, and
+    // empty whenever there is nothing to say - so the line reads
+    // "1920 × 802 · 55:51 · 4.26 GB · 소리 없음" and says nothing at all the
+    // rest of the time.
+    private string NoAudioNote() => _viewerVideoHasNoAudio ? Strings.ViewerNoAudio : string.Empty;
 
     private void ViewerMedia_MediaEnded(object sender, RoutedEventArgs e)
     {
@@ -14366,11 +14481,30 @@ public partial class MainWindow : Window
         // Expected, not exceptional: Windows has no codec for this file. Put
         // the still frame back and say what the panel can still do about it.
         string? path = _viewerVideoPath;
+        LogViewerMediaFailure(path, e.ErrorException);
         StopViewerVideo();
         if (path is not null && string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
         {
             ViewerFileInfo.Text = Strings.ViewerPlaybackUnsupported;
         }
+    }
+
+    // Why a file wouldn't play, in the file's own words (Debug only).
+    //
+    // "재생할 수 없습니다" covers two completely different situations and the
+    // fix for each is the opposite of the other's: a CONTAINER this engine
+    // cannot open at all (MediaElement is the old Windows Media Player
+    // pipeline, and .mkv has no demuxer there whatever is inside it), or a
+    // CODEC Windows has no decoder for. The HRESULT tells them apart, and
+    // guessing between them is how a lot of effort gets spent on the wrong one
+    // (asked 2026-08-10, about an AV1 .mkv that another viewer plays).
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogViewerMediaFailure(string? path, Exception? error)
+    {
+        int hresult = error?.HResult ?? 0;
+        LogClickLine(
+            $"viewer media failed: {System.IO.Path.GetExtension(path ?? string.Empty)}  " +
+            $"hr=0x{hresult:X8}  {error?.Message ?? "-"}  {path ?? "-"}");
     }
 
     private void ViewerMediaPlayPause_Click(object sender, RoutedEventArgs e)
@@ -14638,6 +14772,25 @@ public partial class MainWindow : Window
     private void ViewerMediaMute_Click(object sender, RoutedEventArgs e)
         => SetViewerMediaMuted(!_viewerMediaMuted);
 
+    // Hands the file to whatever it is associated with, and pauses first: two
+    // copies of the same video playing over each other is the one thing this
+    // button must not cause.
+    private void ViewerMediaOpenExternal_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewerVideoPath is not { } path)
+        {
+            return;
+        }
+
+        if (_viewerVideoPlaying)
+        {
+            ViewerMedia.Pause();
+            SetViewerVideoPlaying(false);
+        }
+
+        ShellFileService.OpenWithDefaultApp(path);
+    }
+
     // The slider keeps its own position while muted rather than dropping to
     // zero, so un-muting returns to the level that was set - which is what
     // makes it a toggle rather than a second volume control.
@@ -14738,6 +14891,7 @@ public partial class MainWindow : Window
         }
 
         _viewerVideoPlaying = false;
+        _viewerVideoHasNoAudio = false;
         ViewerMedia.Visibility = Visibility.Collapsed;
         ViewerMediaBar.Visibility = Visibility.Collapsed;
     }
@@ -16068,7 +16222,7 @@ public partial class MainWindow : Window
                 string duration = media.Duration is { } span ? FormatDuration(span) : string.Empty;
 
                 ViewerFileInfo.Text = string.Join("  ·  ",
-                    new[] { head, duration, body }.Where(part => part.Length > 0));
+                    new[] { head, duration, body, NoAudioNote() }.Where(part => part.Length > 0));
             });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
