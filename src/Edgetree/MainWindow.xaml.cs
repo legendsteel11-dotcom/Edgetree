@@ -2332,7 +2332,15 @@ public partial class MainWindow : Window
         double treeWidth = _viewerOpen
             ? Math.Clamp(_settings.ExpandedWidth, MinTreeSplitWidth, MaxExpandedWidth)
             : ClampExpandedWidth(_settings.ExpandedWidth);
-        double expandedWidth = treeWidth + CurrentViewerPanelWidth;
+        // Capped to the work area for the same reason Dock() is, and it is the
+        // same failure: this builds a window width out of two REMEMBERED
+        // numbers, and a panel width saved on a wider screen makes the sum
+        // wider than the screen it is revealing onto - the sidebar would grow
+        // out past the far edge, with the reveal's own animation carrying it
+        // there. The columns give the difference back to the panel.
+        double expandedWidth = Math.Min(
+            treeWidth + CurrentViewerPanelWidth,
+            GetCurrentMonitorWorkArea().Width);
 
         // Revealing never slides, and that asymmetry is the whole finding of
         // 2026-08-05. A window has no pixels where it is off the screen, so one
@@ -13511,14 +13519,27 @@ public partial class MainWindow : Window
         // definitely shouldn't either.
         if (_isDocked && !_settings.IsAutoHidden)
         {
-            // Minus the viewer panel: ExpandedWidth is the TREE's width alone
-            // (see the viewer region below). With the panel open the tree's
-            // share may legitimately sit below the WINDOW floor (the split
-            // floor is smaller), and the standing rule is that nothing but
-            // the middle divider moves the stored tree width - so this keeps
-            // the split-floor clamp, not the window one.
+            // ExpandedWidth is the TREE's width alone (see the viewer region
+            // below). With the panel open the tree's share may legitimately
+            // sit below the WINDOW floor (the split floor is smaller), and the
+            // standing rule is that nothing but the middle divider moves the
+            // stored tree width - so this keeps the split-floor clamp, not the
+            // window one.
+            //
+            // The app's own held share, not Width minus the STORED panel
+            // width: on a window too narrow for that stored width the
+            // subtraction went straight past the tree's real share and hit the
+            // 120px floor, so the tree came back at its FLOOR on the next
+            // launch - a squeeze quietly overwriting the split. The share is
+            // the remembered intent and deliberately survives a squeeze
+            // intact (see ClampViewerColumnToWindow); this is the one place
+            // that wants the intent rather than what is on screen, because
+            // what it writes is read back on a machine that may be a
+            // different size again.
             _settings.ExpandedWidth = _viewerOpen
-                ? Math.Clamp(Width - CurrentViewerPanelWidth, MinTreeSplitWidth, MaxExpandedWidth)
+                ? Math.Clamp(
+                    _viewerTreeShare ?? (Width - CurrentViewerPanelWidth),
+                    MinTreeSplitWidth, MaxExpandedWidth)
                 : ClampExpandedWidth(Width);
         }
 
@@ -13638,6 +13659,41 @@ public partial class MainWindow : Window
     // number every width-persisting path subtracts.
     private double CurrentViewerPanelWidth => _viewerOpen ? ViewerPanelWidth : 0;
 
+    // How much of the window the panel is ACTUALLY holding right now, which is
+    // not what settings remember. The two part company constantly - a window
+    // too narrow for the stored width squeezes the panel
+    // (ClampViewerColumnToWindow), a wider one hands it the surplus, and the
+    // divider deliberately stops writing the setting while maximized - and
+    // every geometry path that used the stored number as an open/close DELTA
+    // moved the window by an amount that was never on screen: the tree gained
+    // or lost the difference on close, and docked right the window jumped
+    // sideways by it.
+    //
+    // The tree column is the truth, because it is the FIXED one (the panel is
+    // the star column, whose GridLength.Value is a star factor, not a width -
+    // see the divider drag). Maximized is the one exception: there Width is the
+    // RESTORE rectangle while the columns describe the maximized window, two
+    // different windows, and the stored width is the only number expressed in
+    // the restore rectangle's own terms.
+    private double LiveViewerPanelWidth
+    {
+        get
+        {
+            if (!_viewerOpen)
+            {
+                return 0;
+            }
+            if (WindowState == WindowState.Maximized)
+            {
+                return ViewerPanelWidth;
+            }
+            double windowWidth = double.IsNaN(Width) ? ActualWidth : Width;
+            return TreeColumn.Width.IsAbsolute
+                ? Math.Clamp(windowWidth - TreeColumn.Width.Value, 0, Math.Max(0, windowWidth))
+                : ViewerPanelWidth;
+        }
+    }
+
     private void ViewerButton_Click(object sender, RoutedEventArgs e)
     {
         if (_viewerOpen)
@@ -13704,7 +13760,21 @@ public partial class MainWindow : Window
         _viewerOpen = true;
 
         bool onLeft = _isDocked && _settings.DockOnRight;
-        double panelWidth = ViewerPanelWidth;
+
+        // The stored panel width was saved on whatever screen the divider was
+        // last dragged on, so it can be wider than the whole screen the window
+        // is opening on today - a 2000px panel remembered from a 4K desktop
+        // asked a 300px docked tree for a 2300px window on a 1366px laptop.
+        // Dock() has carried this cap for exactly that reason; this path had
+        // none at all, docked, and the sidebar simply hung off the edge.
+        //
+        // The panel takes whatever the work area can still give it. The stored
+        // width is NOT rewritten - the same preservation rule a squeeze
+        // follows (see ClampViewerColumnToWindow), so the next roomier window
+        // opens at the width the user actually chose.
+        var workArea = GetCurrentMonitorWorkArea();
+        double panelWidth = Math.Max(0,
+            Math.Min(Width + ViewerPanelWidth, workArea.Width) - Width);
         if (onLeft)
         {
             Left -= panelWidth;
@@ -13714,7 +13784,6 @@ public partial class MainWindow : Window
         {
             // A floating window near the screen's right edge would otherwise
             // grow past it.
-            var workArea = GetCurrentMonitorWorkArea();
             if (Left + Width > workArea.Right)
             {
                 Left = Math.Max(workArea.Left, workArea.Right - Width);
@@ -13750,11 +13819,18 @@ public partial class MainWindow : Window
 
         SetViewerFullscreen(false);
 
+        // Read while the panel is still up and its column still stands: what
+        // the window gives back has to be what the panel was actually holding,
+        // not what settings remember (see LiveViewerPanelWidth). Handing back
+        // the stored width instead took the difference out of the TREE - and
+        // docked on the right, where Left moves by the same amount, the whole
+        // window teleported sideways by it.
+        double panelWidth = LiveViewerPanelWidth;
+
         _viewerOpen = false;
         _pendingViewerPath = null;
         _viewerTreeShare = null;
 
-        double panelWidth = ViewerPanelWidth;
         // Back to the closed shape: tree star, both panel columns 0.
         SetViewerColumns(null);
         ViewerPanel.Visibility = Visibility.Collapsed;
