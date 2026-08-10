@@ -127,7 +127,7 @@ public partial class ColorSettingsWindow : Window
         // The active mode's own button is disabled - nothing to switch to,
         // and the 0.4-opacity disabled look doubles as the "you are here"
         // marker without inventing a checked style. The dice go the other
-        // way (user's call, 2026-08-09): only the theme being looked at can
+        // way (2026-08-09): only the theme being looked at can
         // be rolled, so each zone has exactly one live button.
         DarkModeButton.IsEnabled = _settings.IsLightMode;
         LightModeButton.IsEnabled = !_settings.IsLightMode;
@@ -387,7 +387,7 @@ public partial class ColorSettingsWindow : Window
     // settings.json carries far more than colours - hidden folders, bookmarks,
     // favorites, the last selected path - and all of those name folders that
     // exist on one machine and not the next. Copying the file across is how
-    // someone finds that out (user, 2026-08-04). So the palette travels on its
+    // someone finds that out (2026-08-04). So the palette travels on its
     // own.
     //
     // Every colour, both themes, in one file: a theme is the pair, and
@@ -516,7 +516,7 @@ public partial class ColorSettingsWindow : Window
 
     // ----- 랜덤 배색 ---------------------------------------------------------
     //
-    // One die per theme (user's design, 2026-08-09). A roll doesn't pick 16
+    // One die per theme (2026-08-09). A roll doesn't pick 16
     // random colors - it picks 1~3 HUES and derives every slot from role
     // rules, which is what keeps a roll wearable: surfaces are a near-neutral
     // tint of the base hue on a brightness ladder, text is forced through a
@@ -622,12 +622,12 @@ public partial class ColorSettingsWindow : Window
             : baseHue;
 
         // Roughly one roll in four is a BOLD one: same rules, saturation
-        // ceilings lifted. The calm band alone read as "소극적인 느낌 ...
-        // 살짝씩만 차이를 준다" and starved the blues in particular - a blue
-        // at low saturation greys out sooner than a warm hue does, so
-        // uniformly-drawn blue rolls kept arriving invisible (user,
-        // 2026-08-09, asking for "가끔 살짝만 더 튀는 놈들"). The readability
-        // floors below are what make a bolder ceiling safe to sell.
+        // ceilings lifted. The calm band on its own read as timid - every roll
+        // differing from the last only slightly - and starved the blues in
+        // particular, since a blue at low saturation greys out sooner than a
+        // warm hue does, so uniformly-drawn blue rolls kept arriving invisible
+        // (2026-08-09). The readability floors below are what make a bolder
+        // ceiling safe to sell.
         bool bold = rng.NextDouble() < 0.28;
         double surfaceSat = light
             ? (bold ? 0.05 + rng.NextDouble() * 0.11 : 0.02 + rng.NextDouble() * 0.07)
@@ -638,7 +638,7 @@ public partial class ColorSettingsWindow : Window
 
         if (!light)
         {
-            // 0.07~0.15 -> 0.05~0.11 (user, 2026-08-10). Dark rolls were
+            // 0.07~0.15 -> 0.05~0.11 (2026-08-10). Dark rolls were
             // landing at the pale end of dark and reading as charcoal rather
             // than as a dark theme. Everything else on this branch is derived
             // from bgVal by fixed offsets, so the surfaces keep their
@@ -646,9 +646,9 @@ public partial class ColorSettingsWindow : Window
             double bgVal = 0.05 + rng.NextDouble() * 0.06;
             var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
             var hover = FromHsv(neighborHue, Math.Min(bold ? 0.30 : 0.22, surfaceSat + 0.06), bgVal + 0.08, 255);
-            // A step up in both saturation and brightness (user: "선택박스를
-            // 살짝 강하게"). Capped so a bold roll's already-high accent
-            // saturation can't be multiplied into a shout.
+            // A step up in both saturation and brightness, so the selection box
+            // reads a little stronger than the surface. Capped so a bold roll's
+            // already-high accent saturation can't be multiplied into a shout.
             var selection = FromHsv(accentHue, Math.Min(0.72, accentSat * 1.18), bgVal + 0.17, 255);
             // Text is checked against HOVER, the lightest surface a name
             // actually sits on in the dark theme - passing there passes
@@ -667,7 +667,7 @@ public partial class ColorSettingsWindow : Window
                 TextHover: Emphasize(text, towardLight: true),
                 // Raised with the selection it sits on, so the pair moves
                 // together rather than the box getting stronger under a name
-                // that stayed where it was ("맞춰서 살짝 강하게").
+                // that stayed where it was.
                 Highlight: EnsureContrast(accentHue, accentSat * 0.5, 0.96, selection, 5.0, towardLight: true),
                 ShowMore: EnsureContrast(baseHue, 0.06, 0.60, background, 3.0, towardLight: true),
                 Handle: RollHandle(accentHue, accentSat, background, rng, towardLight: true));
@@ -699,9 +699,8 @@ public partial class ColorSettingsWindow : Window
         }
     }
 
-    // THE ONE THING IN A ROLL THAT IS MEANT TO BE LOUD (user, 2026-08-10:
-    // "손잡이나 바 컬러는 좀 튀어야 할거 같습니다", while everything else stays
-    // quiet). It used to be handed the rolled BACKGROUND, which reproduced the
+    // THE ONE THING IN A ROLL THAT IS MEANT TO BE LOUD, while everything else
+    // stays quiet (2026-08-10). It used to be handed the rolled BACKGROUND, which reproduced the
     // handle's follow-the-background default - correct as a default, and
     // exactly wrong for a die roll, since the one control the palette could
     // show off with came out invisible.
@@ -724,7 +723,7 @@ public partial class ColorSettingsWindow : Window
     }
 
     // Hover names get one visible step MORE presence than resting ones
-    // (user, 2026-08-09: "hover시 텍스트가 살짝 좀 더 강조"): a 15% blend
+    // (2026-08-09): a 15% blend
     // toward the theme's bright end (white in dark, black in light). A blend
     // can only ADD contrast over the already-enforced resting text, so no
     // re-check is needed, and it degrades gracefully when the resting text is
@@ -879,7 +878,7 @@ public partial class ColorSettingsWindow : Window
     //
     // Windows' own picker has three RGB number boxes and nowhere to paste
     // "#2E7D32" from a browser or a design tool, which is how colours actually
-    // travel (user mail, 2026-07-31). So the swatch answers a right-click with
+    // travel (2026-07-31). So the swatch answers a right-click with
     // a box holding its current value.
     //
     // Right-click rather than a field on every row: seventeen rows with a text
@@ -1282,7 +1281,7 @@ public partial class ColorSettingsWindow : Window
         // The handle follows every single move; only the colour going out to
         // the app is throttled. Moving these two together made the handle
         // itself run at the throttle's rate, which reads exactly like a 30Hz
-        // screen (user, 2026-08-04) - and it was never the expensive half.
+        // screen (2026-08-04) - and it was never the expensive half.
         UpdatePickerVisuals();
         QueuePickerUpdate();
     }
@@ -1302,7 +1301,7 @@ public partial class ColorSettingsWindow : Window
     // the same work dozens of times for a single visible result, and that work
     // reaches the whole app: the sidebar behind this window redraws every
     // element that uses the colour being changed, which is why it is felt most
-    // with a lot of rows on screen (user, 2026-08-04).
+    // with a lot of rows on screen (2026-08-04).
     //
     // Thirty a second is the rate here. Sixty - one per frame - was tried
     // first and was still enough to spin the fans up; half of them is under

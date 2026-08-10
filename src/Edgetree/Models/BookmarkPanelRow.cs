@@ -25,7 +25,7 @@ public class BookmarkPanelRow : INotifyPropertyChanged
 
     // 1-based and counted from the top, so the number a row shows is also the
     // number of times Ctrl+Alt+L would have to be pressed to reach it. The
-    // user's answer to "how do I know what order these are in" - chosen over
+    // answer to "how do I know what order these are in" - chosen over
     // letting the list be dragged into order (2026-08-02), because the order
     // IS the cycle order and reordering would silently rewire the shortcuts.
     public int Number { get; }

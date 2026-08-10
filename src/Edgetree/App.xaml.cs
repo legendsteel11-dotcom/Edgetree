@@ -188,8 +188,8 @@ public partial class App : Application
         NativeMethods.SuppressDeviceErrorDialogs();
 
         // See the recovery handler below. A RATE, not a lifetime count - the
-        // first cut was "5 per session", and the user asked the right
-        // question: this app stays up for days, so a lifetime cap spends its
+        // first cut was "5 per session", and the flaw in it is that this app
+        // stays up for days, so a lifetime cap spends its
         // protection fastest on exactly the long-running sessions it exists
         // for. What separates the two cases is how BUNCHED the failures come,
         // not how many: the legitimate race is occasional (worst observed:

@@ -405,7 +405,7 @@ internal static class NativeMethods
     // DWMWA_CAPTION_COLOR provably do not (2026-08-07 rounds); with this
     // set, the transition flash follows the app theme instead of the OS one:
     // dark theme gets a dark sheet, light keeps the white it always matched
-    // (user request, 2026-08-08). Fails harmlessly on older builds, same
+    // (requested 2026-08-08). Fails harmlessly on older builds, same
     // rule as the corner preference below.
     private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
 

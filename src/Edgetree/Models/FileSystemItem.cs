@@ -105,9 +105,9 @@ public class FileSystemItem : INotifyPropertyChanged
     // The folder a drop would land in right now, while a drag is over the
     // tree. It used to be marked by moving the native selection there, which
     // meant a drag started inside the tree pulled the selection off the very
-    // row the user had picked up and only handed it back on release - two
-    // visible jumps for one gesture (user, 2026-08-05: "부모폴더가 선택되고
-    // 클릭을 떼야 다시 선택한 파일로 돌아가서 오해의 소지가 좀 있어서요").
+    // row that was picked up, landing it on the parent folder and only handing
+    // it back on release - two visible jumps for one gesture, and easy to read
+    // as the wrong thing having been grabbed (2026-08-05).
     // A flag of its own lets the drop target and the selection be true at the
     // same time, the way Explorer shows it. Painted with the SAME brushes as
     // selection - a deliberate choice, so the mark reads as one thing and no
@@ -401,8 +401,8 @@ public class FileSystemItem : INotifyPropertyChanged
     // never cleared by the reveal, so the two must not be concatenated
     // blindly). The viewer's carousel counts pictures against this, because
     // "35 / 447" is a claim about the FOLDER, and a total that grew when
-    // 더 보기 was clicked read as the counter being wrong (user,
-    // 2026-08-09). The "더 보기" row itself is not a child and is skipped.
+    // 더 보기 was clicked read as the counter being wrong (2026-08-09). The
+    // "더 보기" row itself is not a child and is skipped.
     public IEnumerable<FileSystemItem> AllLoadedChildren
     {
         get

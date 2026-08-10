@@ -90,9 +90,9 @@
              own stuck-capture watchdog releases any popup that holds capture
              without a menu being open, so it closed itself after a second
              (capture-watchdog.log, "released stuck capture: WPF(PopupRoot)"),
-             and the user had pictured the field simply BEING there - "팔레트
-             우측이나 좌측에 이 입력칸이 나와 있는 형태". Width was the reason
-             it wasn't there to begin with; the user gave that up.
+             and what was wanted was the field simply BEING there, beside the
+             palette. Width was the reason it wasn't there to begin with, and
+             that was given up.
              Every box is wired through this one style: it carries the handlers
              and each row only names the swatch it belongs to, so a colour added
              later needs one Tag and nothing else. -->
@@ -231,7 +231,7 @@
                  mode - the active one is disabled, which is also what marks
                  it as "you are here" - and carries its own 랜덤 die at its
                  right. The die rolls only the theme being LOOKED AT (the
-                 user's call): the inactive zone's die is disabled with it,
+                 decided): the inactive zone's die is disabled with it,
                  so each zone always has exactly one live button - switch
                  there, or roll here. -->
             <Grid Grid.Row="1"
@@ -564,9 +564,9 @@
                             MouseLeftButtonUp="PanelDividerSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <!-- Row 11, right under 탐색기 배경 (user's call, 2026-08-08:
-                     the two backgrounds belong together) - declared here out
-                     of row order only because it arrived later. -->
+                <!-- Row 11, right under 탐색기 배경 (2026-08-08 - the two
+                     backgrounds belong together) - declared here out of row
+                     order only because it arrived later. -->
                 <TextBlock Grid.Row="11"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelViewerBackground}"

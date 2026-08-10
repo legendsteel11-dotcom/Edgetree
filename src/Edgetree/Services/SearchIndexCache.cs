@@ -9,15 +9,15 @@ namespace SidebarExplorer.App.Services;
 // whole scope. This exists for network shares specifically: a NAS scope was
 // measured at ~1,700 files/sec no matter what the client does (running eight
 // folder listings concurrently produced exactly no speedup - see
-// FileSearchService.MaxParallelDirectories), which put one real user's 610k-file
-// share at ~6 minutes per scan. Since the walk can't be made faster, the only
+// FileSearchService.MaxParallelDirectories), which put a real 610k-file share
+// at ~6 minutes per scan. Since the walk can't be made faster, the only
 // way to remove the wait is to not walk at all.
 //
 // Deliberately NOT paired with an automatic background re-scan. Re-scanning
 // silently on every launch would spend those 6 minutes of network traffic on a
 // share the user may not even search that session. Instead the cache is used as
 // it is, its age is shown (see Strings.SearchStatusCached), and refreshing is
-// the user's call. A stale hit is a failure mode people already know from
+// a deliberate act. A stale hit is a failure mode people already know from
 // Explorer - the file opens and Windows says it's gone. A stale MISS is the
 // dangerous one (a file created since the last scan simply doesn't appear, with
 // nothing to explain why), which is exactly why showing the age is not optional.

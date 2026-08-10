@@ -35,8 +35,8 @@ public static class SubtitleService
     // also "movie.kor.srt" - the language tag is the one variation common enough
     // that leaving it out would miss half a real library.
     //
-    // Subfolders (a Subs/ directory) are NOT searched, by the user's call
-    // (2026-08-10): it is a second directory read on a cold network share for
+    // Subfolders (a Subs/ directory) are NOT searched, decided 2026-08-10: it
+    // is a second directory read on a cold network share for
     // every selection, paid by everyone to serve a layout most files do not use.
     public static string? Find(string videoPath)
     {

@@ -85,8 +85,8 @@ public static class FileTypeFilter
     // programs - Windows itself files a .dll as "응용 프로그램 확장" rather than
     // "응용 프로그램", and nobody double-clicks one. This category exists to
     // answer "what can I run here", and a system folder's few hundred DLLs are
-    // the noise a filter is supposed to remove, not the result (user's
-    // question, 2026-08-02). They fall to 기타, which is reachable.
+    // the noise a filter is supposed to remove, not the result (2026-08-02).
+    // They fall to 기타, which is reachable.
     private static readonly HashSet<string> ExecutableExtensions = Build(
         "exe com scr cpl run out",
         "msi msix msixbundle appx appxbundle msp mst appimage flatpakref snap deb rpm pkg",

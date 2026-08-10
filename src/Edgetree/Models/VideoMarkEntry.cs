@@ -14,10 +14,9 @@ public class VideoMarkEntry
     public List<double> Seconds { get; set; } = new();
 
     // Where playback last left off, written without being asked. It exists
-    // because ↑↓ walk the folder while a film is playing (the user's own call)
-    // and one mis-hit therefore throws away where you were - "잘못 누르면 참
-    // 곤란한 상황" (2026-08-10). With this, the way back is to select the row
-    // again.
+    // because ↑↓ walk the folder while a film is playing, so one mis-hit used
+    // to throw away where you were (2026-08-10). With this, the way back is to
+    // select the row again.
     //
     // 0 means nothing to resume, which is also what the very start means, so
     // the two need not be told apart. Deliberately not written for a film that
