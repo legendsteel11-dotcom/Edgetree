@@ -287,6 +287,19 @@ public class FileSystemItem : INotifyPropertyChanged
         }
     }
 
+    // A blank row parked after the last drive so a jump to something near the
+    // end of the tree still has somewhere to scroll into - see MainWindow's
+    // 아래 여백 section. It draws nothing, takes no focus and answers no click;
+    // all it does is count as one row of scroll range.
+    //
+    // Deliberately NOT put in _roots: the roots collection is walked in dozens
+    // of places, and one of them matches a path by prefix - an empty FullPath
+    // would have matched everything. It rides alongside in the tree's items
+    // instead, so no walk over the model can see it.
+    public bool IsBottomGap { get; private init; }
+
+    public static FileSystemItem CreateBottomGap() => new() { IsBottomGap = true };
+
     private FileSystemItem()
     {
         IsPlaceholder = true;

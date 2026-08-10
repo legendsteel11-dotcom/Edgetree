@@ -2112,6 +2112,21 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <!-- The blank rows that make room past the last drive: they are
+                     scroll range and nothing else. No hover, no click, no
+                     keyboard stop, no tooltip - the same set of denials the
+                     search view's header rows carry, for the same reason. -->
+                <DataTrigger Binding="{Binding IsBottomGap}"
+                        Value="True">
+                    <Setter Property="Focusable"
+                            Value="False"/>
+                    <Setter Property="IsHitTestVisible"
+                            Value="False"/>
+                    <Setter Property="ToolTipService.IsEnabled"
+                            Value="False"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <!-- The grab line for every resize edge (and the viewer's divider).
@@ -3170,6 +3185,19 @@
                     <Setter TargetName="ShowMoreText"
                             Property="Visibility"
                             Value="Visible"/>
+                </DataTrigger>
+                <!-- The blank rows parked after the last drive (see the
+                     아래 여백 section). Same treatment as 더 보기 minus the
+                     text: nothing drawn at all, so the run of them reads as
+                     empty space rather than as rows. -->
+                <DataTrigger Binding="{Binding IsBottomGap}"
+                        Value="True">
+                    <Setter TargetName="RowIcon"
+                            Property="Visibility"
+                            Value="Collapsed"/>
+                    <Setter TargetName="NameText"
+                            Property="Visibility"
+                            Value="Collapsed"/>
                 </DataTrigger>
                 <!-- Only while expanded - a collapsed folder's icon can't be
                      usefully clicked to try a different sort without seeing

@@ -473,7 +473,17 @@ public partial class MainWindow : Window
             : DefaultTreeFontSize;
 
         ReloadRoots();
-        ExplorerTree.ItemsSource = _roots;
+
+        // The drives, plus however many blank rows the 아래 여백 currently
+        // needs. A CompositeCollection rather than appending the blanks to
+        // _roots: that collection is walked in dozens of places, one of which
+        // matches a path by prefix, and a blank row's empty path would have
+        // matched every path there is.
+        ExplorerTree.ItemsSource = new System.Windows.Data.CompositeCollection
+        {
+            new System.Windows.Data.CollectionContainer { Collection = _roots },
+            new System.Windows.Data.CollectionContainer { Collection = _bottomGapRows },
+        };
         StartDriveWatchers();
 
         // Deferred one pass: the tree's own ScrollViewer only exists once the
@@ -4908,12 +4918,15 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Within the last viewport-full of rows there is nothing below to
-        // scroll up into, so the row lands as high as it can rather than at the
-        // very top. The pixel version used to buy the missing room with a
-        // margin past the last row; a margin adds pixels, and the extent is
-        // counted in ROWS now, so that no longer reaches - see the 아래 여백
-        // section below.
+        // Within the last screenful there is nothing below the row to scroll up
+        // into, so the room is made rather than the pin given up - see the
+        // 아래 여백 section. Counted in ROWS now, like everything else here.
+        double shortfall = index - scrollViewer.ScrollableHeight;
+        if (shortfall > 0.5)
+        {
+            SetBottomGap(_bottomGapRows.Count + (int)Math.Ceiling(shortfall), scrollViewer);
+        }
+
         double target = Math.Min(index, scrollViewer.ScrollableHeight);
         if (Math.Abs(scrollViewer.VerticalOffset - target) > 0.5)
         {
@@ -5033,80 +5046,64 @@ public partial class MainWindow : Window
 
     // ----- 트리 끝의 아래 여백 ----------------------------------------------
     //
-    // INERT since the tree moved to ScrollUnit=Item (2026-08-10): the scroll
-    // range is counted in rows now, and a margin adds pixels, so this can no
-    // longer buy the room it was built to buy. PinRowToTop stopped calling it
-    // and clamps instead - a jump landing inside the last viewport-full of rows
-    // now stops as high as it can rather than at the very top.
-    //
-    // Kept rather than deleted because the measurements below are the record of
-    // WHY the estimation problem exists at all, and because putting the
-    // behaviour back is a real option: in item mode the equivalent is a run of
-    // zero-height rows at the end (each one counts toward the range and draws
-    // nothing) rather than a margin. Not done yet - it means fake items in the
-    // model, which every walk over the tree would then have to know about.
-    //
-    // Original note follows.
-    //
     // Extra scrollable room past the last row, so a row near the end can still
-    // be pinned to the top. It is a bottom MARGIN on the last root's container,
-    // which lands after that root's entire rendered block - i.e. at the very
-    // bottom of the content - and grows the extent without touching the
-    // viewport. Measured 2026-08-02 in a standalone WPF spike: with every row
-    // realized, a 300px margin bought exactly 300px of extra range and removing
-    // it returned the range to the byte.
+    // be pinned to the top. Without it, "a jump always lands at the top" would
+    // hold everywhere except the last screenful of the tree - and that rule has
+    // been true and exception-free since v1.4.0, which is reason enough to keep
+    // it true (user, 2026-08-10, on noticing the exception).
     //
-    // The same spike is why this hangs off the ROOT and not off some row deeper
-    // down. With 200 rows in one virtualizing panel the 300px margin bought
-    // 1034px instead: VirtualizingStackPanel estimates the height of everything
-    // it hasn't realized from the average of what it has, and one 316px-tall
-    // item skews that average. The root level is the one place immune to it -
-    // there are only ever a handful of drives and the tree caches 1000 items,
-    // so every root is realized and the extent there is a real sum, not an
-    // estimate.
+    // It was a bottom MARGIN on the last root's container until the tree moved
+    // to ScrollUnit=Item on 2026-08-10. A margin adds PIXELS, and the scroll
+    // range is a count of ROWS now, so it bought nothing any more. The
+    // equivalent in row terms is what is here: a run of blank rows after the
+    // last drive, one row of range each, drawing nothing.
+    //
+    // Recorded because it is the reason this used to hang off the ROOT rather
+    // than some row deeper down, and the same fact is why the tree scrolls by
+    // row at all now: measured 2026-08-02 in a standalone WPF spike, a 300px
+    // margin bought exactly 300px at root level but 1034px inside a 200-row
+    // panel - VirtualizingStackPanel estimates the height of everything it
+    // hasn't realized from the average of what it has, and one 316px-tall item
+    // skews that average.
     //
     // Only while a jump needs it (the user's call, 2026-07-30, over always
     // keeping a gap the way a code editor does): a drive tree is not a file,
     // and permanent empty space at the end is a permanent cost for something
     // that matters at the moment of a jump. The gap leaves on its own - see
     // TreeScrollViewer_ScrollChanged.
-    private TreeViewItem? _bottomGapHost;
+    // Blank rows, appended after the last drive through the tree's composite
+    // items source - never into _roots itself (see FileSystemItem.IsBottomGap
+    // for why). One row of range each, drawing nothing.
+    private readonly System.Collections.ObjectModel.ObservableCollection<FileSystemItem> _bottomGapRows = new();
 
-    private double _bottomGapSize;
-
-    private void SetBottomGap(double gap, ScrollViewer scrollViewer)
+    private void SetBottomGap(int rows, ScrollViewer scrollViewer)
     {
-        gap = Math.Max(0, gap);
+        rows = Math.Max(0, rows);
+        if (rows == _bottomGapRows.Count)
+        {
+            return;
+        }
 
         // Same file as the scroll-jump watch so the two line up by timestamp -
         // a jump with a "gap cleared" beside it points straight at this code.
-        if (Math.Abs(gap - _bottomGapSize) > 0.5)
+        LogScrollLine(
+            $"gap    {(rows > 0 ? $"set {rows} rows" : "cleared")}  (was {_bottomGapRows.Count})  " +
+            $"offset {scrollViewer.VerticalOffset:F0}  extent {scrollViewer.ExtentHeight:F0}");
+
+        // Trimmed and grown in place rather than cleared and refilled: a Reset
+        // on this collection would throw away the containers of the rows the
+        // user is looking at, mid-jump.
+        while (_bottomGapRows.Count > rows)
         {
-            LogScrollLine(
-                $"gap    {(gap > 0.5 ? $"set {gap:F0}" : "cleared")}  (was {_bottomGapSize:F0})  " +
-                $"offset {scrollViewer.VerticalOffset:F0}  extent {scrollViewer.ExtentHeight:F0}");
+            _bottomGapRows.RemoveAt(_bottomGapRows.Count - 1);
+        }
+        while (_bottomGapRows.Count < rows)
+        {
+            _bottomGapRows.Add(FileSystemItem.CreateBottomGap());
         }
 
-        // Whatever carried the last gap gives it up first: the last root can
-        // change under us (a drive appearing, a refresh regenerating
-        // containers), and a margin left behind on a row that is no longer last
-        // is a gap in the MIDDLE of the tree. ClearValue rather than a zero
-        // Thickness so the item style's own margin, if it ever gains one, comes
-        // back instead of being overwritten with a hardcoded default.
-        if (_bottomGapHost is { } previous)
+        if (rows > 0)
         {
-            previous.ClearValue(MarginProperty);
-            _bottomGapHost = null;
-        }
-
-        _bottomGapSize = 0;
-
-        if (gap > 0.5 && LastRootContainer() is { } host)
-        {
-            host.Margin = new Thickness(0, 0, 0, gap);
-            _bottomGapHost = host;
-            _bottomGapSize = gap;
-
             scrollViewer.ScrollChanged -= TreeScrollViewer_ScrollChanged;
             scrollViewer.ScrollChanged += TreeScrollViewer_ScrollChanged;
         }
@@ -5114,11 +5111,6 @@ public partial class MainWindow : Window
         // The new range has to exist before the caller scrolls into it.
         ExplorerTree.UpdateLayout();
     }
-
-    private TreeViewItem? LastRootContainer()
-        => _roots.Count == 0
-            ? null
-            : ExplorerTree.ItemContainerGenerator.ContainerFromItem(_roots[^1]) as TreeViewItem;
 
     // The gap is taken back the moment it is no longer on screen - scrolling up
     // past it, in practice. Removing it then is invisible: the space being
@@ -5133,17 +5125,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        // The tree was rebuilt and took the gap's host with it - the margin is
-        // already gone with the container, so just forget it.
-        if (_bottomGapHost is null || !ReferenceEquals(_bottomGapHost, LastRootContainer()))
+        if (_bottomGapRows.Count == 0)
         {
-            _bottomGapHost = null;
-            _bottomGapSize = 0;
             scrollViewer.ScrollChanged -= TreeScrollViewer_ScrollChanged;
             return;
         }
 
-        double gapTop = scrollViewer.ExtentHeight - _bottomGapSize;
+        double gapTop = scrollViewer.ExtentHeight - _bottomGapRows.Count;
         if (scrollViewer.VerticalOffset + scrollViewer.ViewportHeight <= gapTop + 0.5)
         {
             scrollViewer.ScrollChanged -= TreeScrollViewer_ScrollChanged;
@@ -5286,7 +5274,7 @@ public partial class MainWindow : Window
             $"sinceGesture={(sinceGesture is < 0 or > 60000 ? "-" : sinceGesture + "ms")}  " +
             $"nav={(Environment.TickCount64 - _lastNavTicks is < 0 or > 3000 ? "-" : _lastNavLabel)}  " +
             $"lastPress={_lastTreePressLabel}  " +
-            $"gap={_bottomGapSize:F0}  " +
+            $"gap={_bottomGapRows.Count}rows  " +
             $"selected={(ExplorerTree.SelectedItem as FileSystemItem)?.FullPath ?? "-"}");
     }
 
