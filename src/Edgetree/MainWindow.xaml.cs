@@ -13999,10 +13999,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ViewerCloseButton_Click(object sender, RoutedEventArgs e) => CloseViewer();
-
-    // Same thing as the panel's own X, put where the hand already is: the
-    // divider, rather than the far corner of the window (user, 2026-08-09).
+    // The panel's one close control, on the divider where the hand already is
+    // rather than in the far corner of the window (user, 2026-08-09). It was
+    // added beside the panel's own X and outlived it: the X sat under the
+    // window's X and the pair read as ambiguous, while a chevron folding toward
+    // the divider says exactly what it closes (2026-08-10).
     private void ViewerCollapseButton_Click(object sender, RoutedEventArgs e) => CloseViewer();
 
     private void ViewerExpandButton_Click(object sender, RoutedEventArgs e) => OpenViewer();
@@ -16593,7 +16594,6 @@ public partial class MainWindow : Window
         ViewerCaptionPanel.Visibility = on && _viewerVideoPath is not null
             ? Visibility.Visible
             : chrome;
-        ViewerCloseButton.Visibility = chrome;
         ViewerImage.Margin = on ? default : new Thickness(10);
         ViewerPanel.BorderThickness = on
             ? default

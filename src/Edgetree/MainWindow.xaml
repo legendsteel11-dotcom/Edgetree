@@ -4709,8 +4709,17 @@
                     <!-- Collapsed unless the option is on (ApplyPathBarVisibility) -
                          a StackPanel child at Collapsed takes no height, so the
                          footer keeps being exactly the chip strip when it's off. -->
+                    <!-- Bottom 5 → 2, and the chip strip's bottom 3 → 6. The
+                         three pixels are MOVED rather than added: the footer's
+                         total height is unchanged, so this row does not shift
+                         on screen at all (asked for: lift the chips, leave the
+                         path where it is) while the strip below comes off the
+                         window's edge. The air was in the wrong half - there
+                         was more of it between two things that are obviously
+                         separate than under the last row, where the window
+                         ends. -->
                     <Grid x:Name="PathBarRow"
-                            Margin="6,5,6,5"
+                            Margin="6,5,6,2"
                             Height="24"
                             Visibility="Collapsed">
                         <!-- Same outline-only treatment as the search box: a
@@ -4758,10 +4767,18 @@
                          under the last row: the two together read as one strip with
                          even air above and below, which a chip-side bottom margin
                          could not do without this going to zero and the strip
-                         sitting on the window's edge. -->
+                         sitting on the window's edge.
+                         Which is what it was doing anyway at 3 (user, with a
+                         screenshot, 2026-08-10: "칩버튼이 바닥에 아예 붙어서
+                         보입니다"). Now 6, taken from the path row above rather
+                         than added, so the footer is the same height with the
+                         path bar showing. With it hidden - the default - this
+                         panel IS the footer, so there the footer does grow by
+                         those 3px, which is the same fix in the configuration
+                         that needed it just as much. -->
                     <WrapPanel x:Name="VersionFooterPanel"
                             Orientation="Horizontal"
-                            Margin="8,1,4,3">
+                            Margin="8,1,4,6">
                     </WrapPanel>
                 </StackPanel>
             </Border>
@@ -6505,20 +6522,18 @@
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
-                    <Button x:Name="ViewerCloseButton"
-                            Grid.Row="0"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Top"
-                            Margin="0,4,4,0"
-                            Style="{StaticResource ToggleButtonStyle}"
-                            Click="ViewerCloseButton_Click"
-                            ToolTip="{x:Static services:Strings.ToolTipClose}">
-                        <Path Data="M4,4 L12,12 M12,4 L4,12"
-                                Stroke="{DynamicResource ForegroundText}"
-                                StrokeThickness="1.5"
-                                StrokeStartLineCap="Round"
-                                StrokeEndLineCap="Round"/>
-                    </Button>
+                    <!-- The panel's own close X used to sit here, top-right.
+                         It was directly under the WINDOW's close X and drawn
+                         at a different size, so the corner offered two X's
+                         that did different things and neither said which
+                         (user, with a screenshot, 2026-08-10). Closing the
+                         panel already had two controls that say what they
+                         close - the collapse chevron on the divider, which
+                         points at the thing it folds, and the header's viewer
+                         toggle, which is the same switch that opened it. An X
+                         is the one shape in that corner that means "the
+                         window", so this one was the odd one out rather than
+                         the extra one. -->
                 </Grid>
             </Border>
 
