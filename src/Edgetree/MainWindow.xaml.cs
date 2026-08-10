@@ -162,6 +162,9 @@ public partial class MainWindow : Window
     // dropped rather than dragging the tree backwards.
     private int _pathBarCommitToken;
 
+    // One pending path-bar sync at most - see SchedulePathBarSync.
+    private bool _pathBarSyncQueued;
+
     // Set only while the code itself is assigning the box's Text. Assigning
     // Text raises TextChanged, which is where the flag above is set, so
     // without this the box would mark itself dirty the first time the tree
@@ -4848,33 +4851,97 @@ public partial class MainWindow : Window
     // may satisfy on a later dispatcher pass (another frame, another flash),
     // and it only ever scrolls as far as it has to - so a second call for a row
     // already at the top has to be a no-op, which is what lets the correction
-    // pass above be free. The offset itself is exact because the tree scrolls
-    // in PIXELS (VirtualizingPanel.ScrollUnit="Pixel", see MainWindow.xaml);
-    // under the default Item unit this arithmetic would be meaningless.
+    // pass above be free.
+    //
+    // The offset is now an INDEX, not a pixel position (ScrollUnit=Item since
+    // 2026-08-10 - see the TreeView's own note for why). That turns out to suit
+    // this better than the pixel version did: the old code measured the row's
+    // position on screen, so it could only pin a row whose container WPF had
+    // already realized, and the favorites-navigation history is largely a
+    // history of that container not being there. Counting rows asks the model
+    // instead, and the model always answers.
     private void PinRowToTop(TreeViewItem anchor, ScrollViewer scrollViewer)
     {
-        if (ContentTopOf(anchor, scrollViewer) is not { } top)
+        if (anchor.DataContext is not FileSystemItem item ||
+            VisibleRowIndexOf(item) is not { } index)
         {
             return;
         }
 
-        // Near the end of the tree there is nothing left below the row to
-        // scroll into view, so ScrollToVerticalOffset clamps and the row stops
-        // partway down - the jump looks like it landed somewhere arbitrary.
-        // Make the room instead of giving up on the pin.
-        double shortfall = top - scrollViewer.ScrollableHeight;
-        if (shortfall > 0.5)
+        // Within the last viewport-full of rows there is nothing below to
+        // scroll up into, so the row lands as high as it can rather than at the
+        // very top. The pixel version used to buy the missing room with a
+        // margin past the last row; a margin adds pixels, and the extent is
+        // counted in ROWS now, so that no longer reaches - see the 아래 여백
+        // section below.
+        double target = Math.Min(index, scrollViewer.ScrollableHeight);
+        if (Math.Abs(scrollViewer.VerticalOffset - target) > 0.5)
         {
-            SetBottomGap(_bottomGapSize + shortfall, scrollViewer);
-        }
-
-        if (Math.Abs(scrollViewer.VerticalOffset - top) > 0.5)
-        {
-            scrollViewer.ScrollToVerticalOffset(top);
+            scrollViewer.ScrollToVerticalOffset(target);
         }
     }
 
+    // How many rows are drawn above this one, counting only what is actually on
+    // the tree right now - collapsed folders contribute their own row and
+    // nothing else, and "더 보기" counts as the row it is.
+    //
+    // Asked of the model rather than of the containers, deliberately: this has
+    // to answer for rows WPF has virtualized away, which is most of them.
+    private int? VisibleRowIndexOf(FileSystemItem target)
+    {
+        int index = 0;
+        foreach (var root in _roots)
+        {
+            if (CountRowsUntil(root, target, ref index))
+            {
+                return index;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool CountRowsUntil(FileSystemItem item, FileSystemItem target, ref int index)
+    {
+        if (ReferenceEquals(item, target))
+        {
+            return true;
+        }
+
+        index++;
+
+        if (!item.IsExpanded)
+        {
+            return false;
+        }
+
+        foreach (var child in item.Children)
+        {
+            if (CountRowsUntil(child, target, ref index))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // ----- 트리 끝의 아래 여백 ----------------------------------------------
+    //
+    // INERT since the tree moved to ScrollUnit=Item (2026-08-10): the scroll
+    // range is counted in rows now, and a margin adds pixels, so this can no
+    // longer buy the room it was built to buy. PinRowToTop stopped calling it
+    // and clamps instead - a jump landing inside the last viewport-full of rows
+    // now stops as high as it can rather than at the very top.
+    //
+    // Kept rather than deleted because the measurements below are the record of
+    // WHY the estimation problem exists at all, and because putting the
+    // behaviour back is a real option: in item mode the equivalent is a run of
+    // zero-height rows at the end (each one counts toward the range and draws
+    // nothing) rather than a margin. Not done yet - it means fake items in the
+    // model, which every walk over the tree would then have to know about.
+    //
+    // Original note follows.
     //
     // Extra scrollable room past the last row, so a row near the end can still
     // be pinned to the top. It is a bottom MARGIN on the last root's container,
@@ -5136,12 +5203,24 @@ public partial class MainWindow : Window
     }
 
     // Ctrl+wheel: accelerated scrolling, about five times the ordinary wheel
-    // step (~240px per notch vs the default ~48). Deep trees mean a LOT of
-    // plain-wheel notches ("스크롤 피곤도", 2026-07-24), and Ctrl+wheel was
-    // unassigned - the font zoom lives on Ctrl +/- only. A constant factor
-    // rather than progressive velocity: predictable beats clever for a
-    // positioning gesture. The offset is in pixels here (the root panel
-    // scrolls with ScrollUnit=Pixel).
+    // step. Deep trees mean a LOT of plain-wheel notches ("스크롤 피곤도",
+    // 2026-07-24), and Ctrl+wheel was unassigned - the font zoom lives on
+    // Ctrl +/- only. A constant factor rather than progressive velocity:
+    // predictable beats clever for a positioning gesture.
+    //
+    // Counted in ROWS since the tree moved to ScrollUnit=Item (2026-08-10).
+    // Left as pixels it would have been 240 ROWS a notch.
+    //
+    // Five times WHATEVER the plain wheel does on this machine, not a fixed
+    // fifteen. Windows' "lines to scroll per notch" is a user setting, and a
+    // hardcoded number quietly becomes a different multiple on every machine
+    // that has moved it - on one set to eight lines, fifteen is not an
+    // accelerator at all ("파워가 약해진 느낌", 2026-08-10).
+    private const double CtrlWheelAcceleration = 5;
+
+    private static double CtrlWheelRowsPerNotch
+        => Math.Max(1, SystemParameters.WheelScrollLines) * CtrlWheelAcceleration;
+
     private void ExplorerTree_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
     {
         if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
@@ -5151,7 +5230,8 @@ public partial class MainWindow : Window
 
         if (FindTreeScrollViewer() is { } scrollViewer)
         {
-            scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset - e.Delta * 2.0);
+            double rows = e.Delta / (double)Mouse.MouseWheelDeltaForOneLine * CtrlWheelRowsPerNotch;
+            scrollViewer.ScrollToVerticalOffset(scrollViewer.VerticalOffset - rows);
             e.Handled = true;
         }
     }
@@ -6386,6 +6466,11 @@ public partial class MainWindow : Window
         }
         string? selectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
 
+        // Instrument - see LogFilterTiming. Ticks rather than a Stopwatch so
+        // the whole thing costs nothing worth measuring in Release, where the
+        // log call itself is compiled away.
+        long startedAt = Environment.TickCount64;
+
         if (reloadRoots)
         {
             // The drive rows themselves are what changed - a hidden drive
@@ -6430,6 +6515,8 @@ public partial class MainWindow : Window
         // this as two clean passes - snapshot names first, THEN refresh,
         // THEN walk fresh from each root reloading on demand - sidesteps that
         // entirely.
+        long afterDisk = Environment.TickCount64;
+
         foreach (var path in expandedPaths.OrderBy(p => p.Length))
         {
             ExpandPathIfPossible(path);
@@ -6439,15 +6526,92 @@ public partial class MainWindow : Window
             ShowAllChildrenIfPossible(path);
         }
 
+        long afterExpand = Environment.TickCount64;
+
         // Restoring the selection reuses the exact same reveal/expand/select
         // walk favorites navigation already relies on (including its
         // retry-until-the-container-is-actually-realized handling) - hand-
         // rolling a simpler version of that same problem here is exactly what
         // caused the bug above.
-        if (selectedPath is not null)
+        if (pinSelectionToTop)
         {
-            NavigateToPath(selectedPath, pinToTop: pinSelectionToTop, source: "refresh");
+            if (selectedPath is not null)
+            {
+                NavigateToPath(selectedPath, pinToTop: true, source: "refresh");
+            }
+            return;
         }
+
+        // A QUIET refresh - a filter toggle, a background change - takes the
+        // cheap route instead (2026-08-10).
+        //
+        // The reveal walk is asynchronous by design: it expands a level, hands
+        // control back to the dispatcher to wait for a container, scrolls, and
+        // comes back. Every one of those hand-backs is a chance for WPF to
+        // paint the tree while its virtualizing panels are still settling their
+        // offsets - which is what a filter toggle looked like on a tree with a
+        // lot of rows open: rows drawn on top of each other for about a second
+        // (reported 2026-08-10, and it followed the TOTAL number of open rows
+        // rather than any one folder, which is the signature of arrangement
+        // rather than of loading).
+        //
+        // Nothing here needs the walk. Every expanded folder and every "더 보기"
+        // reveal has already been replayed by path above; all that is left is
+        // to put the selection back, and the walk's own extras are actively
+        // unwanted for a display change - it re-caps every revealed folder
+        // (undoing the replay that just ran) and it scrolls, which is what made
+        // rows below the fold jump around.
+        //
+        // Same lesson as 2026-07-17, written up in the favorites-navigation
+        // history: NavigateToPath is built for a deliberate, infrequent jump
+        // and is not a general-purpose reselect.
+        // Settle the tree here rather than leaving it to WPF's next pass, so
+        // the rebuild and its layout are one uninterrupted block. Measured at
+        // 141-313ms on ~280 realized rows, scaling almost exactly linearly with
+        // that count - see LogFilterTiming.
+        ExplorerTree.UpdateLayout();
+
+        long afterLayout = Environment.TickCount64;
+
+        if (selectedPath is not null &&
+            FindItemForPath(selectedPath) is { } item &&
+            FindRealizedContainer(item) is { } container)
+        {
+            // Selecting a TreeViewItem makes it scroll itself into view - WPF
+            // raises RequestBringIntoView from TreeViewItem.OnSelected and the
+            // ScrollViewer above obeys, AFTER this method has returned.
+            //
+            // That deferred scroll was the last unexplained number in the
+            // instrument: the tree's offset moved 1,116px on every toggle
+            // although nothing here scrolls. And a scroll is not free here - it
+            // sends the virtualizing panel off to realize a different set of
+            // rows, and the frame in between is what was being painted with the
+            // old contents still under the new ones. It also explains the rows
+            // below the fold visibly shifting after a toggle.
+            //
+            // Handled at the container, which is where the event starts, so the
+            // ScrollViewer never sees it. Attached only around this one
+            // assignment: a deliberate jump (a favourite, a bookmark) still
+            // scrolls, as it should - that is the whole point of a jump.
+            void SuppressBringIntoView(object _, RequestBringIntoViewEventArgs e) => e.Handled = true;
+
+            container.RequestBringIntoView += SuppressBringIntoView;
+            try
+            {
+                container.IsSelected = true;
+            }
+            finally
+            {
+                container.RequestBringIntoView -= SuppressBringIntoView;
+            }
+        }
+
+        LogFilterTiming(
+            afterDisk - startedAt,
+            afterExpand - afterDisk,
+            afterLayout - afterExpand,
+            Environment.TickCount64 - startedAt,
+            expandedPaths.Count);
     }
 
     // showingAllPaths collects every folder ("더 보기" clicked, all overflow
@@ -6922,6 +7086,37 @@ public partial class MainWindow : Window
         return folder?.FullPath;
     }
 
+    // Coalesces a burst of selection changes into ONE update, run after the
+    // layout it would otherwise have interrupted.
+    //
+    // Why it can't just be done inline: setting CaretIndex and scrolling the
+    // box to its end both force the TextBox to lay itself out then and there.
+    // A filter toggle runs RefreshAllLoadedFolders, which moves the selection
+    // dozens of times while the tree is mid-rebuild - so the box was forcing a
+    // layout pass into each of those moments, and the tree got drawn with its
+    // rows piled on top of each other while it caught up (reported 2026-08-10,
+    // and confirmed by the strip being switched off: the artifact went with
+    // it). At Background priority the update lands once, after the tree has
+    // finished arranging.
+    private void SchedulePathBarSync()
+    {
+        // Costs nothing at all while the strip is off - the tree's selection
+        // handler runs on every keypress in the tree.
+        if (_pathBarSyncQueued || !_settings.ShowPathBar)
+        {
+            return;
+        }
+
+        _pathBarSyncQueued = true;
+        Dispatcher.BeginInvoke(
+            new Action(() =>
+            {
+                _pathBarSyncQueued = false;
+                UpdatePathBarFromSelection();
+            }),
+            System.Windows.Threading.DispatcherPriority.Background);
+    }
+
     private void UpdatePathBarFromSelection()
     {
         // The user is mid-edit - their typing outranks the tree. Every route
@@ -6937,6 +7132,16 @@ public partial class MainWindow : Window
 
     private void SetPathBarText(string text)
     {
+        // Nothing to do, and doing it anyway is not free: the caret and scroll
+        // calls below each force a layout pass. Most syncs during a refresh
+        // land back on the folder the box is already showing.
+        if (string.Equals(PathBarBox.Text, text, StringComparison.Ordinal))
+        {
+            _isPathBarDirty = false;
+            PathBarPlaceholder.Visibility = text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+            return;
+        }
+
         // Guarded because assigning Text raises TextChanged, which is where the
         // dirty flag is set - without this the box would mark itself dirty the
         // first time the tree moved and then stop following it forever.
@@ -9402,7 +9607,9 @@ public partial class MainWindow : Window
         // every way the selection can move, including the walks that run with
         // the favorites guard held. It has its own guard for the only case it
         // needs to sit out (the user is mid-edit).
-        UpdatePathBarFromSelection();
+        //
+        // Queued rather than done here - see SchedulePathBarSync.
+        SchedulePathBarSync();
     }
 
     private void RevealInExplorer_Click(object sender, RoutedEventArgs e)
@@ -16696,6 +16903,52 @@ public partial class MainWindow : Window
         LogClickLine(
             $"tree {(expanded ? "expanded" : "collapsed")}: {item.Name} " +
             $"(+{(sincePress < 0 ? "-" : sincePress + "ms")} after press)");
+    }
+
+    // ----- 계측기: 필터 토글이 어디에 시간을 쓰는가 (Debug 전용) ---------------
+    //
+    // Built to find why a filter toggle left the tree drawing its previous
+    // contents on top of its new ones for about a second, and it did: three
+    // guesses at the mechanism were wrong, and the numbers named the fourth.
+    // What settled it was `extent` - the same folders reporting 9,081px tall
+    // one moment and 36,072px the next, from ~290 realized rows out of ~1,200.
+    // That is the panel's guess at the height of what it hasn't built, and rows
+    // arranged from a guess that bad land on top of each other. The tree scrolls
+    // by row rather than by pixel now, and there is nothing left to guess.
+    //
+    // Kept because the same three numbers answer the next question of this kind
+    // too: whether a slow toggle is disk, expansion replay, or layout - and how
+    // much realized tree there was to lay out, which everything here scales
+    // with (measured at ~1.5ms per realized row, the same in Release).
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogFilterTiming(long diskMs, long expandMs, long layoutMs, long totalMs, int folders)
+    {
+        int realized = CountRealizedRows(ExplorerTree);
+        var scrollViewer = FindTreeScrollViewer();
+        string scroll = scrollViewer is null
+            ? "-"
+            : $"offset={scrollViewer.VerticalOffset:F0} extent={scrollViewer.ExtentHeight:F0} viewport={scrollViewer.ViewportHeight:F0}";
+
+        LogClickLine(
+            $"filter toggle: total={totalMs}ms  disk={diskMs}ms  expand={expandMs}ms  layout={layoutMs}ms  " +
+            $"folders={folders}  realizedRows={realized}  {scroll}");
+    }
+
+    // Every TreeViewItem WPF currently has a container for, at any depth. This
+    // is the number the arrange pass has to work through, and the one the
+    // artifact scales with.
+    private static int CountRealizedRows(ItemsControl host)
+    {
+        int count = 0;
+        foreach (var entry in host.Items)
+        {
+            if (host.ItemContainerGenerator.ContainerFromItem(entry) is TreeViewItem container)
+            {
+                count++;
+                count += CountRealizedRows(container);
+            }
+        }
+        return count;
     }
 
     [System.Diagnostics.Conditional("DEBUG")]

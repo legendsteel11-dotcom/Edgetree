@@ -2263,7 +2263,8 @@
                                     IsDirectionReversed="True"
                                    Orientation="{TemplateBinding Orientation}">
                                 <Track.Thumb>
-                                    <Thumb Style="{StaticResource MinimalScrollBarThumb}"/>
+                                    <Thumb x:Name="ScrollBarThumb"
+                                            Style="{StaticResource MinimalScrollBarThumb}"/>
                                 </Track.Thumb>
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Command="ScrollBar.PageUpCommand"
@@ -2277,6 +2278,30 @@
                                 </Track.IncreaseRepeatButton>
                             </Track>
                         </Grid>
+                        <!-- A floor on the grab area. Track sizes the thumb
+                             purely as viewport ÷ content, with no minimum of
+                             its own, so a long tree in a short window shrank it
+                             to a few pixels - visible, but not something you
+                             can catch with a mouse (user, 2026-08-10, with the
+                             window pulled down to about six rows).
+                             Set per orientation because the thumb's long axis
+                             is the one being squeezed; forcing the other one
+                             would push it out of a bar that is only
+                             ScrollBarThickness across. -->
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Orientation"
+                                    Value="Vertical">
+                                <Setter TargetName="ScrollBarThumb"
+                                        Property="MinHeight"
+                                        Value="28"/>
+                            </Trigger>
+                            <Trigger Property="Orientation"
+                                    Value="Horizontal">
+                                <Setter TargetName="ScrollBarThumb"
+                                        Property="MinWidth"
+                                        Value="28"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -4373,6 +4398,19 @@
                  Also note: do NOT "fix" this by setting IsVirtualizing=False
                  here. That was tried; it silently un-virtualizes the ENTIRE
                  tree (the property inherits) and breaks scrolling app-wide. -->
+            <!-- EXPERIMENT 2026-08-10, NOT a decision: ScrollUnit below was
+                 "Pixel". In pixel mode the panel has to guess the height of
+                 every row it hasn't realized, from the average of the ones it
+                 has - and in a tree that average is meaningless, since a file
+                 row is ~28px and an expanded folder's container is thousands.
+                 Measured: the same folders reported 9,081px tall one moment and
+                 36,072px the next, from ~290 realized rows out of ~1,200. Rows
+                 arranged from those guesses land on top of each other, which is
+                 what a filter toggle was showing for about a second.
+                 Item mode has nothing to guess.
+                 If this proves the cause, PinRowToTop and the bottom-gap
+                 arithmetic must be reworked before it can stay - both are built
+                 on exact pixel offsets (see PinRowToTop's own comment). -->
             <TreeView x:Name="ExplorerTree"
                     Grid.Row="3"
                     Grid.Column="1"
@@ -4385,7 +4423,7 @@
                       ItemContainerStyle="{StaticResource ExplorerTreeViewItemStyle}"
                       VirtualizingPanel.IsVirtualizing="True"
                       VirtualizingPanel.VirtualizationMode="Standard"
-                      VirtualizingPanel.ScrollUnit="Pixel"
+                      VirtualizingPanel.ScrollUnit="Item"
                       VirtualizingPanel.CacheLengthUnit="Item"
                       VirtualizingPanel.CacheLength="1000,1000"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"

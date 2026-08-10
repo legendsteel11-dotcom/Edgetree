@@ -67,7 +67,11 @@ public class FileSystemItem : INotifyPropertyChanged
     // CollectExpandedPaths/RefreshFolderPreservingState).
     public bool IsShowingAllChildren => _showingAll;
 
-    public ObservableCollection<FileSystemItem> Children { get; } = new();
+    // Bulk-capable: the three methods that rewrite this wholesale (the initial
+    // capped fill, "더 보기", and the re-cap) do it in one notification rather
+    // than one per row - see BulkObservableCollection for what that was
+    // costing. Everything else still adds and removes normally.
+    public BulkObservableCollection<FileSystemItem> Children { get; } = new();
 
     public bool IsExpanded
     {
@@ -361,25 +365,21 @@ public class FileSystemItem : INotifyPropertyChanged
     // parked in _overflow behind a single trailing "더 보기" row.
     private void PopulateCapped(List<FileSystemItem> loaded)
     {
-        Children.Clear();
         _overflow.Clear();
         _showingAll = false;
 
         if (loaded.Count <= DisplayCap)
         {
-            foreach (var child in loaded)
-            {
-                Children.Add(child);
-            }
+            Children.ReplaceAll(loaded);
             return;
         }
 
-        for (int i = 0; i < DisplayCap; i++)
-        {
-            Children.Add(loaded[i]);
-        }
         _overflow.AddRange(loaded.GetRange(DisplayCap, loaded.Count - DisplayCap));
-        Children.Add(CreateShowMore(this, _overflow.Count));
+
+        var capped = new List<FileSystemItem>(DisplayCap + 1);
+        capped.AddRange(loaded.GetRange(0, DisplayCap));
+        capped.Add(CreateShowMore(this, _overflow.Count));
+        Children.ReplaceAll(capped);
     }
 
     // The full loaded listing with the reveal state ignored: the revealed
@@ -420,14 +420,19 @@ public class FileSystemItem : INotifyPropertyChanged
         {
             return;
         }
-        if (Children.Count > 0 && Children[^1].IsShowMore)
+        // Built as one list and applied in a single notification. Appending the
+        // overflow row by row is what made a large folder's reveal - and every
+        // filter toggle that replays it - repaint itself hundreds of times.
+        var revealed = new List<FileSystemItem>(Children.Count + _overflow.Count);
+        foreach (var child in Children)
         {
-            Children.RemoveAt(Children.Count - 1);
+            if (!child.IsShowMore)
+            {
+                revealed.Add(child);
+            }
         }
-        foreach (var child in _overflow)
-        {
-            Children.Add(child);
-        }
+        revealed.AddRange(_overflow);
+        Children.ReplaceAll(revealed);
         _showingAll = true;
     }
 
@@ -442,11 +447,17 @@ public class FileSystemItem : INotifyPropertyChanged
         {
             return;
         }
-        while (Children.Count > DisplayCap)
+        // The other half of the same cost: NavigateToPath re-caps every
+        // revealed folder before it walks, so a jump was paying one removal
+        // notification per hidden row on top of the reveal's own adds.
+        int keep = Math.Min(DisplayCap, Children.Count);
+        var capped = new List<FileSystemItem>(keep + 1);
+        for (int i = 0; i < keep; i++)
         {
-            Children.RemoveAt(Children.Count - 1);
+            capped.Add(Children[i]);
         }
-        Children.Add(CreateShowMore(this, _overflow.Count));
+        capped.Add(CreateShowMore(this, _overflow.Count));
+        Children.ReplaceAll(capped);
         _showingAll = false;
     }
 
