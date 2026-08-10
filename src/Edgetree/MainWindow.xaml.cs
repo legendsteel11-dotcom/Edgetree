@@ -6117,6 +6117,10 @@ public partial class MainWindow : Window
             ToolTip = tooltip,
         };
 
+        // Follows Ctrl +/- - see FooterChipFontSize in ApplyLayoutMetrics for
+        // why it's set here rather than in the shared style.
+        chip.SetResourceReference(FontSizeProperty, "FooterChipFontSize");
+
         chip.Click += (_, _) =>
         {
             if (category.Length == 0)
@@ -7958,6 +7962,30 @@ public partial class MainWindow : Window
         // actually is, in MenuScrollViewerStyle's gutter padding, so this
         // number goes back to the value two rounds of feedback settled on.
         double menuVerticalPadding = Math.Min(5.0, Math.Round(8.0 * menuVerticalScale));
+
+        // The footer's filter chips. They were fixed at 11 while everything
+        // else answered Ctrl +/-, and someone reading the tree at 18pt could
+        // not read the strip that says which of their files are hidden -
+        // reported as 노안, which is the same reason the tree's own zoom
+        // exists (2026-08-10).
+        //
+        // TWO steps below the tree, not one. One step was what the strip was
+        // originally drawn at (11 against 12), but a single step stops reading
+        // as a step at all once the tree is large - 19 beside 20 is the same
+        // size to the eye, and the strip starts competing with the content it
+        // is only reporting on (user, 2026-08-10, after taking the font to its
+        // largest). Two steps holds the same relationship all the way up.
+        //
+        // Floored at 9 so the small end stays legible, which also gives the
+        // user's other request for free: at the smallest tree font the two meet
+        // exactly rather than the strip shrinking past readable.
+        //
+        // Window-level, and applied per chip by SetResourceReference rather
+        // than in FooterFilterChipStyle: that style is shared with the
+        // viewer's zoom strip, where the readouts sit in fixed-width slots
+        // (see ViewerZoomText and the media time's hidden twin) that a growing
+        // font would overrun.
+        Resources["FooterChipFontSize"] = Math.Max(9.0, ExplorerTree.FontSize - 2.0);
 
         var appResources = Application.Current.Resources;
         appResources["MenuFontSize"] = ExplorerTree.FontSize;
