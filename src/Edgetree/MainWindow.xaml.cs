@@ -15165,7 +15165,15 @@ public partial class MainWindow : Window
     // scale, centred on the pan - so this adds arithmetic, not state.
     private void UpdateViewerNavigator()
     {
+        // A playing video is not a picture this can map, and the one it would
+        // draw is worse than none: ViewerImage still holds the SHELL PREVIEW
+        // still behind the media element, so the plate came back showing a
+        // frame from somewhere else in the film, with a viewport box on it
+        // that means nothing (user, with a screenshot, 2026-08-10). Starting
+        // playback already collapses the plate - it was the next zoom pass
+        // that put it back, and entering full screen is one of those.
         if (!_settings.ViewerNavigator ||
+            _viewerVideoPath is not null ||
             _viewerPixelWidth <= 0 ||
             ViewerImage.Source is null ||
             !ViewerCanPan ||
