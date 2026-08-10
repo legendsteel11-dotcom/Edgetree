@@ -360,20 +360,48 @@ public static class FileSystemService
         }
     }
 
-    private static void MarkRootUnreachable(string path)
+    // How many times in a row a root has run past the deadline without ever
+    // answering. A read that eventually came back clears it.
+    private static readonly Dictionary<string, int> RootTimeouts = new(StringComparer.OrdinalIgnoreCase);
+
+    // ONE slow read is not a dead drive. It used to be: a single read past the
+    // 1.5s deadline greyed the whole root out for 15s, which is the right
+    // answer for a NAS that has gone away and the wrong one for a NAS that is
+    // merely busy - and this app is now capable of making it busy on its own
+    // (the filmstrip's thumbnails). The symptom was a mapped drive dropping out
+    // of the tree while nothing was wrong with it but timing (2026-08-11).
+    //
+    // A HARD failure still condemns the root on the first try: an IOException
+    // from the SMB stack is the drive answering that it is not there, which is
+    // evidence a timeout never is.
+    private static void MarkRootUnreachable(string path, bool hardFailure = true)
     {
         if (Path.GetPathRoot(path) is not { } root || !IsOnNetworkRoot(path))
         {
             return;
         }
+
         lock (UnreachableRootsUntil)
         {
+            if (!hardFailure)
+            {
+                RootTimeouts.TryGetValue(root, out int strikes);
+                RootTimeouts[root] = ++strikes;
+                if (strikes < TimeoutsBeforeUnreachable)
+                {
+                    return;
+                }
+            }
+
+            RootTimeouts.Remove(root);
             UnreachableRootsUntil[root] = Environment.TickCount64 + UnreachableBackoffMs;
             // So the badge can turn red on the next poll tick without waiting
             // for a syscall to confirm what the timeout already established.
             NetworkRootOffline[root] = true;
         }
     }
+
+    private const int TimeoutsBeforeUnreachable = 3;
 
     // A read that came back normally is the clearest possible evidence the
     // root is back - better than waiting out the backoff or the next poll.
@@ -386,6 +414,10 @@ public static class FileSystemService
         lock (UnreachableRootsUntil)
         {
             UnreachableRootsUntil.Remove(root);
+            // The run of near-misses is over too. Without this, three slow
+            // reads spread across an afternoon would add up to a verdict the
+            // same way three in a row do.
+            RootTimeouts.Remove(root);
             NetworkRootOffline[root] = false;
         }
     }
@@ -418,7 +450,7 @@ public static class FileSystemService
             long elapsed = Environment.TickCount64 - startedTicks;
             if (elapsed >= SlowReadMs)
             {
-                MarkRootUnreachable(path);
+                MarkRootUnreachable(path, hardFailure: false);
                 LogSlowRead(path, elapsed, failed: false);
             }
         }
@@ -460,8 +492,19 @@ public static class FileSystemService
             var read = Task.Run(() => ReadChildrenFromDisk(path, parent));
             if (!read.Wait(NetworkReadTimeoutMs))
             {
-                MarkRootUnreachable(path);
+                MarkRootUnreachable(path, hardFailure: false);
                 LogSlowRead(path, NetworkReadTimeoutMs, failed: true);
+                // The abandoned read still finishes. If it comes back clean,
+                // that is better evidence than the deadline was: the root is
+                // alive and merely slow, so the strike is taken back before it
+                // can join two others into a verdict.
+                _ = read.ContinueWith(finished =>
+                {
+                    if (finished.Status == TaskStatus.RanToCompletion && !finished.Result.ReadFailed)
+                    {
+                        MarkRootReachable(path);
+                    }
+                }, TaskScheduler.Default);
                 readFailed = true;
                 return new List<FileSystemItem>();
             }
@@ -536,7 +579,7 @@ public static class FileSystemService
         {
             if (IsOnNetworkRoot(path))
             {
-                MarkRootUnreachable(path);
+                MarkRootUnreachable(path, hardFailure: readFailed);
             }
             LogSlowRead(path, elapsed, readFailed);
         }
