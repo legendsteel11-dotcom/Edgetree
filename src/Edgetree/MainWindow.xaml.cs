@@ -3330,7 +3330,6 @@ public partial class MainWindow : Window
         ViewerButton.Visibility = visibility;
         CollapseAllButton.Visibility = visibility;
         OptionsButton.Visibility = visibility;
-        MinimizeButton.Visibility = visibility;
         CloseButton.Visibility = visibility;
         FavoritesList.Visibility = visibility;
         FavoritesSplitter.Visibility = visibility;
@@ -3462,9 +3461,9 @@ public partial class MainWindow : Window
     // the only flexible column - so once it has been squeezed to nothing, a
     // narrower window just pushes the buttons out past the right edge. Stepping
     // their size and spacing down keeps the whole row inside the window all the
-    // way to MinExpandedWidth (204), where 7 buttons at 24px + the app icon
-    // still fit. Read via DynamicResource by ToggleButtonStyle and the header
-    // buttons' own margins.
+    // way to MinExpandedWidth (204), where 6 buttons at 24px + the app icon
+    // still fit with room to spare. Read via DynamicResource by
+    // ToggleButtonStyle and the header buttons' own margins.
     // The step ApplyHeaderMetrics last wrote, so it can tell a real change
     // from the same value arriving again on the next resize frame. -1 so the
     // first call always writes (gap is legitimately 0).
@@ -3477,12 +3476,12 @@ public partial class MainWindow : Window
         double width = ActualWidth > 0 ? ActualWidth : Width;
         // Each threshold is the width its own step actually NEEDS, worked out
         // rather than picked: the app icon's column is 34 (a 20px image with
-        // 8+6 of margin), and the seven buttons are six at size+gap*2 plus the
+        // 8+6 of margin), and the six buttons are five at size+gap*2 plus the
         // close button at size+gap+closeGap.
         //
-        //   32/2/6 → 34 + 6*36 + 40 = 290
-        //   28/1/4 → 34 + 6*30 + 33 = 247
-        //   24/0/2 → 34 + 6*24 + 26 = 204   (= MinExpandedWidth exactly)
+        //   32/2/6 → 34 + 5*36 + 40 = 254
+        //   28/1/4 → 34 + 5*30 + 33 = 217
+        //   24/0/2 → 34 + 5*24 + 26 = 180
         //
         // They used to read 250 and 210, which are smaller than what those
         // steps need, so between 250~289 and 210~246 the last column - the
@@ -3491,12 +3490,16 @@ public partial class MainWindow : Window
         // broke when the viewer made a seventh button; the smallest step still
         // fit, which is why only the middle bands showed it.
         //
-        // If a button is ever dropped from this strip, every number here comes
-        // down by that button's own width (36 / 30 / 24).
+        // Down one button's width each (36 / 30 / 24) since tray-minimise left
+        // the strip for the options menu (2026-08-10). The smallest step no
+        // longer lands exactly on MinExpandedWidth (204) - it needs 180 now, so
+        // the floor has 24px of slack it did not have before. The floor is left
+        // where it is: it is what the header CONTENT wants, and shrinking it is
+        // a separate decision from removing a button.
         var (size, gap, closeGap) = width switch
         {
-            >= 290 => (32.0, 2.0, 6.0),
-            >= 247 => (28.0, 1.0, 4.0),
+            >= 254 => (32.0, 2.0, 6.0),
+            >= 217 => (28.0, 1.0, 4.0),
             _ => (24.0, 0.0, 2.0),
         };
 
@@ -3531,7 +3534,7 @@ public partial class MainWindow : Window
         // narrow windows (user call, 2026-07-22: "224 이하"), where the
         // buttons are already tightening above and bigger drawings would
         // crowd their shrinking hit-boxes. Mutated in place: the transform is
-        // shared by all six glyphs via StaticResource and is never used
+        // shared by all five remaining glyphs via StaticResource and is never used
         // inside a sealed Style, so it is never frozen (see the resource's
         // own comment in the XAML).
         double glyphScale = width <= 224 ? 1.0 : 1.15;
@@ -5709,6 +5712,11 @@ public partial class MainWindow : Window
     // Hide() (not Close()) keeps the window - and the app, since it's still
     // the one open window - alive in the background; App's tray icon is what
     // brings it back (see App.RestoreMainWindow).
+    //
+    // The name is the header button's, which no longer exists: this is reached
+    // from the options menu now (2026-08-10), one click having turned out to be
+    // too cheap a price for making the whole window vanish. Kept rather than
+    // renamed so the exit log's history reads continuously.
     private void MinimizeButton_Click(object sender, RoutedEventArgs e)
     {
         // While tray-hidden the process can live for days and then end
@@ -13933,7 +13941,7 @@ public partial class MainWindow : Window
     // bounds what a saved width can re-widen the window by on the next open.
     private const double MaxViewerWidth = 3720;
     // The tree column's floor under the SPLIT drag - deliberately smaller
-    // than MinExpandedWidth: that one is a WINDOW floor (seven header
+    // than MinExpandedWidth: that one is a WINDOW floor (the header
     // buttons must fit), and the header spans all three columns, so the
     // tree column itself can go much narrower before anything breaks.
     private const double MinTreeSplitWidth = 120;

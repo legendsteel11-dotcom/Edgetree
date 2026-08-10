@@ -1841,6 +1841,15 @@
             <MenuItem Header="{x:Static services:Strings.MenuResetSettings}"
                     Click="ResetSettingsMenuItem_Click"/>
             <Separator/>
+            <!-- Moved off the header strip (user, 2026-08-10): it sat between
+                 the options "..." and the close X, two buttons that get used,
+                 and sending the whole window to the tray is not something to
+                 do by a slipped click. Here it costs a menu, which is the
+                 right price for something you mean to do - and it lands
+                 beside 다시 시작, the other lever that acts on the app as a
+                 whole rather than on what it is showing. -->
+            <MenuItem Header="{x:Static services:Strings.ToolTipMinimize}"
+                    Click="MinimizeButton_Click"/>
             <!-- The recovery lever (user, 2026-08-09): when something feels
                  off - possibly another program fighting this one, not even
                  our fault - a restart clears it without hunting the tray
@@ -4224,9 +4233,8 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <!-- The strip the seven header buttons sit in is not a drag
+                <!-- The strip the six header buttons sit in is not a drag
                      handle. Their gaps are 2-4px, and the header's drag only
                      needs the system threshold to be crossed - easy to do by
                      accident on a target that small - so a slightly wandering
@@ -4235,7 +4243,7 @@
                      keep their own clicks; this only ever sees the misses, and
                      swallows them. -->
                 <Border Grid.Column="2"
-                        Grid.ColumnSpan="7"
+                        Grid.ColumnSpan="6"
                         Background="Transparent"
                         MouseLeftButtonDown="HeaderButtonStrip_MouseLeftButtonDown"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
@@ -4446,33 +4454,21 @@
                                 Visibility="Collapsed"/>
                     </Grid>
                 </Button>
-                <Button x:Name="MinimizeButton"
-                        Grid.Column="7"
-                        Style="{StaticResource ToggleButtonStyle}"
-                        Click="MinimizeButton_Click"
-                        Margin="{DynamicResource HeaderButtonMargin}"
-                        RenderTransform="{StaticResource ShiftUp1px}"
-                        ToolTip="{x:Static services:Strings.ToolTipMinimize}"
-                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <!-- A filled bar (not a stroked zero-height line) so its
-                         layout bounding box has real width AND height, same
-                         as the close "X" glyph's - a zero-height Path bounds
-                         box was the likely cause of this not lining up with
-                         the other two header buttons. -->
-                    <Rectangle Width="8"
-                            Height="1.5"
-                            RadiusX="0.75"
-                            RadiusY="0.75"
-                            Fill="{DynamicResource ForegroundText}"
-                            RenderTransformOrigin="0.5,0.5"
-                            RenderTransform="{StaticResource HeaderGlyphGrow}"/>
-                </Button>
+                <!-- The tray-minimise button used to sit here, between the
+                     options "..." and the close X. It moved into the options
+                     menu (user, 2026-08-10): it was a one-click way to make
+                     the whole window disappear, parked between the two header
+                     buttons that actually get used, and a slipped click sent
+                     the app to the tray. Nothing about it needed to be one
+                     click - see the menu item above 다시 시작.
+                     Every threshold in ApplyHeaderMetrics came down by one
+                     button's width when it went. -->
                 <!-- A few extra pixels on the right (vs. every other header
                      button's uniform 2px) so the X glyph reads as centered in
                      its own hit-box instead of crowding the window's true
                      right edge. -->
                 <Button x:Name="CloseButton"
-                        Grid.Column="8"
+                        Grid.Column="7"
                         Style="{StaticResource ToggleButtonStyle}"
                         Click="CloseButton_Click"
                         Margin="{DynamicResource HeaderCloseButtonMargin}"
