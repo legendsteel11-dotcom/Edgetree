@@ -446,4 +446,22 @@ internal static class NativeMethods
 
         return ShellExecuteEx(ref info);
     }
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    // The fix every tray menu needs, and the reason the tray's menu could not
+    // simply be a WPF one before: a popup opened while another app owns the
+    // foreground does not close when you click away from it - the click never
+    // reaches it. Bringing our own window forward first restores the normal
+    // dismissal, which is what Windows' own shell does when it shows a tray
+    // menu. Failure is not worth handling: the menu still opens, it just keeps
+    // the old stickiness.
+    public static void BringToForeground(IntPtr hWnd)
+    {
+        if (hWnd != IntPtr.Zero)
+        {
+            SetForegroundWindow(hWnd);
+        }
+    }
 }

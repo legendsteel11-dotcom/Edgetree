@@ -13,9 +13,6 @@ namespace SidebarExplorer.App;
 public partial class App : Application
 {
     private NotifyIcon? _trayIcon;
-    private ToolStripMenuItem? _trayToggleItem;
-    private ToolStripMenuItem? _trayUpdateItem;
-    private ToolStripSeparator? _trayUpdateSeparator;
     private System.Drawing.Icon? _trayBaseIcon;
     private System.Drawing.Icon? _trayUpdateIcon;
     private IntPtr _trayUpdateIconHandle;
@@ -48,15 +45,16 @@ public partial class App : Application
     // dot was not enough.
     public void ShowUpdateAvailable(Version version)
     {
-        if (_trayIcon is null || _trayUpdateItem is null || _trayUpdateSeparator is null)
+        if (_trayIcon is null)
         {
             return;
         }
 
-        _trayUpdateItem.Text = string.Format(Strings.TrayUpdateAvailable, version);
-        _trayUpdateItem.Visible = true;
-        _trayUpdateSeparator.Visible = true;
-
+        // The menu ROW is no longer set here: the tray menu is WPF now and
+        // reads MainWindow.UpdateAvailableVersion each time it opens (see
+        // MainWindow.ShowTrayContextMenu), which also means it cannot go stale.
+        // What stays here is the icon and its tooltip, which are this class's.
+        //
         // 63 characters is the hard limit on a tray tooltip; the app name plus
         // a short version cannot reach it, but the format string is
         // translatable, so it is trimmed rather than trusted.
@@ -292,37 +290,11 @@ public partial class App : Application
         };
         _trayIcon.MouseClick += TrayIcon_MouseClick;
 
-        var contextMenu = new ContextMenuStrip();
-
-        // First row, and hidden until there is actually something to say - see
-        // ShowUpdateAvailable. The header's own dot is the primary signal, but
-        // it is invisible whenever the sidebar is auto-hidden or sent to the
-        // tray, which is exactly when this icon is the only thing on screen.
-        _trayUpdateItem = new ToolStripMenuItem(string.Empty, null, (_, _) => OpenReleasesPage())
-        {
-            Visible = false
-        };
-        _trayUpdateSeparator = new ToolStripSeparator { Visible = false };
-        contextMenu.Items.Add(_trayUpdateItem);
-        contextMenu.Items.Add(_trayUpdateSeparator);
-
-        _trayToggleItem = new ToolStripMenuItem(Strings.TrayOpen, null, (_, _) => ToggleMainWindowTray());
-        contextMenu.Items.Add(_trayToggleItem);
-        contextMenu.Items.Add(new ToolStripSeparator());
-        contextMenu.Items.Add(Strings.TrayAbout, null, (_, _) => ShowAboutCentered());
-        contextMenu.Items.Add(new ToolStripSeparator());
-        contextMenu.Items.Add(Strings.TrayExit, null, (_, _) =>
-        {
-            ExitLog.Record("tray menu: exit");
-            Shutdown();
-        });
-
-        // The window can be shown/hidden by other means (title bar "_"
-        // button, restoring from taskbar) between menu openings, so the
-        // toggle item's label is refreshed right before it's actually shown
-        // rather than once at construction time.
-        contextMenu.Opening += (_, _) => UpdateTrayToggleItem();
-        _trayIcon.ContextMenuStrip = contextMenu;
+        // No ContextMenuStrip any more. The rows moved into MainWindow.xaml as
+        // a WPF ContextMenu (see MainWindow.ShowTrayContextMenu): this was the
+        // one surface in the app still wearing the system's own look, because
+        // WinForms cannot reach the theme brushes, DarkContextMenuStyle or the
+        // font size everything else follows.
     }
 
     private void TrayIcon_MouseClick(object? sender, System.Windows.Forms.MouseEventArgs e)
@@ -330,19 +302,23 @@ public partial class App : Application
         if (e.Button == System.Windows.Forms.MouseButtons.Left)
         {
             RestoreMainWindow();
-        }
-    }
-
-    private void UpdateTrayToggleItem()
-    {
-        if (_trayToggleItem is null)
-        {
             return;
         }
 
-        bool isWindowVisible = MainWindow is { IsVisible: true };
-        _trayToggleItem.Text = isWindowVisible ? Strings.TrayHide : Strings.TrayOpen;
+        if (e.Button == System.Windows.Forms.MouseButtons.Right)
+        {
+            (MainWindow as MainWindow)?.ShowTrayContextMenu();
+        }
     }
+
+    // Reached from the tray menu, which now lives in MainWindow's resources -
+    // the actions stay here because they are the application's, not the
+    // window's, and two of them run with no window on screen at all.
+    internal void OpenReleasesPageFromTray() => OpenReleasesPage();
+
+    internal void ToggleMainWindowFromTray() => ToggleMainWindowTray();
+
+    internal void ShowAboutFromTray() => ShowAboutCentered();
 
     // Same open/hide split the title bar's own "_" button and tray click use
     // (see MainWindow.MinimizeButton_Click / RestoreMainWindow) - just picks

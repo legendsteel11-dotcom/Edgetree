@@ -72,11 +72,19 @@ public static class ShellThumbnailService
                 return null;
             }
 
+            // CachedBitmap, and it has to be INSIDE the using: what the decoder
+            // hands back is delay-created and still tied to this stream, so
+            // freezing it and returning it produced cells that simply never
+            // drew - a strip with holes in it rather than a slow one (user,
+            // 2026-08-11: "이빨빠진 모양새"). The pixels are read here, while
+            // the file is still open, and what leaves this method owns them.
+            var cached = new CachedBitmap(embedded, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+
             // The header's orientation applies to the embedded picture exactly
             // as it does to the full one, and the shell already honours it - so
             // without this the strip would disagree with itself depending on
             // which path answered.
-            var oriented = ApplyOrientation(embedded, ReadOrientation(frame));
+            var oriented = ApplyOrientation(cached, ReadOrientation(frame));
             oriented.Freeze();
             return oriented;
         }
@@ -174,11 +182,21 @@ public static class ShellThumbnailService
     //
     // NOT a semaphore around Task.Run: that would hold a pool thread per
     // waiting job, and 300 blocked threads is its own outage.
-    // Two, not three: the NAS dropped off the network again at three while a
-    // cold folder was being browsed (2026-08-10). The caller side now also
-    // waits for the strip to settle before asking at all, so this bound only
-    // has to cover what someone actually stopped to look at.
-    private const int MaxShellWorkers = 2;
+    // The bound exists for the NAS and is priced for the NAS: two, because
+    // three dropped it off the network again while a cold folder was being
+    // browsed (2026-08-10). Local disks were paying it too, and a local folder
+    // of 170 photos filled its strip "느긋하게" as a result (user, 2026-08-11).
+    //
+    // So the caller sets it per folder. Everything in this class is a queue in
+    // front of one resource; how much of that resource there is depends on
+    // where the files are, and only the caller knows that.
+    private static int _maxWorkers = 2;
+
+    public static int MaxWorkers
+    {
+        get => Volatile.Read(ref _maxWorkers);
+        set => Volatile.Write(ref _maxWorkers, Math.Clamp(value, 1, 8));
+    }
     private static readonly object PendingGate = new();
     private static readonly Stack<(string Path, int PixelSize, bool ThumbnailOnly,
         bool ReadDimensions, Action<ImageSource?, int, int> OnCompleted)> Pending = new();
@@ -191,7 +209,7 @@ public static class ShellThumbnailService
         lock (PendingGate)
         {
             Pending.Push((path, pixelSize, thumbnailOnly, readDimensions, onCompleted));
-            if (_workers >= MaxShellWorkers)
+            if (_workers >= MaxWorkers)
             {
                 return;
             }

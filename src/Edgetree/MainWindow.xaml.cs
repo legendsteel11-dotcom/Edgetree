@@ -1408,10 +1408,11 @@ public partial class MainWindow : Window
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         // The window itself going away - the tray "exit" path never comes
-        // through here. _closeReason is set by whichever control started it;
-        // "source unknown" means the close came from outside the app's own
-        // buttons (Alt+F4, a task-manager end task, an OS-level close).
-        ExitLog.Record($"window closing: {_closeReason ?? "source unknown"}");
+        // through here, and neither does the header's X any more (it hides to
+        // the tray since 2026-08-10). What is left is Alt+F4, a task-manager
+        // end task, or the OS closing us at logoff - none of which announce
+        // themselves, so there is nothing to name.
+        ExitLog.Record("window closing: outside the app's own controls");
 
         if (!_settingsResetPending)
         {
@@ -5723,12 +5724,62 @@ public partial class MainWindow : Window
 
     // Which control started the current close, for the exit log - see
     // MainWindow_Closing.
-    private string? _closeReason;
 
+    // The X sends the sidebar to the tray; it does not end the app. Quitting is
+    // the tray menu's 종료 (and Alt+F4 still reaches the real close path).
+    //
+    // Why (user, 2026-08-10): they kept ending the app by accident on this
+    // button. An X in that corner means "close this window" in every app there
+    // is, and a sidebar has no clear idea of being closed - auto-hide is
+    // already the answer to "get out of my way". So the accident stays possible
+    // and stops costing anything: the app is one tray click away instead of a
+    // relaunch. Teams and Discord read the X the same way.
+    //
+    // A confirmation was offered first and declined - "종료 컨펌은 좀 거부감이
+    // 있네요" - which is also what [[quiet-over-prompting]] would have said.
+    // This is the version with no dialog in it.
+    //
+    // WHERE it goes follows the mode, because forcing the tray icon on would
+    // override a setting the user had deliberately switched off (their point,
+    // and a fair one). Each mode already owns a way back:
+    //
+    //   tray icon on  - the tray, as the menu item does
+    //   docked, off   - AUTO-HIDE. This app's own answer to "get out of my way"
+    //                   needs no icon anywhere: point at the screen edge and it
+    //                   is back. There is no taskbar button while docked
+    //                   (ShowInTaskbar=false), so minimising would be a
+    //                   disappearance rather than a place to go.
+    //   floating, off - minimise. ShowInTaskbar is true there, so the taskbar
+    //                   button and Alt+Tab both hold it (user confirmed).
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
-        _closeReason = "header close button";
-        Close();
+        if (_settings.AlwaysShowTrayIcon)
+        {
+            HideToTray();
+            return;
+        }
+
+        if (_isDocked)
+        {
+            if (_settings.IsAutoHidden)
+            {
+                // Already in auto-hide, and the header is only on screen
+                // because the pointer revealed it - so the button that means
+                // "get out of my way" puts the reveal away. It used to do
+                // nothing at all here, which is a dead control on a button
+                // everything else in the corner responds to (user, 2026-08-10:
+                // "무반응 -> 정상이나 좀 이상함").
+                CloseAutoHideReveal();
+                return;
+            }
+
+            EnterAutoHide();
+            UpdatePinButtonVisibility();
+            return;
+        }
+
+        SaveStateBeforeHiding();
+        WindowState = WindowState.Minimized;
     }
 
     // Hide() (not Close()) keeps the window - and the app, since it's still
@@ -5739,7 +5790,102 @@ public partial class MainWindow : Window
     // from the options menu now (2026-08-10), one click having turned out to be
     // too cheap a price for making the whole window vanish. Kept rather than
     // renamed so the exit log's history reads continuously.
-    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e) => HideToTray();
+
+    // The app's only in-window way out since the X stopped ending it. No
+    // confirmation, deliberately: a menu item reached on purpose IS the intent,
+    // which is the same reasoning 다시 시작 two rows up was built on, and the
+    // user turned down a confirmation for exactly this ("종료 컨펌은 좀 거부감이
+    // 있네요", 2026-08-10).
+    //
+    // Recorded before the shutdown, matching the tray's own line, so exit.log
+    // can still name which control ended a session.
+    private void ExitAppMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        ExitLog.Record("header menu: exit");
+        Application.Current.Shutdown();
+    }
+
+    // ----- the tray icon's menu -----------------------------------------
+    //
+    // Opened from App on a right-click of the NotifyIcon, but declared and run
+    // HERE: a WPF ContextMenu can only reach DarkContextMenuStyle, the theme
+    // brushes and MenuFontSize from inside this window's resources, and being
+    // reachable by those is the whole point of the swap.
+    //
+    // It has to work while this window is HIDDEN, which is when the tray icon
+    // matters most - so it is placed by absolute screen point rather than
+    // relative to any element of ours.
+    public void ShowTrayContextMenu()
+    {
+        if (FindResource("TrayContextMenu") is not ContextMenu menu)
+        {
+            return;
+        }
+
+        if (FindMenuItem(menu, "trayToggle") is { } toggle)
+        {
+            // Rewritten every time it opens: the window can be shown or hidden
+            // by the header, the taskbar or auto-hide in between.
+            toggle.Header = IsVisible ? Strings.TrayHide : Strings.TrayOpen;
+        }
+
+        var update = FindMenuItem(menu, "trayUpdate");
+        var updateSeparator = menu.Items.OfType<Separator>().FirstOrDefault(item =>
+            System.Windows.Automation.AutomationProperties.GetAutomationId(item) == "trayUpdateSeparator");
+        var updateRows = UpdateAvailableVersion is null ? Visibility.Collapsed : Visibility.Visible;
+        if (update is not null)
+        {
+            update.Visibility = updateRows;
+            if (UpdateAvailableVersion is { } version)
+            {
+                update.Header = string.Format(Strings.TrayUpdateAvailable, version);
+            }
+        }
+
+        if (updateSeparator is not null)
+        {
+            updateSeparator.Visibility = updateRows;
+        }
+
+        // Without this the menu opens and then will not close: a popup shown
+        // while another app holds the foreground never sees the click that is
+        // meant to dismiss it. Windows' own tray menus do the same.
+        NativeMethods.BringToForeground(
+            new System.Windows.Interop.WindowInteropHelper(this).Handle);
+
+        var cursor = System.Windows.Forms.Control.MousePosition;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        menu.Placement = PlacementMode.AbsolutePoint;
+        // The window is the ANCHOR, not the position: AbsolutePoint reads the
+        // offsets below as screen coordinates and ignores where the target is.
+        // What the target actually does is put the menu back on this window's
+        // resource chain - and without it the menu came up with the system's
+        // own highlight and a scrollbar on three items (user, with a
+        // screenshot, 2026-08-11), because a popup with no target resolves
+        // implicit styles against nothing.
+        menu.PlacementTarget = this;
+        menu.HorizontalOffset = cursor.X / dpi.DpiScaleX;
+        menu.VerticalOffset = cursor.Y / dpi.DpiScaleY;
+        menu.IsOpen = true;
+    }
+
+    private void TrayUpdateMenuItem_Click(object sender, RoutedEventArgs e)
+        => (Application.Current as App)?.OpenReleasesPageFromTray();
+
+    private void TrayToggleMenuItem_Click(object sender, RoutedEventArgs e)
+        => (Application.Current as App)?.ToggleMainWindowFromTray();
+
+    private void TrayAboutMenuItem_Click(object sender, RoutedEventArgs e)
+        => (Application.Current as App)?.ShowAboutFromTray();
+
+    private void TrayExitMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        ExitLog.Record("tray menu: exit");
+        Application.Current.Shutdown();
+    }
+
+    private void HideToTray()
     {
         // While tray-hidden the process can live for days and then end
         // WITHOUT the close path running (logoff kill, crash, a dev rebuild's
@@ -5751,8 +5897,12 @@ public partial class MainWindow : Window
         SaveStateBeforeHiding();
         Hide();
 
-        // The tray icon is the only way back once hidden, so force it visible
-        // for the duration even if "always show tray icon" is off.
+        // SAFETY DEVICE: the tray icon is the only way back once hidden, so it
+        // is forced visible for the duration even when "트레이 아이콘" is
+        // switched off. Reached deliberately - the options menu's own
+        // 트레이로 최소화 - so overriding the setting is the lesser surprise;
+        // the header's X does NOT come through here when the setting is off,
+        // precisely so it never has to.
         if (Application.Current is App app)
         {
             app.IsTrayIconVisible = true;
@@ -17311,6 +17461,9 @@ public partial class MainWindow : Window
         string folder = _selectedItem?.Parent?.FullPath ?? string.Empty;
         if (_filmstripBuiltFor != (folder, items!.Count))
         {
+            // Set with the folder, not per request: it is a property of where
+            // these files live.
+            ApplyFilmstripFetchPace(folder);
             rebuilt = true;
             _filmstripBuiltFor = (folder, items.Count);
             _filmstripCells.Clear();
@@ -17448,15 +17601,57 @@ public partial class MainWindow : Window
         _filmstripSettleTimer.Start();
     }
 
-    // 400ms: long enough that arrowing through a folder asks for nothing at all
-    // (auto-repeat is 25-45ms, deliberate tapping 110-145ms - both measured),
-    // short enough that stopping on a picture fills the strip while the eye is
-    // still on it.
+    // Both brakes are priced for where the FILES are, because that is what they
+    // are protecting. On a NAS a thumbnail costs 869ms and a strip scrolled
+    // past 300 photos asks for gigabytes, so waiting for the hand to stop is
+    // worth it. On a local disk it costs almost nothing, and the same wait just
+    // made a 170-photo folder fill "느긋하게" (user, 2026-08-11) - a brake
+    // applied where there was nothing to brake.
+    private const int FilmstripSettleLocalMs = 90;
+    private const int FilmstripSettleNetworkMs = 400;
+
+    private void ApplyFilmstripFetchPace(string? folder)
+    {
+        bool remote = IsNetworkFolder(folder);
+        Services.ShellThumbnailService.MaxWorkers = remote ? 2 : 6;
+        _filmstripSettleTimer ??= CreateFilmstripSettleTimer();
+        _filmstripSettleTimer.Interval = TimeSpan.FromMilliseconds(
+            remote ? FilmstripSettleNetworkMs : FilmstripSettleLocalMs);
+    }
+
+    // A UNC path is remote by its own shape; a mapped letter has to be asked.
+    // Anything that throws (a drive that vanished, a path we cannot parse) is
+    // treated as remote, which errs toward the gentler pace.
+    private static bool IsNetworkFolder(string? folder)
+    {
+        if (string.IsNullOrEmpty(folder))
+        {
+            return false;
+        }
+
+        if (folder.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        try
+        {
+            string? root = Path.GetPathRoot(folder);
+            return root is { Length: > 0 } &&
+                new DriveInfo(root).DriveType == DriveType.Network;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException
+                                       or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
     private System.Windows.Threading.DispatcherTimer CreateFilmstripSettleTimer()
     {
         var timer = new System.Windows.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(400),
+            Interval = TimeSpan.FromMilliseconds(FilmstripSettleNetworkMs),
         };
         timer.Tick += (_, _) =>
         {
