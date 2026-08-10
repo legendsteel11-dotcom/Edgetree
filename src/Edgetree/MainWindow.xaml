@@ -5279,7 +5279,9 @@
                             MouseDown="ViewerImageHost_MouseDown"
                             MediaOpened="ViewerMedia_MediaOpened"
                             MediaEnded="ViewerMedia_MediaEnded"
-                            MediaFailed="ViewerMedia_MediaFailed"/>
+                            MediaFailed="ViewerMedia_MediaFailed"
+                            BufferingStarted="ViewerMedia_BufferingStarted"
+                            BufferingEnded="ViewerMedia_BufferingEnded"/>
                     <!-- The one affordance that turns a still frame into a
                          promise the panel can keep. Only up for a video that
                          isn't playing; clicking the picture itself is left

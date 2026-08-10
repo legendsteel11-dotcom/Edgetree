@@ -14450,6 +14450,116 @@ public partial class MainWindow : Window
     private System.Windows.Threading.DispatcherTimer? _viewerMediaTimer;
     private System.Windows.Threading.DispatcherTimer? _viewerSeekDebounce;
 
+    // ── Playback instrument (Debug only) ──────────────────────────────────
+    //
+    // What it is for: the same video plays smoothly on one run and advances a
+    // few frames a second on the next, with nothing chosen differently
+    // (2026-08-10). It is a timing problem, not a condition, so there is
+    // nothing to reproduce on demand and every fix would be a guess that
+    // cannot be tested. It happens often enough that leaving a recorder in the
+    // Debug build answers it within a few days of ordinary use.
+    //
+    // The one number that settles it is the drift between wall-clock time and
+    // MediaElement.Position, because two opposite causes fit the same
+    // description:
+    //
+    //   drift ~= 0 (Position keeps real time while the picture stutters)
+    //     The graph's clock is right and the VIDEO DECODE is starving - frames
+    //     are dropped to keep up with a clock that is not waiting. That is the
+    //     decoder and the hardware path, and nothing in this app can fix it.
+    //
+    //   drift growing negative (Position falls behind the wall)
+    //     Playback itself is being held up, and that CAN be ours: a timer, a
+    //     layout pass, something still being drawn behind the media element.
+    //     That one we would go and find.
+    //
+    // Lines are collected in memory and written once when playback stops, the
+    // same arrangement resize.log used (2026-08-07): appending to a file on
+    // every tick would be exactly the kind of UI-thread work being measured.
+    private readonly List<string> _videoLogLines = new();
+    private System.Diagnostics.Stopwatch? _videoLogClock;
+    private TimeSpan _videoLogStartPosition;
+    private int _videoPlayCount;
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void VideoLogStart(string? path)
+    {
+        _videoLogLines.Clear();
+        _videoPlayCount++;
+        _videoLogStartPosition = ViewerMedia.Position;
+        _videoLogClock = System.Diagnostics.Stopwatch.StartNew();
+        _videoLogLines.Add(
+            $"play #{_videoPlayCount}  {Path.GetFileName(path ?? "-")}");
+        _videoLogLines.Add(
+            $"  from {_videoLogStartPosition.TotalSeconds:F2}s  " +
+            $"scrubbing={ViewerMedia.ScrubbingEnabled}  volume={ViewerMedia.Volume:F2}");
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void VideoLogRebase(double seconds)
+    {
+        if (_videoLogClock is not null)
+        {
+            _videoLogStartPosition = TimeSpan.FromSeconds(seconds);
+            _videoLogClock.Restart();
+        }
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void VideoLog(string line)
+    {
+        if (_videoLogClock is not null)
+        {
+            _videoLogLines.Add($"{_videoLogClock.Elapsed.TotalSeconds,8:F2}s  {line}");
+        }
+    }
+
+    // One line per readout tick (250ms). `drift` is the whole point of the
+    // file - see the block comment above for how to read it.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void VideoLogTick()
+    {
+        if (_videoLogClock is null)
+        {
+            return;
+        }
+
+        double wall = _videoLogClock.Elapsed.TotalSeconds;
+        double played = (ViewerMedia.Position - _videoLogStartPosition).TotalSeconds;
+        _videoLogLines.Add(
+            $"{wall,8:F2}s  pos {played,8:F2}s  drift {played - wall,7:F2}s  " +
+            $"buffering {ViewerMedia.BufferingProgress:P0}  download {ViewerMedia.DownloadProgress:P0}");
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void VideoLogFlush(string reason)
+    {
+        if (_videoLogClock is null)
+        {
+            return;
+        }
+
+        VideoLog($"--- {reason} ---");
+        _videoLogClock = null;
+
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "video.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}{Environment.NewLine}" +
+                string.Join(Environment.NewLine, _videoLogLines) +
+                Environment.NewLine + Environment.NewLine);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+
+        _videoLogLines.Clear();
+    }
+
     private void SetViewerMediaSliderValue(double seconds)
     {
         _viewerSliderSelfWrite = true;
@@ -14489,10 +14599,19 @@ public partial class MainWindow : Window
         ViewerMediaBar.Visibility = Visibility.Visible;
         ViewerMedia.Play();
         SetViewerVideoPlaying(true);
+        VideoLogStart(path);
     }
 
     private void ViewerMedia_MediaOpened(object sender, RoutedEventArgs e)
     {
+        // How long the engine took to open the file, and what it found -
+        // whether the run that stutters differs here from the run that
+        // doesn't is one of the first things the log can answer.
+        VideoLog(
+            $"opened  {ViewerMedia.NaturalVideoWidth}x{ViewerMedia.NaturalVideoHeight}  " +
+            $"video={ViewerMedia.HasVideo}  audio={ViewerMedia.HasAudio}  " +
+            $"duration={(ViewerMedia.NaturalDuration.HasTimeSpan ? ViewerMedia.NaturalDuration.TimeSpan.ToString() : "-")}");
+
         ViewerMediaPosition.Maximum = ViewerMedia.NaturalDuration.HasTimeSpan
             ? ViewerMedia.NaturalDuration.TimeSpan.TotalSeconds
             : 0;
@@ -14538,7 +14657,17 @@ public partial class MainWindow : Window
         ViewerMedia.Pause();
         SetViewerVideoPlaying(false);
         UpdateViewerMediaReadout();
+        VideoLogFlush("ended");
     }
+
+    // Buffering is the engine's own word for "I am waiting on the source", and
+    // until now the app never asked for it - so a run that stuttered could not
+    // be told apart from one the engine considered perfectly fed.
+    private void ViewerMedia_BufferingStarted(object sender, RoutedEventArgs e)
+        => VideoLog("buffering started");
+
+    private void ViewerMedia_BufferingEnded(object sender, RoutedEventArgs e)
+        => VideoLog("buffering ended");
 
     private void ViewerMedia_MediaFailed(object sender, ExceptionRoutedEventArgs e)
     {
@@ -14582,11 +14711,13 @@ public partial class MainWindow : Window
         {
             ViewerMedia.Pause();
             SetViewerVideoPlaying(false);
+            VideoLogFlush("paused");
         }
         else
         {
             ViewerMedia.Play();
             SetViewerVideoPlaying(true);
+            VideoLogStart(_viewerVideoPath);
         }
     }
 
@@ -14743,7 +14874,14 @@ public partial class MainWindow : Window
     {
         seconds = Math.Clamp(seconds, 0, Math.Max(0, ViewerMediaPosition.Maximum));
         SetViewerMediaSliderValue(seconds);
+        VideoLog($"seek -> {seconds:F2}s  (from {ViewerMedia.Position.TotalSeconds:F2}s)");
         ViewerMedia.Position = TimeSpan.FromSeconds(seconds);
+        // Drift is measured from a starting point, so a seek has to move it or
+        // every line after one reads as a catastrophe. Rebased to what was
+        // ASKED for, which makes the first few drift values afterwards say how
+        // long the seek took to actually land - the number the position bar's
+        // own 20-second latch was built around without ever measuring it.
+        VideoLogRebase(seconds);
         ShowViewerMediaTime(TimeSpan.FromSeconds(seconds));
 
         // MediaElement.Position keeps REPORTING the pre-seek time until the
@@ -14902,6 +15040,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        VideoLogTick();
+
         var position = ViewerMedia.Position;
 
         // A seek is outstanding: leave the bar where the user put it until the
@@ -14942,6 +15082,7 @@ public partial class MainWindow : Window
     // open would make this app's own rename and delete fail on it.
     private void StopViewerVideo()
     {
+        VideoLogFlush("stopped");
         _viewerMediaTimer?.Stop();
         _viewerSeekDebounce?.Stop();
         _viewerMediaSeeking = false;
