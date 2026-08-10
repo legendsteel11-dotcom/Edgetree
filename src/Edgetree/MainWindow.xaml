@@ -5296,22 +5296,31 @@
                             Cursor="Hand"
                             Click="ViewerPlayOverlay_Click"
                             ToolTip="{x:Static services:Strings.ViewerPlay}">
+                        <!-- Light plate, dark mark, no outline (user, 2026-08-10:
+                             the dark-plate-and-white-triangle version "다른데
+                             플레이버튼하고 너무 같아서"). Both halves are
+                             translucent, so the still frame reads through the
+                             button rather than being covered by it - which is
+                             also what keeps a 64px disc from looking like a
+                             sticker dropped on the picture. The outline went
+                             with the dark plate: an edge is what a button needs
+                             when it is darker than everything around it, and
+                             this one is lighter. Hover just makes the plate more
+                             solid; nothing moves or grows. -->
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Grid>
                                     <Ellipse x:Name="Plate"
-                                            Fill="#B0000000"
-                                            Stroke="#66FFFFFF"
-                                            StrokeThickness="1"/>
+                                            Fill="#B0FFFFFF"/>
                                     <Path Data="M 24,18 L 44,32 L 24,46 Z"
-                                            Fill="#F0FFFFFF"/>
+                                            Fill="#C0000000"/>
                                 </Grid>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver"
                                             Value="True">
                                         <Setter TargetName="Plate"
                                                 Property="Fill"
-                                                Value="#D0000000"/>
+                                                Value="#D8FFFFFF"/>
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
