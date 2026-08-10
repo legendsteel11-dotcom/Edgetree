@@ -14869,6 +14869,7 @@ public partial class MainWindow : Window
         // Picked up here and applied in MediaOpened: Position means nothing
         // until the engine knows what it has opened.
         _pendingResumeSeconds = FindVideoMarks(path)?.Resume ?? 0;
+        LoadSubtitlesFor(path);
         ViewerMedia.Play();
         SetViewerVideoPlaying(true);
         VideoLogStart(path);
@@ -15065,6 +15066,249 @@ public partial class MainWindow : Window
             SetViewerVideoPlaying(true);
             VideoLogStart(_viewerVideoPath);
         }
+    }
+
+    // ----- 자막 ---------------------------------------------------------------
+    //
+    // Only the kind that sits beside the film as its own file - see
+    // SubtitleService for why that is the only kind possible here.
+    //
+    // The line is driven by its OWN timer rather than by the readout's. The
+    // readout ticks four times a second, which is right for a clock and visibly
+    // late for a subtitle: a quarter second is about where a line appearing
+    // after the mouth has moved stops reading as timing and starts reading as a
+    // fault. This one only runs while a film with cues is actually playing.
+    private List<SubtitleService.Cue> _subtitleCues = new();
+    private string? _subtitleFilePath;
+    private SubtitleService.Cue? _subtitleShowing;
+    private System.Windows.Threading.DispatcherTimer? _subtitleTimer;
+    private int _subtitleToken;
+
+    private const double MinSubtitleFontSize = 10;
+    private const double MaxSubtitleFontSize = 40;
+
+    // Half a second a press: small enough to land on, large enough that a real
+    // drift takes a few presses rather than twenty. Bounded well past anything
+    // a correctly-made file needs - past this the subtitle belongs to a
+    // different release, not to this one.
+    private const double SubtitleOffsetStep = 0.5;
+    private const double MaxSubtitleOffset = 30;
+
+    // Held in a field as well as in settings: the tick reads it ten times a
+    // second and should not walk a list to do it.
+    private double _subtitleOffset;
+
+    private bool HasSubtitles => _subtitleCues.Count > 0;
+
+    // Looked for on a WORKER, and the answer is thrown away if the selection
+    // moved on while it was out - a directory read plus a file read on a cold
+    // share is exactly the wait this app has a rule about.
+    private void LoadSubtitlesFor(string videoPath)
+    {
+        ClearSubtitles();
+        int token = ++_subtitleToken;
+        Task.Run(() =>
+        {
+            string? file = SubtitleService.Find(videoPath);
+            var cues = file is null ? new List<SubtitleService.Cue>() : SubtitleService.Load(file);
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (token != _subtitleToken || !string.Equals(
+                        _viewerVideoPath, videoPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                _subtitleFilePath = cues.Count > 0 ? file : null;
+                _subtitleCues = cues;
+                _subtitleOffset = FindVideoMarks(videoPath)?.SubtitleOffset ?? 0;
+                ApplySubtitleFontSize();
+                ApplySubtitleOffsetReadout();
+                UpdateSubtitleTimer();
+            });
+        });
+    }
+
+    private void ClearSubtitles()
+    {
+        _subtitleToken++;
+        _subtitleCues = new List<SubtitleService.Cue>();
+        _subtitleFilePath = null;
+        _subtitleShowing = null;
+        _subtitleTimer?.Stop();
+        ViewerSubtitlePlate.Visibility = Visibility.Collapsed;
+        ViewerSubtitleText.Text = string.Empty;
+    }
+
+    // Runs only while there is something to show and the film is moving. A
+    // paused film keeps whatever line was up, which is what pausing on a line of
+    // dialogue is usually for.
+    private void UpdateSubtitleTimer()
+    {
+        bool wanted = _settings.ViewerSubtitles && HasSubtitles && _viewerVideoPlaying;
+        if (!wanted)
+        {
+            _subtitleTimer?.Stop();
+            if (!_settings.ViewerSubtitles || !HasSubtitles)
+            {
+                _subtitleShowing = null;
+                ViewerSubtitlePlate.Visibility = Visibility.Collapsed;
+            }
+            return;
+        }
+
+        _subtitleTimer ??= CreateSubtitleTimer();
+        _subtitleTimer.Start();
+        ShowSubtitleNow();
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateSubtitleTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(100),
+        };
+        timer.Tick += (_, _) => ShowSubtitleNow();
+        return timer;
+    }
+
+    // The offset is taken off the CLOCK rather than added to every cue: the cue
+    // list is parsed once and then only read, and shifting a whole film's worth
+    // of them on each press to move the same picture would be work for nothing.
+    private void ShowSubtitleNow()
+        => ShowSubtitleAt(ViewerMedia.Position.TotalSeconds - _subtitleOffset);
+
+    // A binary search rather than a scan, and the plate is only touched when the
+    // LINE changes: at ten ticks a second, writing the same string back would be
+    // ten layout passes a second for a line that has not moved.
+    private void ShowSubtitleAt(double seconds)
+    {
+        SubtitleService.Cue? cue = null;
+        int low = 0, high = _subtitleCues.Count - 1;
+        while (low <= high)
+        {
+            int mid = (low + high) / 2;
+            var candidate = _subtitleCues[mid];
+            if (seconds < candidate.Start)
+            {
+                high = mid - 1;
+            }
+            else if (seconds > candidate.End)
+            {
+                low = mid + 1;
+            }
+            else
+            {
+                cue = candidate;
+                break;
+            }
+        }
+
+        if (ReferenceEquals(cue, _subtitleShowing))
+        {
+            return;
+        }
+
+        _subtitleShowing = cue;
+        if (cue is null)
+        {
+            ViewerSubtitlePlate.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        ViewerSubtitleText.Text = cue.Text;
+        ViewerSubtitlePlate.Visibility = Visibility.Visible;
+    }
+
+    private void ApplySubtitleFontSize()
+    {
+        double size = Math.Clamp(
+            _settings.ViewerSubtitleFontSize, MinSubtitleFontSize, MaxSubtitleFontSize);
+        ViewerSubtitleText.FontSize = size;
+        if (ViewerSubtitleSizeText is not null)
+        {
+            ViewerSubtitleSizeText.Text = ((int)Math.Round(size)).ToString();
+        }
+    }
+
+    private void StepSubtitleFontSize(double delta)
+    {
+        _settings.ViewerSubtitleFontSize = Math.Clamp(
+            Math.Round(_settings.ViewerSubtitleFontSize + delta),
+            MinSubtitleFontSize, MaxSubtitleFontSize);
+        _settingsService.Save(_settings);
+        ApplySubtitleFontSize();
+    }
+
+    // Written into the same per-film entry the marks and the resume point use,
+    // and dropped again the moment it goes back to zero - an entry that holds
+    // nothing should not survive to take up one of the 200 slots.
+    private void StepSubtitleOffset(double delta)
+    {
+        if (_viewerVideoPath is not { } path)
+        {
+            return;
+        }
+
+        _subtitleOffset = Math.Clamp(
+            Math.Round((_subtitleOffset + delta) * 2) / 2, -MaxSubtitleOffset, MaxSubtitleOffset);
+
+        var entry = FindVideoMarks(path);
+        if (entry is null)
+        {
+            if (_subtitleOffset == 0)
+            {
+                ApplySubtitleOffsetReadout();
+                return;
+            }
+            entry = new VideoMarkEntry { Path = path };
+        }
+
+        entry.SubtitleOffset = _subtitleOffset;
+        _settings.VideoMarks.Remove(entry);
+        if (entry.SubtitleOffset != 0 || entry.Resume > 0 || entry.Seconds.Count > 0)
+        {
+            _settings.VideoMarks.Insert(0, entry);
+        }
+        while (_settings.VideoMarks.Count > MaxMarkedVideos)
+        {
+            _settings.VideoMarks.RemoveAt(_settings.VideoMarks.Count - 1);
+        }
+
+        _settingsService.Save(_settings);
+        ApplySubtitleOffsetReadout();
+        // Straight away, whether or not the film is running: the whole point is
+        // to watch the line move against the picture while pressing.
+        ShowSubtitleNow();
+    }
+
+    private void ApplySubtitleOffsetReadout()
+    {
+        if (ViewerSubtitleOffsetText is not null)
+        {
+            // Signed and in seconds, because the sign IS the information - "0.5"
+            // alone would not say which way it moved.
+            ViewerSubtitleOffsetText.Text = _subtitleOffset == 0
+                ? "0s"
+                : $"{_subtitleOffset:+0.0;-0.0}s";
+        }
+    }
+
+    private void ViewerSubtitleEarlier_Click(object sender, RoutedEventArgs e)
+        => StepSubtitleOffset(-SubtitleOffsetStep);
+
+    private void ViewerSubtitleLater_Click(object sender, RoutedEventArgs e)
+        => StepSubtitleOffset(+SubtitleOffsetStep);
+
+    private void ViewerSubtitleSmaller_Click(object sender, RoutedEventArgs e) => StepSubtitleFontSize(-1);
+
+    private void ViewerSubtitleLarger_Click(object sender, RoutedEventArgs e) => StepSubtitleFontSize(+1);
+
+    private void ViewerSubtitleToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ViewerSubtitles = ViewerSubtitleToggleItem.IsChecked;
+        _settingsService.Save(_settings);
+        UpdateSubtitleTimer();
     }
 
     // ----- 재생 위치 기록 -------------------------------------------------------
@@ -15545,6 +15789,7 @@ public partial class MainWindow : Window
     private void SetViewerVideoPlaying(bool playing)
     {
         _viewerVideoPlaying = playing;
+        UpdateSubtitleTimer();
         ViewerMediaPlayPause.Content = playing ? "❚❚" : "▶";
         ViewerMediaPlayPause.ToolTip = playing ? Strings.ViewerPause : Strings.ViewerPlay;
 
@@ -15692,6 +15937,7 @@ public partial class MainWindow : Window
         // After _viewerVideoPath is cleared, so this empties the canvas rather
         // than redrawing the film that just left.
         DrawViewerMediaMarks();
+        ClearSubtitles();
     }
 
     // Fit is a ratio, so it moves with the panel - and a zoom held at, say,
@@ -16399,6 +16645,17 @@ public partial class MainWindow : Window
         ViewerRewindItem.Visibility = playbackRows;
         ViewerMediaZoomItem.Visibility = playbackRows;
         ViewerMarkAddItem.Visibility = playbackRows;
+        // Only when a subtitle file was actually found beside this film.
+        var subtitleRows = showingVideo && HasSubtitles ? Visibility.Visible : Visibility.Collapsed;
+        ViewerSubtitleToggleItem.Visibility = subtitleRows;
+        ViewerSubtitleToggleItem.IsChecked = _settings.ViewerSubtitles;
+        ViewerSubtitleSizeItem.Visibility = subtitleRows;
+        ViewerSubtitleSyncItem.Visibility = subtitleRows;
+        if (subtitleRows == Visibility.Visible)
+        {
+            ApplySubtitleFontSize();
+            ApplySubtitleOffsetReadout();
+        }
         // Only when it has marks: a submenu that is always there and usually
         // empty is a row of nothing to read past.
         ViewerMarkListItem.Visibility = showingVideo && FindVideoMarks(item.FullPath) is { Seconds.Count: > 0 }

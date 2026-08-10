@@ -255,6 +255,9 @@ public static class Strings
     // not a magnification - the row is about what SIZE the film is shown at,
     // and one of the three answers is "as big as it fits" (user, 2026-08-10).
     public static string ViewerZoom = "영상 크기";
+    public static string ViewerSubtitles = "자막";
+    public static string ViewerSubtitleSize = "자막 크기";
+    public static string ViewerSubtitleSync = "자막 싱크";
     // Safe to be this blunt because of WHERE it is: inside the 위치 목록
     // submenu, under the positions it clears. The word 삭제 means files
     // everywhere else in this app, and it would have needed qualifying if it
@@ -449,6 +452,13 @@ public static class Strings
     public static string ResetSettingsConfirmTitle = "설정 초기화";
     public static string ResetSettingsConfirmBody = "모든 설정과 즐겨찾기가 앱 기본 상태로 초기화됩니다. 이 작업은 되돌릴 수 없습니다.\n\n초기화 후 적용을 위해 앱을 다시 시작합니다. 계속할까요?";
 
+    // Which language the fields below ended up in. Almost nothing needs to ask
+    // - the point of this class is that callers just read a string - but a
+    // BILINGUAL subtitle file has to be told which of its two tracks to play,
+    // and the app's own language is the only answer that isn't a guess (see
+    // SubtitleService).
+    public static bool IsEnglish { get; private set; }
+
     public static void Initialize(string language)
     {
         if (language != "en")
@@ -466,6 +476,7 @@ public static class Strings
             return;
         }
 
+        IsEnglish = true;
         MenuAddFavorite = "Add to Favorites";
         MenuBookmark = "Bookmark";
         MenuBookmarkAdd = "Add Bookmark";
@@ -613,6 +624,9 @@ public static class Strings
         ViewerMarkList = "Marked positions";
         ViewerRewind = "Back to start";
         ViewerZoom = "Video size";
+        ViewerSubtitles = "Subtitles";
+        ViewerSubtitleSize = "Subtitle size";
+        ViewerSubtitleSync = "Subtitle sync";
         ViewerMarkClear = "Clear all marks";
         ViewerPlay = "Play";
         ViewerPause = "Pause";

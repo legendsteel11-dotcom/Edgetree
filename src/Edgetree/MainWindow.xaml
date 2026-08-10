@@ -2673,6 +2673,55 @@
             </Setter>
         </Style>
 
+        <!-- A chip that carries a SHAPE instead of a word. The filter chips'
+             template draws its Content into a TextBlock, which is right for
+             them and cannot hold a Path - and the filmstrip's switch had been
+             making do with box-drawing characters, which read as a broken
+             glyph after a while (user, 2026-08-10).
+
+             Everything else is inherited, so the lit/hover states and the
+             opacity are the row's, not this chip's own. The shape follows the
+             button's Foreground rather than fixing a colour, which is what
+             carries it through those states. -->
+        <Style x:Key="FooterFilterGlyphChipStyle"
+                TargetType="ToggleButton"
+                BasedOn="{StaticResource FooterFilterChipStyle}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd"
+                                Background="Transparent"
+                                CornerRadius="3"
+                                Padding="5,2"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource TreeRowHoverBackground}"/>
+                                <Setter Property="Opacity"
+                                        Value="1"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked"
+                                    Value="True">
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{DynamicResource FooterChipCheckedBackground}"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource FooterChipCheckedForeground}"/>
+                                <Setter Property="Opacity"
+                                        Value="1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- The exclusion chip. Same shape and size as the seven kind chips -
              it belongs to that strip - but it is the only one that TAKES
              files away rather than letting them through, and a strip where
@@ -5256,6 +5305,92 @@
                                         </Grid>
                                     </MenuItem.Header>
                                 </MenuItem>
+                                <!-- Both rows appear only when a subtitle file
+                                     was actually found beside the film - there
+                                     is nothing to switch on or size otherwise,
+                                     and a permanent pair of dead rows would say
+                                     the feature is broken rather than absent. -->
+                                <MenuItem x:Name="ViewerSubtitleToggleItem"
+                                        Header="{x:Static services:Strings.ViewerSubtitles}"
+                                        IsCheckable="True"
+                                        Click="ViewerSubtitleToggle_Click"
+                                        Visibility="Collapsed"/>
+                                <MenuItem x:Name="ViewerSubtitleSizeItem"
+                                        StaysOpenOnClick="True"
+                                        Focusable="False"
+                                        Padding="{DynamicResource MenuStepperRowPadding}"
+                                        Visibility="Collapsed">
+                                    <MenuItem.Header>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                    Text="{x:Static services:Strings.ViewerSubtitleSize}"
+                                                    Foreground="{DynamicResource MenuForeground}"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,8,0"/>
+                                            <!-- The value belongs in the middle
+                                                 here, unlike the 영상 크기 row:
+                                                 a subtitle size IS a number
+                                                 someone tunes and comes back to,
+                                                 so this is the options menu's
+                                                 stepper unchanged. -->
+                                            <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal">
+                                                <Button Content="−"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerSubtitleSmaller_Click"/>
+                                                <TextBlock x:Name="ViewerSubtitleSizeText"
+                                                        Foreground="{DynamicResource MenuForeground}"
+                                                        Width="26"
+                                                        TextAlignment="Center"
+                                                        VerticalAlignment="Center"/>
+                                                <Button Content="+"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerSubtitleLarger_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </MenuItem.Header>
+                                </MenuItem>
+                                <!-- Sync, kept per film (see
+                                     VideoMarkEntry.SubtitleOffset). Half a
+                                     second a press, signed, so the readout says
+                                     which way it moved as well as how far. -->
+                                <MenuItem x:Name="ViewerSubtitleSyncItem"
+                                        StaysOpenOnClick="True"
+                                        Focusable="False"
+                                        Padding="{DynamicResource MenuStepperRowPadding}"
+                                        Visibility="Collapsed">
+                                    <MenuItem.Header>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                    Text="{x:Static services:Strings.ViewerSubtitleSync}"
+                                                    Foreground="{DynamicResource MenuForeground}"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,8,0"/>
+                                            <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal">
+                                                <Button Content="−"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerSubtitleEarlier_Click"/>
+                                                <TextBlock x:Name="ViewerSubtitleOffsetText"
+                                                        Foreground="{DynamicResource MenuForeground}"
+                                                        Width="38"
+                                                        TextAlignment="Center"
+                                                        VerticalAlignment="Center"/>
+                                                <Button Content="+"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerSubtitleLater_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </MenuItem.Header>
+                                </MenuItem>
                                 <MenuItem x:Name="ViewerMarkAddItem"
                                         Header="{x:Static services:Strings.ViewerMarkAdd}"
                                         Click="ViewerMediaMark_Click"
@@ -5453,6 +5588,36 @@
                             <ScaleTransform x:Name="ViewerMediaScale"/>
                         </MediaElement.RenderTransform>
                     </MediaElement>
+                    </Border>
+                    <!-- The subtitle line. OUTSIDE the media element's clip and
+                         its scale on purpose: it is not part of the picture, so
+                         zooming the film must not zoom the words, and it should
+                         stay put and stay readable while the picture moves under
+                         it.
+
+                         A filled box behind the text rather than an outline or a
+                         shadow (user, 2026-08-10, "디즈니플러스 자막 같이"): a
+                         box is one shape that works over any frame, while an
+                         outline needs a second pass over every glyph and a
+                         shadow needs an effect - and both are the kind of thing
+                         that reads as almost-right rather than right.
+
+                         Never hit-testable. It sits over the film, and the film
+                         takes clicks (play/pause). -->
+                    <Border x:Name="ViewerSubtitlePlate"
+                            Grid.Row="0"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Bottom"
+                            Margin="16,0,16,18"
+                            Padding="10,3"
+                            CornerRadius="3"
+                            Background="#A6000000"
+                            IsHitTestVisible="False"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="ViewerSubtitleText"
+                                Foreground="#FFFFFFFF"
+                                TextAlignment="Center"
+                                TextWrapping="Wrap"/>
                     </Border>
                     <!-- The one affordance that turns a still frame into a
                          promise the panel can keep. Only up for a video that
@@ -5874,18 +6039,31 @@
                                  belongs to. The gap sets it apart from the two
                                  chevrons, which act on the picture rather than
                                  on the row itself. -->
-                            <!-- Three boxes in a row, which is what a strip of
-                                 frames looks like. It was ▤ (a square with
-                                 lines through it) and that read as a transport
-                                 control - "재생정지 아이콘 같이 보인다" (user,
-                                 2026-08-10) - which is the one thing a chip
-                                 sitting beside a film must not look like. -->
+                            <!-- Material Symbols "view_column" (user-supplied,
+                                 2026-08-10), kept in its native 960 grid with
+                                 Stretch doing the fitting - the same convention
+                                 the bookmark ribbon and the header's pin follow,
+                                 and the one that keeps these paths from drawing
+                                 off the element entirely.
+
+                                 Two box-drawing characters were tried before it
+                                 and both failed the same way: ▤ read as a
+                                 transport control, and ▯▯▯ read as a broken
+                                 glyph once the eye had passed over it a few
+                                 times. A chip sitting beside a film cannot
+                                 afford either. -->
                             <ToggleButton x:Name="ViewerFilmstripChip"
-                                    Style="{StaticResource FooterFilterChipStyle}"
+                                    Style="{StaticResource FooterFilterGlyphChipStyle}"
                                     Margin="10,0,0,0"
-                                    Content="&#x25AF;&#x25AF;&#x25AF;"
                                     Click="ViewerFilmstripChip_Click"
-                                    ToolTip="{x:Static services:Strings.ViewerFilmstrip}"/>
+                                    ToolTip="{x:Static services:Strings.ViewerFilmstrip}">
+                                <Path Data="M144-312v-336q0-29 21.15-50.5T216-720h528q29.7 0 50.85 21.5Q816-677 816-648v336q0 29-21.15 50.5T744-240H216q-29.7 0-50.85-21.5Q144-283 144-312Zm72 0h128v-336H216v336Zm200 0h128v-336H416v336Zm200 0h128v-336H616v336Z"
+                                        Stretch="Uniform"
+                                        Width="13"
+                                        Height="13"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                            </ToggleButton>
                         </StackPanel>
                         <TextBlock x:Name="ViewerFileName"
                                 Foreground="{DynamicResource FileNameForeground}"

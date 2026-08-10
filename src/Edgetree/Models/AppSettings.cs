@@ -52,6 +52,18 @@ public class AppSettings
     // that touches the disk.
     public List<VideoMarkEntry> VideoMarks { get; set; } = new();
 
+    // Subtitles that sit beside the film as a .smi/.srt (see SubtitleService for
+    // why that is the only kind there can be). ON by default, unlike the
+    // navigator and the filmstrip: those add something to a panel that was
+    // complete without them, while a film whose subtitle file is right there and
+    // silent is a film missing half of itself.
+    //
+    // The size is in DIPs and deliberately NOT tied to the tree's Ctrl +/-: it
+    // is read against the picture, at whatever size the panel happens to be,
+    // rather than alongside the file names.
+    public bool ViewerSubtitles { get; set; } = true;
+    public double ViewerSubtitleFontSize { get; set; } = 16;
+
     // Collapsed to a bare sliver at the screen edge that peeks open on
     // mouse-over - see MainWindow.xaml.cs's EnterAutoHide/ExitAutoHide.
     // Entered by a single click on the app icon while docked and expanded.

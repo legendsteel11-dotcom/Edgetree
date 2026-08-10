@@ -24,4 +24,14 @@ public class VideoMarkEntry
     // barely began or that ran to the end - both would resume somewhere nobody
     // asked to be.
     public double Resume { get; set; }
+
+    // Seconds to shift this film's subtitle by, + for later. PER FILM and not a
+    // global setting, because that is what the number is: a subtitle file drifts
+    // against the release it was timed for, so an offset that fixed one film
+    // would be wrong on the next.
+    //
+    // It lives in this entry rather than in one of its own because the KEY is
+    // the same - the video's path - and a second list keyed identically would
+    // be two things to prune, two things to cap, and two chances to disagree.
+    public double SubtitleOffset { get; set; }
 }
