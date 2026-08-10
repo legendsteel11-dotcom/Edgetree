@@ -10068,6 +10068,38 @@ public partial class MainWindow : Window
 
     private void ExplorerTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
+        // Round 2 of the NAS instrument (2026-08-10). Round 1 measured the
+        // decode and cleared it outright: 108 pictures, none dropped, ~70ms from
+        // request to bitmap-on-the-UI-thread. So the stutter is on THIS side of
+        // the line, and this is the whole of what one arrow key costs
+        // synchronously before the app can draw anything.
+        long selStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        try
+        {
+            SelectedItemChangedCore(e);
+        }
+        finally
+        {
+            LogSelectionCost(selStart);
+        }
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogSelectionCost(long startedAt)
+    {
+        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+        double Ms(long from, long to) => (to - from) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        double gap = _lastSelectionTimestamp == 0 ? 0 : Ms(_lastSelectionTimestamp, startedAt);
+        _lastSelectionTimestamp = now;
+        ViewerLoadLog(
+            $"  sel {Ms(startedAt, now),7:F0}  gap {gap,7:F0}  " +
+            $"thumbs-in-flight {Services.ShellThumbnailService.InFlight,3}");
+    }
+
+    private long _lastSelectionTimestamp;
+
+    private void SelectedItemChangedCore(RoutedPropertyChangedEventArgs<object> e)
+    {
         // The moment the native selection lands on a row OUTSIDE the
         // multi-selection - keyboard navigation, right-click on an unrelated
         // row, a favorites walk - the set no longer matches what reads as
@@ -14072,6 +14104,9 @@ public partial class MainWindow : Window
             return;
         }
 
+        StartUiStallWatch();
+        HookShellThumbnailTrace();
+
         _viewerOpen = true;
 
         bool onLeft = _isDocked && _settings.DockOnRight;
@@ -14132,6 +14167,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        StopUiStallWatch();
+        ViewerLoadLogFlush("viewer closed");
         SetViewerFullscreen(false);
 
         // Read while the panel is still up and its column still stands: what
@@ -14178,6 +14215,10 @@ public partial class MainWindow : Window
     // folder of images fires SelectedItemChanged per row, and decoding every
     // intermediate file would stutter exactly the browsing this panel is
     // for. 120ms is below "feels laggy" and above key-repeat.
+    // Not the Debug-only one used by the instrument: this decides behaviour, so
+    // it has to exist in Release too.
+    private long _lastPreviewRequest;
+
     private void ScheduleViewerPreview()
     {
         if (!_viewerOpen)
@@ -14187,10 +14228,7 @@ public partial class MainWindow : Window
 
         if (_viewerPreviewTimer is null)
         {
-            _viewerPreviewTimer = new System.Windows.Threading.DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(120),
-            };
+            _viewerPreviewTimer = new System.Windows.Threading.DispatcherTimer();
             _viewerPreviewTimer.Tick += (_, _) =>
             {
                 _viewerPreviewTimer!.Stop();
@@ -14198,7 +14236,54 @@ public partial class MainWindow : Window
             };
         }
 
+        // The wait is now conditional, and the condition is whether the loader
+        // is actually behind (2026-08-10). 120ms flat was written when every
+        // selection started its own decode, so pausing was the only way not to
+        // read files nobody would look at. The single-slot queue does that job
+        // properly now - a request that arrives mid-read REPLACES the one
+        // waiting, so an intermediate file costs nothing at all.
+        //
+        // What the flat wait cost instead: tapping an arrow key lands around
+        // 110-145ms (measured), i.e. right on the interval, so every press
+        // restarted the timer and the picture did not change until the hand
+        // stopped. Six presses, nothing, then a jump - "그냥 멍하니 있다 마지막에
+        // 바뀌는 거는 좀 오래된 UX" (user), and they are right.
+        //
+        // AUTO-REPEAT IS ONE GESTURE, NOT FIFTY REQUESTS, and that distinction
+        // is the whole of this. Going immediate whenever the loader was idle
+        // was tried first and made things visibly worse (user, 2026-08-10:
+        // "엄청 버벅"): a held arrow key changes the selection every 20-30ms,
+        // any interval below that fires on every one of them, and the whole
+        // preview update then ran 40-50 times a second. The instrument caught
+        // the result as 1.0-1.9 second UI stalls, each one right after a run of
+        // 20ms gaps.
+        //
+        // So the gap between selections is what decides. A key held down is one
+        // gesture, and the picture it wants is the one it stops on; a hand
+        // choosing files deserves an answer as soon as the loader can give one.
+        //
+        // The line sits at 100ms because both rates were MEASURED rather than
+        // assumed: auto-repeat on this machine lands at 38-65ms, deliberate
+        // tapping at 110-145ms. The first try put it at 60 and caught only part
+        // of the repeat - gaps of 62, 65, 94 crossed it - so the behaviour
+        // alternated within a single held key, which is worse than either rule
+        // on its own.
+        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+        double sincePrevious = _lastPreviewRequest == 0
+            ? double.MaxValue
+            : (now - _lastPreviewRequest) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        _lastPreviewRequest = now;
+
+        bool loaderIdle;
+        lock (_viewerLoadGate)
+        {
+            loaderIdle = !_viewerLoadRunning;
+        }
+
+        bool immediate = loaderIdle && sincePrevious >= 100;
+
         _viewerPreviewTimer.Stop();
+        _viewerPreviewTimer.Interval = TimeSpan.FromMilliseconds(immediate ? 1 : 120);
         _viewerPreviewTimer.Start();
     }
 
@@ -14255,8 +14340,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                int decodeWidth = ViewerDecodeWidth();
-                Task.Run(() => LoadViewerImage(path, decodeWidth));
+                QueueViewerImageLoad(path, ViewerDecodeWidth());
             }
         }
         else
@@ -14284,6 +14368,262 @@ public partial class MainWindow : Window
             Math.Max(200, slotWidth) * VisualTreeHelper.GetDpi(this).DpiScaleX);
     }
 
+    // Where the time actually goes when a NAS folder browses badly (Debug only).
+    //
+    // The user's decisive observation is that the stutter GROWS while tapping
+    // through a folder - "점점 버벅되는 것이 커지는" (2026-08-10) - which is the
+    // signature of something accumulating rather than of any single read being
+    // slow. Guessing at which thing has already cost one round: the concurrent
+    // decodes were real and fixing them bought maybe 30%, so the rest is
+    // somewhere else and this says where.
+    //
+    // Four numbers per picture, and the one that matters is whichever GROWS
+    // down the file:
+    //   wait   - queued until this load started. Grows = the reads themselves
+    //            are the bottleneck and requests are stacking behind them.
+    //   head   - opening the file and reading its header over SMB. Grows = the
+    //            NAS is degrading under the load we are putting on it.
+    //   body   - reading and decoding the pixels. Roughly file size / link
+    //            speed; should NOT grow.
+    //   ui     - handing the frozen bitmap to the dispatcher. Grows = the UI
+    //            thread is busy with something else (tree, filmstrip, layout),
+    //            which would put the cause outside this loader entirely.
+    // `drop` counts requests thrown away without reading anything - the
+    // single-slot queue working, and free to skip.
+    //
+    // Written on the way out (viewer close / app exit), never per line: the
+    // whole point is not to add file I/O to the thing being measured.
+    private readonly List<string> _viewerLoadLogLines = new();
+    private int _viewerLoadLogDropped;
+
+    // Locked: the shell service traces from its own worker threads now, and a
+    // List being appended from two threads is how an instrument starts lying.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void ViewerLoadLog(string line)
+    {
+        lock (_viewerLoadLogLines)
+        {
+            _viewerLoadLogLines.Add(line);
+        }
+    }
+
+    // Round 3, and this one does not care WHAT stopped the UI thread.
+    //
+    // Rounds 1 and 2 measured the decode and the selection handler and cleared
+    // both - 70ms to a bitmap, 0ms in the handler, nothing accumulating - while
+    // the app still browsed badly. Every remaining suspect is something we do
+    // not own a timer around: WPF's layout and render passes over 1329 rows, a
+    // GC, a shell call blocking on the network. So stop naming suspects and
+    // watch the thread itself.
+    //
+    // A timer that wants to tick every 50ms cannot tick while the UI thread is
+    // busy, so the LATENESS of its ticks IS the freeze, whatever caused it.
+    // Only lateness past 200ms is written down: below that is ordinary
+    // scheduling noise and would bury the real ones.
+    private System.Windows.Threading.DispatcherTimer? _uiStallTimer;
+    private long _uiStallLastTick;
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void StartUiStallWatch()
+    {
+        if (_uiStallTimer is not null)
+        {
+            _uiStallLastTick = System.Diagnostics.Stopwatch.GetTimestamp();
+            _uiStallTimer.Start();
+            return;
+        }
+
+        _uiStallTimer = new System.Windows.Threading.DispatcherTimer(
+            System.Windows.Threading.DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(50),
+        };
+        _uiStallTimer.Tick += (_, _) =>
+        {
+            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            double late = (now - _uiStallLastTick) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            _uiStallLastTick = now;
+            if (late >= 200)
+            {
+                ViewerLoadLog($"  *** UI STALL {late,7:F0} ms ***");
+            }
+        };
+        _uiStallLastTick = System.Diagnostics.Stopwatch.GetTimestamp();
+        _uiStallTimer.Start();
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void StopUiStallWatch() => _uiStallTimer?.Stop();
+
+    // A [Conditional] method cannot be turned into a delegate, so the lambda
+    // does the wrapping instead - the hook itself is still Debug-only.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void HookShellThumbnailTrace()
+        => Services.ShellThumbnailService.Trace = line => ViewerLoadLog(line);
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void ViewerLoadLogFlush(string reason)
+    {
+        if (_viewerLoadLogLines.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            // The conditions, so two runs can be compared without remembering
+            // how each was set up - the strip and the folder's size are the two
+            // things worth ruling in or out next.
+            string conditions =
+                $"filmstrip={(ViewerFilmstripHost.Visibility == Visibility.Visible ? "on" : "off")}, " +
+                $"folder={_selectedItem?.Parent?.AllLoadedChildren.Count() ?? 0} items";
+            File.AppendAllText(
+                Path.Combine(dir, "viewerload.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  ({reason}, dropped={_viewerLoadLogDropped}, " +
+                $"{conditions}){Environment.NewLine}" +
+                string.Join(Environment.NewLine, _viewerLoadLogLines) +
+                Environment.NewLine + Environment.NewLine);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+
+        _viewerLoadLogLines.Clear();
+        _viewerLoadLogDropped = 0;
+    }
+
+    // ONE picture is read at a time, and only ever the LATEST one asked for.
+    //
+    // Every selection used to start its own Task.Run, with the "is this still
+    // the file we want?" check at the very END - after the bytes were already
+    // read. Locally that is invisible. Over SMB it is not: a 4K photo is 5-15MB
+    // and takes far longer than the 120ms debounce, so holding an arrow key
+    // stacked up concurrent reads on one connection and threw all but the last
+    // away once they finished. Reported on a NAS folder of 1329 photos - "엄청
+    // 버벅", and then the NAS itself stopped answering for a while (user,
+    // 2026-08-10).
+    //
+    // A slot, not a queue: a request that arrives while another is running
+    // REPLACES whatever was waiting, because nobody wants the picture they
+    // arrowed past three files ago. So a fast run through a folder costs the
+    // read that was already in flight plus the one you stopped on.
+    private readonly object _viewerLoadGate = new();
+    private (string Path, int DecodeWidth, long QueuedAt)? _viewerLoadNext;
+    private bool _viewerLoadRunning;
+
+    private void QueueViewerImageLoad(string path, int decodeWidth)
+    {
+        long queuedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        lock (_viewerLoadGate)
+        {
+            if (_viewerLoadNext is not null)
+            {
+                _viewerLoadLogDropped++;
+            }
+
+            _viewerLoadNext = (path, decodeWidth, queuedAt);
+            if (_viewerLoadRunning)
+            {
+                return;
+            }
+
+            _viewerLoadRunning = true;
+        }
+
+        Task.Run(() =>
+        {
+            while (true)
+            {
+                (string Path, int DecodeWidth, long QueuedAt) job;
+                lock (_viewerLoadGate)
+                {
+                    if (_viewerLoadNext is not { } queued)
+                    {
+                        _viewerLoadRunning = false;
+                        return;
+                    }
+
+                    job = queued;
+                    _viewerLoadNext = null;
+                }
+
+                // Not inside the lock: this is the long one, and holding the
+                // gate across it would make every arrow key wait on the read
+                // it is trying to supersede.
+                LoadViewerImage(job.Path, job.DecodeWidth, queuedAt: job.QueuedAt);
+            }
+        });
+    }
+
+    // EXIF's orientation tag, 1..8, or 1 (upright) for anything that has no
+    // opinion. JPEG keeps it under app1, TIFF at the top of its own IFD; every
+    // other format this viewer decodes has none, and asking costs a dictionary
+    // lookup on metadata already parsed.
+    //
+    // Wrapped rather than trusted: the query throws on formats that have no
+    // such path, and a file can carry a value outside 1..8 - neither is a
+    // reason to fail a picture that decoded perfectly well.
+    private static int ReadExifOrientation(BitmapFrame frame)
+    {
+        try
+        {
+            if (frame.Metadata is not BitmapMetadata metadata)
+            {
+                return 1;
+            }
+
+            object? value = metadata.Format switch
+            {
+                "jpg" or "jpeg" => metadata.GetQuery("/app1/ifd/{ushort=274}"),
+                "tiff" => metadata.GetQuery("/ifd/{ushort=274}"),
+                _ => null,
+            };
+
+            return value is ushort tag && tag is >= 1 and <= 8 ? tag : 1;
+        }
+        catch (Exception ex) when (ex is NotSupportedException or ArgumentException
+                                       or InvalidOperationException or IOException)
+        {
+            return 1;
+        }
+    }
+
+    // The eight EXIF orientations are the four quarter turns, each with and
+    // without a mirror. Both are render-time transforms on a frozen source, so
+    // this costs no second decode and no copy of the pixels.
+    private static BitmapSource ApplyExifOrientation(BitmapSource source, int orientation)
+    {
+        if (orientation <= 1)
+        {
+            return source;
+        }
+
+        // Mirrored first, then turned: EXIF describes the flip as applied to
+        // the stored pixels, and doing it the other way round sends 5 and 7 to
+        // each other's result.
+        BitmapSource result = orientation is 2 or 4 or 5 or 7
+            ? new TransformedBitmap(source, new ScaleTransform(-1, 1))
+            : source;
+
+        double angle = orientation switch
+        {
+            3 or 4 => 180,
+            5 or 8 => 270,
+            6 or 7 => 90,
+            _ => 0,
+        };
+
+        if (angle != 0)
+        {
+            result = new TransformedBitmap(result, new RotateTransform(angle));
+        }
+
+        return result;
+    }
+
     // Background thread. Header first (original dimensions - DecodePixelWidth
     // rewrites the decoded bitmap's own), then the scaled decode; only a
     // frozen bitmap crosses back to the UI thread.
@@ -14292,12 +14632,14 @@ public partial class MainWindow : Window
     // width asks for: it swaps a sharper bitmap into a picture the user is
     // already looking at, so it must not disturb the zoom, the pan, or - if
     // the decode fails this time - the perfectly good image on screen.
-    private void LoadViewerImage(string path, int decodeWidth, bool fullResolution = false)
+    private void LoadViewerImage(string path, int decodeWidth, bool fullResolution = false, long queuedAt = 0)
     {
-        BitmapImage? bitmap = null;
+        BitmapSource? bitmap = null;
         int pixelWidth = 0, pixelHeight = 0;
         long fileLength = 0;
         DateTime modified = default;
+        long started = System.Diagnostics.Stopwatch.GetTimestamp();
+        long headerDone = started, bodyDone = started;
         try
         {
             var fileInfo = new FileInfo(path);
@@ -14325,17 +14667,60 @@ public partial class MainWindow : Window
                 pixelWidth = frame.PixelWidth;
                 pixelHeight = frame.PixelHeight;
 
-                stream.Position = 0;
-                bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.StreamSource = stream;
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                if (pixelWidth > decodeWidth)
+                // A phone writes the sensor's pixels and an EXIF tag saying
+                // which way up they are; WIC hands us the pixels and does NOT
+                // apply the tag. The shell DOES, which is why the filmstrip's
+                // thumbnail stood up while the picture beside it lay on its
+                // side (user, 2026-08-10).
+                int orientation = ReadExifOrientation(frame);
+                bool quarterTurned = orientation is 5 or 6 or 7 or 8;
+                headerDone = System.Diagnostics.Stopwatch.GetTimestamp();
+
+                // Last chance to walk away before the expensive part. The
+                // header above is a few KB; everything after this reads the
+                // whole file, which on a NAS is the entire cost. The selection
+                // can have moved on while this job waited its turn, and the
+                // check at the end of the dispatcher callback is far too late
+                // to save the bytes.
+                if (!string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
                 {
-                    bitmap.DecodePixelWidth = decodeWidth;
+                    return;
                 }
-                bitmap.EndInit();
+
+                stream.Position = 0;
+                var decoded = new BitmapImage();
+                decoded.BeginInit();
+                decoded.StreamSource = stream;
+                decoded.CacheOption = BitmapCacheOption.OnLoad;
+                // The cap is on the width the panel will SHOW, so on a quarter
+                // turn it has to be spent on the source's height instead -
+                // otherwise a portrait photo decodes to the slot's width and
+                // then turns, arriving at a fraction of the size asked for.
+                if (quarterTurned)
+                {
+                    if (pixelHeight > decodeWidth)
+                    {
+                        decoded.DecodePixelHeight = decodeWidth;
+                    }
+                }
+                else if (pixelWidth > decodeWidth)
+                {
+                    decoded.DecodePixelWidth = decodeWidth;
+                }
+
+                decoded.EndInit();
+                bitmap = ApplyExifOrientation(decoded, orientation);
                 bitmap.Freeze();
+
+                // Everything downstream measures the picture as it is SHOWN -
+                // the caption, the fit maths, the navigator's aspect - so the
+                // turn has to reach these two as well.
+                if (quarterTurned)
+                {
+                    (pixelWidth, pixelHeight) = (pixelHeight, pixelWidth);
+                }
+
+                bodyDone = System.Diagnostics.Stopwatch.GetTimestamp();
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException
@@ -14346,8 +14731,24 @@ public partial class MainWindow : Window
             bitmap = null;
         }
 
+        long handedOff = System.Diagnostics.Stopwatch.GetTimestamp();
         Dispatcher.BeginInvoke(() =>
         {
+            // Timed here rather than at BeginInvoke: what this number has to
+            // catch is the dispatcher QUEUE, i.e. the UI thread being busy with
+            // something else, which is the case that would put the cause
+            // outside this loader entirely.
+            static double Ms(long from, long to) =>
+                (to - from) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            long onUi = System.Diagnostics.Stopwatch.GetTimestamp();
+            ViewerLoadLog(
+                $"wait {(queuedAt == 0 ? 0 : Ms(queuedAt, started)),7:F0}  " +
+                $"head {Ms(started, headerDone),7:F0}  " +
+                $"body {Ms(headerDone, bodyDone),7:F0}  " +
+                $"ui {Ms(handedOff, onUi),7:F0}  " +
+                $"{(fullResolution ? "full " : "     ")}" +
+                $"{FormatFileSize(fileLength),9}  {Path.GetFileName(path)}");
+
             if (!_viewerOpen || !string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
             {
                 if (fullResolution)
@@ -14493,8 +14894,7 @@ public partial class MainWindow : Window
             // Single-frame or undecodable - the still path knows what to do
             // with both.
             stream.Dispose();
-            int decodeWidth = ViewerDecodeWidth();
-            Task.Run(() => LoadViewerImage(path, decodeWidth));
+            QueueViewerImageLoad(path, ViewerDecodeWidth());
             return;
         }
 
@@ -16897,9 +17297,21 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Instrumented because the strip costs ten times what the tree does per
+        // selection (measured 2026-08-10) and the first guess - ScrollIntoView -
+        // was wrong: replacing it with arithmetic changed nothing. What the
+        // stalls DO line up with is thumbs-in-flight jumping from 0 to 4-8 the
+        // moment they end, i.e. cells being realised. A rebuild is the one thing
+        // here that could realise a whole strip's worth at once, and it is not
+        // cheap: Clear() plus 1359 Add()s on an ObservableCollection is 1359
+        // change notifications for the ListBox to answer.
+        long filmstripStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        bool rebuilt = false;
+
         string folder = _selectedItem?.Parent?.FullPath ?? string.Empty;
         if (_filmstripBuiltFor != (folder, items!.Count))
         {
+            rebuilt = true;
             _filmstripBuiltFor = (folder, items.Count);
             _filmstripCells.Clear();
             foreach (var item in items)
@@ -16915,6 +17327,21 @@ public partial class MainWindow : Window
         }
 
         SyncFilmstripToSelection();
+        LogFilmstripCost(filmstripStart, rebuilt, items.Count);
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogFilmstripCost(long startedAt, bool rebuilt, int count)
+    {
+        double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - startedAt)
+            * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        // Only the ones worth reading: a sync that did nothing is the common
+        // case and would bury everything else.
+        if (rebuilt || ms >= 20)
+        {
+            ViewerLoadLog(
+                $"  filmstrip {(rebuilt ? "REBUILD" : "sync   ")} {ms,7:F0} ms  cells {count}");
+        }
     }
 
     // An instant jump, never a slide. The strip has to follow ↑↓ through a
@@ -16939,11 +17366,143 @@ public partial class MainWindow : Window
         try
         {
             ViewerFilmstrip.SelectedItem = match;
-            ViewerFilmstrip.ScrollIntoView(match);
+            ScrollFilmstripTo(match);
         }
         finally
         {
             _filmstripSelfSelect = false;
+        }
+
+        // Moving the selection moves what the strip shows, whether or not any
+        // new container was created for it - so the sweep has to be told here
+        // too, not only from Loaded.
+        ScheduleFilmstripThumbnails();
+    }
+
+    // ScrollIntoView was doing this, and it was the whole cost of having the
+    // strip open (measured 2026-08-10, same folder of 1359 items, same walk):
+    //
+    //   filmstrip off - 147 selections,  3 UI stalls,  2.2s frozen in total
+    //   filmstrip on  - 113 selections, 14 UI stalls, 16.4s frozen in total
+    //
+    // Per selection that is 15ms against 145ms, and the viewer managed 96 loads
+    // in the first run against 24 in the second - it never got the thread long
+    // enough to keep up. ScrollIntoView on a virtualising panel walks toward the
+    // target GENERATING AND MEASURING containers, synchronously, and it does it
+    // even when the item is already on screen.
+    //
+    // None of that is needed here. CanContentScroll="True" means the
+    // ScrollViewer's offset and viewport are counted in CELLS, so where a cell
+    // sits is arithmetic - and the common case, moving between two cells that
+    // are both already visible, becomes doing NOTHING at all.
+    private void ScrollFilmstripTo(FilmstripCell cell)
+    {
+        if (FindDescendant<ScrollViewer>(ViewerFilmstrip) is not { } scroller)
+        {
+            // Before the template has been applied there is nothing to scroll;
+            // the strip opens on the selected cell anyway.
+            return;
+        }
+
+        int index = _filmstripCells.IndexOf(cell);
+        if (index < 0)
+        {
+            return;
+        }
+
+        double first = scroller.HorizontalOffset;
+        double visible = scroller.ViewportWidth;
+        if (visible <= 0)
+        {
+            return;
+        }
+
+        if (index < first)
+        {
+            scroller.ScrollToHorizontalOffset(index);
+        }
+        else if (index >= first + visible)
+        {
+            // Landing it on the trailing edge rather than centring it: the
+            // strip follows ↑↓ one cell at a time, so the next move should cost
+            // one more cell of scroll, not half a strip's worth. Centring also
+            // moves cells the eye is already on, which this app does not do.
+            scroller.ScrollToHorizontalOffset(index - visible + 1);
+        }
+    }
+
+    private System.Windows.Threading.DispatcherTimer? _filmstripSettleTimer;
+
+    // Restarted by everything that can change what the strip is showing: a new
+    // container appearing, the selection moving it, the wheel. The sweep reads
+    // the visible range itself, so this only has to say "something moved".
+    private void ScheduleFilmstripThumbnails()
+    {
+        if (ViewerFilmstripHost.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        _filmstripSettleTimer ??= CreateFilmstripSettleTimer();
+        _filmstripSettleTimer.Stop();
+        _filmstripSettleTimer.Start();
+    }
+
+    // 400ms: long enough that arrowing through a folder asks for nothing at all
+    // (auto-repeat is 25-45ms, deliberate tapping 110-145ms - both measured),
+    // short enough that stopping on a picture fills the strip while the eye is
+    // still on it.
+    private System.Windows.Threading.DispatcherTimer CreateFilmstripSettleTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(400),
+        };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            RequestSettledFilmstripThumbnails();
+        };
+        return timer;
+    }
+
+    private void RequestSettledFilmstripThumbnails()
+    {
+        if (FindDescendant<ScrollViewer>(ViewerFilmstrip) is not { } scroller ||
+            scroller.ViewportWidth <= 0)
+        {
+            return;
+        }
+
+        // Swept from what is ON SCREEN NOW, not from the queue of cells that
+        // announced themselves. The queue version left cells permanently blank
+        // (user, 2026-08-10: "아무리 기다려도 안 나오는 칸이 있고요"), and the
+        // reason is that Loaded fires ONCE, when a container is created: a cell
+        // that was queued, found off-screen at settle time and dropped, then
+        // scrolled back into view, never announced itself again. Asking the
+        // strip what it is showing has no such hole in it.
+        int first = Math.Max(0, (int)scroller.HorizontalOffset - 1);
+        int last = Math.Min(_filmstripCells.Count - 1,
+            (int)Math.Ceiling(scroller.HorizontalOffset + scroller.ViewportWidth));
+        for (int index = first; index <= last; index++)
+        {
+            var cell = _filmstripCells[index];
+            if (cell.Requested)
+            {
+                continue;
+            }
+
+            cell.Requested = true;
+            // The picture only - this strip never shows a file's dimensions, and
+            // asking for them opened the file a second time per cell (see
+            // GetThumbnailOnly).
+            ShellThumbnailService.GetThumbnailOnly(cell.Path, FilmstripFetchSize, thumbnail =>
+            {
+                if (thumbnail is not null)
+                {
+                    cell.Thumbnail = thumbnail;
+                }
+            });
         }
     }
 
@@ -17006,14 +17565,17 @@ public partial class MainWindow : Window
             return;
         }
 
-        cell.Requested = true;
-        ShellThumbnailService.GetThumbnail(cell.Path, FilmstripFetchSize, (thumbnail, _, _) =>
-        {
-            if (thumbnail is not null)
-            {
-                cell.Thumbnail = thumbnail;
-            }
-        });
+        // QUEUED, not asked. A cell appearing on screen is not yet a reason to
+        // read a file: making a thumbnail means the shell reads the WHOLE image,
+        // so a strip scrolled past 300 files asks a NAS for gigabytes of photos
+        // nobody stopped to look at. Measured on a cold folder: 869ms each,
+        // worst 2784ms - and the NAS dropped off the network three times in one
+        // evening while this ran unbounded (2026-08-10).
+        //
+        // The settle timer is the whole idea: pay for what the eye stops on.
+        // Requested stays FALSE until the ask actually happens, so a cell that
+        // scrolls away costs nothing and can still be asked for later.
+        ScheduleFilmstripThumbnails();
     }
 
     // A cell at a time, not a pixel at a time (user's call, 2026-08-10, and the
@@ -17040,20 +17602,46 @@ public partial class MainWindow : Window
             }
         }
 
+        // Scrolling by hand shows different cells without creating containers
+        // for them once they have been realised once - so this needs the sweep
+        // as much as the selection does.
+        ScheduleFilmstripThumbnails();
         e.Handled = true;
     }
 
-    // On the RELEASE, not on SelectionChanged: the strip's selection is also
-    // written by the app when the tree moves, and acting on the property would
-    // send that straight back into the tree.
-    private void ViewerFilmstrip_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    // Drag-out from the strip (user, 2026-08-10: "썸네일을 드래그해서 다른 앱으로
+    // 바로 연결하고 싶어서요"). The tree has had this since the beginning and the
+    // search results since they were built; a strip of thumbnails is if anything
+    // the surface where it is most obviously wanted, because the picture you are
+    // dropping is the thing you are looking at.
+    //
+    // Same two-step every drag source here uses: remember a candidate on press,
+    // start the drag only once the pointer has passed the system threshold, so a
+    // plain click still selects. The cell UNDER THE POINTER is what gets
+    // dragged, not the tree's multi-selection - the strip shows one file per
+    // cell and the hand is on one of them.
+    private System.Windows.Point? _filmstripDragStart;
+    private string? _filmstripDragCandidate;
+
+    // Selecting happens HERE, on the press, and that is a change the drag forced
+    // (user, 2026-08-10: selection "한번에 안되는 경우가 가끔"). It used to
+    // happen on the release, which is fine until a drag can start: past the 4px
+    // threshold the modal drag loop swallows the release, so a click with the
+    // smallest wobble in it selected nothing at all. Pressing to select and then
+    // dragging what you just selected is also what Explorer does.
+    private void ViewerFilmstrip_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        _filmstripDragStart = null;
+        _filmstripDragCandidate = null;
         if (_filmstripSelfSelect ||
             ItemsControl.ContainerFromElement(ViewerFilmstrip, (DependencyObject)e.OriginalSource)
                 is not ListBoxItem { Content: FilmstripCell cell })
         {
             return;
         }
+
+        _filmstripDragStart = e.GetPosition(ViewerFilmstrip);
+        _filmstripDragCandidate = cell.Path;
 
         // Same crossing the chevrons make: a cell past the folder's "더 보기"
         // cap is one the strip promised, so the reveal happens rather than the
@@ -17064,6 +17652,58 @@ public partial class MainWindow : Window
         }
 
         SelectVisibleItem(cell.Item);
+    }
+
+    private void ViewerFilmstrip_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_filmstripDragCandidate is not { } path || _filmstripDragStart is not { } start ||
+            e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(ViewerFilmstrip);
+        bool pastThreshold =
+            Math.Abs(current.X - start.X) >= SystemParameters.MinimumHorizontalDragDistance ||
+            Math.Abs(current.Y - start.Y) >= SystemParameters.MinimumVerticalDragDistance;
+        if (!pastThreshold)
+        {
+            return;
+        }
+
+        _filmstripDragStart = null;
+        _filmstripDragCandidate = null;
+
+        // FileDrop + Copy-only, exactly like the tree's and the search list's:
+        // any app that takes an Explorer file drop takes this, and Copy (never
+        // Move) means dropping into Explorer or another app can never remove the
+        // original.
+        var data = new DataObject(DataFormats.FileDrop, new[] { path });
+
+        // Sourced from the LIST, not the cell container: the strip virtualises,
+        // so a container can be recycled out from under the drag's modal loop.
+        // The finally is the same safety device the other two carry - a capture
+        // that outlives the drag would leave the app deaf to the next click.
+        try
+        {
+            DragDrop.DoDragDrop(ViewerFilmstrip, data, DragDropEffects.Copy);
+        }
+        finally
+        {
+            if (Mouse.Captured is not null)
+            {
+                Mouse.Capture(null);
+            }
+        }
+    }
+
+    // Nothing left to do on release - see the press handler for why the work
+    // moved there. Kept as the place the drag candidate is dropped, so a click
+    // that never became a drag leaves no state behind.
+    private void ViewerFilmstrip_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        _filmstripDragStart = null;
+        _filmstripDragCandidate = null;
     }
 
     // Height IS cell size - there is nothing else in the row to give pixels to.

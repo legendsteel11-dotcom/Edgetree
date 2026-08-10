@@ -33,33 +33,249 @@ public static class ShellThumbnailService
     public static void GetThumbnail(string path, int pixelSize, Action<ImageSource?, int, int> onCompleted)
         => GetPreview(path, pixelSize, thumbnailOnly: true, onCompleted);
 
+    // For callers that only want the picture. The dimensions below cost a
+    // SECOND open of the same file - cheap locally, a second network round trip
+    // over SMB - and the filmstrip throws them away: it asks for one thumbnail
+    // per realised cell, so on a NAS folder that was one wasted open per cell
+    // scrolled past (found 2026-08-10, chasing a stutter that grew while
+    // browsing 1329 photos).
+    public static void GetThumbnailOnly(string path, int pixelSize, Action<ImageSource?> onCompleted)
+        => GetPreview(path, pixelSize, thumbnailOnly: true,
+            (image, _, _) => onCompleted(image), readDimensions: false);
+
+    // The picture a JPEG already carries inside itself.
+    //
+    // This is the difference between us and the viewers that open a folder of
+    // 1359 NAS photos in seconds (user's comparison with FastStone, and the
+    // measurement that made sense of it: 869ms average per shell thumbnail on a
+    // cold NAS folder, worst 2784ms). The shell builds its thumbnail by reading
+    // and decoding the WHOLE file - 2-5MB each over SMB. Almost every JPEG a
+    // phone or camera writes already holds a small one in its EXIF header, and
+    // reading that touches only the first few tens of KB.
+    //
+    // DelayCreation + CacheOption.None is what keeps it to the header: the
+    // decoder is asked for the thumbnail and nothing else, so the pixels of the
+    // full image are never fetched.
+    //
+    // Returns null when there is no embedded thumbnail (PNG, most screenshots,
+    // some editors' output) - the caller falls back to the shell, which is
+    // still the only answer for those.
+    public static ImageSource? TryReadEmbedded(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            var frame = BitmapDecoder.Create(stream,
+                BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0];
+            if (frame.Thumbnail is not { } embedded)
+            {
+                return null;
+            }
+
+            // The header's orientation applies to the embedded picture exactly
+            // as it does to the full one, and the shell already honours it - so
+            // without this the strip would disagree with itself depending on
+            // which path answered.
+            var oriented = ApplyOrientation(embedded, ReadOrientation(frame));
+            oriented.Freeze();
+            return oriented;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
+                                      or FileFormatException or ArgumentException or OverflowException)
+        {
+            return null;
+        }
+    }
+
+    private static int ReadOrientation(BitmapFrame frame)
+    {
+        try
+        {
+            if (frame.Metadata is not BitmapMetadata metadata)
+            {
+                return 1;
+            }
+
+            object? value = metadata.Format switch
+            {
+                "jpg" or "jpeg" => metadata.GetQuery("/app1/ifd/{ushort=274}"),
+                "tiff" => metadata.GetQuery("/ifd/{ushort=274}"),
+                _ => null,
+            };
+
+            return value is ushort tag && tag is >= 1 and <= 8 ? tag : 1;
+        }
+        catch (Exception e) when (e is NotSupportedException or ArgumentException
+                                     or InvalidOperationException or IOException)
+        {
+            return 1;
+        }
+    }
+
+    private static BitmapSource ApplyOrientation(BitmapSource source, int orientation)
+    {
+        if (orientation <= 1)
+        {
+            return source;
+        }
+
+        BitmapSource result = orientation is 2 or 4 or 5 or 7
+            ? new TransformedBitmap(source, new ScaleTransform(-1, 1))
+            : source;
+
+        double angle = orientation switch
+        {
+            3 or 4 => 180,
+            5 or 8 => 270,
+            6 or 7 => 90,
+            _ => 0,
+        };
+
+        return angle == 0 ? result : new TransformedBitmap(result, new RotateTransform(angle));
+    }
+
     // thumbnailOnly:false lets the shell fall back to the file-type icon -
     // what the viewer panel shows for a non-image selection. The context
     // menu's thumbnail slot keeps thumbnailOnly:true (see the flag note in
     // Extract).
-    public static void GetPreview(string path, int pixelSize, bool thumbnailOnly, Action<ImageSource?, int, int> onCompleted)
+    // How many of these are running right now. Nothing here throttles - every
+    // call is its own Task.Run - so on a folder of 1329 files the filmstrip can
+    // put one in flight per cell it realises, all on the same SMB connection.
+    // Read by the viewer's load instrument; if this number climbs while
+    // browsing, the strip is the thing to bound (2026-08-10).
+    private static int _inFlight;
+
+    public static int InFlight => Volatile.Read(ref _inFlight);
+
+    // Set by the viewer's instrument in Debug builds. What it is looking for:
+    // this Task.Run is an MTA thread pool thread, and a shell COM object created
+    // there can come back as a PROXY whose calls marshal onto the app's STA
+    // thread - i.e. onto the UI thread. If that is what is happening, an
+    // Extract that takes 1.5s on a cold NAS freezes the window for 1.5s, which
+    // matches both the size and the timing of the stalls left unexplained after
+    // everything else was timed and cleared (2026-08-10).
+    public static Action<string>? Trace;
+
+    // A few at a time, NEWEST FIRST, because both halves were measured on a
+    // cold NAS folder (2026-08-10):
+    //
+    //   314 extractions, average 869ms each, worst 2784ms
+    //
+    // Every one of those used to be its own Task.Run, fired the moment a cell
+    // was realised, all onto one SMB connection. Three things came of it: the
+    // NAS itself stopped answering twice, each call got slower because they
+    // were competing, and - the part that makes it feel broken rather than
+    // slow - the queue was FIFO, so the cells actually on screen waited behind
+    // hundreds for cells scrolled past long ago.
+    //
+    // A STACK fixes the last one for free: the newest request is the one the
+    // eye is on. Old entries still run, just last, and the OS thumbnail cache
+    // makes the second visit to any folder cheap regardless.
+    //
+    // NOT a semaphore around Task.Run: that would hold a pool thread per
+    // waiting job, and 300 blocked threads is its own outage.
+    // Two, not three: the NAS dropped off the network again at three while a
+    // cold folder was being browsed (2026-08-10). The caller side now also
+    // waits for the strip to settle before asking at all, so this bound only
+    // has to cover what someone actually stopped to look at.
+    private const int MaxShellWorkers = 2;
+    private static readonly object PendingGate = new();
+    private static readonly Stack<(string Path, int PixelSize, bool ThumbnailOnly,
+        bool ReadDimensions, Action<ImageSource?, int, int> OnCompleted)> Pending = new();
+    private static int _workers;
+
+    public static void GetPreview(string path, int pixelSize, bool thumbnailOnly,
+        Action<ImageSource?, int, int> onCompleted, bool readDimensions = true)
     {
+        Interlocked.Increment(ref _inFlight);
+        lock (PendingGate)
+        {
+            Pending.Push((path, pixelSize, thumbnailOnly, readDimensions, onCompleted));
+            if (_workers >= MaxShellWorkers)
+            {
+                return;
+            }
+
+            _workers++;
+        }
+
         Task.Run(() =>
         {
-            var thumbnail = Extract(path, pixelSize, thumbnailOnly);
+            while (true)
+            {
+                (string Path, int PixelSize, bool ThumbnailOnly,
+                    bool ReadDimensions, Action<ImageSource?, int, int> OnCompleted) job;
+                lock (PendingGate)
+                {
+                    if (!Pending.TryPop(out job))
+                    {
+                        _workers--;
+                        return;
+                    }
+                }
+
+                RunPreview(job.Path, job.PixelSize, job.ThumbnailOnly, job.ReadDimensions, job.OnCompleted);
+            }
+        });
+    }
+
+    private static void RunPreview(string path, int pixelSize, bool thumbnailOnly,
+        bool readDimensions, Action<ImageSource?, int, int> onCompleted)
+    {
+        try
+        {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+
+            // The header first, and the shell only if the file has no thumbnail
+            // of its own. Traced separately so the two costs stay comparable -
+            // the whole point of this path is that they should not be.
+            ImageSource? thumbnail = null;
+            string source = "embedded";
+            if (thumbnailOnly)
+            {
+                thumbnail = TryReadEmbedded(path);
+            }
+
+            if (thumbnail is null)
+            {
+                source = "shell   ";
+                thumbnail = Extract(path, pixelSize, thumbnailOnly);
+            }
+
+            if (Trace is { } trace)
+            {
+                double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0)
+                    * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                if (ms >= 100)
+                {
+                    trace($"  thumb {source} {ms,7:F0} ms  {System.IO.Path.GetFileName(path)}");
+                }
+            }
 
             int pixelWidth = 0, pixelHeight = 0;
-            try
+            if (readDimensions)
             {
-                using var stream = File.OpenRead(path);
-                var frame = BitmapDecoder.Create(stream,
-                    BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0];
-                pixelWidth = frame.PixelWidth;
-                pixelHeight = frame.PixelHeight;
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException or FileFormatException or ArgumentException)
-            {
-                // No WIC codec / unreadable header - the info line just omits
-                // the dimensions.
+                try
+                {
+                    using var stream = File.OpenRead(path);
+                    var frame = BitmapDecoder.Create(stream,
+                        BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0];
+                    pixelWidth = frame.PixelWidth;
+                    pixelHeight = frame.PixelHeight;
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException or FileFormatException or ArgumentException)
+                {
+                    // No WIC codec / unreadable header - the info line just omits
+                    // the dimensions.
+                }
             }
 
             Application.Current?.Dispatcher.BeginInvoke(() => onCompleted(thumbnail, pixelWidth, pixelHeight));
-        });
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _inFlight);
+        }
     }
 
     private static ImageSource? Extract(string path, int pixelSize, bool thumbnailOnly)

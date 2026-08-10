@@ -5881,6 +5881,8 @@
                                 ScrollViewer.HorizontalScrollBarVisibility="Hidden"
                                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
                                 PreviewMouseWheel="ViewerFilmstrip_PreviewMouseWheel"
+                                PreviewMouseLeftButtonDown="ViewerFilmstrip_PreviewMouseLeftButtonDown"
+                                PreviewMouseMove="ViewerFilmstrip_PreviewMouseMove"
                                 PreviewMouseLeftButtonUp="ViewerFilmstrip_PreviewMouseLeftButtonUp">
                             <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate>
