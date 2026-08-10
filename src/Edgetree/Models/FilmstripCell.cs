@@ -42,6 +42,13 @@ public class FilmstripCell : INotifyPropertyChanged
     // scroll past it, since that is exactly the file the call is slowest for.
     public bool Requested { get; set; }
 
+    // The same guard for the cheap speculative ask made ahead of the strip on a
+    // network folder, kept SEPARATE from Requested on purpose: that ask reads
+    // the file's own header and stops there, so its coming back empty says
+    // nothing about whether the shell could make a thumbnail. Sharing one flag
+    // would let a speculative miss decide the cell is blank for good.
+    public bool AskedAhead { get; set; }
+
     public ImageSource? Thumbnail
     {
         get => _thumbnail;

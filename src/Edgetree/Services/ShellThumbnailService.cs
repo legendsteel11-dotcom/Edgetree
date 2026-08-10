@@ -39,16 +39,23 @@ public static class ShellThumbnailService
     // per realised cell, so on a NAS folder that was one wasted open per cell
     // scrolled past (found 2026-08-10, chasing a stutter that grew while
     // browsing 1329 photos).
-    public static void GetThumbnailOnly(string path, int pixelSize, Action<ImageSource?> onCompleted)
+    //
+    // embeddedOnly is what makes fetching AHEAD of the strip affordable. The
+    // header a JPEG carries costs tens of KB; the shell's answer costs the whole
+    // file, and sustained 2-5MB reads over SMB dropped a network drive off the
+    // network while the strip was scrolled (2026-08-11). A speculative fetch
+    // takes the cheap answer or no answer at all; a file that is actually
+    // arrived at is still asked properly.
+    public static void GetThumbnailOnly(string path, int pixelSize, Action<ImageSource?> onCompleted,
+        bool embeddedOnly = false)
         => GetPreview(path, pixelSize, thumbnailOnly: true,
-            (image, _, _) => onCompleted(image), readDimensions: false);
+            (image, _, _) => onCompleted(image), readDimensions: false, embeddedOnly: embeddedOnly);
 
     // The picture a JPEG already carries inside itself.
     //
     // This is the difference between us and the viewers that open a folder of
-    // 1359 NAS photos in seconds (user's comparison with FastStone, and the
-    // measurement that made sense of it: 869ms average per shell thumbnail on a
-    // cold NAS folder, worst 2784ms). The shell builds its thumbnail by reading
+    // 1359 NAS photos in seconds. The measurement that made sense of it: 869ms
+    // average per shell thumbnail on a cold NAS folder, worst 2784ms. The shell builds its thumbnail by reading
     // and decoding the WHOLE file - 2-5MB each over SMB. Almost every JPEG a
     // phone or camera writes already holds a small one in its EXIF header, and
     // reading that touches only the first few tens of KB.
@@ -75,9 +82,9 @@ public static class ShellThumbnailService
             // CachedBitmap, and it has to be INSIDE the using: what the decoder
             // hands back is delay-created and still tied to this stream, so
             // freezing it and returning it produced cells that simply never
-            // drew - a strip with holes in it rather than a slow one (user,
-            // 2026-08-11: "이빨빠진 모양새"). The pixels are read here, while
-            // the file is still open, and what leaves this method owns them.
+            // drew - a strip with gaps scattered through it rather than a slow
+            // one (2026-08-11). The pixels are read here, while the file is
+            // still open, and what leaves this method owns them.
             var cached = new CachedBitmap(embedded, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
 
             // The header's orientation applies to the embedded picture exactly
@@ -185,7 +192,8 @@ public static class ShellThumbnailService
     // The bound exists for the NAS and is priced for the NAS: two, because
     // three dropped it off the network again while a cold folder was being
     // browsed (2026-08-10). Local disks were paying it too, and a local folder
-    // of 170 photos filled its strip "느긋하게" as a result (user, 2026-08-11).
+    // of 170 photos filled its strip at a visibly unhurried pace as a result
+    // (2026-08-11).
     //
     // So the caller sets it per folder. Everything in this class is a queue in
     // front of one resource; how much of that resource there is depends on
@@ -197,18 +205,84 @@ public static class ShellThumbnailService
         get => Volatile.Read(ref _maxWorkers);
         set => Volatile.Write(ref _maxWorkers, Math.Clamp(value, 1, 8));
     }
+    // Per-source totals, so the flush can say what the two paths actually cost
+    // instead of listing the slow ones. "misses" is the count that came back
+    // with nothing - for the embedded row that is files with no header
+    // thumbnail, which is the number that decides whether fetching ahead is
+    // worth doing at all on a network folder.
+    private sealed class CostTally
+    {
+        public int Count;
+        public int Misses;
+        public double TotalMs;
+        public double MaxMs;
+    }
+
+    private static readonly object CostGate = new();
+    private static readonly Dictionary<string, CostTally> Costs = new();
+
+    private static void RecordCost(string source, bool missed, double ms)
+    {
+        lock (CostGate)
+        {
+            if (!Costs.TryGetValue(source, out var tally))
+            {
+                Costs[source] = tally = new CostTally();
+            }
+
+            tally.Count++;
+            if (missed)
+            {
+                tally.Misses++;
+            }
+
+            tally.TotalMs += ms;
+            tally.MaxMs = Math.Max(tally.MaxMs, ms);
+        }
+    }
+
+    public static int PendingCostCount
+    {
+        get
+        {
+            lock (CostGate)
+            {
+                return Costs.Values.Sum(tally => tally.Count);
+            }
+        }
+    }
+
+    // Read and reset together: each flush describes the run it belongs to, so
+    // two runs can be compared without subtracting one from the other by hand.
+    public static List<string> DrainCostSummary()
+    {
+        lock (CostGate)
+        {
+            var lines = Costs
+                .Where(pair => pair.Value.Count > 0)
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair =>
+                    $"  {pair.Key} x{pair.Value.Count,5}   avg {pair.Value.TotalMs / pair.Value.Count,6:F0} ms" +
+                    $"   max {pair.Value.MaxMs,6:F0} ms   none {pair.Value.Misses}")
+                .ToList();
+            Costs.Clear();
+            return lines;
+        }
+    }
+
     private static readonly object PendingGate = new();
     private static readonly Stack<(string Path, int PixelSize, bool ThumbnailOnly,
-        bool ReadDimensions, Action<ImageSource?, int, int> OnCompleted)> Pending = new();
+        bool ReadDimensions, bool EmbeddedOnly, Action<ImageSource?, int, int> OnCompleted)> Pending = new();
     private static int _workers;
 
     public static void GetPreview(string path, int pixelSize, bool thumbnailOnly,
-        Action<ImageSource?, int, int> onCompleted, bool readDimensions = true)
+        Action<ImageSource?, int, int> onCompleted, bool readDimensions = true,
+        bool embeddedOnly = false)
     {
         Interlocked.Increment(ref _inFlight);
         lock (PendingGate)
         {
-            Pending.Push((path, pixelSize, thumbnailOnly, readDimensions, onCompleted));
+            Pending.Push((path, pixelSize, thumbnailOnly, readDimensions, embeddedOnly, onCompleted));
             if (_workers >= MaxWorkers)
             {
                 return;
@@ -221,8 +295,8 @@ public static class ShellThumbnailService
         {
             while (true)
             {
-                (string Path, int PixelSize, bool ThumbnailOnly,
-                    bool ReadDimensions, Action<ImageSource?, int, int> OnCompleted) job;
+                (string Path, int PixelSize, bool ThumbnailOnly, bool ReadDimensions,
+                    bool EmbeddedOnly, Action<ImageSource?, int, int> OnCompleted) job;
                 lock (PendingGate)
                 {
                     if (!Pending.TryPop(out job))
@@ -232,39 +306,66 @@ public static class ShellThumbnailService
                     }
                 }
 
-                RunPreview(job.Path, job.PixelSize, job.ThumbnailOnly, job.ReadDimensions, job.OnCompleted);
+                RunPreview(job.Path, job.PixelSize, job.ThumbnailOnly, job.ReadDimensions,
+                    job.EmbeddedOnly, job.OnCompleted);
             }
         });
     }
 
     private static void RunPreview(string path, int pixelSize, bool thumbnailOnly,
-        bool readDimensions, Action<ImageSource?, int, int> onCompleted)
+        bool readDimensions, bool embeddedOnly, Action<ImageSource?, int, int> onCompleted)
     {
         try
         {
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
 
-            // The header first, and the shell only if the file has no thumbnail
-            // of its own. Traced separately so the two costs stay comparable -
-            // the whole point of this path is that they should not be.
+            // Our own cache first, and it answers from LOCAL disk however far
+            // away the file itself is. That ordering is the point: everything
+            // below reads the original, and for a folder on a NAS every one of
+            // those reads is network traffic paid again.
             ImageSource? thumbnail = null;
-            string source = "embedded";
+            string source = "cache   ";
+            bool fromCache = false;
             if (thumbnailOnly)
             {
+                thumbnail = ThumbnailCacheService.TryRead(path, pixelSize);
+                fromCache = thumbnail is not null;
+            }
+
+            // Then the file's own header, and the shell only if it has no
+            // thumbnail of its own. Traced separately so the three costs stay
+            // comparable - the whole point of this path is that they should not
+            // be.
+            if (thumbnail is null && thumbnailOnly)
+            {
+                source = "embedded";
                 thumbnail = TryReadEmbedded(path);
             }
 
-            if (thumbnail is null)
+            if (thumbnail is null && !embeddedOnly)
             {
                 source = "shell   ";
                 thumbnail = Extract(path, pixelSize, thumbnailOnly);
             }
 
-            if (Trace is { } trace)
+            // Only what was just made, and only for the thumbnail-only callers:
+            // the viewer's non-image mode falls back to a file-type ICON, which
+            // is not a picture of this file and must never be stored as one.
+            if (thumbnail is not null && thumbnailOnly && !fromCache)
+            {
+                ThumbnailCacheService.Write(path, thumbnail, pixelSize);
+            }
+
             {
                 double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0)
                     * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
-                if (ms >= 100)
+                // Counted whatever it cost, because the number this path was
+                // built for is SMALL and a "log the slow ones" threshold is
+                // exactly what hid it: 100ms of per-file lines and not one of
+                // them embedded, which reads as "the header path never runs"
+                // when it may equally mean "it always beat the threshold".
+                RecordCost(source, thumbnail is null, ms);
+                if (Trace is { } trace && ms >= 100)
                 {
                     trace($"  thumb {source} {ms,7:F0} ms  {System.IO.Path.GetFileName(path)}");
                 }

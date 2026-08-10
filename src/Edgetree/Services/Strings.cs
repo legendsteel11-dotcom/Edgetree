@@ -114,7 +114,7 @@ public static class Strings
     // The submenu holding the set-once housekeeping toggles (autostart, tray
     // icon, folder/file icons, title bar text) - they sat as top-level rows
     // until the menu grew long enough that daily rows and once-ever rows were
-    // shoulder to shoulder (user, 2026-08-08).
+    // shoulder to shoulder (2026-08-08).
     public static string MenuGeneralSettings = "기본 설정";
     public static string MenuStartWithWindows = "부팅 후 자동 시작";
     public static string MenuAlwaysShowTrayIcon = "트레이 아이콘";
@@ -139,7 +139,7 @@ public static class Strings
     // stated somewhere the hand is already resting, or it may as well not exist.
     public static string ColorSwatchTooltip = "클릭: 색 선택기 · 우클릭: 색상 코드 입력";
     public static string ColorHexInputHint = "#RRGGBB · Enter 적용, Esc 취소";
-    // The recovery lever for "뭔가 이상하다" - the user's own framing: the
+    // The recovery lever for "something is off and I cannot say what": the
     // fault may not even be this app's (another program fighting over the
     // same edge/hooks), and a restart clears both kinds at once.
     public static string MenuRestart = "다시 시작";
@@ -248,12 +248,24 @@ public static class Strings
     public static string ViewerPrevImage = "이전 이미지";
     public static string ViewerNextImage = "다음 이미지";
     public static string ViewerFilmstrip = "필름스트립";
+    public static string MenuImageViewer = "이미지 뷰어";
+    // Named for what it does rather than for the machinery ("이미지 캐싱"), so
+    // the row itself says whether you want it.
+    public static string MenuPrecacheThumbnails = "이미지 썸네일 미리 불러오기";
+    // The size rides in the row itself, because the only reason to press it is
+    // that the number has grown - and a row that has to be pressed to find out
+    // is a row that gets pressed for no reason.
+    public static string MenuClearThumbnailCache = "썸네일 파일 정리";
+    public static string MenuClearThumbnailCacheSized = "썸네일 파일 정리 ({0})";
+    // {0} is how many are in hand so far. No total: the strip's own counter is
+    // right beside it and already says how many the folder holds.
+    public static string ViewerPrecaching = "미리 불러오는 중 {0}";
     public static string ViewerMarkAdd = "위치 기록";
     public static string ViewerMarkList = "위치 목록";
     public static string ViewerRewind = "처음으로";
     // "영상 크기" rather than "확대": the row's middle button is 맞춤, which is
     // not a magnification - the row is about what SIZE the film is shown at,
-    // and one of the three answers is "as big as it fits" (user, 2026-08-10).
+    // and one of the three answers is "as big as it fits" (2026-08-10).
     public static string ViewerZoom = "영상 크기";
     public static string ViewerSubtitles = "자막";
     public static string ViewerSubtitleSize = "자막 크기";
@@ -365,7 +377,7 @@ public static class Strings
     public static string ButtonClose = "닫기";
     // Colours travel between machines; the rest of settings.json does not -
     // hidden folders, bookmarks and last-selected paths all name folders the
-    // other PC may not have (user, 2026-08-04).
+    // other PC may not have (2026-08-04).
     public static string ButtonExportColors = "내보내기";
     public static string ButtonImportColors = "불러오기";
     public static string ColorFileFilter = "Edgetree 색상 (*.json)|*.json";
@@ -376,7 +388,7 @@ public static class Strings
     public static string ColorThemeLightMode = "☀️ 라이트 모드";
     public static string ButtonRandomColors = "랜덤";
     // "되돌리기" over the more precise "랜덤 전으로", which read oddly
-    // (user, 2026-08-09); the button lives beside 랜덤, which carries the
+    // (2026-08-09); the button lives beside 랜덤, which carries the
     // context the label dropped.
     public static string ButtonUndoRandom = "되돌리기";
     // Plain (no emoji) versions for use inside a sentence - see
@@ -620,6 +632,11 @@ public static class Strings
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
         ViewerFilmstrip = "Filmstrip";
+        MenuImageViewer = "Image viewer";
+        MenuPrecacheThumbnails = "Preload image thumbnails";
+        MenuClearThumbnailCache = "Clean up thumbnail files";
+        MenuClearThumbnailCacheSized = "Clean up thumbnail files ({0})";
+        ViewerPrecaching = "Preloading {0}";
         ViewerMarkAdd = "Mark position";
         ViewerMarkList = "Marked positions";
         ViewerRewind = "Back to start";

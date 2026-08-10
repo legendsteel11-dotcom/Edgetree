@@ -13,15 +13,14 @@ public class AppSettings
     // by ViewerWidth on top of it, and every place that persists a width
     // subtracts the panel again (see MainWindow's viewer region). ViewerOpen
     // survives restarts; auto-hide and dock transitions fold the panel and
-    // clear it (user's call, 2026-08-08).
+    // clear it (2026-08-08).
     public bool ViewerOpen { get; set; } = false;
     public double ViewerWidth { get; set; } = 360;
 
     // The zoom navigator (chip at the end of the viewer's zoom strip). OFF by
-    // default on purpose: the person who asked for it doesn't want it on their
-    // own screen - "저는 없어도 깔끔한데 분명 이 상황에서는 요구될 의견이라서"
-    // - so it exists for whoever goes looking, and stays out of the way of
-    // everyone who doesn't. Even switched on it only appears while the picture
+    // default on purpose: it was asked for on behalf of other people rather
+    // than wanted on the asker's own screen, so it exists for whoever goes
+    // looking and stays out of the way of everyone who doesn't. Even switched on it only appears while the picture
     // is actually bigger than the panel; there is nothing to navigate at fit.
     public bool ViewerNavigator { get; set; } = false;
 
@@ -36,6 +35,15 @@ public class AppSettings
     // shape of a film frame.
     public bool ViewerFilmstrip { get; set; } = false;
     public double ViewerFilmstripCellHeight { get; set; } = 64;
+
+    // Whether the strip fetches the WHOLE folder rather than only the part
+    // around what is on screen. Off by default because it is a trade, not an
+    // improvement: on a folder of 1359 photos over SMB it is a few minutes of
+    // background reading and 100-250MB of thumbnails held in memory, in exchange
+    // for a strip that never has a gap in it once it has settled. That is a good
+    // trade for someone working through a shoot and a bad one for someone
+    // glancing at a folder, which is exactly the shape a setting is for.
+    public bool ViewerPrecacheThumbnails { get; set; } = false;
 
     // Playback marks: places in a film someone wanted to be able to come back
     // to, kept per file and shown as ticks over the position bar.
@@ -104,10 +112,8 @@ public class AppSettings
     // Someone opening it for the first time is judging it, and the full-height
     // bar reads as unfriendly there - it draws a line down the whole side of the
     // screen, so the screen looks cut in two rather than having something
-    // sitting at its edge. The handle is the same thickness and does not
-    // (author, using the handle exclusively since it shipped: "이쁘기도 하고
-    // 화면이 잘린 느낌도 안 들고요", and of the bar, "초기에 불친절하게
-    // 보였습니다").
+    // sitting at its edge. The handle is the same thickness and does not, and
+    // has been the only mode in use here since it shipped.
     public bool AutoHideUseHandle { get; set; } = false;
 
     // Whether the peek slides in and out or simply appears.
@@ -152,8 +158,8 @@ public class AppSettings
 
     // "아이콘 방식" - true shows the same icons Windows Explorer does (see
     // ShellIconService), false the bundled PNG set. Default flipped to the
-    // Explorer icons one day after the feature shipped (user call,
-    // 2026-07-21): the familiar look is the better first impression, and the
+    // Explorer icons one day after the feature shipped (2026-07-21): the
+    // familiar look is the better first impression, and the
     // v1.2.0 cohort who preferred the PNG set can (and existing users who
     // never opened the option will) simply see the switch and pick.
     public bool UseShellIcons { get; set; } = true;
@@ -380,7 +386,7 @@ public class AppSettings
     // On by default. It does cost a permanent tree row, which is the thing a
     // 1080p laptop is short of - but a strip nobody finds is worth nothing,
     // and the install base is still small enough that changing the default
-    // layout under existing users is cheap (user's call, 2026-08-10). Anyone
+    // layout under existing users is cheap (2026-08-10). Anyone
     // who wants the row back turns it off in 기본 설정.
     public bool ShowPathBar { get; set; } = true;
 
@@ -436,8 +442,8 @@ public class AppSettings
     //
     // ONE, not a list of named filters: a second one needs a managing list
     // with a − per row (the shape 숨긴 폴더 uses) and a name per entry, while
-    // going from one to many later is easy and the reverse is not (user's call,
-    // 2026-08-06). It is selected like any other kind, so it can be combined
+    // going from one to many later is easy and the reverse is not
+    // (2026-08-06). It is selected like any other kind, so it can be combined
     // with 코드 or 이미지 rather than replacing them.
     public string FileFilterCustomExtensions { get; set; } = "";
 
@@ -455,8 +461,9 @@ public class AppSettings
 
     // Folders the user has taken out of the tree ("이 폴더 숨기기"). Only the
     // tree hides them - the file search still finds what is inside, because a
-    // search is a deliberate act of looking and "분명 있는데 검색이 안 된다" is
-    // a worse surprise than seeing a folder you hid (decided 2026-08-02).
+    // search is a deliberate act of looking, and a file that is plainly there
+    // but cannot be found is a worse surprise than seeing a folder you hid
+    // (decided 2026-08-02).
     //
     // Kept as paths rather than as a flag on the items for the same reason
     // bookmarks are: item instances are created lazily and thrown away by every

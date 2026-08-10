@@ -36,7 +36,7 @@ public partial class MainWindow : Window
     // 180 → 204 when the viewer toggle became the seventh header button - the
     // floor exists so the button row still fits (see ApplyHeaderMetrics).
     private const double MinExpandedWidth = 204;
-    // 1200 → 2000 (user, 2026-08-08): with the viewer panel in the window
+    // 1200 → 2000 (2026-08-08): with the viewer panel in the window
     // the old cap - sized for a tree-only sidebar - was suddenly the tight
     // constraint on the OUTER edge drag. This still caps only the TREE's
     // share; the viewer's own cap is MaxViewerWidth in the viewer region.
@@ -370,6 +370,12 @@ public partial class MainWindow : Window
         FileSystemItem.DisplayCap = Math.Clamp(_settings.MaxItemsPerFolder, 1, 50);
 
         AttachViewerMediaContextMenu();
+
+        // Off the UI thread and never awaited: it walks the cache directory to
+        // learn its size, which is the only thing standing between a full cache
+        // and a trim. Nothing waits on the answer - the cache reads and writes
+        // perfectly well before it lands.
+        Task.Run(Services.ThumbnailCacheService.Measure);
 
         // Alongside the other listing rules, and for the same reason: a saved
         // filter has to be in force for the FIRST folder read, not from the
@@ -847,7 +853,7 @@ public partial class MainWindow : Window
         //
         // That blue is the bookmark ribbon's own #4A90E2, arrived at by trying
         // a deeper one first: a saturated navy filled the chip with more weight
-        // than a footer wants ("배경이 좀 쎄다"), while the lighter blue reads
+        // than a footer wants, while the lighter blue reads
         // as a mark rather than a block. Keeping it the SAME blue the app
         // already draws with is the part worth holding on to - one accent, used
         // in both places, rather than a second one invented for this strip.
@@ -865,7 +871,7 @@ public partial class MainWindow : Window
         SetBrushColor("FooterChipExcludeForeground", light ? "#B3453B" : "#E08C82");
         // Solid, at the same weight as the other chips' lit fill on each theme -
         // this is what says on or off, and a tint was not enough to tell them
-        // apart (user, 2026-08-10). Dark gets the muted one for the same reason
+        // apart (2026-08-10). Dark gets the muted one for the same reason
         // the grey/blue pair above splits: it sits on a dark ground already.
         SetBrushColor("FooterChipExcludeCheckedBackground", light ? "#B3453B" : "#8A423A");
         SetBrushColor("FolderNameHoverForeground", light ? _settings.LightFolderNameHoverColorHex : _settings.FolderNameHoverColorHex);
@@ -895,10 +901,10 @@ public partial class MainWindow : Window
     // close X and the two edge chevrons all wore theme-fixed or tree-side
     // inks on USER-SET backgrounds, so a palette could swallow them whole -
     // the chevron's glyph was invisible until hover, and the caption clashed
-    // outright once 랜덤 existed (user reports, 2026-08-09). The caption
+    // outright once 랜덤 existed (reported 2026-08-09). The caption
     // originally matching the tree's name colours was the user's spec, made
     // when the viewer background always equalled the tree's; splitting the
-    // backgrounds broke that premise, and the user asked for a way out that
+    // backgrounds broke that premise, and what was wanted was a way out that
     // adds NO colour rows.
     //
     // So these inks are DERIVED, never picked: each surface takes whichever
@@ -936,7 +942,7 @@ public partial class MainWindow : Window
         // Stepped back from the maximum-contrast inks these used to be. The
         // caption is four rows deep - counter, name, metadata, chips - and at
         // full strength each of them argued for itself: "너무 자기들 주장이
-        // 강해서 좀 복잡하고 난해해 보입니다" (user, 2026-08-10). Backing the ink
+        // 강해서 좀 복잡하고 난해해 보입니다" (2026-08-10). Backing the ink
         // off is the way to quiet a whole area without opacity, which this app
         // does not use to rank text, and without touching type sizes the user
         // has already settled twice.
@@ -946,7 +952,7 @@ public partial class MainWindow : Window
         SetLocalBrush(resources, "ForegroundText",
             useLightInk ? Color.FromRgb(0xC4, 0xC7, 0xCE) : Color.FromRgb(0x4C, 0x4F, 0x56));
         // The name sits a step above the metadata line under it, not a whole
-        // tier above it (user, 2026-08-10). The comparison that matters is
+        // tier above it (2026-08-10). The comparison that matters is
         // against what that line actually RENDERS as, not against its ink: it
         // carries the chips' 0.65, so at these values the name lands roughly 40
         // levels clear of it - present as the heading of the caption, quiet
@@ -960,8 +966,8 @@ public partial class MainWindow : Window
         SetLocalBrush(resources, "HoverBackground", hoverFill);
 
         // NOT overridden any more - the panel now takes the footer's own lit
-        // chip, which in light mode is the app's blue with white text (user,
-        // 2026-08-10: "파일필터 칩 on과 같이 파란색에 흰색 글씨").
+        // chip, which in light mode is the app's blue with white text
+        // (2026-08-10).
         //
         // And it turns out that is the more consistent answer, not just the
         // asked-for one. Everything else this method derives is a WASH - it
@@ -1106,8 +1112,7 @@ public partial class MainWindow : Window
     // "… 더 보기" row, which is the app's existing example of text that is
     // present but not competing: that row renders its own colour at Opacity
     // 0.65, i.e. 35% of the way to the background. Asked for by eye and then
-    // taken from that row rather than guessed (user, 2026-08-02: "… 더 보기
-    // 정도 되면 딱 적당할 듯").
+    // taken from that row rather than guessed (2026-08-02).
     private const double MutedNameBlend = 0.35;
 
     // Blends a colour `amount` of the way towards the theme's own extreme -
@@ -1233,7 +1238,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        // THE RULE THE ARROWS SETTLED ON (user, 2026-08-10, after trying
+        // THE RULE THE ARROWS SETTLED ON (2026-08-10, after trying
         // several combinations): ↑↓ move BETWEEN items, ←→ move INSIDE the
         // current one. A film has an inside - its timeline - so there the
         // sideways keys seek. A picture has none, so they fall through to the
@@ -1701,7 +1706,7 @@ public partial class MainWindow : Window
     // transitions.
     //
     // This USED to be a 200ms eased Width/Left animation. Removed entirely
-    // (2026-07-21, user call) after it kept producing irregular visible
+    // (2026-07-21) after it kept producing irregular visible
     // ghosting/afterimages: every animation tick resizes/moves the real
     // native HWND, and whether DWM composes each of those frames cleanly is
     // outside the app's control - frame-rate capping was tried in an earlier
@@ -1931,7 +1936,7 @@ public partial class MainWindow : Window
             // Arriving had the mirror of that, a cubic EaseOut, and it covered
             // most of the distance in the first third: the sidebar appeared to
             // pop into place and then creep the last few pixels, which is the
-            // "팟 하고 뜬다" that survived every change to the duration - the
+            // abrupt pop that survived every change to the duration - the
             // problem was never how long it took. A power of 1.3 is barely more
             // than linear, just enough to settle at the end.
             EasingFunction = arriving
@@ -1988,7 +1993,7 @@ public partial class MainWindow : Window
     // out and back was enough to relocate the sidebar entirely - the window
     // landed on the neighbouring display, and PositionToWorkArea, which asks
     // which monitor the window is currently on, then docked it to that one
-    // (2026-08-05: "아직도 왼쪽 모니터로 넘어가는데요").
+    // (2026-08-05).
     private bool CanSlide => _settings.AutoHideSlide && !HasScreenBeyondDockedEdge();
 
 
@@ -2016,9 +2021,9 @@ public partial class MainWindow : Window
     private const double MinDockedHeight = 150;
 
     // Hold a modifier while dragging a docked edge and it lands on a fraction
-    // of the screen instead of wherever the cursor is (user, 2026-08-09). Two
+    // of the screen instead of wherever the cursor is (2026-08-09). Two
     // grids rather than one, and both fine enough to be worth reaching for:
-    // SHIFT is the everyday one and CTRL refines it (the user's own pairing -
+    // SHIFT is the everyday one and CTRL refines it (the chosen pairing -
     // the first version had them the other way round and read backwards).
     // Multiples of each other on purpose, so every Shift line is also a Ctrl
     // line and refining never means starting over.
@@ -3549,7 +3554,7 @@ public partial class MainWindow : Window
         }
 
         // The glyph-only enlargement steps back to its original size on
-        // narrow windows (user call, 2026-07-22: "224 이하"), where the
+        // narrow windows (2026-07-22, at 224 and below), where the
         // buttons are already tightening above and bigger drawings would
         // crowd their shrinking hit-boxes. Mutated in place: the transform is
         // shared by all five remaining glyphs via StaticResource and is never used
@@ -3710,14 +3715,14 @@ public partial class MainWindow : Window
         (sender as UIElement)?.ReleaseMouseCapture();
     }
 
-    // The pin is a full pinned/auto-hide toggle now (user call, 2026-07-23,
+    // The pin is a full pinned/auto-hide toggle now (2026-07-23,
     // relayed "혼란스럽다" feedback on the old greyed-out-while-pinned pin):
     // docked and pinned, clicking it enters auto-hide; docked and
     // auto-hidden, clicking pins it open again; floating, it re-docks as
     // always. The glyph mirrors the state - upright while pinned, lying on
     // its side while auto-hiding (see UpdatePinButtonVisibility). The app
     // icon used to be the auto-hide entry; that was retired the same day so
-    // exactly ONE control owns this state (user call, same feedback thread).
+    // exactly ONE control owns this state (same feedback thread).
     private void PinButton_Click(object sender, RoutedEventArgs e)
     {
         if (!_isDocked)
@@ -3745,7 +3750,7 @@ public partial class MainWindow : Window
 
         // The panel used to fold here (and in Dock) because both transitions
         // rewrite the window's bounds from remembered values. EXPERIMENT
-        // (user, 2026-08-08): it rides through instead - the bounds rewrite
+        // (2026-08-08): it rides through instead - the bounds rewrite
         // happens as before, and ApplyViewerSide + the SizeChanged clamp
         // reconcile the columns to whatever window comes out, with the
         // remembered panel width intact.
@@ -3784,7 +3789,7 @@ public partial class MainWindow : Window
         // the BAND's top. Clearing the margin alone made the content leap up
         // to the parked Top - a bottom-band undock threw the window to the
         // screen top, far from the cursor that was dragging it (reported
-        // 2026-08-07, "창이 위로 튀고... 커서가 저 멀리"). Committing the band
+        // 2026-08-07). Committing the band
         // as the window's actual bounds first keeps the header exactly where
         // the cursor is; the corner-nudge and remembered-spot paths below then
         // also start from the band, which is where the user last saw the
@@ -3810,7 +3815,7 @@ public partial class MainWindow : Window
         // tree-only width and the band's full height - the panel crushed to
         // its floor inside a tall skinny strip, which is a poor first
         // picture for exactly the person seeing float mode for the first
-        // time. A starter shape instead (user, 2026-08-08): the panel at
+        // time. A starter shape instead (2026-08-08): the panel at
         // least 960 wide, the window built around a 16:9-ish panel - a
         // quarter-of-a-4K feel on any monitor. Only when nothing is
         // remembered: a session that has floated before restores its own
@@ -3833,7 +3838,7 @@ public partial class MainWindow : Window
 
         // Floors for the native resize borders, which answer to nothing else -
         // without them the frame can be dragged down to a sliver that is
-        // almost impossible to find again (reported 2026-08-07, "없어질 뻔").
+        // almost impossible to find again (reported 2026-08-07).
         // Floating only: docked sizes are all programmatic and the auto-hide
         // sliver (3-8px) and handle must stay allowed - Dock() resets these.
         MinWidth = MinExpandedWidth;
@@ -4010,7 +4015,7 @@ public partial class MainWindow : Window
         // straight through to the real window and only applies the band clip
         // at its end - and DWM can composite a frame in between, which with
         // a short BOTTOM band meant the whole floating window painted once
-        // at the TOP of the screen on every dock (user report with
+        // at the TOP of the screen on every dock (reported with
         // screenshots, 2026-08-08; same family as the 08-07 park findings).
         // Applying the TARGET band's region before anything moves closes the
         // gap: the region's rows lie outside the still-floating window, so
@@ -4050,7 +4055,7 @@ public partial class MainWindow : Window
         // Columns BEFORE the park: ApplyViewerSide after PositionToWorkArea
         // meant one more layout pass landing on the already-parked
         // full-height window - a single top-of-screen flash on every dock
-        // with the panel open (user report, 2026-08-08). This way the park
+        // with the panel open (reported 2026-08-08). This way the park
         // and its band clip are the last geometry to land.
         ApplyViewerSide();
         PositionToWorkArea();
@@ -4736,7 +4741,7 @@ public partial class MainWindow : Window
     //
     // Files used to be an exception: they pinned their PARENT folder and were
     // selected below it, so a search hit landed in its folder's context. That
-    // is gone (2026-08-02, user's call) - every jump now puts its own target at
+    // is gone (2026-08-02) - every jump now puts its own target at
     // the top, whatever it is. The context it was buying stopped being worth a
     // rule of its own once every row gained a full-path tooltip, and the
     // exception cost more than it paid in a folder of hundreds, where the
@@ -4964,7 +4969,7 @@ public partial class MainWindow : Window
 
         // Only when nothing is about to be pinned. A pin computes its own final
         // offset, and this call scrolling somewhere else first is exactly what
-        // drew the intermediate frame reported as "이동할 때 화면이 한 번 번쩍임"
+        // drew the intermediate frame reported as a single flash of the view
         // (2026-07-28): the two scrolls used to be a whole rendered frame apart.
         if (!pinToTop)
         {
@@ -5011,7 +5016,7 @@ public partial class MainWindow : Window
         // wrong, so pinning here scrolls somewhere arbitrary and the correction
         // below has to haul the view back - which is what F5 did, since it
         // rebuilds the whole tree before restoring the selection through this
-        // same machinery (reported 2026-08-02, "F5만 한번 다른 데 갔다가 오네요").
+        // same machinery (reported 2026-08-02).
         // Skipping straight to the deferred pin there is the pre-existing
         // behaviour, and it was never the flashing case.
         if (settled)
@@ -5108,7 +5113,7 @@ public partial class MainWindow : Window
     }
 
     // The mirror of SelectNextVisibleRow, added when ↑↓ had to keep working
-    // while a film was playing (user, 2026-08-10). Focus is not in the tree
+    // while a film was playing (2026-08-10). Focus is not in the tree
     // then - it is wherever the click that started playback left it - so the
     // tree's own arrow handling never sees the key, and the folder became
     // unwalkable exactly while the panel was most in use.
@@ -5268,7 +5273,7 @@ public partial class MainWindow : Window
     // be pinned to the top. Without it, "a jump always lands at the top" would
     // hold everywhere except the last screenful of the tree - and that rule has
     // been true and exception-free since v1.4.0, which is reason enough to keep
-    // it true (user, 2026-08-10, on noticing the exception).
+    // it true (2026-08-10, on noticing the exception).
     //
     // It was a bottom MARGIN on the last root's container until the tree moved
     // to ScrollUnit=Item on 2026-08-10. A margin adds PIXELS, and the scroll
@@ -5284,7 +5289,7 @@ public partial class MainWindow : Window
     // hasn't realized from the average of what it has, and one 316px-tall item
     // skews that average.
     //
-    // Only while a jump needs it (the user's call, 2026-07-30, over always
+    // Only while a jump needs it (decided 2026-07-30, over always
     // keeping a gap the way a code editor does): a drive tree is not a file,
     // and permanent empty space at the end is a permanent cost for something
     // that matters at the moment of a jump. The gap leaves on its own - see
@@ -5514,7 +5519,7 @@ public partial class MainWindow : Window
     }
 
     // Ctrl+wheel: accelerated scrolling, about five times the ordinary wheel
-    // step. Deep trees mean a LOT of plain-wheel notches ("스크롤 피곤도",
+    // step. Deep trees mean a LOT of plain-wheel notches (tiring to scroll,
     // 2026-07-24), and Ctrl+wheel was unassigned - the font zoom lives on
     // Ctrl +/- only. A constant factor rather than progressive velocity:
     // predictable beats clever for a positioning gesture.
@@ -5526,7 +5531,7 @@ public partial class MainWindow : Window
     // fifteen. Windows' "lines to scroll per notch" is a user setting, and a
     // hardcoded number quietly becomes a different multiple on every machine
     // that has moved it - on one set to eight lines, fifteen is not an
-    // accelerator at all ("파워가 약해진 느낌", 2026-08-10).
+    // accelerator at all (2026-08-10).
     private const double CtrlWheelAcceleration = 5;
 
     private static double CtrlWheelRowsPerNotch
@@ -5728,7 +5733,7 @@ public partial class MainWindow : Window
     // The X sends the sidebar to the tray; it does not end the app. Quitting is
     // the tray menu's 종료 (and Alt+F4 still reaches the real close path).
     //
-    // Why (user, 2026-08-10): they kept ending the app by accident on this
+    // Why (2026-08-10): they kept ending the app by accident on this
     // button. An X in that corner means "close this window" in every app there
     // is, and a sidebar has no clear idea of being closed - auto-hide is
     // already the answer to "get out of my way". So the accident stays possible
@@ -5750,7 +5755,7 @@ public partial class MainWindow : Window
     //                   (ShowInTaskbar=false), so minimising would be a
     //                   disappearance rather than a place to go.
     //   floating, off - minimise. ShowInTaskbar is true there, so the taskbar
-    //                   button and Alt+Tab both hold it (user confirmed).
+    //                   button and Alt+Tab both hold it (confirmed).
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
         if (_settings.AlwaysShowTrayIcon)
@@ -5767,8 +5772,8 @@ public partial class MainWindow : Window
                 // because the pointer revealed it - so the button that means
                 // "get out of my way" puts the reveal away. It used to do
                 // nothing at all here, which is a dead control on a button
-                // everything else in the corner responds to (user, 2026-08-10:
-                // "무반응 -> 정상이나 좀 이상함").
+                // everything else in the corner responds to
+                // (2026-08-10).
                 CloseAutoHideReveal();
                 return;
             }
@@ -5861,7 +5866,7 @@ public partial class MainWindow : Window
         // offsets below as screen coordinates and ignores where the target is.
         // What the target actually does is put the menu back on this window's
         // resource chain - and without it the menu came up with the system's
-        // own highlight and a scrollbar on three items (user, with a
+        // own highlight and a scrollbar on three items (reported with a
         // screenshot, 2026-08-11), because a popup with no target resolves
         // implicit styles against nothing.
         menu.PlacementTarget = this;
@@ -5954,8 +5959,27 @@ public partial class MainWindow : Window
             FindMenuItem(menu, "fontWeight") is { } fontWeight &&
             FindMenuItem(menu, "sortMenu") is { } sortMenu &&
             FindMenuItem(menu, "iconStyleMenu") is { } iconStyleMenu &&
-            FindMenuItem(menu, "languageMenu") is { } languageMenu)
+            FindMenuItem(menu, "languageMenu") is { } languageMenu &&
+            FindMenuItem(menu, "imageViewer") is { } imageViewer)
         {
+            if (FindMenuItem(imageViewer, "precacheThumbnails") is { } precacheThumbnails &&
+                FindMenuItem(imageViewer, "clearThumbnailCache") is { } clearThumbnailCache)
+            {
+                precacheThumbnails.IsChecked = _settings.ViewerPrecacheThumbnails;
+                // The row carries the size it would reclaim, and goes grey at
+                // nothing to reclaim - so it answers "is there anything to tidy"
+                // without being pressed.
+                long bytes = Services.ThumbnailCacheService.CurrentBytes;
+                clearThumbnailCache.IsEnabled = bytes > 0;
+                clearThumbnailCache.Header = bytes > 0
+                    ? string.Format(Strings.MenuClearThumbnailCacheSized, FormatCacheSize(bytes))
+                    : Strings.MenuClearThumbnailCache;
+            }
+            else
+            {
+                LogClickLine("options menu: an 이미지 뷰어 row is missing");
+            }
+
             // Nothing expanded means nothing to collapse - grey it out rather
             // than offering a confirmation prompt that would do nothing.
             collapseAllExpanded.IsEnabled = CollectAllExpandedPaths().Count > 0;
@@ -6465,7 +6489,7 @@ public partial class MainWindow : Window
 
     // Carried by every chip rather than by the panel around them: once the row
     // wraps, the only thing between the two lines is what the chips themselves
-    // bring (user, 2026-08-06 - the two lines were touching). It goes on their
+    // bring (2026-08-06 - the two lines were touching). It goes on their
     // TOP, so the panel's own bottom margin still holds the strip off the
     // window's edge and the air above and below comes out even.
     //
@@ -6475,7 +6499,7 @@ public partial class MainWindow : Window
     // an argument - three call sites each writing their own Thickness is how
     // the custom-extension chip came to be the only one in the strip with no
     // row gap at all, sitting 2px above the two chips beside it whenever the
-    // line wrapped (user, with a screenshot, 2026-08-10).
+    // line wrapped (reported with a screenshot, 2026-08-10).
     private const double FooterChipGap = 2;
 
     private static readonly Thickness FooterChipMargin =
@@ -6484,7 +6508,7 @@ public partial class MainWindow : Window
     private void BuildFooterFilterChips()
     {
         // 전체 is deliberately NOT a chip, and it is the only one missing from
-        // the strip - every kind the menu offers has one here (user, 2026-08-10).
+        // the strip - every kind the menu offers has one here (2026-08-10).
         //
         // It was the odd one out twice over. Alone among identical-looking chips
         // it behaved as a radio rather than a toggle - one row, two rules. Worse,
@@ -6499,7 +6523,7 @@ public partial class MainWindow : Window
         // first pass and the strip immediately started lying: switched on from
         // the menu it had no chip here, so clearing every visible chip left a
         // filter running with nothing on screen saying so, and 전체 looked
-        // broken (user, with a screenshot, 2026-08-10). A kind the menu can
+        // broken (reported with a screenshot, 2026-08-10). A kind the menu can
         // switch on is a kind this strip has to be able to switch off.
         foreach (var (category, label) in FileFilterRows)
         {
@@ -6525,7 +6549,7 @@ public partial class MainWindow : Window
 
         // Last of all, and only once there is something to exclude. Its own ink
         // carries the meaning here - a leading "−" was tried and taken out
-        // again (user, 2026-08-10): in a strip of short words it read as
+        // again (2026-08-10): in a strip of short words it read as
         // clutter, and the chip is already the only coloured thing in the row.
         // The menu's copy of this row keeps its minus, since a menu has no
         // colour to spend.
@@ -6622,7 +6646,7 @@ public partial class MainWindow : Window
     // BuildFooterFilterChips.
     //
     // The app name and version used to sit at the head of this strip and were
-    // dropped when the toggles arrived (user's call): a row of controls is not
+    // dropped when the toggles arrived: a row of controls is not
     // a place for a label nobody acts on, and the version is still in 앱 정보,
     // which is where someone actually goes looking for it.
     private void UpdateFileFilterIndicator()
@@ -7372,7 +7396,7 @@ public partial class MainWindow : Window
     }
 
     // The recovery lever: when something feels off - and the fault may be
-    // another program's, not ours (the user's own framing, 2026-08-09) - one
+    // another program's, not ours (2026-08-09) - one
     // click brings the app back clean. Same restart the language change
     // performs, minus its prompt: clicking 다시 시작 IS the intent. State is
     // flushed first (SaveCurrentWidth also persists expanded folders,
@@ -7661,6 +7685,46 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string FormatCacheSize(long bytes)
+        => bytes >= 1024L * 1024 * 1024
+            ? $"{bytes / (1024.0 * 1024 * 1024):F1} GB"
+            : $"{Math.Max(1, bytes / (1024 * 1024))} MB";
+
+    // No confirmation. Nothing is lost that cannot be made again - the pictures
+    // are untouched and the next visit to a folder simply refills it - so a
+    // prompt would only be asking permission to do the thing that was clicked.
+    private void ClearThumbnailCacheMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        Services.ThumbnailCacheService.Clear();
+        // The cells hold their own copies, so what is on screen stays; only the
+        // disk side is gone.
+    }
+
+    private void PrecacheThumbnailsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem)
+        {
+            return;
+        }
+
+        _settings.ViewerPrecacheThumbnails = menuItem.IsChecked;
+        // Switching it ON starts on the folder already open rather than waiting
+        // for the next one; switching it OFF stops the walk but keeps whatever
+        // has already been fetched, since throwing that away would only mean
+        // fetching it again.
+        if (menuItem.IsChecked)
+        {
+            _filmstripTrickleGaveUp = false;
+            _filmstripHeaderPassDone = false;
+            ScheduleFilmstripThumbnails();
+        }
+        else
+        {
+            _filmstripTrickleTimer?.Stop();
+            UpdateFilmstripPrecacheText();
+        }
+    }
+
     // ---- 경로 표시줄 -------------------------------------------------------
     //
     // Two halves sharing one box. Downwards it MIRRORS the tree: whenever the
@@ -7884,7 +7948,7 @@ public partial class MainWindow : Window
     // else TAKES keyboard focus, and much of this window - the footer strip,
     // the tree's empty space below the last row - isn't focusable, so those
     // clicks used to leave a half-finished path sitting in the box (reported
-    // 2026-08-10).
+    // while (2026-08-10).
     private void Window_PreviewMouseDownForPathBar(object sender, MouseButtonEventArgs e)
     {
         if (!PathBarBox.IsKeyboardFocusWithin)
@@ -7985,7 +8049,7 @@ public partial class MainWindow : Window
                 //
                 // Nothing here runs when the path didn't resolve: the text the
                 // user typed stays exactly where they left it, which is what
-                // makes "고쳐서 다시 Enter" possible.
+                // makes fixing the typed path and pressing Enter again possible.
                 _isPathBarDirty = false;
                 UpdatePathBarFromSelection();
             });
@@ -8249,7 +8313,7 @@ public partial class MainWindow : Window
         // Two digits' worth, so rows below ten and above it share one left
         // edge. Not three: nobody keeps a thousand bookmarks, and reserving for
         // a case that will not happen pushes every row right for nothing
-        // (user's point, 2026-08-02). A third digit simply widens the column
+        // (2026-08-02). A third digit simply widens the column
         // when it does turn up.
         Resources["PanelNumberWidth"] = Math.Round(panelNumberFontSize * 1.2);
 
@@ -8275,7 +8339,7 @@ public partial class MainWindow : Window
         double bookmarkMarkerHeight = Math.Round(9.0 * growOnlyScale);
         Resources["BookmarkMarkerHeight"] = bookmarkMarkerHeight;
 
-        // ONE vertical line for both right-edge marks (user's call,
+        // ONE vertical line for both right-edge marks (decided
         // 2026-08-02). A row carrying only a sort icon and a row carrying only
         // a bookmark used to sit 4.5px apart - the icon centred 9.5px in from
         // the right edge, the ribbon 5px - which reads as a wobble down the
@@ -8321,7 +8385,7 @@ public partial class MainWindow : Window
 
         // The viewer caption's three lines - name, metadata, chips - now take
         // the SAME number the tree's rows do, instead of a hard-coded 4 each
-        // (user, 2026-08-10: "이 간격도 행간격 영향을 받게"). Two things follow
+        // (2026-08-10). Two things follow
         // from that and both are the point: it is tighter at the default (3
         // rather than 4), and it is no longer a number only I can change - the
         // 행 간격 option already in the menu reaches it, all the way down to 0
@@ -8424,17 +8488,17 @@ public partial class MainWindow : Window
         // someone zooming the font down is trying to fit more on screen, so
         // the breathing room should give way ahead of the text.
         //
-        // The pivot is 14, not the tree default of 12 (user call, 2026-07-21,
+        // The pivot is 14, not the tree default of 12 (2026-07-21,
         // after trying 12): full breathing room from 14pt up, the tightening
         // curve below. The vertical base of 8 is chosen so the approved
         // values are reproduced exactly at 9pt (3px) and 12pt (6px), while
-        // 14pt gains the "살짝 더" room that was asked for.
+        // 14pt gains the extra room that was asked for.
         //
         // The per-row padding PLATEAUS at 6px - the approved 12pt value -
         // instead of ever reaching the old 8/8+ range (2026-07-23, two rounds
         // of feedback): first a low-resolution remote screen report ("행간이
         // 너무 넓다" - a large-font menu read as almost filling the window),
-        // then the user's own VS Code side-by-side, whose menus stay compact
+        // then VS Code side by side, whose menus stay compact
         // at similar font sizes by keeping rows INSIDE a group tight and
         // spending the air on group boundaries instead. That rhythm is
         // recreated here: row padding stops growing (big text already makes
@@ -8472,9 +8536,9 @@ public partial class MainWindow : Window
         // originally drawn at (11 against 12), but a single step stops reading
         // as a step at all once the tree is large - 19 beside 20 is the same
         // size to the eye, and the strip starts competing with the content it
-        // is only reporting on (user, 2026-08-10, after taking the font to its
-        // largest). Two held that relationship; three is where the user put it
-        // on seeing both strips side by side the same day ("살짝만 더 작게").
+        // is only reporting on (2026-08-10, after taking the font to its
+        // largest). Two held that relationship; three is where it landed
+        // on seeing both strips side by side the same day.
         //
         // Floored at 9 so the small end stays legible, which also gives the
         // user's other request for free: at the smallest tree font the two meet
@@ -8534,8 +8598,8 @@ public partial class MainWindow : Window
         appResources["DialogWidth"] = Math.Round(330.0 * scale);
         // The colour window alone outgrew the shared width when its top
         // gained the two theme zones with dice and its bottom row a fourth
-        // button - 랜덤 전으로 was clipping at 330 (user, 2026-08-09, with
-        // the widening their own suggestion). The other dialogs stay at 330.
+        // button - 랜덤 전으로 was clipping at 330 (2026-08-09; the
+        // widening was the suggested fix). The other dialogs stay at 330.
         appResources["ColorDialogWidth"] = Math.Round(390.0 * scale);
         // The colour window's hex box and the line under it. Wide enough for
         // "#RRGGBB" with room to spare, and the hint a step smaller - set apart
@@ -8607,7 +8671,7 @@ public partial class MainWindow : Window
         // The stepper rows were the one place the menu's row rhythm hiccuped:
         // their +/- buttons stand taller than a line of text, so under the
         // shared padding those rows came out a few pixels taller than every
-        // row around them (user, 2026-08-08). Their padding hands back the
+        // row around them (2026-08-08). Their padding hands back the
         // buttons' overshoot instead - half above, half below - so a stepper
         // row measures the same as a plain row. Floored at zero: below ~11pt
         // the 20px button floor (see MenuStepperButtonSize above - shrinking
@@ -8665,7 +8729,7 @@ public partial class MainWindow : Window
     // host their items in a ScrollViewer - but a ScrollViewer given unbounded
     // height never scrolls, so this is the number that makes it work.
     //
-    // Deliberately NOT the full work area (user's call): a menu that fills the
+    // Deliberately NOT the full work area: a menu that fills the
     // screen edge to edge reads as broken, and the gap left above and below is
     // also the cue that the list continues past what is shown.
     //
@@ -8673,7 +8737,7 @@ public partial class MainWindow : Window
     // scrollbar takes a lane of its own out of the content (see
     // MinimalScrollViewerTemplate), so an ORDINARY right-click menu that only
     // just crosses the line loses visible width for nothing, which is exactly
-    // what got reported at 0.8 ("폭이 좀 많이 줄어든 느낌", 2026-08-02). The cap
+    // what got reported at 0.8 as too great a loss of width (2026-08-02). The cap
     // is here for the runaway list of 65 rows, not for menus that merely happen
     // to be long.
     private void ApplyMenuMaxHeight()
@@ -8754,8 +8818,8 @@ public partial class MainWindow : Window
 
     // Registers/unregisters the currently-running exe under the per-user Run
     // key. Points at whatever path this process was actually launched from,
-    // per the user's call to implement this ahead of a proper installer -
-    // re-toggle after moving/rebuilding the exe if the path changes.
+    // this having been implemented ahead of a proper installer - re-toggle
+    // after moving/rebuilding the exe if the path changes.
     private void SetStartWithWindows(bool enabled)
     {
         try
@@ -9162,7 +9226,7 @@ public partial class MainWindow : Window
         // then back DOWN to the target, and that return trip parks the target
         // on the viewport's bottom edge every time - so each carousel step
         // pinned the selected row to the bottom of the tree even when the row
-        // it stepped to was already comfortably on screen (user report,
+        // it stepped to was already comfortably on screen (reported,
         // 2026-08-09). With the skip, a step between two visible rows moves
         // the viewport not at all, and a step past the edge scrolls the one
         // row the ↓ key would.
@@ -10490,7 +10554,7 @@ public partial class MainWindow : Window
 
             // Deliberately NOT greyed out when nothing is hidden. It was, and a
             // disabled row that still shows its submenu arrow reads as broken
-            // rather than as unavailable (user, 2026-08-02). There is also
+            // rather than as unavailable (2026-08-02). There is also
             // something in there either way now: "숨긴 폴더 표시" leads the
             // submenu, and an empty list says so in words.
 
@@ -10636,7 +10700,7 @@ public partial class MainWindow : Window
     // image, so a click on it reads as "bigger, here", and the default app is
     // still one Enter or double-click away on the row itself. It replaced a
     // "뷰어에서 보기" row that said the same thing in words directly under the
-    // picture (user, 2026-08-09) - and which had nothing left to do whenever
+    // picture (2026-08-09) - and which had nothing left to do whenever
     // the panel was already open, since right-clicking a row selects it and
     // the viewer follows the selection.
     //
@@ -11065,7 +11129,7 @@ public partial class MainWindow : Window
     // handed the shell a dead path. Folding it up leaves one grey, red-dotted
     // drive row that says exactly what is true: this is not reachable right
     // now. The rows are not discarded, only closed, so re-expanding after the
-    // drive returns costs nothing (user's call, 2026-07-26).
+    // drive returns costs nothing (2026-07-26).
     private static void ApplyNetworkOfflineState(FileSystemItem item, bool isOffline)
     {
         item.IsNetworkDriveOffline = isOffline;
@@ -11511,7 +11575,7 @@ public partial class MainWindow : Window
     // It never was one: every other entry in these menus is a place to go or a
     // single thing to release, and this is a one-shot that empties the whole
     // list. As a row it also sat in the very column the cursor travels down
-    // while looking for one bookmark to drop (user, 2026-08-04). It takes the
+    // while looking for one bookmark to drop (2026-08-04). It takes the
     // chip style the per-row 해제 already uses, so a list has one button family
     // rather than two, and it keeps to the right end away from that column.
     //
@@ -11751,7 +11815,7 @@ public partial class MainWindow : Window
     //
     // Takes a folder out of the TREE only. The file search still indexes and
     // finds what is inside it, because a search is a deliberate act of looking
-    // and "분명 있는데 검색이 안 된다" is the worse surprise (decided
+    // and a file that is plainly there but unfindable is the worse surprise (decided
     // 2026-08-02, with the user). The list below is not a nicety either: hiding
     // a folder removes the only row you could have right-clicked to get it
     // back, so the two ship together or not at all.
@@ -11997,12 +12061,12 @@ public partial class MainWindow : Window
         submenu.Items.Clear();
 
         // A "숨긴 폴더 표시" toggle led this list for a while and was taken out
-        // again (2026-08-02, user's call): "숨겼는데 또 별도로 보여준다"의
-        // 개념이 애매하다 - hidden is hidden, and a persistent switch that
+        // again (2026-08-02): "hide it, then show it separately anyway" is a
+        // muddled idea - hidden is hidden, and a persistent switch that
         // un-hides everything without unhiding it is a third state to hold in
         // your head. If it comes back it should be a LIVE peek - held down to
         // reveal, gone on release - which is a different thing from a setting.
-        // "어디로 갔지"는 이 목록이 답한다.
+        // 이 목록이 "그 폴더가 어디 갔나"에 답한다.
         //
         // Keeping SOMETHING in here matters beyond looks: a MenuItem whose
         // Items go to zero reports HasItems=false, WPF stops opening a popup
@@ -12425,7 +12489,7 @@ public partial class MainWindow : Window
         // was missing here alone, which made the two routes to the same list
         // disagree about what could be done with it - and the hidden-folder
         // list, whose one builder serves both menus, never had that problem
-        // (user, 2026-08-04). Tagged like the rows so the next open clears it
+        // (2026-08-04). Tagged like the rows so the next open clears it
         // instead of stacking a second one.
         var clearAll = BuildListClearAllButton(
             Strings.MenuBookmarkClearAll,
@@ -12913,7 +12977,7 @@ public partial class MainWindow : Window
         // that writes the clipboard while we're in the background can leave the
         // notification unread or unreadable (another process still holding it),
         // and then nothing ever revisits the question (2026-07-28, reported as
-        // "브라우저에서 복사해도 그대로 남아 있음").
+        // the mark survives copying from a browser).
         DropCutMarksIfClipboardMovedOn();
         DropCutMarksForVanishedPaths();
     }
@@ -13033,7 +13097,7 @@ public partial class MainWindow : Window
         // The margin is the only part of this that is ours to spend, and it
         // was tried at 30 on 2026-08-09 and REVERTED the same minute: 530ms
         // made the rename box feel like it was opening on clicks that weren't
-        // meant for it ("더 리네임이 자주 되는것 같이 느껴지고"). The wait is
+        // meant for it, which made inline rename feel like it triggered too often. The wait is
         // not the complaint's real subject - the system double-click time is
         // 500 of it - so shortening the margin buys a feeling of misfires
         // rather than a feeling of speed. Leave it at 100.
@@ -13197,7 +13261,7 @@ public partial class MainWindow : Window
         // needs (delete = "next picture, this one gone"). Left to itself, WPF
         // moves the selection to the PARENT folder when the selected row is
         // removed, which yanked the viewer from the picture to a folder icon
-        // (user report, 2026-08-09). Computed before anything is deleted -
+        // (reported 2026-08-09). Computed before anything is deleted -
         // the positions only exist while the rows are all still there.
         FileSystemItem? successor = null;
         var goingAway = new HashSet<FileSystemItem>(items);
@@ -13766,7 +13830,7 @@ public partial class MainWindow : Window
     private void SetExpandedWidthAnchored(double newWidth)
     {
         // newWidth is the whole WINDOW's target. With the viewer panel open,
-        // the outer edge belongs to the VIEWER alone (user's calls,
+        // the outer edge belongs to the VIEWER alone (decided
         // 2026-08-08, two refinements the same hour): the tree's share never
         // moves from here - the middle divider is the one and only way to
         // resize the tree - and the drag simply stops at the viewer's own
@@ -13813,7 +13877,7 @@ public partial class MainWindow : Window
     {
         // Left button only - same latent trap as ExplorerTree_MouseDoubleClick
         // (see its comment): WPF raises this for right-button double-clicks too.
-        // A deliberate no-op while the viewer is open (user, 2026-08-08): the
+        // A deliberate no-op while the viewer is open (2026-08-08): the
         // outer edge then belongs to the viewer (see SetExpandedWidthAnchored),
         // and a "fit the tree" gesture on the viewer's edge fits nothing the
         // user is looking at.
@@ -14060,7 +14124,7 @@ public partial class MainWindow : Window
     //
     // Deliberately kept OUT of every risky geometry path: dock, undock,
     // dock-side change and auto-hide all close the panel first (auto-hide
-    // folding it is the user's call, 2026-08-08), so PositionToWorkArea,
+    // folding it was the decision, 2026-08-08), so PositionToWorkArea,
     // the reveal slide and the band clip never meet a widened window.
 
     private bool _viewerOpen;
@@ -14087,7 +14151,7 @@ public partial class MainWindow : Window
     // Set only by the two chips and the double-click that toggles them, so
     // picking 1:1 once carries down a folder - the wheel and +/- stay a
     // one-off zoom on the picture in front of you and are deliberately NOT
-    // remembered (user, 2026-08-09). Session-only; nothing is persisted.
+    // remembered (2026-08-09). Session-only; nothing is persisted.
     private bool _viewerRestAtActualSize;
     // Which file the zoom above belongs to. The panel reloads the SAME file
     // whenever a width drag settles (to re-decode at the new size), and
@@ -14117,7 +14181,7 @@ public partial class MainWindow : Window
     private bool _viewerPanning;
     // The temporary full cover (middle-click on the picture, Esc to leave).
     // Deliberately NOT the same thing as the 0px divider position tried and
-    // rolled back on 2026-08-08 ("아무리 봐도 어색") - that was proposed as the
+    // rolled back on 2026-08-08 as simply awkward to look at - that was proposed as the
     // resting split, where a strip of tree always belongs; this is a mode
     // entered on purpose and left by the gesture that entered it.
     private bool _viewerFullscreen;
@@ -14130,15 +14194,15 @@ public partial class MainWindow : Window
     // them - it is a ratio, and it moves - so the 맞춤 chip is how you get
     // back to it. Nor is it the floor any more: it was, and that left a large
     // picture unable to zoom out at all past the size it rested at, which no
-    // other viewer does (user, 2026-08-08). The ladder simply runs down to 5%.
+    // other viewer does (2026-08-08). The ladder simply runs down to 5%.
     private static readonly double[] ViewerZoomSteps =
         { 0.05, 0.1, 0.17, 0.25, 0.33, 0.5, 0.67, 1.0, 1.5, 2.0, 3.0, 4.0, 8.0 };
     private System.Windows.Threading.DispatcherTimer? _viewerPreviewTimer;
 
     private const double MinViewerWidth = 240;
-    // 800 → 1600 → 3200 → 3720 the day the split drag landed (user kept
-    // hitting it: the panel is where the pixels should go). 3720 is the
-    // user's own 4K arithmetic - 3840 minus the tree's 120 floor - chosen so
+    // 800 → 1600 → 3200 → 3720 the day the split drag landed, each step
+    // because the previous one kept being hit: the panel is where the pixels
+    // should go. 3720 is 4K arithmetic - 3840 minus the tree's 120 floor - so
     // a near-fullscreen window can give everything but the tree strip to the
     // panel. The split can only grow within the current window anyway - the
     // real bound is the window minus MinTreeSplitWidth - so this cap mostly
@@ -14204,7 +14268,7 @@ public partial class MainWindow : Window
     }
 
     // The panel's one close control, on the divider where the hand already is
-    // rather than in the far corner of the window (user, 2026-08-09). It was
+    // rather than in the far corner of the window (2026-08-09). It was
     // added beside the panel's own X and outlived it: the X sat under the
     // window's X and the pair read as ambiguous, while a chevron folding toward
     // the divider says exactly what it closes (2026-08-10).
@@ -14396,13 +14460,13 @@ public partial class MainWindow : Window
         // What the flat wait cost instead: tapping an arrow key lands around
         // 110-145ms (measured), i.e. right on the interval, so every press
         // restarted the timer and the picture did not change until the hand
-        // stopped. Six presses, nothing, then a jump - "그냥 멍하니 있다 마지막에
-        // 바뀌는 거는 좀 오래된 UX" (user), and they are right.
+        // stopped. Six presses, nothing, then a jump - which reads as dated
+        // interaction design, and that judgement is correct.
         //
         // AUTO-REPEAT IS ONE GESTURE, NOT FIFTY REQUESTS, and that distinction
         // is the whole of this. Going immediate whenever the loader was idle
-        // was tried first and made things visibly worse (user, 2026-08-10:
-        // "엄청 버벅"): a held arrow key changes the selection every 20-30ms,
+        // was tried first and made things visibly worse (2026-08-10:
+        // heavy stuttering): a held arrow key changes the selection every 20-30ms,
         // any interval below that fires on every one of them, and the whole
         // preview update then ran 40-50 times a second. The instrument caught
         // the result as 1.0-1.9 second UI stalls, each one right after a run of
@@ -14521,7 +14585,7 @@ public partial class MainWindow : Window
     // Where the time actually goes when a NAS folder browses badly (Debug only).
     //
     // The user's decisive observation is that the stutter GROWS while tapping
-    // through a folder - "점점 버벅되는 것이 커지는" (2026-08-10) - which is the
+    // through a folder, the stutter growing as it went (2026-08-10) - which is the
     // signature of something accumulating rather than of any single read being
     // slow. Guessing at which thing has already cost one round: the concurrent
     // decodes were real and fixing them bought maybe 30%, so the rest is
@@ -14614,7 +14678,11 @@ public partial class MainWindow : Window
     [System.Diagnostics.Conditional("DEBUG")]
     private void ViewerLoadLogFlush(string reason)
     {
-        if (_viewerLoadLogLines.Count == 0)
+        // A run that fetched hundreds of thumbnails and never crossed a single
+        // 100ms threshold has nothing in the line list and is precisely the run
+        // worth recording, so the totals below decide this too.
+        if (_viewerLoadLogLines.Count == 0 &&
+            Services.ShellThumbnailService.PendingCostCount == 0)
         {
             return;
         }
@@ -14630,12 +14698,20 @@ public partial class MainWindow : Window
             string conditions =
                 $"filmstrip={(ViewerFilmstripHost.Visibility == Visibility.Visible ? "on" : "off")}, " +
                 $"folder={_selectedItem?.Parent?.AllLoadedChildren.Count() ?? 0} items";
+            // The two thumbnail paths, totalled rather than sampled. The
+            // per-file lines above only carry what crossed 100ms, and the header
+            // path is supposed to live well under that - so without this its
+            // cost was invisible in exactly the runs it was built for.
+            var costs = Services.ShellThumbnailService.DrainCostSummary();
             File.AppendAllText(
                 Path.Combine(dir, "viewerload.log"),
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  ({reason}, dropped={_viewerLoadLogDropped}, " +
                 $"{conditions}){Environment.NewLine}" +
                 string.Join(Environment.NewLine, _viewerLoadLogLines) +
-                Environment.NewLine + Environment.NewLine);
+                Environment.NewLine +
+                string.Join(Environment.NewLine, costs) +
+                (costs.Count > 0 ? Environment.NewLine : string.Empty) +
+                Environment.NewLine);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -14652,9 +14728,9 @@ public partial class MainWindow : Window
     // read. Locally that is invisible. Over SMB it is not: a 4K photo is 5-15MB
     // and takes far longer than the 120ms debounce, so holding an arrow key
     // stacked up concurrent reads on one connection and threw all but the last
-    // away once they finished. Reported on a NAS folder of 1329 photos - "엄청
-    // 버벅", and then the NAS itself stopped answering for a while (user,
-    // 2026-08-10).
+    // away once they finished. Reported on a NAS folder of 1329 photos as
+    // heavy stuttering, and then the NAS itself stopped answering for a
+    // while (2026-08-10).
     //
     // A slot, not a queue: a request that arrives while another is running
     // REPLACES whatever was waiting, because nobody wants the picture they
@@ -14821,7 +14897,7 @@ public partial class MainWindow : Window
                 // which way up they are; WIC hands us the pixels and does NOT
                 // apply the tag. The shell DOES, which is why the filmstrip's
                 // thumbnail stood up while the picture beside it lay on its
-                // side (user, 2026-08-10).
+                // side (2026-08-10).
                 int orientation = ReadExifOrientation(frame);
                 bool quarterTurned = orientation is 5 or 6 or 7 or 8;
                 headerDone = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -14941,7 +15017,7 @@ public partial class MainWindow : Window
             _viewerPixelHeight = pixelHeight;
             _viewerDecodedWidth = bitmap.PixelWidth;
 
-            // A new picture arrives fitted (user's call, round 2): a zoom
+            // A new picture arrives fitted (round 2): a zoom
             // carried over from the last file lands somewhere arbitrary in
             // this one, and arrow-keying a folder would show a different
             // corner of every image. A RE-load of the same file is not that -
@@ -15549,7 +15625,7 @@ public partial class MainWindow : Window
         // panel's idea of "how big is this" came from the still it drew before
         // playback - a 1024px stand-in for a 1280×536 film - so a zoom readout
         // would have said 100% at the wrong scale, and 맞춤 would have fitted
-        // the wrong rectangle (user, 2026-08-10). NaturalVideoWidth is the only
+        // the wrong rectangle (2026-08-10). NaturalVideoWidth is the only
         // honest answer and it is not knowable until here.
         //
         // The decoded width is set to match so the full-resolution pass stays
@@ -16216,7 +16292,7 @@ public partial class MainWindow : Window
         // clear, the readout tick fired inside the debounce window and wrote
         // the real playback position back over the clicked one, so the seek
         // that followed 150ms later aimed at where it had started
-        // (2026-08-09, "깜빡깜빡 제자리로 계속 회귀"). Value changing IS the
+        // (2026-08-09, the thumb flickering back to where it started). Value changing IS the
         // gesture, whatever produced it.
         _viewerMediaSeeking = true;
         ShowViewerMediaTime(TimeSpan.FromSeconds(e.NewValue));
@@ -16235,7 +16311,7 @@ public partial class MainWindow : Window
         {
             // Still holding it - a hand that pauses mid-drag has not let go.
             // Committing on the pause was what made the bar feel like it
-            // slipped out of the fingers ("놓친 기분", 2026-08-09): the seek
+            // slipped out of the fingers (2026-08-09): the seek
             // landed, the flag cleared, and the readout tick took the bar
             // back while the hand was still on it. The ticks keep coming and
             // do nothing until the capture ends, which is also the way out if
@@ -16291,7 +16367,7 @@ public partial class MainWindow : Window
         // MediaElement.Position keeps REPORTING the pre-seek time until the
         // seek actually lands - seconds, on a large file - and the readout
         // tick wrote that stale number straight back into the bar, dragging
-        // it home again ("한번 클릭하면 왔다가 다시 제자리로"). So the bar is
+        // it home again. So the bar is
         // LATCHED at what was asked for and left alone until the element
         // reports somewhere near it. The tick cap is a way out for a seek
         // that never lands at all rather than a timing guess.
@@ -16641,9 +16717,9 @@ public partial class MainWindow : Window
 
     // The scale the picture RESTS at. In the panel that is plain fit, ceiling
     // and all - the round-1 call was that a small picture may scale up to fill
-    // the slot. Full screen it stops at 100%: "작은건 작게 큰건 맞추면" (user,
-    // 2026-08-08) - big pictures fit the monitor, small ones stay their own
-    // size rather than being blown up across a 4K screen. That ceiling is also
+    // the slot. Full screen it stops at 100% - small stays small, large is
+    // fitted (2026-08-08): big pictures fit the monitor, small ones stay
+    // their own size rather than blown up across a 4K screen. That ceiling
     // what makes a 3840 picture on a 3840 screen land at exactly 1:1: the raw
     // fit works out a hair over 1.0, because a maximized WPF window is a few
     // pixels wider than the screen it covers, and the ceiling swallows it.
@@ -16670,7 +16746,7 @@ public partial class MainWindow : Window
     // of this - a new string in the zoom readout, four chips re-deciding their
     // checked/enabled state, the cursor, the navigator, the full-resolution
     // decode - was riding every one of those frames, which is what made a
-    // floating resize stutter "이미지 사이즈와 관계 없이" (user, 2026-08-09).
+    // floating resize stutter "이미지 사이즈와 관계 없이" (2026-08-09).
     private void ApplyViewerZoomTransform()
     {
         // The RAW fit here, never the rest scale: this converts to the
@@ -16747,7 +16823,7 @@ public partial class MainWindow : Window
         ViewerZoomOutButton.IsEnabled = display > ViewerZoomSteps[0] + 0.001;
         ViewerZoomInButton.IsEnabled = display < ViewerZoomSteps[^1] - 0.001;
         ViewerNavigatorChip.IsChecked = _settings.ViewerNavigator;
-        // Gone entirely for a film (user, 2026-08-10). The navigator does not
+        // Gone entirely for a film (2026-08-10). The navigator does not
         // apply to one - see UpdateViewerNavigator - so a switch that changes
         // nothing is worse than no switch, and letting it come and go with
         // whether the film happened to be PLAYING would have been worse than
@@ -16771,14 +16847,14 @@ public partial class MainWindow : Window
     private const double ViewerNavigatorMinHostHeight = 160;
     // Proportional to the panel's shorter side, so the same plate that reads
     // right beside a 900px panel doesn't become a postage stamp once the
-    // viewer has the whole 4K screen (user, 2026-08-08). The ceiling is what
+    // viewer has the whole 4K screen (2026-08-08). The ceiling is what
     // keeps "bigger screen" from turning into "map instead of picture".
     // The FLOOR is relative too: a fixed 56px left a postage stamp exactly
-    // where precision is scarcest, the small panel (user, 2026-08-09) - so
+    // where precision is scarcest, the small panel (2026-08-09) - so
     // small panels floor at MinSideShare of the shorter side, capped at
     // MinSide. Note `side` is the plate's LONGER edge: a wide picture's
     // plate height is this divided by the aspect again, which is why the
-    // first bump (120) still read "아까랑 비슷한데요" on a 16:9 image - the
+    // first bump (120) still read as unchanged on a 16:9 image - the
     // floor has to be generous to survive that division. The 0.22 ratio
     // takes over past ~773px; large panels are unchanged.
     private const double ViewerNavigatorSideRatio = 0.22;
@@ -16796,7 +16872,7 @@ public partial class MainWindow : Window
         // worse than none: ViewerImage holds the SHELL PREVIEW still - behind
         // the media element while playing, and in its own right before that -
         // so the plate came back showing a frame from somewhere else in the
-        // film, with a viewport box on it that means nothing (user, with a
+        // film, with a viewport box on it that means nothing (reported with a
         // screenshot, 2026-08-10). Starting playback already collapses the
         // plate; it was the next zoom pass that put it back, and entering full
         // screen is one of those. Widened from "playing" to "a video at all" so
@@ -16844,7 +16920,7 @@ public partial class MainWindow : Window
         // The plate's 1px border sits OUTSIDE the content the box lives in,
         // so every map computation runs on the inner size - mapping against
         // the outer one pushed the box past the right/bottom edge by the
-        // border's width (user, 2026-08-09: "살짝 벗어나네요").
+        // border's width (2026-08-09).
         double innerWidth = Math.Max(1, plateWidth - 2);
         double innerHeight = Math.Max(1, plateHeight - 2);
 
@@ -16891,8 +16967,8 @@ public partial class MainWindow : Window
         UpdateViewerNavigator();
     }
 
-    // The navigator as a MAP (user, 2026-08-09: they kept grabbing the white
-    // box and getting a whole-image pan): press anywhere on the plate and
+    // The navigator as a MAP (2026-08-09, after the white box kept being
+    // grabbed and giving a whole-image pan): press anywhere on the plate and
     // the view CENTRES on that point, then follows the drag - absolute per
     // event, never accumulated, for the pan drag's own reason. The
     // arithmetic is UpdateViewerNavigator's run backwards, and collapses
@@ -17134,7 +17210,7 @@ public partial class MainWindow : Window
         }
 
         // The header goes with it. Without this the mode was just "the window
-        // is maximized" (user, 2026-08-08) - and worse, entering it from a
+        // is maximized" (2026-08-08) - and worse, entering it from a
         // window ALREADY maximized by a header double-click changed nothing
         // but the tree, so the same middle-click looked like it was opening
         // and closing the explorer rather than entering a mode. With the
@@ -17145,8 +17221,8 @@ public partial class MainWindow : Window
         // strip and the close button was the first attempt, on the reasoning
         // that the mode would otherwise have nothing to hold on to - but they
         // eat the picture's own space, so a 3840 image on a 3840 screen had
-        // nowhere to be 1:1 (user, 2026-08-08: "보통 일반적으로 다른
-        // 이미지뷰어들의 1:1은 아무 정보도 표시하지 않습니다"). Margins and
+        // nowhere to be 1:1 (2026-08-08; other image viewers show no chrome
+        // at all at 1:1). Margins and
         // the panel's divider line go for the same reason - a 1px border is
         // still 1px the picture doesn't get. The way out is Esc, Enter or
         // middle-click; that is what every other viewer offers too.
@@ -17193,7 +17269,7 @@ public partial class MainWindow : Window
         // ↑↓ walk the folder in this mode, and they only reach the tree while
         // the tree holds keyboard focus - which it may not, since anything
         // can have taken it before the mode was entered (an undock, a divider
-        // drag, a click on the picture). Reported as "가끔 상하키가 안 먹는다",
+        // drag, a click on the picture). Reported as ↑↓ intermittently not working,
         // and the tell was that it followed those gestures rather than the
         // mode itself. Handing focus back on BOTH crossings makes the keys
         // work the same way every time.
@@ -17243,7 +17319,7 @@ public partial class MainWindow : Window
     // actually on the picture surface (not the icon fallback or an empty
     // panel) and the selected row's path is the one being shown. An active
     // multi-selection is collapsed to the shown file rather than blocking
-    // the menu (user's call, 2026-08-09): the hand that right-clicked one
+    // the menu (2026-08-09): the hand that right-clicked one
     // picture means that one, and the rows un-highlighting says so.
     private void ViewerImageHost_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
@@ -17331,7 +17407,7 @@ public partial class MainWindow : Window
     // "더 보기" (AllLoadedChildren). The count is a claim about the FOLDER:
     // counting only revealed rows made the total grow when 더 보기 was
     // clicked - and not even then, since the counter only recomputes on a
-    // selection change - which read as the counter being wrong (user,
+    // selection change - which read as the counter being wrong (
     // 2026-08-09). Counting the full in-memory list costs nothing and makes
     // the total independent of reveal state entirely; the chevron pays the
     // reveal only at the moment it actually crosses the boundary (see
@@ -17605,14 +17681,24 @@ public partial class MainWindow : Window
     // are protecting. On a NAS a thumbnail costs 869ms and a strip scrolled
     // past 300 photos asks for gigabytes, so waiting for the hand to stop is
     // worth it. On a local disk it costs almost nothing, and the same wait just
-    // made a 170-photo folder fill "느긋하게" (user, 2026-08-11) - a brake
+    // made a 170-photo folder fill "느긋하게" (2026-08-11) - a brake
     // applied where there was nothing to brake.
     private const int FilmstripSettleLocalMs = 90;
     private const int FilmstripSettleNetworkMs = 400;
 
+    // Asked once per folder and kept, not asked per sweep: DriveInfo on a mapped
+    // letter is a question about a device, and this app has already paid for
+    // putting one of those on the UI thread.
+    private bool _filmstripRemote;
+
     private void ApplyFilmstripFetchPace(string? folder)
     {
         bool remote = IsNetworkFolder(folder);
+        _filmstripRemote = remote;
+        // A new folder is a new judgement: the give-up above is about how the
+        // far end was answering, not a verdict on the drive.
+        _filmstripTrickleGaveUp = false;
+        _filmstripHeaderPassDone = false;
         Services.ShellThumbnailService.MaxWorkers = remote ? 2 : 6;
         _filmstripSettleTimer ??= CreateFilmstripSettleTimer();
         _filmstripSettleTimer.Interval = TimeSpan.FromMilliseconds(
@@ -17661,6 +17747,60 @@ public partial class MainWindow : Window
         return timer;
     }
 
+    // How far past the edges of the strip to fetch, so the wheel lands on cells
+    // that are already filled instead of on the fetch itself. Cells already
+    // holding a thumbnail scroll perfectly at any cell size - the cost is all in
+    // the fetch, so the fetch is what moves ahead of the eye.
+    //
+    // The first build of this dropped a network drive off the network
+    // (2026-08-11), and the reasoning that allowed it was nearly right, which is
+    // why it is worth keeping: the work was bounded at 200 cells. It IS bounded
+    // - PER STOP. A long scroll is many stops, so what it adds up to is the
+    // whole folder, which is the multi-GB-of-SMB case the shell path was already
+    // known to cost.
+    //
+    // So the bound that matters is not how MANY are fetched ahead but what each
+    // one is ALLOWED TO COST. Ahead of the strip, a network folder takes the
+    // header answer or none (embeddedOnly) - tens of KB against the whole file.
+    // Whatever has no header of its own simply fills when the user arrives at
+    // it, which is what happened before this feature existed anyway.
+    // One number for both, now that the header path has been measured where it
+    // matters: on a network folder of 1359 photos it answered 322 asks at an
+    // average of 13ms, worst 50ms (2026-08-11). 200 cells of that is a second
+    // and a half of background work.
+    private const int FilmstripLookahead = 100;
+
+    // The same measurement said the other half of this: 128 of those 322 files
+    // - two in five - carry no thumbnail in their own header, and nothing but
+    // the shell can make one for them. Left at that, the strip fills 60% ahead
+    // of the eye and the rest stay empty, which is what the lookahead was built
+    // to stop.
+    //
+    // So the shell is allowed ahead of the strip too, but ONE AT A TIME and
+    // never overlapping: the next speculative shell read is not started until
+    // the last one has landed. That is what makes it self-limiting - a cold
+    // answer takes about 869ms, so a queue that can only ever hold one of them
+    // moves at roughly one file a second instead of saturating every worker for
+    // as long as the wheel keeps turning. The cells the user actually arrives at
+    // do not queue behind this; they are pushed later and the service's stack
+    // serves them first.
+    private const int FilmstripTrickleNetworkMs = 150;
+    private const int FilmstripTrickleLocalMs = 20;
+
+    // A speculative read that takes this long says the far end is struggling,
+    // and speculation is the first thing that should stop when it is. Fetching
+    // ahead is switched off for the rest of the visit to this folder; what the
+    // strip is actually showing carries on being fetched as it always was.
+    private const int FilmstripTrickleGiveUpMs = 2500;
+
+    // Beyond this the thumbnail is let go, so a long walk through a 1359-photo
+    // folder cannot grow the app without limit (each one is 75-190KB alive).
+    // Wider than the fetch window on purpose: with the two equal, a cell would
+    // be dropped by the same sweep that had just decided to fetch it, and small
+    // back-and-forth scrolling would thrash. Going back is cheap anyway - the
+    // second ask is served by Windows' own thumbcache.
+    private const int FilmstripKeepMargin = 150;
+
     private void RequestSettledFilmstripThumbnails()
     {
         if (FindDescendant<ScrollViewer>(ViewerFilmstrip) is not { } scroller ||
@@ -17671,7 +17811,7 @@ public partial class MainWindow : Window
 
         // Swept from what is ON SCREEN NOW, not from the queue of cells that
         // announced themselves. The queue version left cells permanently blank
-        // (user, 2026-08-10: "아무리 기다려도 안 나오는 칸이 있고요"), and the
+        // - cells that never filled however long they were waited on - and the
         // reason is that Loaded fires ONCE, when a container is created: a cell
         // that was queued, found off-screen at settle time and dropped, then
         // scrolled back into view, never announced itself again. Asking the
@@ -17679,25 +17819,294 @@ public partial class MainWindow : Window
         int first = Math.Max(0, (int)scroller.HorizontalOffset - 1);
         int last = Math.Min(_filmstripCells.Count - 1,
             (int)Math.Ceiling(scroller.HorizontalOffset + scroller.ViewportWidth));
+
+        bool remote = _filmstripRemote;
+
+        // Preloading a network folder does the CHEAP pass over all of it first,
+        // once. Three fifths of these files answer from their own header in
+        // 13ms, so the whole folder's worth is about ten seconds - leaving the
+        // slow shell reads, one at a time below, with only the two fifths that
+        // actually need them. Walking the folder in one order and paying 869ms
+        // for files that never needed it would turn ten minutes into twenty.
+        //
+        // Pushed before anything else in this sweep, so it sits at the BOTTOM of
+        // the service's stack and everything nearer the eye is served first.
+        if (remote && _settings.ViewerPrecacheThumbnails && !_filmstripHeaderPassDone)
+        {
+            _filmstripHeaderPassDone = true;
+            for (int index = _filmstripCells.Count - 1; index >= 0; index--)
+            {
+                RequestFilmstripThumbnail(index, ahead: true, remote: true);
+            }
+        }
+
+        // FARTHEST FIRST, and that is load-bearing rather than tidy. The
+        // service's queue is a LIFO stack, so whatever is pushed LAST is served
+        // first - walking outward from the middle would hand the far edge of the
+        // lookahead priority over the cell under the user's eyes.
+        for (int reach = FilmstripLookahead; reach >= 1; reach--)
+        {
+            RequestFilmstripThumbnail(first - reach, ahead: true, remote);
+            RequestFilmstripThumbnail(last + reach, ahead: true, remote);
+        }
+
         for (int index = first; index <= last; index++)
         {
-            var cell = _filmstripCells[index];
-            if (cell.Requested)
+            RequestFilmstripThumbnail(index, ahead: false, remote);
+        }
+
+        // Letting go is the opposite of what preloading was turned on for, so
+        // the two never run together. What that costs is stated where the
+        // setting is declared: the whole folder stays in memory.
+        if (!_settings.ViewerPrecacheThumbnails)
+        {
+            ReleaseDistantFilmstripThumbnails(first, last);
+        }
+
+        _filmstripTrickleRange = (first, last);
+        if (remote || _settings.ViewerPrecacheThumbnails)
+        {
+            StartFilmstripTrickle();
+        }
+    }
+
+    // Where the last sweep was looking, so the trickle picks the file nearest
+    // what is on screen rather than walking the folder in order.
+    private (int First, int Last) _filmstripTrickleRange;
+    private System.Windows.Threading.DispatcherTimer? _filmstripTrickleTimer;
+    private bool _filmstripTrickleBusy;
+    private bool _filmstripTrickleGaveUp;
+    private bool _filmstripHeaderPassDone;
+
+    private void StartFilmstripTrickle()
+    {
+        if (_filmstripTrickleGaveUp)
+        {
+            return;
+        }
+
+        if (_filmstripTrickleTimer is null)
+        {
+            _filmstripTrickleTimer = new System.Windows.Threading.DispatcherTimer();
+            _filmstripTrickleTimer.Tick += (_, _) => TrickleFilmstripThumbnail();
+        }
+
+        // The gap between one speculative read and the next. On a network folder
+        // it is the whole brake; on a local disk there is nothing to brake, and a
+        // folder of 1359 would take three minutes at the network pace for no
+        // reason. One at a time either way - that is what keeps the workers free
+        // for the cells actually being looked at.
+        _filmstripTrickleTimer.Interval = TimeSpan.FromMilliseconds(
+            _filmstripRemote ? FilmstripTrickleNetworkMs : FilmstripTrickleLocalMs);
+        _filmstripTrickleTimer.Start();
+    }
+
+    private void TrickleFilmstripThumbnail()
+    {
+        // The give-up is decided HERE, on a timer that runs whatever the far end
+        // is doing, and not in the callback below. A read that never comes back
+        // is the same outage as one that takes forever, and a guard that waits
+        // for the answer in order to declare the answer late would be waiting
+        // for exactly the thing that has gone wrong. Releasing the slot as well
+        // as stopping matters: a late answer that lands afterwards is still
+        // welcome, it just no longer holds anything up.
+        if (_filmstripTrickleBusy)
+        {
+            double busyMs = (System.Diagnostics.Stopwatch.GetTimestamp() - _filmstripTrickleStartedAt)
+                * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            if (busyMs >= FilmstripTrickleGiveUpMs)
+            {
+                _filmstripTrickleGaveUp = true;
+                _filmstripTrickleBusy = false;
+                _filmstripTrickleTimer?.Stop();
+                ViewerLoadLog($"  trickle STOPPED after {busyMs:F0} ms");
+            }
+
+            return;
+        }
+
+        if (_filmstripTrickleGaveUp || ViewerFilmstripHost.Visibility != Visibility.Visible)
+        {
+            _filmstripTrickleTimer?.Stop();
+            return;
+        }
+
+        // Outward from the middle of what is on screen, so the gaps nearest the
+        // eye close first however far the walk eventually reaches.
+        var (first, last) = _filmstripTrickleRange;
+        int centre = (first + last) / 2;
+        int reachLimit = _settings.ViewerPrecacheThumbnails
+            ? _filmstripCells.Count
+            : FilmstripLookahead + (last - first);
+        FilmstripCell? target = null;
+        for (int reach = 0; reach <= reachLimit; reach++)
+        {
+            target = TrickleCandidate(centre - reach) ?? TrickleCandidate(centre + reach);
+            if (target is not null)
+            {
+                break;
+            }
+        }
+
+        UpdateFilmstripPrecacheText();
+        if (target is null)
+        {
+            // Nothing left within reach - stopped rather than left ticking, and
+            // restarted by the next sweep when the window has moved.
+            _filmstripTrickleTimer?.Stop();
+            return;
+        }
+
+        _filmstripTrickleBusy = true;
+        _filmstripTrickleStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        target.Requested = true;
+        ShellThumbnailService.GetThumbnailOnly(target.Path, FilmstripFetchSize, thumbnail =>
+        {
+            _filmstripTrickleBusy = false;
+            if (thumbnail is not null)
+            {
+                target.Thumbnail = thumbnail;
+            }
+        });
+    }
+
+    private long _filmstripTrickleStartedAt;
+
+    private FilmstripCell? TrickleCandidate(int index)
+    {
+        if (index < 0 || index >= _filmstripCells.Count)
+        {
+            return null;
+        }
+
+        bool precache = _settings.ViewerPrecacheThumbnails;
+        if (!precache &&
+            (index < _filmstripTrickleRange.First - FilmstripLookahead ||
+             index > _filmstripTrickleRange.Last + FilmstripLookahead))
+        {
+            return null;
+        }
+
+        var cell = _filmstripCells[index];
+        if (cell.Requested || cell.Thumbnail is not null)
+        {
+            return null;
+        }
+
+        // Without preloading this only mops up after the cheap pass: AskedAhead
+        // says the file's own header was read and had nothing, which is the only
+        // case worth spending a shell read on speculatively. With preloading on,
+        // the whole folder is the job, so a cell nothing has looked at yet
+        // qualifies too.
+        return precache || cell.AskedAhead ? cell : null;
+    }
+
+    // Beside the counter, and only while there is something to say. Counted
+    // rather than tracked in a field: a cell can gain a thumbnail from three
+    // different paths and a counter incremented in all three is a counter that
+    // will disagree with the strip one day.
+    private void UpdateFilmstripPrecacheText()
+    {
+        if (!_settings.ViewerPrecacheThumbnails ||
+            ViewerFilmstripHost.Visibility != Visibility.Visible)
+        {
+            ViewerPrecacheText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        int have = 0, missing = 0;
+        foreach (var cell in _filmstripCells)
+        {
+            if (cell.Thumbnail is not null)
+            {
+                have++;
+            }
+            else if (!cell.Requested)
+            {
+                missing++;
+            }
+        }
+
+        // Gone the moment nothing is left to fetch. A line that stayed to say
+        // "done" would be a line asking to be read every time a folder opens.
+        if (missing == 0)
+        {
+            ViewerPrecacheText.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        ViewerPrecacheText.Text = string.Format(Strings.ViewerPrecaching, have);
+        ViewerPrecacheText.Visibility = Visibility.Visible;
+    }
+
+    private void RequestFilmstripThumbnail(int index, bool ahead, bool remote)
+    {
+        if (index < 0 || index >= _filmstripCells.Count)
+        {
+            return;
+        }
+
+        var cell = _filmstripCells[index];
+        if (cell.Thumbnail is not null || cell.Requested)
+        {
+            return;
+        }
+
+        // A speculative header-only ask that came back with nothing must NOT
+        // count as "this cell has been asked": the file may well have a
+        // thumbnail the shell can make, and the whole point is that we find that
+        // out when the user actually reaches the cell. AskedAhead is what stops
+        // it being re-asked speculatively for ever in the meantime.
+        bool headerOnly = ahead && remote;
+        if (headerOnly)
+        {
+            if (cell.AskedAhead)
+            {
+                return;
+            }
+
+            cell.AskedAhead = true;
+        }
+        else
+        {
+            cell.Requested = true;
+        }
+
+        // The picture only - this strip never shows a file's dimensions, and
+        // asking for them opened the file a second time per cell (see
+        // GetThumbnailOnly).
+        ShellThumbnailService.GetThumbnailOnly(cell.Path, FilmstripFetchSize, thumbnail =>
+        {
+            if (thumbnail is not null)
+            {
+                cell.Thumbnail = thumbnail;
+            }
+        }, embeddedOnly: headerOnly);
+    }
+
+    // Only cells that actually HOLD a picture are let go. One that is still in
+    // flight (Requested with nothing on it yet) is left alone deliberately:
+    // clearing Requested there would put a second copy of the same read into a
+    // queue the first one is already sitting in, and the answer that lands can
+    // be dropped by the next sweep instead.
+    private void ReleaseDistantFilmstripThumbnails(int first, int last)
+    {
+        for (int index = 0; index < _filmstripCells.Count; index++)
+        {
+            if (index >= first - FilmstripKeepMargin && index <= last + FilmstripKeepMargin)
             {
                 continue;
             }
 
-            cell.Requested = true;
-            // The picture only - this strip never shows a file's dimensions, and
-            // asking for them opened the file a second time per cell (see
-            // GetThumbnailOnly).
-            ShellThumbnailService.GetThumbnailOnly(cell.Path, FilmstripFetchSize, thumbnail =>
+            var cell = _filmstripCells[index];
+            if (cell.Thumbnail is null)
             {
-                if (thumbnail is not null)
-                {
-                    cell.Thumbnail = thumbnail;
-                }
-            });
+                continue;
+            }
+
+            cell.Thumbnail = null;
+            cell.Requested = false;
+            cell.AskedAhead = false;
         }
     }
 
@@ -17724,7 +18133,7 @@ public partial class MainWindow : Window
 
         // The two marks are sized from the cell, not fixed: the strip is
         // resizable, and a badge that reads right on a 64px frame is a speck on
-        // a 200px one and swallows a 40px one (user, 2026-08-10). Floors and
+        // a 200px one and swallows a 40px one (2026-08-10). Floors and
         // ceilings on both, because proportion alone stops being readable at
         // the ends of the range - a 6px play triangle says nothing, and a 60px
         // one is no longer a label on the picture.
@@ -17741,8 +18150,8 @@ public partial class MainWindow : Window
         // sooner, because the two are not the same kind of thing. The badge
         // labels the PICTURE and should stay in proportion to it; the ribbon is
         // the tree's own mark, and a mark is only recognisable as the same mark
-        // if it stays about the same size wherever it is drawn (user, 2026-08-10
-        // - "트리쪽 아이콘 크기와 동일했으면"). The tree draws it at 9px, so the
+        // if it stays about the same size wherever it is drawn (2026-08-10
+        // - it should match the size the tree draws). The tree draws it at 9px, so the
         // range here starts just above that and tops out before it could read
         // as a label on the frame rather than a mark on the file.
         Resources["FilmstripRibbonSize"] = Math.Clamp(Math.Round(height * 0.18), 10, 15);
@@ -17773,7 +18182,7 @@ public partial class MainWindow : Window
         ScheduleFilmstripThumbnails();
     }
 
-    // A cell at a time, not a pixel at a time (user's call, 2026-08-10, and the
+    // A cell at a time, not a pixel at a time (2026-08-10, and the
     // same choice the tree made for its rows). LineLeft/LineRight move by one
     // ITEM because the strip scrolls its content rather than its pixels
     // (CanContentScroll) - which is also what makes the strip virtualize.
@@ -17804,8 +18213,8 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    // Drag-out from the strip (user, 2026-08-10: "썸네일을 드래그해서 다른 앱으로
-    // 바로 연결하고 싶어서요"). The tree has had this since the beginning and the
+    // Drag-out from the strip, so a thumbnail can be dropped straight into
+    // another app (2026-08-10). The tree has had this since the beginning and the
     // search results since they were built; a strip of thumbnails is if anything
     // the surface where it is most obviously wanted, because the picture you are
     // dropping is the thing you are looking at.
@@ -17819,7 +18228,7 @@ public partial class MainWindow : Window
     private string? _filmstripDragCandidate;
 
     // Selecting happens HERE, on the press, and that is a change the drag forced
-    // (user, 2026-08-10: selection "한번에 안되는 경우가 가끔"). It used to
+    // (2026-08-10, after selection intermittently failing on one click). It used to
     // happen on the release, which is fine until a drag can start: past the 4px
     // threshold the modal drag loop swallows the release, so a click with the
     // smallest wobble in it selected nothing at all. Pressing to select and then
@@ -18166,9 +18575,9 @@ public partial class MainWindow : Window
     // cell is a star column, so that is text trimming per row), and then our
     // write moved it back and the grid measured the lot AGAIN. Two full tree
     // measures per frame, scaling with how many rows were realized - which is
-    // exactly why a diagonal drag toward fullscreen was "지진이 난 것 같은"
+    // exactly why a diagonal drag toward fullscreen shook so badly
     // while a top-edge drag (width unchanged, so this method wrote nothing)
-    // was merely rough (user, 2026-08-09).
+    // was merely rough (2026-08-09).
     //
     // Inverted, a window resize costs nothing here: the grid hands the delta
     // to the star panel by itself, the tree's width never changes so its rows
@@ -18272,7 +18681,7 @@ public partial class MainWindow : Window
         // floor, not the window one) of the fixed window width. A floating
         // window briefly had a floor of 0 here - divider pushed all the way,
         // viewer covering the whole window - tried at the user's request and
-        // rolled back the same hour ("아무리 봐도 어색"): a strip of tree
+        // rolled back the same hour as awkward to look at: a strip of tree
         // always remains, in both modes. If full-cover comes back, it wants
         // to be a real fullscreen view (round 3), not a 0px column.
         // Max(min, ...) so a window too narrow for both floors can't hand

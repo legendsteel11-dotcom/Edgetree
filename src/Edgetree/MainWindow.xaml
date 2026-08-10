@@ -225,9 +225,9 @@
              960-unit box - a magnifier fills 672 of it, a close X only 480, a
              chevron 384 - and that difference is the family's own optical
              sizing. Fitting each path's BOUNDS to a common size throws it away
-             and the row stops looking like a set (user, with a screenshot,
+             and the row stops looking like a set (reported with a screenshot,
              2026-08-10: "미묘하게 좀 달라보이는", and the pin, narrowest of
-             them, "좀 작다").
+             them, and reading small).
              So every glyph's Data carries "M0-960H960M0 0H960" at the END: two
              absolute horizontal segments at the box's top and bottom. They
              enclose no area, so a Fill paints nothing (verified by rendering);
@@ -262,7 +262,7 @@
              the style's whole Thickness, it does not merge with it. Writing
              Margin="6,0,0,0" on a chip to push it away from its neighbour
              therefore silently dropped the style's own right margin, and the
-             two chips after it ended up touching (user, with a screenshot,
+             two chips after it ended up touching (reported with a screenshot,
              2026-08-10). Every chip in the row now takes one of these two, so
              the right-hand gap is carried no matter which is applied.
              The group gap separates the three things this row does - set the
@@ -532,7 +532,7 @@
              follows the theme without naming a brush. -->
         <!-- The "해제" button on a bookmark-list / hidden-folder-list row.
              It used to be a "−" that appeared only on the hovered row: compact,
-             but easy to miss entirely and a small target once found (user,
+             but easy to miss entirely and a small target once found (
              2026-08-02: "-가 너무 작아서 놓치기가 쉽네요"). Now it is a word,
              on every row, always there - so the list says what can be done with
              it without being explored first.
@@ -926,7 +926,7 @@
                 Closed="AnyMenu_Closed"
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
             <!-- The GLOBAL refresh - drive list plus every loaded folder -
-                 which had no mouse path at all (user request 2026-08-09):
+                 which had no mouse path at all (requested 2026-08-09):
                  the row menu's 새로고침 needs a row and reads only that
                  folder. Explorer's empty-space menu leads with refresh too.
                  No F5 gesture text on purpose - F5 is the row refresh. -->
@@ -976,7 +976,7 @@
                  "bigger, here" is what a click on it reads as, and the
                  default app is still one Enter or double-click away. This
                  replaced a "뷰어에서 보기" row that said the same thing in
-                 words directly under the picture (user, 2026-08-09).
+                 words directly under the picture (2026-08-09).
                  THIS ITEM AND THE SEPARATOR BELOW MUST STAY THE MENU'S FIRST
                  TWO - TreeViewItem_PreviewMouseRightButtonDown matches them
                  positionally (`menu.Items is [MenuItem, Separator, ..]`).
@@ -1068,8 +1068,8 @@
             <MenuItem Header="{x:Static services:Strings.MenuAddFavorite}"
                     Tag="addFavorite"
                     Click="AddFavorite_Click"/>
-            <!-- A submenu rather than the single toggle it used to be (user
-                 request 2026-07-30, from a relayed enquiry): setting one was the
+            <!-- A submenu rather than the single toggle it used to be
+                 (requested 2026-07-30, from a relayed enquiry): setting one was the
                  only bookmark action reachable by mouse, so the jumps existed
                  only for whoever found the shortcuts, and the options menu's
                  list looked like the whole feature. The first item's header
@@ -1111,7 +1111,7 @@
             </MenuItem>
             <!-- Global, not about the row under the cursor - but this is the
                  menu the hand is already in when a folder turns out to be full
-                 of files you did not want to see (user's request, 2026-08-02).
+                 of files you did not want to see (requested 2026-08-02).
                  Same submenu the options menu and the empty-space menu open. -->
             <MenuItem Header="{x:Static services:Strings.MenuFileFilter}"
                     Tag="fileFilter"
@@ -1242,7 +1242,7 @@
         <!-- The TRAY icon's menu. It lived in WinForms until now (NotifyIcon's
              ContextMenuStrip), which is why it was the one surface in the app
              wearing the system's own look while everything else followed the
-             theme - "쟤만 좀 그래서" (user, 2026-08-11). Declared here rather
+             theme, which left it the odd one out (2026-08-11). Declared here rather
              than built in App.xaml.cs so it takes DarkContextMenuStyle, the
              theme brushes and MenuFontSize like every other menu, including
              following Ctrl +/-.
@@ -1526,12 +1526,26 @@
                         AutomationProperties.AutomationId="autoHideSlide"
                         Click="AutoHideSlideMenuItem_Click"/>
             </MenuItem>
+            <!-- The viewer's own settings, in their own group. These two do not
+                 change what the tree draws, which is what everything above is
+                 about - they are about the pictures and what is kept on disk for
+                 them. -->
+            <MenuItem Header="{x:Static services:Strings.MenuImageViewer}"
+                    AutomationProperties.AutomationId="imageViewer">
+                <MenuItem Header="{x:Static services:Strings.MenuPrecacheThumbnails}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="precacheThumbnails"
+                        Click="PrecacheThumbnailsMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuClearThumbnailCache}"
+                        AutomationProperties.AutomationId="clearThumbnailCache"
+                        Click="ClearThumbnailCacheMenuItem_Click"/>
+            </MenuItem>
             <!-- Everything about the panel beside the tree in one place: WHAT
                  it shows, then - past a separator - WHERE it sits. The
                  position toggle used to be a row of its own out on the menu,
                  named after favorites; folding it in both drops a line and
                  stops the name lying now that the panel can hold either list
-                 (user's call, 2026-08-02).
+                 (2026-08-02).
 
                  Three states rather than a favorites on/off toggle: the panel
                  only used to disappear when the favorites list was EMPTY, so
@@ -1542,7 +1556,7 @@
                  Last in the group, directly above the separator: what follows
                  is the bookmark and hidden-folder lists, which is where
                  someone lands next after choosing what the panel shows
-                 (user's call, 2026-08-04). -->
+                 (2026-08-04). -->
             <MenuItem Header="{x:Static services:Strings.MenuSidePanel}"
                     AutomationProperties.AutomationId="sidePanel">
                 <MenuItem Header="{x:Static services:Strings.MenuSidePanelFavorites}"
@@ -1602,7 +1616,7 @@
                     Click="ColorSettingsMenuItem_Click"/>
             <Separator/>
             <!-- Directly above the font SIZE row, not off on its own among the
-                 checkboxes (user's call, 2026-08-02): the two are the same
+                 checkboxes (2026-08-02): the two are the same
                  question asked twice, and a reader looking for one will look
                  where the other is.
 
@@ -1914,7 +1928,7 @@
             <MenuItem Header="{x:Static services:Strings.MenuResetSettings}"
                     Click="ResetSettingsMenuItem_Click"/>
             <Separator/>
-            <!-- Moved off the header strip (user, 2026-08-10): it sat between
+            <!-- Moved off the header strip (2026-08-10): it sat between
                  the options "..." and the close X, two buttons that get used,
                  and sending the whole window to the tray is not something to
                  do by a slipped click. Here it costs a menu, which is the
@@ -1923,7 +1937,7 @@
                  whole rather than on what it is showing. -->
             <MenuItem Header="{x:Static services:Strings.ToolTipMinimize}"
                     Click="MinimizeButton_Click"/>
-            <!-- The recovery lever (user, 2026-08-09): when something feels
+            <!-- The recovery lever (2026-08-09): when something feels
                  off - possibly another program fighting this one, not even
                  our fault - a restart clears it without hunting the tray
                  icon or changing the language just to reach one. No
@@ -2423,7 +2437,7 @@
                              purely as viewport ÷ content, with no minimum of
                              its own, so a long tree in a short window shrank it
                              to a few pixels - visible, but not something you
-                             can catch with a mouse (user, 2026-08-10, with the
+                             can catch with a mouse (2026-08-10, with the
                              window pulled down to about six rows).
                              Set per orientation because the thumb's long axis
                              is the one being squeezed; forcing the other one
@@ -2748,7 +2762,7 @@
                 TargetType="ToggleButton">
             <!-- Follows Ctrl +/- through the resource, and it is set HERE so
                  that every chip in either strip takes it - the viewer's zoom
-                 row used to be the one place left at a fixed 11 (user, asked
+                 row used to be the one place left at a fixed 11 (asked
                  for both linked, 2026-08-10). What made that possible was
                  giving the two fixed-width readouts (% and the media time)
                  hidden twins instead of hardcoded widths, so a growing font
@@ -2810,7 +2824,7 @@
              template draws its Content into a TextBlock, which is right for
              them and cannot hold a Path - and the filmstrip's switch had been
              making do with box-drawing characters, which read as a broken
-             glyph after a while (user, 2026-08-10).
+             glyph after a while (2026-08-10).
 
              Everything else is inherited, so the lit/hover states and the
              opacity are the row's, not this chip's own. The shape follows the
@@ -2909,7 +2923,7 @@
                                  chip's own hue instead of theirs. A tinted
                                  wash was tried first, so that the coloured ink
                                  could stay in both states, and the on/off
-                                 difference was too quiet to read (user,
+                                 difference was too quiet to read (
                                  2026-08-10). The hue alone already says which
                                  chip this is; the fill has the other job. -->
                             <Trigger Property="IsChecked"
@@ -2944,7 +2958,7 @@
             <!-- These are the ones left carrying a bare glyph once 맞춤, 1:1 and
                  내비게이터 became marks - − + < > and the transport row. The
                  outline is what makes them read as buttons beside the icons,
-                 and the shared box is what keeps the row even (user, asked for
+                 and the shared box is what keeps the row even (asked for
                  both, 2026-08-10). -->
             <Setter Property="BorderBrush"
                     Value="{DynamicResource ViewerChipBorderBrush}"/>
@@ -3057,7 +3071,7 @@
 
         <!-- The little chevron that closes the viewer from the divider, so the
              gesture is where the eye already is instead of a trip to the
-             window's top-right corner (user, 2026-08-09). Its own style rather
+             window's top-right corner (2026-08-09). Its own style rather
              than the header's ToggleButtonStyle: this one is a tall narrow
              plate riding a 1px line, not a square button in a row of squares.
              Resting ink matches the footer chips (0.65) so it reads as the
@@ -3337,7 +3351,7 @@
                      under the scrollbar's hover zone costs nothing. Height
                      follows the font zoom (BookmarkMarkerHeight, grow-only
                      like the sort icon's). The glyph is Material Symbols
-                     "bookmark" (user-provided SVG v2, flat-top ribbon) kept
+                     "bookmark" (SVG v2, flat-top ribbon) kept
                      in its native 960 grid, Stretch doing the fitting - same
                      convention as the header's keep-pin. Fixed mid-blue by
                      design: legible on both themes without adding a 16th
@@ -3647,7 +3661,7 @@
                      everything else rather than red: the whole row already
                      reads as switched off, and a warning colour on top of that
                      is louder than the situation - a NAS being asleep is
-                     normal, not an error (user's call, 2026-07-26). -->
+                     normal, not an error (2026-07-26). -->
                 <DataTrigger Binding="{Binding IsNetworkDriveOffline}"
                         Value="True">
                     <Setter TargetName="NetworkBadge"
@@ -4351,7 +4365,7 @@
                      glyph itself flips between a magnifier and a left chevron
                      ("back to explorer") the same way CollapseAllButton swaps
                      its arrow Data. -->
-                <!-- Column 3, not 2: the pin sits first (user call, 2026-07-22)
+                <!-- Column 3, not 2: the pin sits first (2026-07-22)
                      - the two swapped columns, everything else untouched. -->
                 <Button x:Name="SearchButton"
                         Grid.Column="3"
@@ -4361,7 +4375,7 @@
                         RenderTransform="{StaticResource ShiftUp1px}"
                         ToolTip="{x:Static services:Strings.ToolTipSearch}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <!-- Material Symbols "search" (user-supplied, 2026-08-10),
+                    <!-- Material Symbols "search" (2026-08-10),
                          and the back state it swaps to is "chevron_left" - the
                          same path the viewer's carousel already uses, so that
                          one needed no new file. Both are FILLED now where the
@@ -4385,7 +4399,7 @@
                         Margin="{DynamicResource HeaderButtonMargin}"
                         Visibility="Collapsed"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <!-- Material Symbols "keep" / "keep_off" (user-supplied,
+                    <!-- Material Symbols "keep" / "keep_off" (
                          2026-08-10). The pin was already this family's "keep",
                          but from a separately downloaded file and shown in TWO
                          STATES BY ROTATION: upright = pinned open, lying on its
@@ -4422,7 +4436,7 @@
                      hand-built 16-unit box as the magnifier.
                      A PICTURE, not the eye it started as: an eye is the
                      general "preview" sign, and it promised the panel could
-                     show the contents of any file (user, 2026-08-09) - which
+                     show the contents of any file (2026-08-09) - which
                      it can't; anything that isn't an image gets its shell
                      icon. The tooltip already said 이미지 뷰어 and that was
                      not enough, which is the usual result of leaving the
@@ -4436,8 +4450,8 @@
                         ToolTip="{x:Static services:Strings.ToolTipViewer}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <!-- Material Symbols "image" (Resources/Icons/image_16dp_
-                         E3E3E3_FILL0_wght400_GRAD0_opsz24.svg), the user's own
-                         pick after the hand-drawn one read as "조금 튀는".
+                         E3E3E3_FILL0_wght400_GRAD0_opsz24.svg), chosen after
+                         the hand-drawn one stood out against its neighbours.
                          The weight was settled by eye against the arithmetic
                          and the arithmetic won: this app's glyphs are 1.4 in a
                          16 box = 8.8%, 400/24 works out at about 8.3%, and it
@@ -4474,7 +4488,7 @@
                         RenderTransform="{StaticResource ShiftUp1px}"
                         ToolTip="{x:Static services:Strings.ToolTipCollapseAll}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <!-- Material Symbols "chevron_line_up" (user-supplied,
+                    <!-- Material Symbols "chevron_line_up" (
                          2026-08-10), replacing a hand-drawn filled triangle.
                          The ceiling line is what the triangle never said: this
                          folds everything UP TO the top, it is not a direction.
@@ -4514,7 +4528,7 @@
                         ContextMenu="{StaticResource OptionsMenu}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <Grid>
-                        <!-- Material Symbols "more_horiz" (user-supplied,
+                        <!-- Material Symbols "more_horiz" (
                              2026-08-10). The same three dots the hand-built
                              version drew, which is exactly why it is worth
                              swapping: three Ellipses at 3px with 1px margins
@@ -4533,8 +4547,8 @@
                              clicking stays the normal options menu. -->
                         <!-- Nudged further up-right than its first placement
                              (-2,-3): the 15% glyph grow widened the "..." and
-                             the dot read as overlapping its last dot (user
-                             report on the live v1.2.1 update test). -->
+                             the dot read as overlapping its last dot
+                             (reported on the live v1.2.1 update test). -->
                         <Ellipse x:Name="UpdateAvailableDot"
                                 Width="5"
                                 Height="5"
@@ -4547,7 +4561,7 @@
                 </Button>
                 <!-- The tray-minimise button used to sit here, between the
                      options "..." and the close X. It moved into the options
-                     menu (user, 2026-08-10): it was a one-click way to make
+                     menu (2026-08-10): it was a one-click way to make
                      the whole window disappear, parked between the two header
                      buttons that actually get used, and a slipped click sent
                      the app to the tray. Nothing about it needed to be one
@@ -4566,7 +4580,7 @@
                         RenderTransform="{StaticResource ShiftUp2px}"
                         ToolTip="{x:Static services:Strings.ToolTipMinimize}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <!-- Material Symbols "minimize" (user-supplied, 2026-08-11).
+                    <!-- Material Symbols "minimize" (2026-08-11).
                          It was a "close" X until this button stopped closing
                          anything - it puts the sidebar away now, in whichever
                          way the current mode offers - and an X that ends
@@ -4616,7 +4630,7 @@
                  drag-to-reorder gesture on top of them, none of which a
                  bookmark row wants. Deliberately no reorder here - the order
                  IS the Ctrl+Alt+L/J cycle order, so dragging it would rewire
-                 the shortcuts silently (user's call, 2026-08-02). -->
+                 the shortcuts silently (2026-08-02). -->
             <ListBox x:Name="BookmarkPanelList"
                     Grid.Row="1"
                     Grid.Column="1"
@@ -4654,7 +4668,7 @@
                  and everything below. Position-mode flipping of that border
                  is gone too: the line IS the boundary now, same on either
                  side. -->
-            <!-- Back to 1px, matching every other section divider (user,
+            <!-- Back to 1px, matching every other section divider (
                  2026-08-08). It spent 08-04~08-08 at 2px ("a hairline between
                  two alike lists read as a gap"), but once the viewer panel
                  added another 1px line the odd one out was this one. The
@@ -4877,7 +4891,7 @@
                          even air above and below, which a chip-side bottom margin
                          could not do without this going to zero and the strip
                          sitting on the window's edge.
-                         Which is what it was doing anyway at 3 (user, with a
+                         Which is what it was doing anyway at 3 (reported with a
                          screenshot, 2026-08-10: "칩버튼이 바닥에 아예 붙어서
                          보입니다"). Now 6, taken from the path row above rather
                          than added, so the footer is the same height with the
@@ -4945,7 +4959,7 @@
                                 Margin="4,0,0,0"
                                 Click="SearchBrowseButton_Click"
                                 ToolTip="{x:Static services:Strings.SearchTooltipBrowseFolder}">
-                            <!-- Material Symbols "folder" (user-supplied,
+                            <!-- Material Symbols "folder" (
                                  2026-08-10), replacing a hand-drawn solid
                                  folder. Outlined like the rest of the family,
                                  which also stops it competing with the FILLED
@@ -5035,7 +5049,7 @@
                                 Margin="0,0,3,0"
                                 Click="SearchHistoryButton_Click"
                                 ToolTip="{x:Static services:Strings.SearchTooltipHistory}">
-                            <!-- Material Symbols "list_arrow" (user-supplied,
+                            <!-- Material Symbols "list_arrow" (
                                  2026-08-10), replacing a bare down-chevron.
                                  The chevron only said "down"; this says a LIST
                                  comes down, which is what the button opens -
@@ -5178,7 +5192,7 @@
                                 ToolTip="{x:Static services:Strings.SearchTooltipRefresh}">
                             <Grid Width="15"
                                     Height="15">
-                                <!-- Material Symbols "refresh" (user-supplied,
+                                <!-- Material Symbols "refresh" (
                                      2026-08-10). One path where this was an arc
                                      plus a separate arrowhead triangle - two
                                      shapes that had to be kept meeting each
@@ -5453,7 +5467,7 @@
                                          popup that resolves against the VIEWER
                                          panel's derived inks - so the row came
                                          out barely legible on the menu's own
-                                         surface (user, with a screenshot,
+                                         surface (reported with a screenshot,
                                          2026-08-10). This style is the one the
                                          other in-menu buttons already use, and
                                          it takes MenuForeground.
@@ -5469,7 +5483,7 @@
                                          A first attempt used the menu's plain
                                          text-button style and it read as a
                                          different kind of control in the same
-                                         menu (user, with a screenshot,
+                                         menu (reported with a screenshot,
                                          2026-08-10) - one app, one stepper.
 
                                          No percentage between them, which is
@@ -5501,7 +5515,7 @@
                                                  separate 맞춤 line underneath
                                                  was tried first and the pair
                                                  read as two unrelated controls
-                                                 (user, 2026-08-10). Auto width
+                                                 (2026-08-10). Auto width
                                                  on the middle one - the style's
                                                  square box is cut for a single
                                                  glyph. -->
@@ -5640,7 +5654,7 @@
                                      leaves a file marked for a move that can't
                                      happen. Greyed rather than hidden - the rows
                                      every other selection has should not vanish
-                                     and move everything under them (user,
+                                     and move everything under them (
                                      2026-08-10). -->
                                 <MenuItem x:Name="ViewerCutItem"
                                         Header="{x:Static services:Strings.MenuCut}"
@@ -5694,7 +5708,7 @@
                          so the host stays a Border with one child and its clip
                          is untouched; it sizes itself to the picture's aspect
                          in code.
-                         The plate is a MAP now, not read-only (user,
+                         The plate is a MAP now, not read-only (
                          2026-08-09 - they kept grabbing the white box and
                          getting a whole-image pan instead): press anywhere on
                          it and the view centres there, then follows the drag.
@@ -5726,9 +5740,9 @@
                             <!-- Full strength, dimmed by the SCRIM below and
                                  only OUTSIDE the box - the first design
                                  dimmed the whole thumbnail and brightened
-                                 the box's fill, and the user asked for the
-                                 inverse (2026-08-09): the part you are
-                                 looking at stays true, the rest steps back. -->
+                                 the box's fill, and the inverse was asked for
+                                 (2026-08-09): the part you are looking at
+                                 stays true, the rest steps back. -->
                             <Image x:Name="ViewerNavigatorImage"
                                     Stretch="Fill"
                                     RenderOptions.BitmapScalingMode="LowQuality"/>
@@ -5785,7 +5799,7 @@
                          had one (ViewerImageHost is the Border that carries it);
                          the media element is that Border's SIBLING, so nothing
                          held it in and a zoomed film simply grew out over the
-                         tree (user, with a screenshot, 2026-08-10). Its own
+                         tree (reported with a screenshot, 2026-08-10). Its own
                          Border, rather than clipping the row's Grid, so the play
                          overlay and the navigator keep the bounds they had. -->
                     <Border Grid.Row="0"
@@ -5806,7 +5820,7 @@
                             BufferingEnded="ViewerMedia_BufferingEnded">
                         <!-- Scale only, and centred. The picture's transform
                              group carries a pan as well; a film does not, by
-                             the user's own call (2026-08-10) - left-drag is
+                             decided 2026-08-10 - left-drag is
                              already play/pause here, and splitting it by
                              whether the film happens to be zoomed would be the
                              conditional gesture this app keeps refusing. So the
@@ -5823,7 +5837,7 @@
                          it.
 
                          A filled box behind the text rather than an outline or a
-                         shadow (user, 2026-08-10, "디즈니플러스 자막 같이"): a
+                         shadow (2026-08-10, "디즈니플러스 자막 같이"): a
                          box is one shape that works over any frame, while an
                          outline needs a second pass over every glyph and a
                          shadow needs an effect - and both are the kind of thing
@@ -5860,7 +5874,7 @@
                             Cursor="Hand"
                             Click="ViewerPlayOverlay_Click"
                             ToolTip="{x:Static services:Strings.ViewerPlay}">
-                        <!-- Light plate, dark mark, no outline (user, 2026-08-10:
+                        <!-- Light plate, dark mark, no outline (2026-08-10:
                              the dark-plate-and-white-triangle version "다른데
                              플레이버튼하고 너무 같아서"). Both halves are
                              translucent, so the still frame reads through the
@@ -5903,7 +5917,7 @@
                     <!-- Name, a wide gap, then ONE metadata line (resolution ·
                          size · date) - briefly three lines, folded back the
                          same day: nothing more is coming to this caption
-                         (user, 2026-08-08). The name wears the tree's own
+                         (2026-08-08). The name wears the tree's own
                          file-name colour; the metadata line wears the footer
                          chips' unchecked ink (ForegroundText at the chips'
                          own 0.65 - matching them is the user's spec here, so
@@ -5919,7 +5933,7 @@
 
                          CanContentScroll, and the wheel handler that goes with
                          it, are what make this move a CELL at a time instead of
-                         a pixel at a time (user's call, and the same choice the
+                         a pixel at a time (and the same choice the
                          tree made for its rows). Virtualized in the same
                          breath: it is what keeps a 257-frame folder to the
                          dozen containers on screen, and the shell is only asked
@@ -5985,7 +5999,7 @@
                                                      under the cursor sat right
                                                      next to the one outline that
                                                      was supposed to mean
-                                                     something ("좀 헷갈립니다",
+                                                     something (confusing as it stood,
                                                      user 2026-08-10).
 
                                                      Selection keeps the line -
@@ -6080,7 +6094,7 @@
                                                          follows 색상 설정, so it
                                                          is the colour the user
                                                          actually chose to mean
-                                                         "this one" (user,
+                                                         "this one" (
                                                          2026-08-10). A border
                                                          here rather than a fill,
                                                          because a fill behind a
@@ -6120,7 +6134,7 @@
                                              fainter than it: this one is a label
                                              saying what the frame is, not a
                                              control asking to be pressed
-                                             (user, 2026-08-10).
+                                             (2026-08-10).
 
                                              Moving it out of the corner also
                                              left the corner free, which is where
@@ -6210,7 +6224,7 @@
                             Grid.Row="2"
                             Margin="10,0,10,10">
                         <!-- Carousel row, < 35 / 257 > ABOVE the caption - the
-                             user's own placement (2026-08-09), and the one that
+                             the placement chosen (2026-08-09), and the one that
                              dissolves the recorded conflict: chevrons OVER the
                              picture would sit exactly where the pan drag lives
                              and couldn't take the navigator's hit-test escape,
@@ -6229,7 +6243,7 @@
                              (same trick as ViewerZoomText's fixed width). -->
                         <!-- One step ABOVE the zoom strip: the carousel is the
                              caption's primary control and read too small at the
-                             strip's own size (user, 2026-08-09). That was a
+                             strip's own size (2026-08-09). That was a
                              literal 13 against 11 until the strip started
                              following Ctrl +/-; it is the same relationship,
                              now expressed as the resource that holds it at
@@ -6240,7 +6254,7 @@
                                 Margin="0,0,0,6"
                                 Visibility="Collapsed">
                             <!-- Material Symbols "chevron_left" / "chevron_right"
-                                 (user-supplied, 2026-08-10). These two were the
+                                 (2026-08-10). These two were the
                                  last ASCII in the strip: < and > are a pair of
                                  angle brackets doing an arrow's job, and they
                                  kept a local FontSize purely to be legible at
@@ -6280,6 +6294,23 @@
                                         Fill="{Binding Foreground,
                                             RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
+                            <!-- Preloading says so HERE, beside the counter it
+                                 is filling in, and nowhere else: no popup and
+                                 no dialog. It appears only while the walk is
+                                 running and takes its width from its own text,
+                                 so the counter and chevrons never move because
+                                 of it - they sit to the LEFT of it. -->
+                            <!-- A SMALLER font is what makes this the secondary
+                                 thing on the row; the 0.65 is the same ink its
+                                 neighbour carries, so the two read as one strip
+                                 rather than one of them being dimmed. -->
+                            <TextBlock x:Name="ViewerPrecacheText"
+                                    Margin="{DynamicResource ViewerChipGroupMargin}"
+                                    FontSize="{DynamicResource FooterChipFontSize}"
+                                    Foreground="{DynamicResource ForegroundText}"
+                                    Opacity="0.65"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed"/>
                         </StackPanel>
                         <TextBlock x:Name="ViewerFileName"
                                 Foreground="{DynamicResource FileNameForeground}"
@@ -6309,7 +6340,7 @@
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
                                 Margin="{DynamicResource ViewerCaptionChipRowGap}">
-                            <!-- Material Symbols "fit_screen" (user-supplied,
+                            <!-- Material Symbols "fit_screen" (
                                  2026-08-10), same convention as the filmstrip
                                  chip below: native 960 grid, Stretch doing the
                                  fitting, Fill following the button's own
@@ -6329,7 +6360,7 @@
                                         Fill="{Binding Foreground,
                                             RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
                             </ToggleButton>
-                            <!-- Material Symbols "view_real_size" (user-supplied,
+                            <!-- Material Symbols "view_real_size" (
                                  2026-08-10) - a drawn 1:1, which is what the
                                  word was. It went to an icon after the two
                                  beside it did: a lone word between three marks
@@ -6345,7 +6376,7 @@
                                         Fill="{Binding Foreground,
                                             RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
                             </ToggleButton>
-                            <!-- Material Symbols "remove" / "add" (user-supplied,
+                            <!-- Material Symbols "remove" / "add" (
                                  2026-08-10), replacing the − and + characters
                                  they were drawn with. A minus sign and a drawn
                                  minus look the same until the row around them
@@ -6394,7 +6425,7 @@
                                             RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                             <!-- Material Symbols "picture_in_picture_alt"
-                                 (user-supplied, 2026-08-10) - a small framed
+                                 (2026-08-10) - a small framed
                                  box inside a larger one, which is the
                                  navigator's plate drawn at chip size. -->
                             <ToggleButton x:Name="ViewerNavigatorChip"
@@ -6410,7 +6441,7 @@
                                             RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
                             </ToggleButton>
                             <!-- Moved here from beside the carousel counter
-                                 (user, 2026-08-10). It used to sit next to
+                                 (2026-08-10). It used to sit next to
                                  < 35 / 257 > on the argument that the counter IS
                                  the filmstrip with the pictures taken out; what
                                  outweighed it is that this row is now where the
@@ -6422,7 +6453,7 @@
                                  filmstrip can no longer be turned on or off
                                  with a film open.
 
-                                 Material Symbols "view_column" (user-supplied,
+                                 Material Symbols "view_column" (
                                  2026-08-10). Two box-drawing characters were
                                  tried before it and both failed the same way:
                                  ▤ read as a transport control, and ▯▯▯ read as
@@ -6452,7 +6483,7 @@
                             <!-- The marks ride WITH the bar rather than beside
                                  it: a tick is only meaningful against the
                                  position it points at. Underneath rather than
-                                 on top (user, 2026-08-10) - above, they sat in
+                                 on top (2026-08-10) - above, they sat in
                                  the space the thumb travels through and read as
                                  part of the control being dragged. Hit-testing
                                  off, so the whole bar stays one seek target and
@@ -6478,7 +6509,7 @@
                                     HorizontalAlignment="Center"
                                     Margin="{DynamicResource ViewerMediaButtonRowMargin}">
                                 <!-- Material Symbols "play_arrow" / "pause"
-                                     (user-supplied, 2026-08-10). Both marks
+                                     (2026-08-10). Both marks
                                      live here at once and one is shown, the way
                                      the mute toggle beside them works: swapping
                                      a Content string was fine for two
@@ -6506,7 +6537,7 @@
                                                     RelativeSource={RelativeSource AncestorType=Button}}"/>
                                     </Grid>
                                 </Button>
-                                <!-- Material Symbols "stop" (user-supplied,
+                                <!-- Material Symbols "stop" (
                                      2026-08-10). Outlined rather than solid,
                                      like the rest of this set - which is why
                                      they are taken from the family rather than
@@ -6525,14 +6556,14 @@
                                                 RelativeSource={RelativeSource AncestorType=Button}}"/>
                                 </Button>
                                 <!-- Back to the beginning. The strip had a mark
-                                     button here and this replaced it (user,
+                                     button here and this replaced it (
                                      2026-08-10): marking a position is a thing
                                      you do occasionally and can reach for in a
                                      menu, while starting over is the control
                                      every player has in front of you - and the
                                      blue ribbon was the one loud thing in a row
                                      of quiet glyphs. -->
-                                <!-- Material Symbols "first_page" (user-supplied,
+                                <!-- Material Symbols "first_page" (
                                      2026-08-10), and the right pick over
                                      skip_previous: this button goes to the
                                      START of the film, where skip_previous
@@ -6575,7 +6606,7 @@
                                      muted, so the icon itself never has to be
                                      swapped for another shape. -->
                                 <!-- Material Symbols "volume_up" / "volume_off"
-                                     (user-supplied, 2026-08-10), replacing a
+                                     (2026-08-10), replacing a
                                      hand-drawn speaker with a stroked slash
                                      laid over it. The family draws the muted
                                      state as its own whole shape, so the two
@@ -6636,7 +6667,7 @@
                                         Click="ViewerMediaOpenExternal_Click"
                                         ToolTip="{x:Static services:Strings.ViewerOpenExternally}">
                                     <!-- Material Symbols "open_in_new"
-                                         (user-supplied, 2026-08-10), replacing
+                                         (2026-08-10), replacing
                                          a hand-drawn pair of stroked lines.
                                          Same glyph, drawn by the family the
                                          rest of the row comes from - stroke
@@ -6656,7 +6687,7 @@
                          It was directly under the WINDOW's close X and drawn
                          at a different size, so the corner offered two X's
                          that did different things and neither said which
-                         (user, with a screenshot, 2026-08-10). Closing the
+                         (reported with a screenshot, 2026-08-10). Closing the
                          panel already had two controls that say what they
                          close - the collapse chevron on the divider, which
                          points at the thing it folds, and the header's viewer
@@ -6712,7 +6743,7 @@
                     Click="ViewerCollapseButton_Click"
                     ToolTip="{x:Static services:Strings.ViewerClose}">
                 <!-- Material Symbols "chevron_left" - the carousel's own
-                     previous/next mark, brought here (user, 2026-08-10) after
+                     previous/next mark, brought here (2026-08-10) after
                      arrow_menu_close was tried and dropped: its vertical bar
                      ran parallel to the divider a few pixels away, and at the
                      size this lane allows it was both small and clipped.
@@ -6729,8 +6760,8 @@
                      size the lane actually has room for.
 
                      It takes ViewerChipIconSize - the CAROUSEL's number, not a
-                     new one - because it is the carousel's mark: the user asked
-                     for the two to match (2026-08-10), and sharing the resource
+                     new one - because it is the carousel's mark, and the two
+                     were asked to match (2026-08-10); sharing the resource
                      is what keeps them matching through Ctrl +/- rather than
                      just today. Ink lands at 6.7 x 11 in a 14 x 40 plate.
 
