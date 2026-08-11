@@ -11851,6 +11851,27 @@ public partial class MainWindow : Window
             return;
         }
 
+        // THUMBS.DB IS THE APP'S OWN REFLECTION, and it cost a NAS its footing
+        // (2026-08-12). Windows keeps thumbnails for a NETWORK folder in a
+        // Thumbs.db inside that folder - not in the local central cache it uses
+        // for local disks - so asking the shell for thumbnails writes into the
+        // very folder being looked at. Every write is a change here; the change
+        // queues a refresh; the refresh is a 2,400-entry SMB enumeration that
+        // freezes the window for up to 1.5s; and while it runs the filmstrip
+        // asks for the next thumbnail. Measured at 48 refreshes in 25 seconds,
+        // with the share slowing from 1.6s to 5.9s under its own load.
+        //
+        // Ignored by NAME rather than by attribute: asking the disk whether the
+        // file is hidden is a network round trip of its own, on the watcher's
+        // thread, for a file this tree would never draw either way. desktop.ini
+        // rides along for the same reason - Explorer writes it, nobody sees it.
+        string changed = Path.GetFileName(e.FullPath);
+        if (string.Equals(changed, "Thumbs.db", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(changed, "desktop.ini", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
         Dispatcher.BeginInvoke(() =>
         {
             QueueExternalRefresh(folderPath);
@@ -12085,11 +12106,35 @@ public partial class MainWindow : Window
         // Two ways this folder can be the one on screen: it holds the file the
         // panel is showing (the counter and the strip walk its siblings), or it
         // IS the selected folder, whose own children the strip stands in for.
-        if (ReferenceEquals(shown.Parent, folder) || ReferenceEquals(shown, folder))
+        if (!ReferenceEquals(shown.Parent, folder) && !ReferenceEquals(shown, folder))
         {
-            UpdateViewerCarousel();
+            return;
         }
+
+        // ONLY WHEN THE LIST ACTUALLY GREW OR SHRANK, and this is not tidiness -
+        // it closes a loop that took a NAS down (2026-08-12). UpdateViewerCarousel
+        // kicks the filmstrip's trickle; the trickle reads files off the share to
+        // get their thumbnails; reading them is a change the watcher reports; the
+        // watcher's refresh lands back here. Merges were arriving every second or
+        // two, each one a fresh 2,400-entry enumeration over SMB, and the reads
+        // stacked until the folder took six seconds to answer.
+        //
+        // A merge that changed nothing has nothing for the strip either, so the
+        // count is the whole test - and a file appearing or going, which is what
+        // this was written for, always moves it.
+        int now = GetViewerCarouselItems(shown).Count;
+        if (now == _viewerCarouselCount)
+        {
+            return;
+        }
+
+        UpdateViewerCarousel();
     }
+
+    // What the counter last said, so a refresh that found the same folder it
+    // left can be recognised and dropped. Written by UpdateViewerCarousel, which
+    // is the one place the list is actually taken.
+    private int _viewerCarouselCount = -1;
 
     // ----- 북마크 (책갈피) --------------------------------------------------
     //
@@ -20004,6 +20049,10 @@ public partial class MainWindow : Window
         }
 
         var images = GetViewerCarouselItems(current);
+        // Recorded here, where the list is actually taken, so a later refresh
+        // can tell "this folder changed" from "this folder was read again and
+        // is the same" - see NoteFolderChangedForViewer, and the loop it stops.
+        _viewerCarouselCount = images.Count;
         int index = images.IndexOf(current);
         if (index < 0)
         {
