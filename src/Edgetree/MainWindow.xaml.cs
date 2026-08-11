@@ -1575,6 +1575,12 @@ public partial class MainWindow : Window
         // themselves, so there is nothing to name.
         ExitLog.Record("window closing: outside the app's own controls");
 
+        // The viewer's measurements are held in memory and written when the
+        // viewer closes, so a session that ended with it still open threw away
+        // everything it had measured - including the run that was being watched
+        // (2026-08-12). Debug-only, like the log itself.
+        ViewerLoadLogFlush("app closing");
+
         if (!_settingsResetPending)
         {
             SaveCurrentWidth();
@@ -15858,6 +15864,19 @@ public partial class MainWindow : Window
     private System.Windows.Threading.DispatcherTimer? _uiStallTimer;
     private long _uiStallLastTick;
 
+    // WHAT THE COLLECTOR DID ACROSS THE SAME GAP. The stall line said how long
+    // the thread was gone but never where it went, and on 2026-08-12 that left
+    // one suspect standing with no way to charge it: a 2,404-item folder froze
+    // for up to 1563ms with thumbs-in-flight at 0, a 43ms strip rebuild and no
+    // slow read anywhere near it - every path that does actual work ruled out.
+    // The strip holds ~1000 thumbnails of 256KB, so a folder change makes a
+    // quarter of a gigabyte of large objects unreachable at once, and a gen2
+    // pass stops every thread including this timer's.
+    //
+    // Sampled EVERY tick, not only on the late ones, or the delta would cover
+    // whatever time has passed since the last stall rather than the stall.
+    private int _uiStallGen0, _uiStallGen1, _uiStallGen2;
+
     [System.Diagnostics.Conditional("DEBUG")]
     private void StartUiStallWatch()
     {
@@ -15878,12 +15897,25 @@ public partial class MainWindow : Window
             long now = System.Diagnostics.Stopwatch.GetTimestamp();
             double late = (now - _uiStallLastTick) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
             _uiStallLastTick = now;
+
+            int g0 = GC.CollectionCount(0);
+            int g1 = GC.CollectionCount(1);
+            int g2 = GC.CollectionCount(2);
             if (late >= 200)
             {
-                ViewerLoadLog($"  *** UI STALL {late,7:F0} ms ***");
+                ViewerLoadLog(
+                    $"  *** UI STALL {late,7:F0} ms ***  gc {g0 - _uiStallGen0}/{g1 - _uiStallGen1}/" +
+                    $"{g2 - _uiStallGen2}  heap {GC.GetTotalMemory(false) / (1024 * 1024),5} MB");
             }
+
+            _uiStallGen0 = g0;
+            _uiStallGen1 = g1;
+            _uiStallGen2 = g2;
         };
         _uiStallLastTick = System.Diagnostics.Stopwatch.GetTimestamp();
+        _uiStallGen0 = GC.CollectionCount(0);
+        _uiStallGen1 = GC.CollectionCount(1);
+        _uiStallGen2 = GC.CollectionCount(2);
         _uiStallTimer.Start();
     }
 
