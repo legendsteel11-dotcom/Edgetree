@@ -19044,6 +19044,14 @@ public partial class MainWindow : Window
         // lives outside this panel already for that reason.
         ViewerCaptionPanel.Visibility = chrome;
         ViewerImage.Margin = on ? default : new Thickness(10);
+        // THE FILM TOO. This line was missing, and the picture element beside it
+        // has always had it: a 10px margin is right in the panel, where the
+        // picture is an object sitting on a surface next to the tree, and wrong
+        // the moment the surface is the whole screen. It showed as a thin black
+        // border all the way round a full-screen film - separate from the film's
+        // own letterbox bars, which come from its aspect ratio and can only be
+        // removed by cropping it (2026-08-11).
+        ViewerMedia.Margin = on ? default : new Thickness(10);
 
         // BLACK behind the picture in full screen, and only there. The panel's
         // own backdrop is a colour someone chose to sit beside their tree, and
