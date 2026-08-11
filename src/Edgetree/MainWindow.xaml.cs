@@ -6191,6 +6191,12 @@ public partial class MainWindow : Window
             FindMenuItem(menu, "languageMenu") is { } languageMenu &&
             FindMenuItem(menu, "imageViewer") is { } imageViewer)
         {
+            if (FindMenuItem(imageViewer, "thumbnailSizeRow") is { } thumbnailSizeRow)
+            {
+                UpdateStepperRow(thumbnailSizeRow, FilmstripMaxFetchSize,
+                    FilmstripFetchSteps[0], FilmstripFetchSteps[^1]);
+            }
+
             if (FindMenuItem(imageViewer, "precacheThumbnails") is { } precacheThumbnails &&
                 FindMenuItem(imageViewer, "clearThumbnailCache") is { } clearThumbnailCache)
             {
@@ -6959,6 +6965,62 @@ public partial class MainWindow : Window
     private static MenuItem? FindMenuItem(ItemsControl menu, string id)
         => menu.Items.OfType<MenuItem>()
             .FirstOrDefault(item => System.Windows.Automation.AutomationProperties.GetAutomationId(item) == id);
+
+    private void ThumbnailMaxSizeDecrement_Click(object sender, RoutedEventArgs e)
+        => StepThumbnailMaxSize(sender, -1);
+
+    private void ThumbnailMaxSizeIncrement_Click(object sender, RoutedEventArgs e)
+        => StepThumbnailMaxSize(sender, +1);
+
+    // Moves along the fetch steps rather than by pixels: the sizes in between
+    // buy nothing - a thumbnail is either big enough for the cell or it is not
+    // - and stepping one pixel at a time through a range this wide would be a
+    // control nobody could reach the end of.
+    //
+    // Applied at once, including to the strip already on screen. The pictures
+    // in hand are the wrong size the moment this changes, and leaving them
+    // until the next folder would make the setting look like it had done
+    // nothing.
+    private void StepThumbnailMaxSize(object sender, int direction)
+    {
+        int current = FilmstripMaxFetchSize;
+        int index = Array.IndexOf(FilmstripFetchSteps, current);
+        if (index < 0)
+        {
+            index = 0;
+            for (int i = 0; i < FilmstripFetchSteps.Length; i++)
+            {
+                if (FilmstripFetchSteps[i] <= current)
+                {
+                    index = i;
+                }
+            }
+        }
+
+        int next = FilmstripFetchSteps[Math.Clamp(index + direction, 0, FilmstripFetchSteps.Length - 1)];
+        if (next == _settings.ViewerThumbnailMaxSize)
+        {
+            return;
+        }
+
+        _settings.ViewerThumbnailMaxSize = next;
+        _settingsService.Save(_settings);
+
+        if (FilmstripFetchSize != _filmstripFetchStep)
+        {
+            _filmstripFetchStep = FilmstripFetchSize;
+            foreach (var cell in _filmstripCells)
+            {
+                cell.Thumbnail = null;
+                cell.Requested = false;
+                cell.AskedAhead = false;
+            }
+
+            ScheduleFilmstripThumbnails();
+        }
+
+        UpdateStepperRow(sender, next, FilmstripFetchSteps[0], FilmstripFetchSteps[^1]);
+    }
 
     private void MaxItemsPerFolderDecrement_Click(object sender, RoutedEventArgs e)
         => StepMaxItemsPerFolder(sender, -1);
@@ -20380,20 +20442,43 @@ public partial class MainWindow : Window
     // would have drawn the same strip (2026-08-12).
     private static readonly int[] FilmstripFetchSteps = { 32, 48, 64, 96, 128, 160, 192, 224, 256 };
 
+    // The user's ceiling on all of it (옵션 메뉴 → 이미지 뷰어 → 썸네일 최대 크기).
+    // Past this the strip is drawn LARGER from the same picture rather than
+    // fetched bigger, which is the whole point: a taller strip stops costing
+    // memory once the number that multiplies by the folder's size is pinned.
+    private int FilmstripMaxFetchSize => Math.Clamp(
+        _settings.ViewerThumbnailMaxSize, FilmstripFetchSteps[0], FilmstripFetchSteps[^1]);
+
     private int FilmstripFetchSize
     {
         get
         {
-            double needed = FilmstripCellHeight * FilmstripAspect;
+            // IN REAL PIXELS, not in the layout's own units. A cell height is a
+            // DIP, so on a 150% display a 64 "pixel" cell is 96 of the pixels
+            // the picture is actually drawn into - and fetching for the DIP
+            // would hand a 96px thumbnail to a 144px slot and let WPF blow it
+            // up. The whole point of choosing a size is that it matches what is
+            // drawn, and on a high-DPI screen the two are not the same number
+            // (raised 2026-08-12, along with the app's own Ctrl +/- scaling -
+            // which moves the CHIPS around the strip rather than the cells, so
+            // it does not enter this).
+            double scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+            double needed = FilmstripCellHeight * FilmstripAspect * (scale > 0 ? scale : 1);
+            int cap = FilmstripMaxFetchSize;
             foreach (int step in FilmstripFetchSteps)
             {
+                if (step >= cap)
+                {
+                    return cap;
+                }
+
                 if (step >= needed)
                 {
                     return step;
                 }
             }
 
-            return FilmstripFetchSteps[^1];
+            return cap;
         }
     }
 

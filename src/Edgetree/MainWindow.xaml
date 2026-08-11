@@ -1618,6 +1618,45 @@
                 <MenuItem Header="{x:Static services:Strings.MenuClearThumbnailCache}"
                         AutomationProperties.AutomationId="clearThumbnailCache"
                         Click="ClearThumbnailCacheMenuItem_Click"/>
+                <!-- A CEILING on how big a thumbnail may be, in pixels. The
+                     strip asks for whatever the current cell needs and this
+                     caps it, so making the strip taller stops costing memory
+                     past the chosen point - the frames are drawn larger from
+                     the same picture instead. The step is what a folder of
+                     thousands multiplies: 2,402 files are 86MB at 128 and
+                     318MB at 256 (2026-08-12). -->
+                <MenuItem StaysOpenOnClick="True"
+                        Focusable="False"
+                        Padding="{DynamicResource MenuStepperRowPadding}"
+                        AutomationProperties.AutomationId="thumbnailSizeRow">
+                    <MenuItem.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                    Text="{x:Static services:Strings.MenuThumbnailMaxSize}"
+                                    Foreground="{DynamicResource MenuForeground}"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,8,0"/>
+                            <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal">
+                                <Button Content="−"
+                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                        Click="ThumbnailMaxSizeDecrement_Click"/>
+                                <TextBlock Text="128"
+                                        Foreground="{DynamicResource MenuForeground}"
+                                        Width="34"
+                                        TextAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                                <Button Content="+"
+                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                        Click="ThumbnailMaxSizeIncrement_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </MenuItem.Header>
+                </MenuItem>
             </MenuItem>
             <!-- Everything about the panel beside the tree in one place: WHAT
                  it shows, then - past a separator - WHERE it sits. The

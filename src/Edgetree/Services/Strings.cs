@@ -277,6 +277,8 @@ public static class Strings
 
     // Synthetic "show the rest" row appended under a folder capped at
     // FileSystemItem.DisplayCap items. {0} is the hidden count.
+    public static string MenuThumbnailMaxSize = "썸네일 최대 크기";
+
     public static string ShowMoreFormat = "… 더 보기 ({0}개)";
 
     // The same trailing slot once the reveal has happened: the two states are
@@ -776,6 +778,7 @@ public static class Strings
         ToolTipPutAway = "Put the sidebar away";
         ToolTipClose = "Exit";
         RootPathLabel = "This PC";
+        MenuThumbnailMaxSize = "Max thumbnail size";
         ShowMoreFormat = "… Show {0} more";
         ShowLessFormat = "… Show {0} less";
 

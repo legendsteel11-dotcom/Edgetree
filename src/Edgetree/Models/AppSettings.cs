@@ -36,6 +36,16 @@ public class AppSettings
     public bool ViewerFilmstrip { get; set; } = false;
     public double ViewerFilmstripCellHeight { get; set; } = 64;
 
+    // The largest a filmstrip thumbnail may be fetched and kept, in pixels. The
+    // strip asks for what the current cell needs; this caps that, so a taller
+    // strip is drawn from the same picture rather than a bigger one.
+    //
+    // It is the multiplier on a big folder: 2,402 files are 86MB of thumbnails
+    // at 128 and 318MB at 256, and none of those extra pixels are drawn at the
+    // default cell height. Defaulted low deliberately - the machines this costs
+    // the most are the ones least able to pay it (2026-08-12).
+    public int ViewerThumbnailMaxSize { get; set; } = 128;
+
     // Pulls an HDR film's colour back for an SDR screen (see
     // HdrToneMapEffect). Off by default and remembered once switched on:
     // applying it to a film that is NOT HDR makes it worse, and nothing here
