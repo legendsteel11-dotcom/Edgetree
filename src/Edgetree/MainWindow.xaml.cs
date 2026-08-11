@@ -7887,6 +7887,176 @@ public partial class MainWindow : Window
     // answer), and Esc or leaving the box puts the current selection's path
     // back. Backspacing past a folder or two therefore costs nothing: the tree
     // has not moved, so there is nothing to undo.
+    // ----- 트리 히스토리 -------------------------------------------------------
+    //
+    // Back and forward across the places the tree has been, in the two chevrons
+    // at the right of the path bar.
+    //
+    // WHAT IS HARD HERE IS NOT THE STACK, which is a list of strings and could
+    // hold three hundred as cheaply as thirty. It is that THIS APP MOVES THE
+    // SELECTION BY ITSELF constantly: a favorites or bookmark jump expands its
+    // way down and the selection lands on every folder along the road,
+    // auto-collapse closing the previously-open drive makes WPF move the
+    // selection to that drive's ROOT (see the note in SelectedItemChangedCore),
+    // the startup restore selects the remembered row, and a folder refresh
+    // reselects quietly. Recorded as they arrive, those fill the stack with
+    // places nobody chose and the back button walks through rubble.
+    //
+    // SO NOTHING HERE ASKS WHICH ROUTE A SELECTION CAME FROM. The push is
+    // DEBOUNCED - it happens once the selection has stopped moving - which is
+    // one rule covering every case at once: a reveal walk's intermediate rows
+    // are each overwritten by the next before the timer ever fires, so only the
+    // destination survives, and holding ↓ through twenty rows records where the
+    // finger stopped rather than twenty entries. Guarding each route instead
+    // would mean listing them, and this app has already learned once that
+    // guarding routes leaves the one nobody thought of open.
+    //
+    // A FOLDER IS ONE PLACE (the user's call). Selecting three pictures in a
+    // row is not three entries: an entry whose folder matches the current one
+    // REPLACES it, so the entry still points at the exact row while 뒤로 always
+    // crosses a folder boundary. Without it, thirty slots go on one folder and
+    // the button never leaves it.
+    //
+    // That same rule is also why this needs no "we are navigating" flag. The
+    // index is moved BEFORE the walk starts, so the walk's own landing matches
+    // the entry it was sent to and is absorbed as a replace rather than growing
+    // the stack. A walk that ends up somewhere else instead is genuinely
+    // somewhere else, and recording it is the honest answer.
+    private readonly List<TreeHistoryEntry> _treeHistory = new();
+    private int _treeHistoryIndex = -1;
+    private System.Windows.Threading.DispatcherTimer? _treeHistoryTimer;
+
+    // The FOLDER is carried rather than worked out from the path later: asking
+    // the disk whether a path is a directory is exactly the blocking question
+    // that cost this app 21-59 second freezes on a sleeping network drive, and
+    // the item being recorded already knows the answer for free.
+    private readonly record struct TreeHistoryEntry(string Path, string Folder);
+
+    // Session only, deliberately: a back button that remembers across restarts
+    // is not what the gesture means anywhere else, and persisting it would mean
+    // writing settings on every move.
+    private const int MaxTreeHistory = 30;
+
+    // Long enough for a reveal walk to finish landing, short enough that a
+    // deliberate click is recorded before the hand can reach the button.
+    private const int TreeHistoryQuietMs = 400;
+
+    private void ScheduleTreeHistoryPush()
+    {
+        _treeHistoryTimer ??= CreateTreeHistoryTimer();
+        // Restarted, not merely started: every selection on the way pushes the
+        // moment of recording further out, which is the whole mechanism.
+        _treeHistoryTimer.Stop();
+        _treeHistoryTimer.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateTreeHistoryTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(TreeHistoryQuietMs)
+        };
+        timer.Tick += (_, _) =>
+        {
+            _treeHistoryTimer?.Stop();
+            PushTreeHistory();
+        };
+        return timer;
+    }
+
+    private void PushTreeHistory()
+    {
+        if (_selectedItem is not { } item)
+        {
+            return;
+        }
+
+        string folder = item.IsDirectory
+            ? item.FullPath
+            : item.Parent?.FullPath ?? item.FullPath;
+
+        if (_treeHistoryIndex >= 0 &&
+            string.Equals(_treeHistory[_treeHistoryIndex].Folder, folder, StringComparison.OrdinalIgnoreCase))
+        {
+            // Still in the same place, on a different row of it. The entry moves
+            // and the forward tail is left alone - nothing has been navigated
+            // away from, so there is nothing ahead to invalidate.
+            _treeHistory[_treeHistoryIndex] = new TreeHistoryEntry(item.FullPath, folder);
+            UpdateTreeHistoryButtons();
+            return;
+        }
+
+        // A new place while standing part-way back drops what was ahead, the way
+        // every back/forward pair does - and it is what makes "앞으로 is dead at
+        // the end" true rather than a separate rule.
+        if (_treeHistoryIndex < _treeHistory.Count - 1)
+        {
+            _treeHistory.RemoveRange(_treeHistoryIndex + 1, _treeHistory.Count - _treeHistoryIndex - 1);
+        }
+
+        _treeHistory.Add(new TreeHistoryEntry(item.FullPath, folder));
+        if (_treeHistory.Count > MaxTreeHistory)
+        {
+            _treeHistory.RemoveAt(0);
+        }
+
+        _treeHistoryIndex = _treeHistory.Count - 1;
+        UpdateTreeHistoryButtons();
+    }
+
+    private void TreeHistoryBackButton_Click(object sender, RoutedEventArgs e) => GoTreeHistory(-1);
+
+    private void TreeHistoryForwardButton_Click(object sender, RoutedEventArgs e) => GoTreeHistory(+1);
+
+    private void GoTreeHistory(int direction)
+    {
+        int target = _treeHistoryIndex + direction;
+        if (target < 0 || target >= _treeHistory.Count)
+        {
+            return;
+        }
+
+        var entry = _treeHistory[target];
+
+        // A drive that has since gone (an unplugged stick, a root the user
+        // hid): the entry cannot be reached, so it is dropped and the tree goes
+        // to the top rather than the button reading as broken. A STRING test
+        // against the live roots, never a disk one - see the note on the entry
+        // record.
+        if (!_roots.Any(r => entry.Path.StartsWith(r.FullPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)))
+        {
+            _treeHistory.RemoveAt(target);
+            if (_treeHistoryIndex > target)
+            {
+                _treeHistoryIndex--;
+            }
+            ScrollTreeToTop();
+            UpdateTreeHistoryButtons();
+            return;
+        }
+
+        // BEFORE the walk: the landing then matches this entry's folder and is
+        // absorbed by the replace branch above instead of being recorded as a
+        // new place.
+        _treeHistoryIndex = target;
+        NavigateToPath(entry.Path, source: "history");
+        UpdateTreeHistoryButtons();
+    }
+
+    private void ScrollTreeToTop() => FindTreeScrollViewer()?.ScrollToTop();
+
+    private void UpdateTreeHistoryButtons()
+    {
+        // Both go dead while the search view is up. The path bar follows the
+        // overlay into it (MovePathBarInto), so a press there would move the
+        // tree behind a screen nobody can see it through.
+        bool usable = !_isSearchViewActive;
+        TreeHistoryBackButton.IsEnabled = usable && _treeHistoryIndex > 0;
+        TreeHistoryForwardButton.IsEnabled = usable
+            && _treeHistoryIndex >= 0
+            && _treeHistoryIndex < _treeHistory.Count - 1;
+    }
+
     private void ApplyPathBarVisibility()
     {
         PathBarRow.Visibility = _settings.ShowPathBar ? Visibility.Visible : Visibility.Collapsed;
@@ -11126,6 +11296,10 @@ public partial class MainWindow : Window
         // The viewer panel follows the selection (debounced - see the
         // method). A no-op while the panel is closed.
         ScheduleViewerPreview();
+        // Debounced for a different reason than the preview's: not to spare
+        // work, but so a selection the APP moved is overwritten before it can
+        // be recorded. See the 트리 히스토리 region.
+        ScheduleTreeHistoryPush();
         // Not debounced: this one only appears or disappears, and waiting
         // 120ms to show a button the cursor may already be heading for reads
         // as lag rather than as smoothing.
@@ -21909,6 +22083,10 @@ public partial class MainWindow : Window
         ApplyPathBarVisibility();
         SearchButtonIcon.Data = active ? SearchGlyphBack : SearchGlyphMagnifier;
         SearchButton.ToolTip = active ? Strings.ToolTipExitSearch : Strings.ToolTipSearch;
+        // The path bar has just moved into (or out of) the results view, and the
+        // two history chevrons ride with it - they are only usable on the side
+        // where the tree they move is visible.
+        UpdateTreeHistoryButtons();
 
         // The favorites splitter is a transparent 9px grab strip floating over
         // its neighbours on ZIndex 1, and the search view merely covers rows

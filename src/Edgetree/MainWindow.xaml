@@ -326,8 +326,18 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
+                        <!-- The outline was declared on the style and never
+                             DRAWN until 2026-08-11 - the template took the
+                             Background and dropped the two border properties, so
+                             a button asking for one silently got nothing. Bound
+                             now; the style's own 0 keeps every header button
+                             exactly as it was, and the path bar's two history
+                             chevrons are the first to ask for a resting outline
+                             (matching the path field they sit beside). -->
                         <Border x:Name="Bd"
                                 Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="3">
                             <!-- Dimmed by default and brightened on hover (see the
                                  trigger below) - an Opacity toggle on the whole
@@ -4611,10 +4621,19 @@
                          was more of it between two things that are obviously
                          separate than under the last row, where the window
                          ends. -->
+                    <!-- 트리 히스토리's two buttons live at the right end, OUTSIDE
+                         the field's outline: they are not part of what the box
+                         accepts. The field's three layers carry no Grid.Column
+                         and so stay in the star column they always had. -->
                     <Grid x:Name="PathBarRow"
                             Margin="6,5,6,2"
                             Height="24"
                             Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
                         <!-- Same outline-only treatment as the search box: a
                              border, not a filled field. -->
                         <Border Background="Transparent"
@@ -4642,6 +4661,60 @@
                                 PreviewMouseLeftButtonDown="PathBarBox_PreviewMouseLeftButtonDown"
                                 GotKeyboardFocus="PathBarBox_GotKeyboardFocus"
                                 LostKeyboardFocus="PathBarBox_LostKeyboardFocus"/>
+                        <!-- The SAME chevrons the carousel walks a folder with,
+                             which is the pair this app already means "one step
+                             either way" by. Sizes are literals here rather than
+                             resources because this whole row is - the box's 12pt
+                             and the row's 24 are literals too, so a button that
+                             followed Ctrl +/- would be the only thing in it that
+                             moved.
+
+                             The style brings its own disabled state (0.45), so
+                             the end of the stack shows as a greyed chevron that
+                             stays in place rather than a button that vanishes
+                             and shifts its neighbour.
+
+                             A RESTING OUTLINE, the path field's own brush: these
+                             two stand alone on a strip with no other controls,
+                             where a header button always has five neighbours to
+                             read as a row with. The box beside them is drawn as
+                             an outline rather than a filled field, so matching it
+                             makes the three read as one strip. Only the disabled
+                             state drops the fill; the outline stays either way,
+                             which is what keeps the row from twitching as the
+                             ends of the stack come and go. -->
+                        <Button x:Name="TreeHistoryBackButton"
+                                Grid.Column="1"
+                                Style="{StaticResource ToggleButtonStyle}"
+                                BorderBrush="{DynamicResource ControlBorder}"
+                                BorderThickness="1"
+                                Width="22"
+                                Height="22"
+                                Margin="4,0,0,0"
+                                Click="TreeHistoryBackButton_Click"
+                                ToolTip="{x:Static services:Strings.TreeHistoryBack}">
+                            <Path Data="M576-240 336-480l240-240 51 51-189 189 189 189-51 51Z"
+                                    Fill="{DynamicResource ForegroundText}"
+                                    Stretch="Uniform"
+                                    Width="12"
+                                    Height="12"/>
+                        </Button>
+                        <Button x:Name="TreeHistoryForwardButton"
+                                Grid.Column="2"
+                                Style="{StaticResource ToggleButtonStyle}"
+                                BorderBrush="{DynamicResource ControlBorder}"
+                                BorderThickness="1"
+                                Width="22"
+                                Height="22"
+                                Margin="2,0,0,0"
+                                Click="TreeHistoryForwardButton_Click"
+                                ToolTip="{x:Static services:Strings.TreeHistoryForward}">
+                            <Path Data="M522-480 333-669l51-51 240 240-240 240-51-51 189-189Z"
+                                    Fill="{DynamicResource ForegroundText}"
+                                    Stretch="Uniform"
+                                    Width="12"
+                                    Height="12"/>
+                        </Button>
                     </Grid>
 
                     <!-- The version, and then one toggle per file-kind filter
