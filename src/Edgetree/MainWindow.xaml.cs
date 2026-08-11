@@ -20577,7 +20577,7 @@ public partial class MainWindow : Window
         var (first, last) = _filmstripTrickleRange;
         int centre = (first + last) / 2;
         int reachLimit = _settings.ViewerPrecacheThumbnails
-            ? _filmstripCells.Count
+            ? FilmstripRetainReach
             : FilmstripLookahead + (last - first);
         FilmstripCell? target = null;
         for (int reach = 0; reach <= reachLimit; reach++)
@@ -20589,6 +20589,7 @@ public partial class MainWindow : Window
             }
         }
 
+        TrimFilmstripThumbnails(centre);
         UpdateFilmstripPrecacheText();
         if (target is null)
         {
@@ -20612,6 +20613,73 @@ public partial class MainWindow : Window
     }
 
     private long _filmstripTrickleStartedAt;
+
+    // ----- 몇 장까지 들고 있는가 ------------------------------------------------
+    //
+    // A THUMBNAIL IS 256x256 BGRA - a quarter of a megabyte each - and the cells
+    // ARE the cache, so with 캐싱 on the strip used to hold one for every file in
+    // the folder. Measured on a NAS folder of 1361 pictures: over 1GB, back to
+    // 130MB on leaving it (2026-08-11). Not a leak - the cells go when the
+    // folder does - but no ceiling either, and it scales straight with the
+    // folder: 10,000 files would be some 2.6GB of pixels.
+    //
+    // So a window instead: this many cells either side of where the eye is, and
+    // the rest let go. ~2000 held is around 500MB at the very worst and is more
+    // strip than anyone walks in one stretch.
+    //
+    // THE SAME NUMBER BOUNDS THE FETCH (see reachLimit above), and it has to.
+    // Dropping thumbnails while the trickle still reached the whole folder would
+    // have it re-fetch what was just dropped, for ever.
+    //
+    // Letting go costs almost nothing to get back: every fetch consults this
+    // app's own thumbnail cache FIRST, which answers from LOCAL disk however far
+    // away the file is (see ShellThumbnailService). The second visit to a place
+    // is a millisecond read, not the 869ms the cold NAS pass measured - and that
+    // cache holds ~20,000 thumbnails, so a folder of this size fits whole.
+    private const int FilmstripRetainReach = 1000;
+
+    // Walks only what is OUTSIDE the window, so the scan costs nothing on the
+    // folders where there is nothing to drop. The visible cells are a few dozen
+    // around the centre and can never be reached from here.
+    //
+    // BOTH ENDS ARE CLAMPED TO THE COLLECTION, and the first one is not
+    // theoretical: centre comes from the trickle's range, which can still
+    // describe the folder BEFORE this one - walk a 5,000-cell folder, open a
+    // 2,400-cell one, and "0 to centre-1000" runs off the end. It crashed on the
+    // first try (2026-08-12). Skipping the middle is an optimisation, and it is
+    // what let an index come from arithmetic instead of from the list's own
+    // bounds; the clamp is what pays that back.
+    private void TrimFilmstripThumbnails(int centre)
+    {
+        int count = _filmstripCells.Count;
+        int below = Math.Clamp(centre - FilmstripRetainReach, 0, count);
+        int above = Math.Clamp(centre + FilmstripRetainReach + 1, 0, count);
+
+        for (int i = 0; i < below; i++)
+        {
+            DropFilmstripThumbnail(i);
+        }
+
+        for (int i = above; i < count; i++)
+        {
+            DropFilmstripThumbnail(i);
+        }
+    }
+
+    private void DropFilmstripThumbnail(int index)
+    {
+        var cell = _filmstripCells[index];
+        if (cell.Thumbnail is null)
+        {
+            return;
+        }
+
+        cell.Thumbnail = null;
+        // Requested goes with it, or the cell could never be filled again when
+        // it comes back into reach - it would stay marked as already asked for,
+        // and stay blank for good.
+        cell.Requested = false;
+    }
 
     private FilmstripCell? TrickleCandidate(int index)
     {
