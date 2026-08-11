@@ -11897,7 +11897,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        item.MergeChildrenFromDisk();
+        // Through the shared method, so the viewer is told here too: a recovery
+        // pass that quietly left the strip stale would be the same bug arriving
+        // by the rarer road. At most one folder in the walk is the one on
+        // screen, so the check costs a reference compare per folder.
+        RefreshFolderPreservingState(item);
         foreach (var child in item.Children)
         {
             if (child is { IsPlaceholder: false, IsShowMore: false, IsDirectory: true })
@@ -12053,7 +12057,39 @@ public partial class MainWindow : Window
     //    instances. Reselect logic stays deliberately absent (the old
     //    NavigateToPath reselect was its own bug saga - see git history).
     private void RefreshFolderPreservingState(FileSystemItem item)
-        => item.MergeChildrenFromDisk();
+    {
+        item.MergeChildrenFromDisk();
+        NoteFolderChangedForViewer(item);
+    }
+
+    // THE TREE IS BOUND TO THE MERGED COLLECTION AND REDRAWS ITSELF. The viewer
+    // is not: its counter and its filmstrip are built from a list taken when the
+    // selection last moved, so a file arriving in the folder on screen appeared
+    // in the tree and nowhere else - the strip sat at "5 / 5" until a click
+    // happened to rebuild it (reported 2026-08-11, a download landing in the
+    // folder being viewed).
+    //
+    // Hung on the MERGE rather than on the watcher that prompted this one, so
+    // the manual refresh, the event-loss resync and a folder created in-app all
+    // reach it too. Guarding each route instead is the mistake this app has
+    // already made once, in the copy-into-itself runaway.
+    private void NoteFolderChangedForViewer(FileSystemItem folder)
+    {
+        // A result list is nobody's folder to rebuild - it is the search's, and
+        // it has its own path back (RelinkSearchViewer).
+        if (!_viewerOpen || _viewerListOverride is not null || ViewerItem is not { } shown)
+        {
+            return;
+        }
+
+        // Two ways this folder can be the one on screen: it holds the file the
+        // panel is showing (the counter and the strip walk its siblings), or it
+        // IS the selected folder, whose own children the strip stands in for.
+        if (ReferenceEquals(shown.Parent, folder) || ReferenceEquals(shown, folder))
+        {
+            UpdateViewerCarousel();
+        }
+    }
 
     // ----- 북마크 (책갈피) --------------------------------------------------
     //
