@@ -68,6 +68,13 @@
             BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
+                <!-- Grows with the font and stops at 28 on the way down, and
+                     the title inside it now does the same (DialogTitleTextSize)
+                     - the bar had a floor and the letters did not, so Ctrl+−
+                     left a 28px bar with the title shrunk to nothing inside it
+                     (2026-08-11). Pinning the title outright was the first fix
+                     and was worse the other way round: a zoomed-up dialog with
+                     a default-size title on top of it. -->
                 <RowDefinition Height="{DynamicResource DialogTitleBarHeight}"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
@@ -81,17 +88,18 @@
                 <StackPanel Orientation="Horizontal"
                         VerticalAlignment="Center"
                         Margin="{DynamicResource DialogTitleIndent}">
-                    <!-- The TEXT's size, not the tree's icon size: this one
+                    <!-- The TITLE's size, not the tree's icon size: this one
                          stands beside a line of type rather than in a row of
-                         other icons, so what it has to match is the letters. -->
+                         other icons, so what it has to match is the letters -
+                         including their floor. -->
                     <Image Source="pack://application:,,,/Resources/icon.png"
-                            Width="{DynamicResource DialogFontSize}"
-                            Height="{DynamicResource DialogFontSize}"
+                            Width="{DynamicResource DialogTitleTextSize}"
+                            Height="{DynamicResource DialogTitleTextSize}"
                             Margin="0,0,7,0"
                             RenderOptions.BitmapScalingMode="HighQuality"/>
                     <TextBlock Text="{x:Static services:Strings.HelpTitle}"
                             Foreground="{DynamicResource DialogForeground}"
-                            FontSize="{DynamicResource DialogFontSize}"
+                            FontSize="{DynamicResource DialogTitleTextSize}"
                             VerticalAlignment="Center"/>
                 </StackPanel>
                 <Button Style="{StaticResource DialogCloseButtonStyle}"

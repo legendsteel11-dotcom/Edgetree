@@ -137,6 +137,30 @@ public partial class MainWindow : Window
 
     private System.Windows.Point? _headerDragStart;
     private FileSystemItem? _selectedItem;
+
+    // What the VIEWER is showing, which is no longer always what the tree has
+    // selected: a search result previewed from the results list is shown
+    // without moving the tree at all (see PreviewSearchResult), so the panel
+    // needs its own answer to "which file is this".
+    //
+    // Derived rather than stored, so there is no second copy to keep in step -
+    // while nothing overrides it the panel and the tree read the same field.
+    // The override holds only while the results list is driving the panel, and
+    // the tree moving clears it (ExplorerTree_SelectedItemChanged): one rule
+    // for handing the panel back, rather than a clear at every place a
+    // selection can change.
+    //
+    // The LIST comes with the item, because the two cannot be allowed to
+    // disagree - whatever list is driving the viewer is the list the carousel
+    // counter and the filmstrip walk (see GetViewerCarouselItems). While the
+    // results were driving the picture and the folder was driving the strip,
+    // "4 / 33" and the strip pointed at different sets from the list on screen.
+    private FileSystemItem? _searchViewerItem;
+    private List<FileSystemItem>? _viewerListOverride;
+
+    private FileSystemItem? ViewerItem
+        => _viewerListOverride is null ? _selectedItem : _searchViewerItem;
+
     private bool _isNavigatingFromFavorite;
     private System.Windows.Point? _itemDragStart;
     private FileSystemItem? _itemDragCandidate;
@@ -1237,7 +1261,7 @@ public partial class MainWindow : Window
         // Home for 처음으로, because that is what Home means; the button it
         // matches is the one that undoes a resumed position.
         //
-        // TWO keys for 위치 기록, which is unusual here and deliberate: Insert
+        // TWO keys for the 영상 북마크, which is unusual here and deliberate: Insert
         // is where the hand already goes to add something in this app, and P is
         // reachable without leaving the ←→ the other hand is seeking with.
         // Both toggle, so the same key takes a mark back the way pressing the
@@ -1311,7 +1335,7 @@ public partial class MainWindow : Window
             // who never opens the strip loses a key - and the strip being on
             // screen is a visible reason for the keys to mean something else.
             if (_settings.ViewerFilmstrip &&
-                _selectedItem is { } carouselRow &&
+                ViewerItem is { } carouselRow &&
                 IsViewerCarouselItem(carouselRow))
             {
                 ViewerCarouselStep(e.Key == Key.Right ? +1 : -1);
@@ -1354,8 +1378,12 @@ public partial class MainWindow : Window
 
             // Paused: only when the keyboard is NOT already in the tree, since
             // there the TreeView's own handling is the one that should run and
-            // stepping in front of it would double every press.
-            if ((Keyboard.FocusedElement as DependencyObject)
+            // stepping in front of it would double every press. The same
+            // reasoning covers the results list while it is driving the panel -
+            // the rows it moves between ARE the panel's set, and walking the
+            // tree instead would take the panel away from the list.
+            if (_viewerListOverride is null &&
+                (Keyboard.FocusedElement as DependencyObject)
                 ?.FindAncestor<System.Windows.Controls.TreeView>() is null)
             {
                 if (e.Key == Key.Down)
@@ -1416,6 +1444,14 @@ public partial class MainWindow : Window
                 SetTreeFontSize(DefaultTreeFontSize);
                 e.Handled = true;
                 break;
+            // Opens, and opens only. Made a toggle for one round and put back:
+            // the difficulty it was aimed at turned out to be DISTANCE - the
+            // header's search button walks away from the hand as the viewer
+            // widens the window - and the answer to that is a way out inside
+            // the search view itself (SearchCloseButton), not a second meaning
+            // on the key. Pressing it while the keyboard is already in the
+            // results still pulls focus back to the box, which a toggle would
+            // have spent.
             case Key.F:
                 SetSearchViewActive(true);
                 e.Handled = true;
@@ -7785,6 +7821,12 @@ public partial class MainWindow : Window
     private void ApplyPathBarVisibility()
     {
         PathBarRow.Visibility = _settings.ShowPathBar ? Visibility.Visible : Visibility.Collapsed;
+        // The host is a bordered strip of its own, so it has to go with the row
+        // it holds - left showing it would draw a rule under the results with
+        // nothing beneath it.
+        SearchPathBarHost.Visibility = _settings.ShowPathBar && _isSearchViewActive
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
         if (_settings.ShowPathBar)
         {
@@ -7800,11 +7842,56 @@ public partial class MainWindow : Window
         }
     }
 
-    // The folder the box should be naming right now: the selected row when it
-    // is a folder, its parent when it is a file, and nothing at all when the
-    // tree has no selection (startup, before the last path is restored).
+    // Moves the one path strip between the footer and the bottom of the search
+    // view, so whichever view is up has it. See the host's note in the XAML for
+    // why it is moved rather than copied.
+    private void MovePathBarInto(bool searchView)
+    {
+        if (PathBarRow.Parent is System.Windows.Controls.Panel currentPanel)
+        {
+            currentPanel.Children.Remove(PathBarRow);
+        }
+        else if (PathBarRow.Parent is Border currentBorder)
+        {
+            currentBorder.Child = null;
+        }
+
+        if (searchView)
+        {
+            SearchPathBarHost.Child = PathBarRow;
+        }
+        else
+        {
+            // Back above the version and the filter chips, which is where it
+            // has always sat.
+            FooterStack.Children.Insert(0, PathBarRow);
+        }
+    }
+
+    // The folder the box should be naming right now.
+    //
+    // In the TREE: the selected row when it is a folder, its parent when it is
+    // a file, and nothing at all when there is no selection (startup, before
+    // the last path is restored).
+    //
+    // In SEARCH: the folder of the selected result, because that is the "where
+    // am I" the view can answer - the tree's selection is behind the overlay
+    // and has nothing to do with what is on screen. Results come from many
+    // folders, so this is the one line that says which one the current hit
+    // lives in without reading it off a header that may be trimmed. Nothing
+    // selected falls back to the scope being searched.
     private string? CurrentPathBarFolder()
     {
+        if (_isSearchViewActive)
+        {
+            return SearchResultsList.SelectedItem switch
+            {
+                SearchRow { IsHeader: true } header => header.DirectoryPath,
+                SearchRow { Entry: { } entry } => entry.DirectoryPath,
+                _ => _searchScopeFolder,
+            };
+        }
+
         var item = _selectedItem;
         if (item is null || item.IsPlaceholder)
         {
@@ -8082,6 +8169,10 @@ public partial class MainWindow : Window
                     return;
                 }
 
+                // Typed from the search view, this is a way OUT of it: the walk
+                // moves the tree, and leaving the overlay up would hide the one
+                // thing the Enter was for.
+                SetSearchViewActive(false);
                 NavigateToPath(resolved, source: "pathbar");
 
                 // The typed text has done its job; the box goes back to
@@ -8689,12 +8780,23 @@ public partial class MainWindow : Window
         // its own, so the divider owes it that gap - without it the line sat
         // against the next label.
         appResources["DialogDividerMargin"] = new Thickness(0, dialogRowGap + 2, 0, dialogRowGap + 2);
-        // Grow-only: 28px is comfortable at the default font and only becomes
-        // cramped once the title inside it grows. A GridLength, not a double -
-        // RowDefinition.Height takes nothing else, and handing it a number
-        // throws while the window is being parsed rather than at build time.
+        // GROW-ONLY, both of these, and they have to move together: 28px is
+        // comfortable at the default font and only becomes cramped once the
+        // title inside it grows. A GridLength, not a double - RowDefinition
+        // .Height takes nothing else, and handing it a number throws while the
+        // window is being parsed rather than at build time.
+        //
+        // The FLOOR under the title text is the fix for a real defect
+        // (2026-08-11): the bar had one and the letters did not, so Ctrl+−
+        // left a 28px bar with the title shrunk to nothing inside it. Pinning
+        // the title outright was tried first and looked worse in the other
+        // direction - a zoomed-up 색상 설정 with a 12pt title on top of it - so
+        // the rule is not "chrome is fixed", it is **chrome grows with the
+        // document and stops where it stops being readable**.
         appResources["DialogTitleBarHeight"] =
             new GridLength(Math.Max(28.0, Math.Round(28.0 * scale)));
+        appResources["DialogTitleTextSize"] =
+            Math.Max(DefaultTreeFontSize, ExplorerTree.FontSize);
         appResources["DialogTitleFontSize"] = ExplorerTree.FontSize + 2.0;
         appResources["DialogTitleIconSize"] = Math.Round(24.0 * scale);
         // The stepper buttons carry a "+"/"−" that follows the menu font, so
@@ -10489,6 +10591,14 @@ public partial class MainWindow : Window
         }
 
         _selectedItem = e.NewValue as FileSystemItem;
+
+        // The tree moving always takes the panel back from the results list -
+        // stated once here rather than at each of the ways a tree selection can
+        // change. Nothing else is needed: ViewerItem reads _selectedItem again
+        // the moment the override is gone, and the preview scheduled below
+        // acts on it.
+        _viewerListOverride = null;
+        _searchViewerItem = null;
 
         FileSystemItem? newGuideTarget = _selectedItem is { IsDirectory: true } ? _selectedItem : _selectedItem?.Parent;
         if (newGuideTarget is not null)
@@ -14411,7 +14521,7 @@ public partial class MainWindow : Window
         bool show =
             !_viewerOpen &&
             !(_settings.IsAutoHidden && !_isAutoHideRevealed) &&
-            _selectedItem is { IsPlaceholder: false, IsShowMore: false, IsDirectory: false } item &&
+            ViewerItem is { IsPlaceholder: false, IsShowMore: false, IsDirectory: false } item &&
             HasViewerPreview(item.FullPath);
 
         ViewerExpandButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
@@ -14520,6 +14630,10 @@ public partial class MainWindow : Window
         _viewerOpen = false;
         _pendingViewerPath = null;
         _viewerTreeShare = null;
+        // Nothing is being shown, so nothing is driving what is shown. Reopening
+        // starts from the tree again, which is where the eye button lives.
+        _viewerListOverride = null;
+        _searchViewerItem = null;
 
         // Back to the closed shape: tree star, both panel columns 0.
         SetViewerColumns(null);
@@ -14632,7 +14746,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var item = _selectedItem;
+        var item = ViewerItem;
         if (item is null || item.IsPlaceholder || item.IsShowMore)
         {
             _pendingViewerPath = null;
@@ -14652,6 +14766,13 @@ public partial class MainWindow : Window
         string path = item.FullPath;
         if (string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
         {
+            // Same file, and NOT necessarily the same list around it: leaving
+            // a search preview lands the tree on the very picture the results
+            // list was already showing, with a different set behind it. The
+            // picture is left alone (that is what this early return is for -
+            // it keeps a playing GIF or film alive through a re-selection),
+            // but the counter and the strip have to be told.
+            UpdateViewerCarousel();
             return;
         }
         _pendingViewerPath = path;
@@ -14821,7 +14942,7 @@ public partial class MainWindow : Window
             // things worth ruling in or out next.
             string conditions =
                 $"filmstrip={(ViewerFilmstripHost.Visibility == Visibility.Visible ? "on" : "off")}, " +
-                $"folder={_selectedItem?.Parent?.AllLoadedChildren.Count() ?? 0} items";
+                $"folder={ViewerItem?.Parent?.AllLoadedChildren.Count() ?? 0} items";
             // The two thumbnail paths, totalled rather than sampled. The
             // per-file lines above only carry what crossed 100ms, and the header
             // path is supposed to live well under that - so without this its
@@ -16132,7 +16253,7 @@ public partial class MainWindow : Window
         UpdateSubtitleTimer();
     }
 
-    // ----- 재생 위치 기록 -------------------------------------------------------
+    // ----- 영상 북마크 (재생 위치) ----------------------------------------------
     //
     // The tree's bookmark, one level down: that one marks a file, this marks a
     // place inside one. Kept per path in the settings file, drawn as ticks over
@@ -17591,8 +17712,16 @@ public partial class MainWindow : Window
            && (ThumbnailExtensions.Contains(Path.GetExtension(item.FullPath))
                || VideoExtensions.Contains(Path.GetExtension(item.FullPath)));
 
+    // The one place the panel's world is decided, which is why the search link
+    // needed nothing else: hand it a different source list and the counter, the
+    // chevrons and the filmstrip all walk that list instead of the folder.
     private List<FileSystemItem> GetViewerCarouselItems(FileSystemItem current)
     {
+        if (_viewerListOverride is { } results)
+        {
+            return results;
+        }
+
         IEnumerable<FileSystemItem> siblings = current.Parent?.AllLoadedChildren ?? _roots;
         return siblings.Where(IsViewerCarouselItem).ToList();
     }
@@ -17603,7 +17732,7 @@ public partial class MainWindow : Window
     private void UpdateViewerCarousel()
     {
         if (!_viewerOpen
-            || _selectedItem is not { } current
+            || ViewerItem is not { } current
             || !IsViewerCarouselItem(current))
         {
             ViewerCarouselBar.Visibility = Visibility.Collapsed;
@@ -17692,14 +17821,23 @@ public partial class MainWindow : Window
         long filmstripStart = System.Diagnostics.Stopwatch.GetTimestamp();
         bool rebuilt = false;
 
-        string folder = _selectedItem?.Parent?.FullPath ?? string.Empty;
-        if (_filmstripBuiltFor != (folder, items!.Count))
+        // Which SET these cells were built for. Usually a folder; while the
+        // results list is driving the panel it is the search itself, whose
+        // files come from many folders at once and so have no one path to name.
+        string builtFor = _viewerListOverride is null
+            ? ViewerItem?.Parent?.FullPath ?? string.Empty
+            : SearchFilmstripKey;
+        if (_filmstripBuiltFor != (builtFor, items!.Count))
         {
             // Set with the folder, not per request: it is a property of where
-            // these files live.
-            ApplyFilmstripFetchPace(folder);
+            // these files live. Results spread across folders are paced by the
+            // search SCOPE - one answer for the whole set, and the right one
+            // whenever the scope is the share the pacing exists for.
+            ApplyFilmstripFetchPace(_viewerListOverride is null
+                ? builtFor
+                : _searchScopeFolder);
             rebuilt = true;
-            _filmstripBuiltFor = (folder, items.Count);
+            _filmstripBuiltFor = (builtFor, items.Count);
             _filmstripCells.Clear();
             foreach (var item in items)
             {
@@ -17743,7 +17881,7 @@ public partial class MainWindow : Window
         }
 
         var match = _filmstripCells.FirstOrDefault(cell =>
-            ReferenceEquals(cell.Item, _selectedItem));
+            ReferenceEquals(cell.Item, ViewerItem));
         if (match is null || ReferenceEquals(ViewerFilmstrip.SelectedItem, match))
         {
             return;
@@ -18404,16 +18542,35 @@ public partial class MainWindow : Window
 
         _filmstripDragStart = e.GetPosition(ViewerFilmstrip);
         _filmstripDragCandidate = cell.Path;
+        MoveViewerTo(cell.Item);
+    }
 
-        // Same crossing the chevrons make: a cell past the folder's "더 보기"
-        // cap is one the strip promised, so the reveal happens rather than the
-        // click doing nothing.
-        if (cell.Item.Parent is { } parent && !parent.Children.Contains(cell.Item))
+    // Where the strip and the chevrons both land: whatever list is driving the
+    // panel is the list this moves within, so neither control grows a second
+    // idea of "go to this one".
+    //
+    // Driven by the results, that means moving the SEARCH selection - moving
+    // the tree instead would collapse the list out from under the gesture,
+    // which is exactly what the single click was split apart to stop.
+    private void MoveViewerTo(FileSystemItem target)
+    {
+        if (_viewerListOverride is not null)
+        {
+            SelectSearchViewerItem(target);
+            return;
+        }
+
+        // A row past the folder's "더 보기" cap is one the counter and the strip
+        // already promised, so the reveal happens rather than the click doing
+        // nothing. Only the tree has a cap to cross; a result list has none.
+        if (target.Parent is { } parent && !parent.Children.Contains(target))
         {
             parent.ShowAllChildren();
         }
 
-        SelectVisibleItem(cell.Item);
+        // Selects, scrolls to and focuses the tree row; selection-follow then
+        // brings the picture, so there is no second path to the same file.
+        SelectVisibleItem(target);
     }
 
     private void ViewerFilmstrip_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
@@ -18504,7 +18661,7 @@ public partial class MainWindow : Window
 
     private void ViewerCarouselStep(int direction)
     {
-        if (_selectedItem is not { } current || !IsViewerCarouselItem(current))
+        if (ViewerItem is not { } current || !IsViewerCarouselItem(current))
         {
             return;
         }
@@ -18517,21 +18674,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Crossing the reveal boundary: the counter promised this picture,
-        // so the chevron performs the same reveal the "더 보기" row would
-        // and keeps going - stopping at the cap would make the total a lie.
-        // Only > can get here (overflow rows only ever hide at the BOTTOM),
-        // and the cost is exactly a hand-click on 더 보기.
-        var target = images[next];
-        if (current.Parent is { } parent && !parent.Children.Contains(target))
-        {
-            parent.ShowAllChildren();
-        }
-
-        // Selects, scrolls to and focuses the tree row; selection-follow then
-        // brings the picture, so the chevrons never grow a second idea of
-        // "next" to keep in sync (same reasoning as the Space key's).
-        SelectVisibleItem(target);
+        // Crossing the reveal boundary is handled there: the counter promised
+        // this picture, so the chevron performs the same reveal the "더 보기"
+        // row would and keeps going - stopping at the cap would make the total
+        // a lie.
+        MoveViewerTo(images[next]);
     }
 
     private void ViewerImageHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -19510,6 +19657,74 @@ public partial class MainWindow : Window
     {
         _searchRows = rows;
         SearchResultsList.ItemsSource = rows;
+        RelinkSearchViewer();
+    }
+
+    // The result set changed: a keystroke, another page from "더 보기", a
+    // different sort, a batch arriving mid-scan. Two jobs, and the second one
+    // is why this runs even when nothing is being previewed yet.
+    //
+    // KEEP a choice that survived the change, with the new set behind it -
+    // otherwise the counter goes on describing a list that is no longer on
+    // screen.
+    //
+    // Otherwise SHOW THE TOP RESULT. While a query is being typed, results are
+    // already on screen and nothing has been picked yet, and leaving the panel
+    // on whatever the tree was pointing at made the two halves of the window
+    // read as unrelated. The top row is what the list itself is offering, so
+    // the panel answering with it is the list finishing its own sentence
+    // rather than the app choosing something. Every keystroke landing on the
+    // same first result costs nothing: the path has not changed, so the loader
+    // early-returns.
+    private void RelinkSearchViewer()
+    {
+        // Only where there is somewhere to show it, and only while the view
+        // that owns the list is up - a scan streaming batches in after the
+        // search view was closed must not take the panel off the tree.
+        if (!_viewerOpen || !_isSearchViewActive)
+        {
+            return;
+        }
+
+        if (_searchViewerItem is { } shown)
+        {
+            // Asked of the ROWS rather than of the carousel list, so a
+            // previewed document - listed, but never part of the set the
+            // carousel walks - is not mistaken for one that dropped out.
+            bool stillListed = _searchRows.Any(row =>
+                row.Entry is { } entry &&
+                string.Equals(entry.FullPath, shown.FullPath, StringComparison.OrdinalIgnoreCase));
+            if (stillListed)
+            {
+                var kept = SearchViewerItems();
+                _viewerListOverride = kept;
+                _searchViewerItem = kept.FirstOrDefault(i =>
+                    string.Equals(i.FullPath, shown.FullPath, StringComparison.OrdinalIgnoreCase)) ?? shown;
+                UpdateViewerCarousel();
+                return;
+            }
+        }
+
+        // Past the folder header - the first row a result set has is one.
+        var top = _searchRows.FirstOrDefault(row => row.Entry is not null);
+        if (top is null)
+        {
+            // Blank. An empty box and a query that found nothing were split
+            // apart at first - "nothing asked" against "nothing found" - and
+            // the difference does not survive being looked at: either way the
+            // list has nothing to show, and the tree it would fall back to is
+            // the view the search is covering. A picture left standing under an
+            // empty result list reads as a result.
+            _viewerListOverride = NoViewerItems;
+            _searchViewerItem = null;
+            ScheduleViewerPreview();
+            return;
+        }
+
+        // Through the list's own selection, so the highlighted row and the
+        // picture are the same act - and so the top result is a real starting
+        // point for ↑↓ and the chevrons rather than an unmarked one.
+        SearchResultsList.SelectedItem = top;
     }
 
     // Shares the tree's sort geometries rather than the PNG pairs this used to
@@ -19622,6 +19837,9 @@ public partial class MainWindow : Window
     private void SearchButton_Click(object sender, RoutedEventArgs e)
         => SetSearchViewActive(!_isSearchViewActive);
 
+    private void SearchCloseButton_Click(object sender, RoutedEventArgs e)
+        => SetSearchViewActive(false);
+
     // Single entry point for switching between the explorer and search views -
     // keeps the button glyph/tooltip, the overlay's visibility, and focus all
     // in sync regardless of what triggered it (button, Ctrl+F/E, or Esc).
@@ -19640,6 +19858,10 @@ public partial class MainWindow : Window
 
         _isSearchViewActive = active;
         SearchView.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+        // Before the sync below, so the strip is already in the view it is
+        // about to be filled for.
+        MovePathBarInto(active);
+        ApplyPathBarVisibility();
         SearchButtonIcon.Data = active ? SearchGlyphBack : SearchGlyphMagnifier;
         SearchButton.ToolTip = active ? Strings.ToolTipExitSearch : Strings.ToolTipSearch;
 
@@ -19670,13 +19892,151 @@ public partial class MainWindow : Window
             {
                 UpdateSearchStatus();
             }
+
+            // Opening onto results that are already there is the same state as
+            // typing into them: the list is up, so the list drives the panel.
+            RelinkSearchViewer();
             FocusSearchBox();
         }
         else
         {
             SearchHistoryPopup.IsOpen = false;
+            ReleaseSearchViewerLink();
             ExplorerTree.Focus();
         }
+    }
+
+    // ----- 검색 결과가 뷰어를 끌 때 -------------------------------------------
+    //
+    // A click on a result used to do two jobs at once - "show me this" and
+    // "take me there" - which was one job while there was nothing to show. The
+    // viewer split them apart: going there closes the list, so looking at the
+    // second result meant searching again. So the single click keeps the new
+    // job (preview, list stays put) and the double click keeps the old one,
+    // with 트리에서 보기 in the row menu because a double click is not
+    // discoverable.
+    //
+    // With the panel CLOSED there is nowhere to preview to, so a single click
+    // still goes to the tree exactly as before - the split only exists where it
+    // buys something, and nobody who never opens the panel loses a gesture.
+
+    // The results as FileSystemItems: the panel's whole pipeline (decode,
+    // carousel, filmstrip) speaks that type, and building them here is all the
+    // link costs. Images and films only, by the same test the folder carousel
+    // uses, so the two behave identically.
+    //
+    // Built once per result set and kept against the row list it came from -
+    // the strip matches its cells to the shown item BY REFERENCE, so handing
+    // out fresh instances per click would leave nothing in the strip
+    // highlighted. Rebinding the rows (a new query, 더 보기, a sort change)
+    // replaces the list object and this rebuilds against it.
+    private List<FileSystemItem>? _searchViewerItems;
+    private List<SearchRow>? _searchViewerItemsFor;
+
+    // "The list is driving, and it is showing nothing" - which is a different
+    // state from "the list is not driving", and the two have to be told apart
+    // or a search that finds nothing looks the same as no search at all.
+    private static readonly List<FileSystemItem> NoViewerItems = new();
+
+    // What the filmstrip's "same set as last time?" check compares while the
+    // results drive it. Not a path: these files come from many folders, and a
+    // path here would collide with a real one.
+    //
+    // The generation is what makes it an identity. A folder is told apart by
+    // its path and its length, but every result set would answer to the same
+    // name here - so two searches that happened to turn up the same number of
+    // pictures would have left the previous one's cells standing.
+    private int _searchViewerGeneration;
+    private string SearchFilmstripKey => $"\u0001검색 결과 #{_searchViewerGeneration}";
+
+    private List<FileSystemItem> SearchViewerItems()
+    {
+        if (ReferenceEquals(_searchViewerItemsFor, _searchRows) && _searchViewerItems is { } cached)
+        {
+            return cached;
+        }
+
+        _searchViewerGeneration++;
+        var items = new List<FileSystemItem>();
+        foreach (var row in _searchRows)
+        {
+            if (row.Entry is not { } entry)
+            {
+                continue;
+            }
+
+            var item = new FileSystemItem(entry.FileName, entry.FullPath, isDirectory: false);
+            if (IsViewerCarouselItem(item))
+            {
+                items.Add(item);
+            }
+        }
+
+        _searchViewerItems = items;
+        _searchViewerItemsFor = _searchRows;
+        return items;
+    }
+
+    // Shows a result in the panel without moving the tree. A result that is not
+    // a picture or a film still previews (the panel answers with its icon card,
+    // same as in the tree) - it just isn't part of the set the carousel walks,
+    // so the counter and the strip go away for it, which is what they do in a
+    // folder of documents too.
+    private void PreviewSearchResult(FileSearchService.SearchEntry entry)
+    {
+        if (!_viewerOpen)
+        {
+            return;
+        }
+
+        var items = SearchViewerItems();
+        _viewerListOverride = items;
+        _searchViewerItem = items.FirstOrDefault(i =>
+                                string.Equals(i.FullPath, entry.FullPath, StringComparison.OrdinalIgnoreCase))
+                            ?? new FileSystemItem(entry.FileName, entry.FullPath, isDirectory: false);
+        ScheduleViewerPreview();
+    }
+
+    // The way back from the strip and the chevrons: move the list's selection
+    // and let the selection change bring the picture, so there is one path in.
+    private void SelectSearchViewerItem(FileSystemItem target)
+    {
+        var row = _searchRows.FirstOrDefault(r =>
+            r.Entry is { } entry &&
+            string.Equals(entry.FullPath, target.FullPath, StringComparison.OrdinalIgnoreCase));
+        if (row is null)
+        {
+            return;
+        }
+
+        SearchResultsList.SelectedItem = row;
+        // An instant jump so the row stays reachable, never a slide - the same
+        // rule the filmstrip follows.
+        SearchResultsList.ScrollIntoView(row);
+    }
+
+    // Leaving the search view hands the panel back to the tree. Skipped when
+    // the leaving IS an activation: the tree is a moment away from landing on
+    // that very file, and re-pointing the panel at the old selection first
+    // would load a picture nobody asked for on the way past.
+    private bool _searchLeavingForResult;
+
+    private void ReleaseSearchViewerLink()
+    {
+        if (_viewerListOverride is null)
+        {
+            return;
+        }
+
+        _viewerListOverride = null;
+        _searchViewerItem = null;
+        if (_searchLeavingForResult)
+        {
+            return;
+        }
+
+        ScheduleViewerPreview();
+        UpdateViewerCarousel();
     }
 
     private void FocusSearchBox()
@@ -20328,14 +20688,26 @@ public partial class MainWindow : Window
     {
         _searchDragStart = null;
         _searchDragCandidate = null;
+        _searchDoubleClicked = null;
         var container = ItemsControl.ContainerFromElement(SearchResultsList, (DependencyObject)e.OriginalSource) as ListBoxItem;
         LogClick("press", container?.Content as SearchRow);
         if (container is { Content: SearchRow { Entry: { } entry } })
         {
             _searchDragStart = e.GetPosition(SearchResultsList);
             _searchDragCandidate = entry;
+            // Recorded on the PRESS, where the count is definitive, and acted
+            // on at the release with the rest of the click handling.
+            if (e.ClickCount == 2)
+            {
+                _searchDoubleClicked = entry;
+            }
         }
     }
+
+    // The second click of a double, waiting for its release. Not a bool: the
+    // release has to act on the row that was double-clicked, not on whatever
+    // happens to be under the cursor by then.
+    private FileSearchService.SearchEntry? _searchDoubleClicked;
 
     // One timeline for every click-shaped thing the app can see, written at
     // three depths so a click that "didn't take" can be placed:
@@ -20532,10 +20904,38 @@ public partial class MainWindow : Window
         {
             _searchDisplayLimit += SearchResultDisplayCap;
             RunSearchFilter();
+            return;
         }
-        else if (row.Entry is { } entry)
+
+        if (_searchDoubleClicked is { } doubleClicked)
+        {
+            _searchDoubleClicked = null;
+            ActivateSearchResult(doubleClicked);
+            return;
+        }
+
+        // A single click with the panel closed still means "take me there" -
+        // there is nothing to preview into, so the gesture keeps the only job
+        // it can do. With the panel open the preview has already happened, off
+        // the list's own selection change, and there is nothing left here.
+        if (!_viewerOpen && row.Entry is { } entry)
         {
             ActivateSearchResult(entry);
+        }
+    }
+
+    // Where the preview comes from, for every way the selection can move:
+    // clicking a row, arrow-keying down the list, and the panel's own chevrons
+    // and filmstrip reaching back into it.
+    private void SearchResultsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // The strip names the selected result's folder while search is up, so
+        // it has to follow this the way it follows the tree's selection.
+        SchedulePathBarSync();
+
+        if (SearchResultsList.SelectedItem is SearchRow { Entry: { } entry })
+        {
+            PreviewSearchResult(entry);
         }
     }
 
@@ -20620,9 +21020,31 @@ public partial class MainWindow : Window
         // its own capture normally, before anything is hidden.
         Dispatcher.BeginInvoke(() =>
         {
-            SetSearchViewActive(false);
-            NavigateToPath(entry.FullPath, source: "search-result");
+            // Held across the collapse so the panel keeps showing this file
+            // rather than blinking through the old tree selection on the way -
+            // the walk below lands on the same picture (see
+            // ReleaseSearchViewerLink).
+            _searchLeavingForResult = true;
+            try
+            {
+                SetSearchViewActive(false);
+                NavigateToPath(entry.FullPath, source: "search-result");
+            }
+            finally
+            {
+                _searchLeavingForResult = false;
+            }
         }, System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    // The discoverable half of the double click. Same act, one that can be
+    // read off a menu.
+    private void SearchRevealInTree_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedSearchResult is { } entry)
+        {
+            ActivateSearchResult(entry);
+        }
     }
 
     private void CommitSearchHistory(string query)

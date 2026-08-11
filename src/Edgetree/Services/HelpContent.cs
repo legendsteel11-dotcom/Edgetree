@@ -48,7 +48,8 @@ public static class HelpContent
         T("사용하지 않는 폴더 감추기", "Hide the folders you never open"),
         T("자주 쓰는 파일 종류 지정하기 (제외도 함께)", "Set the file kinds you work with - and the ones to exclude"),
         T("자주 가는 폴더를 북마크나 즐겨찾기로", "Bookmark the folders you keep going back to"),
-        T("이미지가 많은 폴더는 썸네일 미리 불러오기", "Preload thumbnails for folders full of images"),
+        T("썸네일 캐싱 옵션을 켜고 많은 이미지를 빠르게 관리",
+          "Turn thumbnail caching on and move through big image folders fast"),
         T("색상을 원하는 대로 맞추기", "Set the colours the way you want them"),
         T("검색 결과는 폴더별 묶기로 보기", "Read search results grouped by folder"),
     };
@@ -61,14 +62,14 @@ public static class HelpContent
             {
                 new Group(string.Empty, new[]
                 {
-                    R("가장자리에 마우스 대기", "숨어 있을 때 다시 꺼내기",
-                      "Point at the screen edge", "Bring it back while hidden"),
+                    R("가장자리 혹은 손잡이에 커서 이동", "숨어 있을 때 다시 꺼내기",
+                      "Point at the screen edge, or at the handle", "Bring it back while hidden"),
                     R("핀 클릭", "펼친 채로 두기 ↔ 자동 숨김",
                       "Click the pin", "Stay open ↔ auto-hide"),
-                    R("머리글 오른쪽 끝 ─", "사이드바 치우기 (종료 아님)",
-                      "The ─ at the end of the header", "Put the sidebar away - it does not quit"),
-                    R("머리글 우클릭", "도움말 · 트레이로 최소화 · 다시 시작 · 종료",
-                      "Right-click the header", "Help · Minimise to tray · Restart · Quit"),
+                    R("제목 표시줄 오른쪽 끝 ─", "사이드바 치우기 (종료 아님)",
+                      "The ─ at the end of the title bar", "Put the sidebar away - it does not quit"),
+                    R("제목 표시줄 우클릭", "도움말 · 트레이로 최소화 · 다시 시작 · 종료",
+                      "Right-click the title bar", "Help · Minimise to tray · Restart · Quit"),
                     R("가장자리 드래그", "너비 조절",
                       "Drag the outer edge", "Resize"),
                     R("가장자리 더블클릭", "내용에 맞춰 너비 맞춤",
@@ -88,10 +89,10 @@ public static class HelpContent
             {
                 new Group(string.Empty, new[]
                 {
-                    R("머리글 드래그", "창으로 떼어내기 · 옮기기",
-                      "Drag the header", "Pull it off, and move it"),
-                    R("머리글 더블클릭", "최대화 · 되돌리기",
-                      "Double-click the header", "Maximise · restore"),
+                    R("제목 표시줄 드래그", "창으로 떼어내기 · 옮기기",
+                      "Drag the title bar", "Pull it off, and move it"),
+                    R("제목 표시줄 더블클릭", "최대화 · 되돌리기",
+                      "Double-click the title bar", "Maximise · restore"),
                     R("가장자리 · 모서리 드래그", "크기 조절",
                       "Drag an edge or corner", "Resize"),
                     R("가장자리로 드래그", "다시 붙이기",
@@ -135,8 +136,10 @@ public static class HelpContent
             {
                 new Group(string.Empty, new[]
                 {
-                    R("아래쪽 칩 줄", "종류별로 걸러 보기", "The chip strip at the bottom", "Show only some kinds of file"),
-                    R("칩 줄 → 사용자 지정", "확장자를 직접 적기", "Chips → Custom", "Type the extensions yourself"),
+                    R("아래쪽 필터 버튼 줄", "종류별로 걸러 보기",
+                      "The filter buttons at the bottom", "Show only some kinds of file"),
+                    R("필터 버튼 → 사용자 지정", "확장자를 직접 적기",
+                      "A filter button → Custom", "Type the extensions yourself"),
                     R("폴더 행의 정렬 아이콘", "그 폴더만 따로 정렬", "The sort icon on a folder row", "Sort that one folder its own way"),
                     R("옵션 → 정렬 기준", "전체 기본 정렬", "Options → Sort by", "The default for everything"),
                     R("더 보기", "나머지 마저 펼치기", "Show more", "Reveal the rest"),
@@ -149,12 +152,30 @@ public static class HelpContent
             {
                 new Group(string.Empty, new[]
                 {
-                    R("머리글 돋보기", "검색 열기 · 닫기", "The magnifier in the header", "Open · close search"),
+                    R("Ctrl+F", "검색 열기", "Ctrl+F", "Open search"),
+                    R("제목 표시줄 돋보기", "검색 열기 · 닫기",
+                      "The magnifier in the title bar", "Open · close search"),
                     R("폴더 아이콘", "검색 범위 선택", "The folder icon", "Choose where to look"),
-                    R("결과 클릭", "트리에서 그 자리로", "Click a result", "Go to it in the tree"),
-                    R("결과 아래 색인 날짜", "그 뒤에 생긴 파일은 다시 훑어야 나옴",
-                      "The index date under the results", "Anything newer needs another scan"),
-                    R("Esc", "검색 닫기", "Esc", "Close search"),
+                    // Three rows for what is one conditional behaviour, and the
+                    // condition is what each row turns on: with the panel shut
+                    // a click can only mean "take me there", and with it open
+                    // that meaning moves to the double click so the single one
+                    // can show the file without collapsing the list. Stated as
+                    // three plain outcomes rather than as one row with an
+                    // if-clause in it.
+                    R("결과 클릭", "트리의 해당 항목으로 이동",
+                      "Click a result", "Go to it in the tree"),
+                    R("결과 클릭 · ↑ ↓", "(이미지 뷰어 연 상태) 검색 결과 항목 이동",
+                      "Click a result · ↑ ↓", "(with the image viewer open) Move through the results"),
+                    R("결과 더블클릭", "(이미지 뷰어 연 상태) 트리의 해당 항목으로 이동",
+                      "Double-click a result", "(with the image viewer open) Go to it in the tree"),
+                    R("결과 표시 수", "기본 1,000개 · 목록 끝의 더 보기로 1,000개씩 더",
+                      "How many results show", "1,000 at a time - \"Show more\" at the end adds another 1,000"),
+                    // The dot is the half a label cannot say: the button names
+                    // the act, nothing names the reason to press it.
+                    R("상태줄 오른쪽 ↻", "다시 인덱싱 — 파란 점은 폴더가 바뀌었다는 표시",
+                      "The ↻ on the status line", "Reindex - a blue dot means the folder has changed"),
+                    R("Esc · Ctrl+E", "검색 닫기", "Esc · Ctrl+E", "Close search"),
                 }),
             }),
 
@@ -166,13 +187,20 @@ public static class HelpContent
                 {
                     R("휠", "확대 · 축소", "Wheel", "Zoom in · out"),
                     R("드래그", "확대했을 때 이동", "Drag", "Move around, when zoomed in"),
+                    // What the plate IS, which nothing on screen says - it
+                    // appears on its own once there is more picture than panel,
+                    // and a small dark square in a corner explains nothing by
+                    // itself.
+                    R("내비게이터", "확대하면 오른쪽 아래에 — 전체에서 지금 보는 자리, 눌러서 이동 (▣ 버튼으로 켜고 끔)",
+                      "The navigator",
+                      "Bottom right, once zoomed in - where you are in the whole image; click to go there (the ▣ button turns it off)"),
                     R("좌우로 길게 드래그", "이전 · 다음 이미지", "Drag sideways, a good push", "Previous · next image"),
                     R("더블클릭", "맞춤 ↔ 1:1", "Double-click", "Fit ↔ actual size"),
                     R("가운데 클릭 · Enter", "전체 화면", "Middle-click · Enter", "Full screen"),
                     R("Esc", "전체 화면 나가기", "Esc", "Leave full screen"),
                     R("↑ ↓", "이전 · 다음 항목", "↑ ↓", "Previous · next item"),
-                    R("← →", "필름스트립이 켜져 있을 때 이전 · 다음",
-                      "← →", "Previous · next, while the filmstrip is open"),
+                    R("← →", "썸네일 바가 켜져 있을 때 이전 · 다음",
+                      "← →", "Previous · next, while the thumbnail bar is open"),
                 }),
 
                 new Group(T("영상", "Film"), new[]
@@ -183,19 +211,51 @@ public static class HelpContent
                     R("같은 영상 다시 재생", "보던 자리에서 이어보기",
                       "Play the same file again", "It carries on from where you left off"),
                     R("Home", "처음부터", "Home", "Back to the start"),
-                    R("P · Insert", "지금 위치 기록 · 해제", "P · Insert", "Mark this position, or take it back"),
+                    R("P · Insert", "영상 북마크 표시 · 해제",
+                      "P · Insert", "Bookmark this moment, or take it back"),
+                    R("우클릭 → 북마크 목록", "표시해 둔 자리로 이동 · 전체 삭제",
+                      "Right-click → Bookmarks", "Jump to one, or clear them all"),
                     R("재생 중 ↑ ↓", "안 받음 (일시정지하면 돌아옴)",
                       "↑ ↓ while playing", "Refused - they come back when it is paused"),
                     R("우클릭 → 자막", "켜기 · 크기 · 싱크", "Right-click → Subtitles", "On, size, and sync"),
                     R("전체 화면에서 아래쪽", "재생 막대 꺼내기",
                       "Full screen, point at the bottom", "Bring the transport bar back"),
+                    // The rows someone asks about rather than discovers, and the
+                    // help is where that answer belongs: this is the page people
+                    // are already looking for something on, so saying what does
+                    // not work here reads as an answer instead of as a warning
+                    // (which is why it is NOT on the download page).
+                    //
+                    // The extension list is VideoExtensions. WHAT THE ROWS DO
+                    // NOT DO is name a codec: a first draft said "mkv does not
+                    // play" and "install the Store's HEVC/AV1 extensions", and
+                    // the first was falsified within the hour (2026-08-11 - mkv
+                    // plays fine on a machine with a codec pack). Playback is
+                    // MediaElement, the OLD pipeline, so it uses the DirectShow
+                    // filters installed on the PC and not the Store's Media
+                    // Foundation extensions - which is exactly why the same file
+                    // plays on one machine and not another, and why the honest
+                    // row is the one that says so.
+                    R("재생되는 형식",
+                      "mp4 · m4v · mov · avi · wmv · mkv · webm · mpg · mpeg · ts · m2ts · mts · flv · 3gp",
+                      "Formats it plays",
+                      "mp4 · m4v · mov · avi · wmv · mkv · webm · mpg · mpeg · ts · m2ts · mts · flv · 3gp"),
+                    R("코덱", "외부 코덱 사용 (필요 시 사용자 설치)",
+                      "Codecs", "Whatever is installed on the PC - add one if a file needs it"),
+                    // "트리에서" is not padding: Enter INSIDE the panel is full
+                    // screen (see the images group above), and this row sits in
+                    // the viewer's own section.
+                    R("재생이 안 되면", "기본 프로그램 사용 권장 (트리에서 더블클릭 · Enter)",
+                      "When it will not play", "Better opened in your usual player (double-click or Enter, in the tree)"),
                 }),
 
-                new Group(T("필름스트립(썸네일 바)", "The filmstrip (thumbnail bar)"), new[]
+                new Group(T("썸네일 바", "The thumbnail bar"), new[]
                 {
-                    R("캐러셀 옆 ▤ 칩", "아래 줄에 폴더의 이미지들", "The ▤ chip beside the counter", "The folder's images as a row"),
+                    R("장수 표시 옆 ▤ 버튼", "아래 줄에 그 폴더의 이미지들 — 검색 중이면 결과",
+                      "The ▤ button beside the counter", "The folder's images as a row - or the results, while searching"),
                     R("칸을 밖으로 드래그", "다른 앱에 떨어뜨리기", "Drag a cell out", "Drop it into another app"),
-                    R("옵션 → 이미지 뷰어", "썸네일 미리 불러오기 · 썸네일 파일 정리",
+                    R("바 위쪽 가장자리 드래그", "칸 크기", "Drag the bar's top edge", "Cell size"),
+                    R("옵션 → 이미지 뷰어", "이미지 썸네일 캐싱 · 캐싱 파일 정리",
                       "Options → Image viewer", "Preload thumbnails · clean the cache up"),
                 }),
             }),

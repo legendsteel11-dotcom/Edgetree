@@ -102,6 +102,8 @@ public static class Strings
     public static string MenuOpenTerminal = "터미널에서 열기";
     public static string MenuOpenWithCode = "Code로 열기";
     public static string MenuRevealInExplorer = "탐색기에서 위치 열기";
+    public static string MenuRevealInTree = "트리에서 보기";
+    public static string GestureDoubleClick = "더블클릭";
     public static string MenuProperties = "속성";
     public static string MenuRemoveFavorite = "즐겨찾기에서 제거";
 
@@ -254,21 +256,33 @@ public static class Strings
     public static string MenuSetWallpaper = "바탕 화면 배경으로 설정";
     public static string ViewerPrevImage = "이전 이미지";
     public static string ViewerNextImage = "다음 이미지";
-    public static string ViewerFilmstrip = "필름스트립";
+    // 썸네일 바, not 필름스트립: the loanword is barely used in Korean, and the
+    // help had already been glossing it ("필름스트립(썸네일 바)") - which is a
+    // label admitting it needs a translation. The English keeps its own name
+    // rather than being translated back.
+    public static string ViewerFilmstrip = "썸네일 바";
     public static string MenuImageViewer = "이미지 뷰어";
-    // Named for what it does rather than for the machinery ("이미지 캐싱"), so
-    // the row itself says whether you want it.
-    public static string MenuPrecacheThumbnails = "이미지 썸네일 미리 불러오기";
+    // 캐싱 rather than 미리 불러오기, reversing the earlier choice to name it for
+    // what it does instead of for the machinery: 캐싱 is the word Korean users
+    // read fastest here, and "미리 불러오기" describes the act without naming the
+    // thing that is left behind - which is what the row below cleans up. The two
+    // rows now share a noun, so the pair reads as one subject.
+    public static string MenuPrecacheThumbnails = "이미지 썸네일 캐싱";
     // The size rides in the row itself, because the only reason to press it is
     // that the number has grown - and a row that has to be pressed to find out
     // is a row that gets pressed for no reason.
-    public static string MenuClearThumbnailCache = "썸네일 파일 정리";
-    public static string MenuClearThumbnailCacheSized = "썸네일 파일 정리 ({0})";
-    // {0} is how many are in hand so far. No total: the strip's own counter is
+    public static string MenuClearThumbnailCache = "캐싱 파일 정리";
+    public static string MenuClearThumbnailCacheSized = "캐싱 파일 정리 ({0})";
+    // {0} is how many are in hand so far. No total: the bar's own counter is
     // right beside it and already says how many the folder holds.
-    public static string ViewerPrecaching = "미리 불러오는 중 {0}";
-    public static string ViewerMarkAdd = "위치 기록";
-    public static string ViewerMarkList = "위치 목록";
+    public static string ViewerPrecaching = "캐싱 중 {0}";
+    // 북마크, not 위치 기록 (2026-08-11). "기록" reads as logging something
+    // rather than as leaving a marker you come back to, and the app already
+    // has a word for exactly that act on a tree row. Qualified with 영상 in the
+    // help so the two are told apart there; inside a video's own menu the
+    // qualifier is what the menu already is.
+    public static string ViewerMarkAdd = "북마크";
+    public static string ViewerMarkList = "북마크 목록";
     public static string ViewerRewind = "처음으로";
     // "영상 크기" rather than "확대": the row's middle button is 맞춤, which is
     // not a magnification - the row is about what SIZE the film is shown at,
@@ -277,7 +291,7 @@ public static class Strings
     public static string ViewerSubtitles = "자막";
     public static string ViewerSubtitleSize = "자막 크기";
     public static string ViewerSubtitleSync = "자막 싱크";
-    // Safe to be this blunt because of WHERE it is: inside the 위치 목록
+    // Safe to be this blunt because of WHERE it is: inside the 북마크 목록
     // submenu, under the positions it clears. The word 삭제 means files
     // everywhere else in this app, and it would have needed qualifying if it
     // sat anywhere the file rows could be mistaken for its subject.
@@ -564,6 +578,8 @@ public static class Strings
         MenuOpenTerminal = "Open in Terminal";
         MenuOpenWithCode = "Open with Code";
         MenuRevealInExplorer = "Reveal in Explorer";
+        MenuRevealInTree = "Show in Tree";
+        GestureDoubleClick = "Double-click";
         MenuProperties = "Properties";
         MenuRemoveFavorite = "Remove from Favorites";
 
@@ -641,20 +657,20 @@ public static class Strings
         MenuSetWallpaper = "Set as desktop background";
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
-        ViewerFilmstrip = "Filmstrip";
+        ViewerFilmstrip = "Thumbnail bar";
         MenuImageViewer = "Image viewer";
         MenuPrecacheThumbnails = "Preload image thumbnails";
         MenuClearThumbnailCache = "Clean up thumbnail files";
         MenuClearThumbnailCacheSized = "Clean up thumbnail files ({0})";
         ViewerPrecaching = "Preloading {0}";
-        ViewerMarkAdd = "Mark position";
-        ViewerMarkList = "Marked positions";
+        ViewerMarkAdd = "Bookmark";
+        ViewerMarkList = "Bookmarks";
         ViewerRewind = "Back to start";
         ViewerZoom = "Video size";
         ViewerSubtitles = "Subtitles";
         ViewerSubtitleSize = "Subtitle size";
         ViewerSubtitleSync = "Subtitle sync";
-        ViewerMarkClear = "Clear all marks";
+        ViewerMarkClear = "Clear all";
         ViewerPlay = "Play";
         ViewerPause = "Pause";
         ViewerStop = "Stop";

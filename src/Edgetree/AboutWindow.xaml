@@ -115,6 +115,9 @@
             BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
+                <!-- Bar and title both grow with the font and both stop on the
+                     way down - see HelpWindow, where the missing floor under
+                     the title was caught. -->
                 <RowDefinition Height="{DynamicResource DialogTitleBarHeight}"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
@@ -124,7 +127,7 @@
                     MouseLeftButtonDown="HeaderGrid_MouseLeftButtonDown">
                 <TextBlock Text="Edgetree"
                         Foreground="{DynamicResource DialogForeground}"
-                        FontSize="{DynamicResource DialogFontSize}"
+                        FontSize="{DynamicResource DialogTitleTextSize}"
                         VerticalAlignment="Center"
                         Margin="{DynamicResource DialogTitleIndent}"/>
                 <Button Style="{StaticResource DialogCloseButtonStyle}"

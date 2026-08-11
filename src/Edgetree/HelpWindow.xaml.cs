@@ -19,6 +19,16 @@ namespace SidebarExplorer.App;
 // XAML it would be the whole document written twice with the markup repeated
 // sixty times, and the two languages would drift apart the first time a row was
 // added in a hurry.
+//
+// NO TEXTBLOCK HERE SETS ITS OWN FontSize, and that is the fix for the one way
+// building a document in code goes wrong: `FindResource` READS a number, so
+// every row was cast in the size the window happened to open at, and Ctrl+/−
+// moved the app around a page that had frozen (reported 2026-08-11 - the title
+// bar, which is XAML and a DynamicResource, shrank while the document did not
+// budge). The window's own FontSize is the dynamic reference and FontSize
+// inherits, so leaving it unset is what makes every line follow. The one size
+// that differs - the section titles - asks for itself with
+// SetResourceReference, never with a read.
 public partial class HelpWindow : Window
 {
     private readonly AppSettings _settings;
@@ -80,7 +90,6 @@ public partial class HelpWindow : Window
                         Text = group.SubTitle,
                         FontWeight = FontWeights.Bold,
                         Foreground = (Brush)FindResource("DialogForeground"),
-                        FontSize = (double)FindResource("DialogFontSize"),
                         Margin = new Thickness(0, 14, 0, 2),
                     });
                 }
@@ -98,7 +107,6 @@ public partial class HelpWindow : Window
     private UIElement BuildTipBox()
     {
         var accent = (Brush)FindResource("AccentForeground");
-        double fontSize = (double)FindResource("DialogFontSize");
 
         var stack = new StackPanel();
         stack.Children.Add(new TextBlock
@@ -106,7 +114,6 @@ public partial class HelpWindow : Window
             Text = HelpContent.TipsTitle,
             FontWeight = FontWeights.Bold,
             Foreground = accent,
-            FontSize = fontSize,
             Margin = new Thickness(0, 0, 0, 8),
         });
 
@@ -125,7 +132,6 @@ public partial class HelpWindow : Window
             {
                 Text = (i + 1).ToString() + ".",
                 Foreground = accent,
-                FontSize = fontSize,
                 Margin = new Thickness(0, 2, 8, 2),
             };
             Grid.SetRow(number, i);
@@ -136,7 +142,6 @@ public partial class HelpWindow : Window
             {
                 Text = tips[i],
                 Foreground = (Brush)FindResource("DialogForeground"),
-                FontSize = fontSize,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 2, 0, 2),
             };
@@ -171,7 +176,6 @@ public partial class HelpWindow : Window
     private UIElement BuildSectionTitle(string title, bool first)
     {
         var accent = (Brush)FindResource("AccentForeground");
-        double fontSize = (double)FindResource("DialogTitleFontSize");
 
         var row = new StackPanel
         {
@@ -190,14 +194,18 @@ public partial class HelpWindow : Window
             Margin = new Thickness(1, 1, 8, 0),
         });
 
-        row.Children.Add(new TextBlock
+        var text = new TextBlock
         {
             Text = title,
             FontWeight = FontWeights.Bold,
             Foreground = accent,
-            FontSize = fontSize,
             VerticalAlignment = VerticalAlignment.Center,
-        });
+        };
+        // The only size in the document that is not the inherited one, so it is
+        // the only one that has to ask for itself. A reference, not a read:
+        // Ctrl+/− has to reach a window that is already open.
+        text.SetResourceReference(TextBlock.FontSizeProperty, "DialogTitleFontSize");
+        row.Children.Add(text);
 
         return row;
     }
@@ -211,7 +219,6 @@ public partial class HelpWindow : Window
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
 
-        double fontSize = (double)FindResource("DialogFontSize");
         // NOT the accent colour, which it was for a day. In this app accent
         // means "this is a link, click it" - every other place it appears is
         // underlined and opens something - so a whole column of blue gestures
@@ -229,7 +236,6 @@ public partial class HelpWindow : Window
             {
                 Text = rows[i].Gesture,
                 Foreground = gestureBrush,
-                FontSize = fontSize,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 3, 12, 3),
             };
@@ -241,7 +247,6 @@ public partial class HelpWindow : Window
             {
                 Text = rows[i].Meaning,
                 Foreground = meaningBrush,
-                FontSize = fontSize,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 3, 0, 3),
             };

@@ -1430,6 +1430,13 @@
                     Click="SearchOpen_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpenWith}"
                     Click="SearchOpenWith_Click"/>
+            <!-- The row's own double click, written down: a single click now
+                 previews into the panel without closing the list, so the trip
+                 to the tree needs somewhere to be read off. The gesture is
+                 named here because a label is what teaches one. -->
+            <MenuItem Header="{x:Static services:Strings.MenuRevealInTree}"
+                    InputGestureText="{x:Static services:Strings.GestureDoubleClick}"
+                    Click="SearchRevealInTree_Click"/>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuCut}"
                     InputGestureText="Ctrl+X"
@@ -4549,7 +4556,7 @@
                      free: SetExpandedContentVisibility already hides this
                      border and zeroes the row, and the search overlay already
                      covers it. -->
-                <StackPanel Orientation="Vertical">
+                <StackPanel x:Name="FooterStack" Orientation="Vertical">
                     <!-- Collapsed unless the option is on (ApplyPathBarVisibility) -
                          a StackPanel child at Collapsed takes no height, so the
                          footer keeps being exactly the chip strip when it's off. -->
@@ -4645,6 +4652,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- Controls group: scope row + input row, on the same slightly-
@@ -4660,6 +4668,7 @@
                     <Grid Margin="6,6,6,3">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
@@ -4718,6 +4727,37 @@
                                     Height="14"
                                     Stretch="Uniform"
                                     Fill="{DynamicResource ForegroundText}"/>
+                        </Button>
+                        <!-- The way out, inside the view it leaves. The header's
+                             search button already does this, but it is anchored
+                             to the top of the WINDOW - and the window grows by a
+                             whole panel when the viewer opens, so the button
+                             walks away from the hand exactly when the search
+                             view is being used most (2026-08-11). A control that
+                             ends something belongs next to the thing it ends.
+
+                             Material Symbols "close". The X was freed when the
+                             header's own close button became a minimize bar
+                             (see CloseButton) - and unlike that one, this really
+                             does end what it sits on, so the glyph is honest
+                             here.
+
+                             Set apart from its two neighbours by the margin:
+                             those change WHAT is searched and HOW it is ordered,
+                             this leaves. -->
+                        <Button x:Name="SearchCloseButton"
+                                Grid.Column="3"
+                                Style="{StaticResource ToggleButtonStyle}"
+                                Width="26"
+                                Height="26"
+                                Margin="6,0,0,0"
+                                Click="SearchCloseButton_Click"
+                                ToolTip="{x:Static services:Strings.ToolTipExitSearch}">
+                            <Path Data="M256-200l-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z M0-960H960M0 0H960"
+                                    Fill="{DynamicResource ForegroundText}"
+                                    Stretch="Uniform"
+                                    Width="{DynamicResource HeaderGlyphBox}"
+                                    Height="{DynamicResource HeaderGlyphBox}"/>
                         </Button>
                     </Grid>
 
@@ -4959,8 +4999,12 @@
                 </StackPanel>
 
                 <!-- Results: two lines per entry - dim italic folder path over
-                     the filename. Single click activates (see
-                     SearchResultsList_PreviewMouseLeftButtonUp). -->
+                     the filename. A single click previews the row in the image
+                     panel and leaves the list standing; a double click goes to
+                     it in the tree, which is what a single click did before the
+                     panel existed (see SearchResultsList_PreviewMouseLeftButtonUp
+                     and PreviewSearchResult). With the panel closed a single
+                     click still goes to the tree. -->
                 <ListBox x:Name="SearchResultsList"
                         Grid.Row="2"
                         Style="{StaticResource FavoritesListBoxStyle}"
@@ -4976,6 +5020,7 @@
                         PreviewMouseMove="SearchResultsList_PreviewMouseMove"
                         PreviewMouseLeftButtonUp="SearchResultsList_PreviewMouseLeftButtonUp"
                         PreviewMouseRightButtonDown="SearchResultsList_PreviewMouseRightButtonDown"
+                        SelectionChanged="SearchResultsList_SelectionChanged"
                         KeyDown="SearchResultsList_KeyDown">
                     <ListBox.ItemTemplate>
                         <!-- One row is either a folder header or a file (see
@@ -5070,6 +5115,24 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
+
+                <!-- Where the path strip goes while search is up. The strip is
+                     ONE control that moves between here and the footer
+                     (MovePathBarInto) rather than a second copy: every bit of
+                     its behaviour - the dirty flag, the deepest-existing-path
+                     walk, the click-away reset - hangs off that one box, and a
+                     twin would have needed all of it parameterised to stay
+                     honest.
+                     Reparented because the search view covers the footer it
+                     normally lives in (rows 1-4), and the footer stays covered
+                     on purpose: the filter chips beside it act on the TREE, and
+                     leaving them showing over a result list would read as
+                     though they were filtering it. -->
+                <Border x:Name="SearchPathBarHost"
+                        Grid.Row="3"
+                        BorderThickness="0,1,0,0"
+                        BorderBrush="{DynamicResource PanelDividerBrush}"
+                        Visibility="Collapsed"/>
             </Grid>
 
             <!-- The image viewer panel (round 1). Lives in one of the two
