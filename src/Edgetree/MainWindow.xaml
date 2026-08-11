@@ -5750,6 +5750,31 @@
                                     </MenuItem.Header>
                                 </MenuItem>
                                 <Separator/>
+                                <!-- THE FILE's bookmark, which the panel had no
+                                     way to reach: the row it marks is the one the
+                                     panel is showing, so a picture worth coming
+                                     back to had to be found in the tree again
+                                     first (2026-08-11).
+                                     Add and remove only - one row that swaps its
+                                     own label. The tree's menu offers the LIST
+                                     and the two jumps as well, and that is the
+                                     right place for them: they are about the
+                                     collection, where this is about the file in
+                                     front of you.
+                                     At the head of the file-action group rather
+                                     than in a fence of its own, which would be a
+                                     group of one. It shows for everything the
+                                     panel opens - pictures, films and sound
+                                     alike - because the tree row underneath is a
+                                     row either way.
+                                     Straight to the row menu's own handler, like
+                                     every other file action here: it reads the
+                                     tree's selection, and this menu only opens
+                                     when that selection IS the panel's file. -->
+                                <MenuItem x:Name="ViewerBookmarkItem"
+                                        Header="{x:Static services:Strings.MenuBookmarkAdd}"
+                                        InputGestureText="Ctrl+Alt+K"
+                                        Click="BookmarkMenuItem_Click"/>
                                 <!-- All four are refused while a film is loaded:
                                      a playing MediaElement holds the file OPEN,
                                      so rename and delete fail at the OS and cut

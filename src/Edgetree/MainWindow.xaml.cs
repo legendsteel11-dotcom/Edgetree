@@ -19717,6 +19717,13 @@ public partial class MainWindow : Window
         ViewerRewindItem.Visibility = playbackRows;
         ViewerMediaZoomItem.Visibility = pictureRows;
         ViewerMarkAddItem.Visibility = playbackRows;
+        // The FILE's bookmark, on every kind of file the panel opens. One row
+        // that says which way it goes, the same swap the tree's own menu makes -
+        // and `item` above is already the tree row this menu is standing on, so
+        // there is nothing else to ask.
+        ViewerBookmarkItem.Header = item.IsBookmarked
+            ? Strings.MenuBookmarkRemove
+            : Strings.MenuBookmarkAdd;
         // Only when a subtitle file was actually found beside this film.
         var subtitleRows = movingPicture && HasSubtitles ? Visibility.Visible : Visibility.Collapsed;
         ViewerSubtitleToggleItem.Visibility = subtitleRows;

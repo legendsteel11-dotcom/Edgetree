@@ -326,8 +326,15 @@ public static class Strings
     // has a word for exactly that act on a tree row. Qualified with 영상 in the
     // help so the two are told apart there; inside a video's own menu the
     // qualifier is what the menu already is.
-    public static string ViewerMarkAdd = "북마크";
-    public static string ViewerMarkList = "북마크 목록";
+    // QUALIFIED SINCE 2026-08-11, and the reason the old note gave for leaving
+    // it bare has expired. It read "inside a video's own menu the qualifier is
+    // what the menu already is" - true while this menu held only the film's own
+    // rows, and false the moment the FILE's 북마크 joined it. Two rows both
+    // called 북마크, one marking a second of film and one marking a row in the
+    // tree, is the kind of thing nobody reads twice. The help already used this
+    // longer name for it.
+    public static string ViewerMarkAdd = "영상 북마크";
+    public static string ViewerMarkList = "영상 북마크 목록";
     public static string ViewerRewind = "처음으로";
     // Two pairs because the transport serves sound and film from the same row,
     // and the tooltip is set to whichever the loaded file is. 곡 over a folder
@@ -783,8 +790,8 @@ public static class Strings
         MenuClearThumbnailCache = "Clean up thumbnail files";
         MenuClearThumbnailCacheSized = "Clean up thumbnail files ({0})";
         ViewerPrecaching = "Preloading {0}";
-        ViewerMarkAdd = "Bookmark";
-        ViewerMarkList = "Bookmarks";
+        ViewerMarkAdd = "Video Bookmark";
+        ViewerMarkList = "Video Bookmarks";
         ViewerRewind = "Back to start";
         ViewerPrevTrack = "Previous track";
         ViewerNextTrack = "Next track";
