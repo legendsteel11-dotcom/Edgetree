@@ -20750,9 +20750,23 @@ public partial class MainWindow : Window
             return;
         }
 
+        // COUNTED OVER THE SAME WINDOW THE TRICKLE WALKS, not over the folder.
+        // Counting the folder was right while the strip fetched all of it; once
+        // the fetch got a ceiling it left the line permanently on. In a folder
+        // of 2,404 the window fills at ~1,017 and the trickle stops, having done
+        // everything it means to do - and every remaining cell counted as still
+        // missing, so "캐싱 중" sat there over a timer that was not running
+        // (2026-08-12). The line's whole job is "is there anything left to
+        // fetch", and what is fetchable is now a window.
+        var (first, last) = _filmstripTrickleRange;
+        int centre = (first + last) / 2;
+        int from = Math.Clamp(centre - FilmstripRetainReach, 0, _filmstripCells.Count);
+        int to = Math.Clamp(centre + FilmstripRetainReach + 1, 0, _filmstripCells.Count);
+
         int have = 0, missing = 0;
-        foreach (var cell in _filmstripCells)
+        for (int i = from; i < to; i++)
         {
+            var cell = _filmstripCells[i];
             if (cell.Thumbnail is not null)
             {
                 have++;
