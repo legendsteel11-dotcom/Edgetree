@@ -62,6 +62,12 @@
              fallback is only ever exercised by the thing that has no other
              answer, so a mistake in one is invisible everywhere it works. -->
         <system:Double x:Key="ScrollBarThickness">12</system:Double>
+        <!-- The shortest a scroll thumb may get, along whichever axis it
+             scrolls (see MinimalScrollBarStyle's triggers, where it is read
+             for both orientations). It is a FLOOR on the grab area, not a
+             size: anything short of a folder with thousands of rows never
+             reaches it. -->
+        <system:Double x:Key="ScrollThumbMinLength">44</system:Double>
         <GridLength x:Key="ScrollGutterWidth">13</GridLength>
         <SolidColorBrush x:Key="MenuForeground" Color="#FFCCCCCC"/>
         <SolidColorBrush x:Key="PanelDividerBrush" Color="#FF3A3A3A"/>
@@ -116,6 +122,18 @@
                             <!-- Track defaults to Vertical and ignores the ScrollBar's own
                                  Orientation unless explicitly bound - without this, a
                                  horizontal scrollbar renders as a stray vertical sliver. -->
+                            <!-- IsDirectionReversed is TRUE FOR VERTICAL ONLY -
+                                 see the trigger below, which turns it off for a
+                                 horizontal bar. Vertical needs it because the
+                                 Track's axis runs the opposite way to the
+                                 scroll offset; horizontal does not, and left at
+                                 True the bar runs BACKWARDS: offset 0 puts the
+                                 thumb hard against the right edge, and
+                                 scrolling forward walks it left. This template
+                                 had only ever driven the tree, so the first
+                                 horizontal bar in the app found it (2026-08-12)
+                                 - and a thumb sitting where nobody would aim is
+                                 also why it read as unclickable. -->
                             <Track x:Name="PART_Track"
                                     IsDirectionReversed="True"
                                    Orientation="{TemplateBinding Orientation}">
@@ -144,19 +162,36 @@
                              Set per orientation because the thumb's long axis
                              is the one being squeezed; forcing the other one
                              would push it out of a bar that is only
-                             ScrollBarThickness across. -->
+                             ScrollBarThickness across.
+
+                             RAISED FROM 28 to 44 (2026-08-12). 28 was measured
+                             against a short window, not against a long list: a
+                             folder of 2,400 rows pins the thumb at the floor
+                             whatever the window height, so the floor IS the
+                             thumb there, and it was being missed repeatedly -
+                             in a list that is also stuttering, which turns one
+                             missed grab into several. A miss costs more than a
+                             slightly coarser thumb does: the click lands on the
+                             track instead and pages the list somewhere nobody
+                             asked to go.
+
+                             One resource for both, so this stays a single
+                             number to tune rather than two that can drift. -->
                         <ControlTemplate.Triggers>
                             <Trigger Property="Orientation"
                                     Value="Vertical">
                                 <Setter TargetName="ScrollBarThumb"
                                         Property="MinHeight"
-                                        Value="28"/>
+                                        Value="{DynamicResource ScrollThumbMinLength}"/>
                             </Trigger>
                             <Trigger Property="Orientation"
                                     Value="Horizontal">
                                 <Setter TargetName="ScrollBarThumb"
                                         Property="MinWidth"
-                                        Value="28"/>
+                                        Value="{DynamicResource ScrollThumbMinLength}"/>
+                                <Setter TargetName="PART_Track"
+                                        Property="IsDirectionReversed"
+                                        Value="False"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -361,6 +396,47 @@
                     </Trigger.ExitActions>
                 </Trigger>
             </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- The filmstrip's own, and it differs from the one above on the two
+             points that decide whether a bar is usable on a SHORT HORIZONTAL
+             strip rather than a tall list (2026-08-12, after the overlay one
+             was tried there):
+
+             A LANE OF ITS OWN, not an overlay. Overlaid on a list 60px tall the
+             bar sat across the bottom of every frame - the picture and the
+             control fought for the same pixels, and aiming at the bar meant
+             aiming at a thumbnail. It costs the strip the bar's height, which
+             is the trade being made deliberately.
+
+             ALWAYS VISIBLE, not revealed on hover. Hiding it at rest is right
+             for a tree, where the bar is a fallback for a list you mostly read;
+             on a strip of 2,400 frames it IS the way around, and something you
+             have to go looking for before it appears is the opposite of that.
+             A local Opacity beats the style's own setter, so the thumb keeps
+             every other thing about its appearance - the same colour, corner
+             and hover brightening the tree's has, which is what makes the two
+             read as one control rather than two. -->
+        <ControlTemplate x:Key="FilmstripScrollViewerTemplate" TargetType="ScrollViewer">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <ScrollContentPresenter Grid.Row="0"
+                        Content="{TemplateBinding Content}"
+                        CanContentScroll="{TemplateBinding CanContentScroll}"
+                        Margin="{TemplateBinding Padding}"/>
+                <ScrollBar x:Name="PART_HorizontalScrollBar"
+                        Grid.Row="1"
+                        Style="{StaticResource MinimalScrollBarStyle}"
+                        Opacity="1"
+                        Orientation="Horizontal"
+                        Value="{TemplateBinding HorizontalOffset}"
+                        Maximum="{TemplateBinding ScrollableWidth}"
+                        ViewportSize="{TemplateBinding ViewportWidth}"
+                        Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"/>
+            </Grid>
         </ControlTemplate>
     </Application.Resources>
 </Application>

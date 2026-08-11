@@ -2107,6 +2107,35 @@
             </Setter>
         </Style>
 
+        <!-- The strip gets the app's own scrollbar, not Windows'. A ListBox
+             with no Style of its own keeps the stock template, and the stock
+             template brings the stock ScrollViewer with it - so turning the
+             horizontal bar on gave the strip a grey Windows bar with arrow
+             buttons at both ends, next to the thin overlay bars the tree and
+             the results list use (2026-08-12). Everywhere else in this app
+             reaches MinimalScrollViewerTemplate through a control template;
+             this is the same route for the one control that had none.
+             The bar is an OVERLAY there, drawn on top of the content rather
+             than in a lane of its own, so the strip keeps every pixel of its
+             height. -->
+        <Style x:Key="FilmstripListBoxStyle"
+                TargetType="ListBox">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBox">
+                        <ScrollViewer Focusable="False"
+                                Padding="{TemplateBinding Padding}"
+                                Template="{StaticResource FilmstripScrollViewerTemplate}"
+                                CanContentScroll="{TemplateBinding ScrollViewer.CanContentScroll}"
+                                HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
+                            <ItemsPresenter/>
+                        </ScrollViewer>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ExplorerTreeViewItemStyle"
                 TargetType="TreeViewItem">
             <!-- Blocks the root TreeView's deliberately huge CacheLength (see
@@ -6103,13 +6132,24 @@
                              it holds, not enforced when it cannot.
                              The right stays at 4: nothing over there has an edge
                              to agree with. -->
+                        <!-- HorizontalScrollBarVisibility is Auto rather than
+                             Hidden (2026-08-12): a strip of 2,400 frames
+                             scrolled with no bar showed neither where it was
+                             nor how far it went, and the wheel was the only way
+                             to find out. Auto leaves a short folder's strip
+                             exactly as it was - the bar only exists once the
+                             frames do not fit - and it picks up the app's own
+                             thin scrollbar (App.xaml's implicit style, the same
+                             one the tree and the results list use), so nothing
+                             here has to describe what it looks like. -->
                         <ListBox x:Name="ViewerFilmstrip"
+                                Style="{StaticResource FilmstripListBoxStyle}"
                                 Background="Transparent"
                                 BorderThickness="0"
                                 Padding="0,5,4,4"
                                 Focusable="False"
                                 ScrollViewer.CanContentScroll="True"
-                                ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
                                 PreviewMouseWheel="ViewerFilmstrip_PreviewMouseWheel"
                                 PreviewMouseLeftButtonDown="ViewerFilmstrip_PreviewMouseLeftButtonDown"
@@ -6358,6 +6398,27 @@
                              band use, so the gesture is one the hand already
                              knows. Height IS cell size here: there is nothing
                              else in the row to give the pixels to. -->
+                        <!-- WHERE THE PICTURE ON SCREEN SITS IN THE WHOLE
+                             STRIP, drawn on the scrollbar itself. Scrolling a
+                             long strip carries the selected frame off the end
+                             of it, and there was then nothing saying which way
+                             it had gone; a dot on the bar answers that without
+                             the app moving anything on its own, and it is the
+                             reason no "back to the current picture" button is
+                             needed. Placed from code (see
+                             UpdateFilmstripPositionMarker) against the bar's
+                             real bounds rather than guessed from padding, so it
+                             cannot drift from the track it belongs to.
+                             Hit-test off: the bar underneath keeps every
+                             gesture. -->
+                        <Canvas x:Name="ViewerFilmstripMarkerLayer"
+                                IsHitTestVisible="False">
+                            <Ellipse x:Name="ViewerFilmstripMarker"
+                                    Width="5"
+                                    Height="5"
+                                    Fill="{DynamicResource AccentForeground}"
+                                    Visibility="Collapsed"/>
+                        </Canvas>
                         <Thumb x:Name="ViewerFilmstripThumb"
                                 Height="6"
                                 Margin="0,-3,0,0"

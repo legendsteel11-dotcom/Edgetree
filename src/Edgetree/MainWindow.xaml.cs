@@ -20444,6 +20444,81 @@ public partial class MainWindow : Window
         // new container was created for it - so the sweep has to be told here
         // too, not only from Loaded.
         ScheduleFilmstripThumbnails();
+
+        // After layout, not during it: on the first frame of a folder the
+        // scrollbar has not been measured yet, so the bar this reads has no
+        // width to place anything against.
+        Dispatcher.BeginInvoke(
+            UpdateFilmstripPositionMarker,
+            System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    // ----- 스크롤바 위의 현재 위치 ----------------------------------------------
+    //
+    // A dot on the strip's scrollbar saying where the picture on screen sits in
+    // the whole folder. Scrolling a long strip carries the selected frame off
+    // the end of it and nothing said which way it had gone; this answers that
+    // without the app scrolling anything by itself, which is the standing rule
+    // here - and it is why the strip needs no "back to the current picture"
+    // button (2026-08-12).
+    //
+    // Placed against the ScrollViewer's REAL bounds, transformed into the
+    // marker layer's own space. The alternative - deriving it from the strip's
+    // padding and the cell size - is the kind of arithmetic that agrees with
+    // the bar today and drifts the next time either changes.
+    //
+    // Hidden whenever the bar is: a folder that fits has nothing to point at,
+    // and a dot floating where no track exists would read as a fault.
+    private double _lastFilmstripThumbWidth = -1;
+
+    private void UpdateFilmstripPositionMarker()
+    {
+        int index = ViewerFilmstrip.SelectedIndex;
+        if (ViewerFilmstripHost.Visibility != Visibility.Visible ||
+            index < 0 ||
+            FindDescendant<ScrollViewer>(ViewerFilmstrip) is not { } scroller ||
+            scroller.Template?.FindName("PART_HorizontalScrollBar", scroller)
+                is not System.Windows.Controls.Primitives.ScrollBar bar ||
+            bar.Visibility != Visibility.Visible || bar.ActualWidth <= 0)
+        {
+            ViewerFilmstripMarker.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // THE SAME ARITHMETIC THE TRACK ITSELF USES, taken from the bar rather
+        // than derived alongside it. A dot placed by its own formula agrees at
+        // the two ends and drifts everywhere in between, because a track maps
+        // the value over the span the THUMB can travel - the bar's width less
+        // the thumb's own - and not over the bar. Reading the real thumb keeps
+        // the two in step at every size the strip can be dragged to.
+        double thumbWidth =
+            (bar.Template?.FindName("PART_Track", bar) as System.Windows.Controls.Primitives.Track)
+                ?.Thumb?.ActualWidth ?? 0;
+        double dot = ViewerFilmstripMarker.Width;
+        double span = Math.Max(0, bar.ActualWidth - thumbWidth);
+        double at = bar.Maximum <= 0 ? 0 : Math.Clamp(index / bar.Maximum, 0, 1);
+
+        // Centred on where the thumb WOULD be for this picture, which is the
+        // whole claim the dot is making.
+        // The thumb's REAL width, written down once whenever it changes: the
+        // floor meant to keep it catchable is set on the Thumb, and whether a
+        // Track actually honours it for a horizontal bar is the open question
+        // behind "it is still too small to grab" (2026-08-12).
+        if (Math.Abs(thumbWidth - _lastFilmstripThumbWidth) > 0.5)
+        {
+            _lastFilmstripThumbWidth = thumbWidth;
+            LogClickLine(
+                $"strip bar: thumb={thumbWidth:F0}px  bar={bar.ActualWidth:F0}px  " +
+                $"max={bar.Maximum:F0}  viewport={bar.ViewportSize:F0}  cells={_filmstripCells.Count}");
+        }
+
+        var origin = bar.TransformToVisual(ViewerFilmstripMarkerLayer)
+            .Transform(new System.Windows.Point(0, 0));
+        Canvas.SetLeft(ViewerFilmstripMarker,
+            origin.X + at * span + (thumbWidth - dot) / 2);
+        Canvas.SetTop(ViewerFilmstripMarker,
+            origin.Y + (bar.ActualHeight - dot) / 2);
+        ViewerFilmstripMarker.Visibility = Visibility.Visible;
     }
 
     // ScrollIntoView was doing this, and it was the whole cost of having the
