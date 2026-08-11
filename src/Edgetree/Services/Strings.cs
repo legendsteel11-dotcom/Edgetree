@@ -293,8 +293,11 @@ public static class Strings
     // The path bar's two chevrons. Plain 뒤로/앞으로 rather than "이전 위치":
     // this is the gesture every browser and file manager has, and naming it
     // anything else would make it read as something new.
-    public static string TreeHistoryBack = "뒤로";
-    public static string TreeHistoryForward = "앞으로";
+    // The key rides in the tooltip because there is nowhere else it could be
+    // said - these two are buttons, not menu rows with an InputGestureText
+    // column, and a shortcut nobody can discover is one nobody uses.
+    public static string TreeHistoryBack = "뒤로  (Ctrl+←)";
+    public static string TreeHistoryForward = "앞으로  (Ctrl+→)";
     public static string ViewerPrevImage = "이전 이미지";
     public static string ViewerNextImage = "다음 이미지";
     // 썸네일 바, not 필름스트립: the loanword is barely used in Korean, and the
@@ -769,8 +772,8 @@ public static class Strings
         ViewerNavigator = "Navigator";
         ViewerClose = "Close viewer";
         MenuSetWallpaper = "Set as desktop background";
-        TreeHistoryBack = "Back";
-        TreeHistoryForward = "Forward";
+        TreeHistoryBack = "Back  (Ctrl+←)";
+        TreeHistoryForward = "Forward  (Ctrl+→)";
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
         ViewerFilmstrip = "Thumbnail bar";

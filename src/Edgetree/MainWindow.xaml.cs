@@ -1262,6 +1262,26 @@ public partial class MainWindow : Window
             return;
         }
 
+        // 트리 히스토리, the same pair every browser and file manager binds it to.
+        // Free to take: nothing in this app had Ctrl+←/→ - checked before
+        // binding rather than after - and the plain arrows keep every meaning
+        // they already had (tree collapse/expand, seeking a film, walking the
+        // filmstrip), since none of those read a modifier.
+        //
+        // Out of a TEXT BOX, where Ctrl+←/→ is word-by-word movement and taking
+        // it would break renaming and the path bar. Out of the SEARCH VIEW for
+        // the same reason the two buttons grey out there: the tree it moves is
+        // behind the results.
+        if (Keyboard.Modifiers == ModifierKeys.Control &&
+            (e.Key == Key.Left || e.Key == Key.Right) &&
+            !_isSearchViewActive &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            GoTreeHistory(e.Key == Key.Left ? -1 : +1);
+            e.Handled = true;
+            return;
+        }
+
         // F1 from anywhere, including out of a text box: it is the one key on a
         // keyboard that means the same thing in every program, and someone
         // reaching for it is by definition unsure where they are.

@@ -141,6 +141,13 @@ public static class HelpContent
                 {
                     R("↑ ↓", "위 · 아래 행 이동", "↑ ↓", "Previous · next row"),
                     R("← →", "접기 · 펼치기", "← →", "Collapse · expand"),
+                    // Named for the places rather than for the rows: it moves
+                    // between folders you have been in, not between every row
+                    // you clicked, and someone who expects the second one will
+                    // read the first press as a miss.
+                    R("Ctrl+← · Ctrl+→", "지나온 폴더로 뒤로 · 앞으로 (경로 표시줄의 < > 와 같음)",
+                      "Ctrl+← · Ctrl+→",
+                      "Back · forward through the folders you have been in - the same as the path bar's < >"),
                     R("Ctrl + 휠", "빠른 스크롤", "Ctrl + wheel", "Scroll about five times faster"),
                     R("Ctrl + / −", "글자 크기 조절", "Ctrl + / −", "Text size"),
                     R("Enter", "열기", "Enter", "Open"),
