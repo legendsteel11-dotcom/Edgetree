@@ -20332,7 +20332,11 @@ public partial class MainWindow : Window
                 : _searchScopeFolder);
             rebuilt = true;
             _filmstripBuiltFor = (builtFor, items.Count);
-            _filmstripCells.Clear();
+            // The outgoing folder's pictures go back here, not whenever a
+            // collection happens to come round - and the requests still queued
+            // for them go too, since they are asking for a folder nobody is
+            // looking at any more and would only compete with this one.
+            ClearFilmstripCells();
             foreach (var item in items)
             {
                 _filmstripCells.Add(new FilmstripCell(item, IsViewerPlayable(item.FullPath)));
@@ -21325,17 +21329,26 @@ public partial class MainWindow : Window
     // down. The pixels are let go HERE, on the cells themselves, so it does not
     // matter who else is still pointing at them; the queue is dropped as well
     // so nothing refills what was just released.
-    private void ReleaseFilmstripCells()
+    // Every cell's picture handed back before the list is dropped. Used by the
+    // release below AND by the rebuild a folder change causes, which is the
+    // common case by far: clearing the collection on its own leaves the pixels
+    // alive until something collects them, and leaves their reported weight
+    // standing for pictures that no longer exist.
+    private void ClearFilmstripCells()
     {
         Services.ShellThumbnailService.DropPending();
 
         foreach (var cell in _filmstripCells)
         {
-            cell.Thumbnail = null;
-            cell.Requested = false;
+            cell.Drop();
         }
 
         _filmstripCells.Clear();
+    }
+
+    private void ReleaseFilmstripCells()
+    {
+        ClearFilmstripCells();
         _filmstripBuiltFor = default;
         _filmstripTrickleRange = (0, 0);
         _filmstripTrickleTimer?.Stop();

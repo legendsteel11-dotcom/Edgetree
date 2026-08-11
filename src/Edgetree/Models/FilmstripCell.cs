@@ -63,11 +63,37 @@ public class FilmstripCell : INotifyPropertyChanged
     // goes through here, and each one either replaces a value or clears it.
     private const long ThumbnailBytes = 256 * 256 * 4;
 
+    // A CELL THAT HAS BEEN DROPPED NEVER TAKES A PICTURE AGAIN, and this is why
+    // the guard lives in the setter rather than at the call sites: a fetch
+    // already in flight when the strip is rebuilt answers into the cell it
+    // started with, and that cell is gone from the list with nothing left to
+    // clear it again. It would take the picture, report the weight, and never
+    // report it back - so the collector would be told about a quarter of a
+    // gigabyte that does not exist, once per folder, for the life of the run.
+    // A number like that does not cost memory; it costs COLLECTIONS, which is
+    // the stutter this was all being fixed for.
+    private bool _dropped;
+
+    // Handing the picture back and refusing any more. Called for every cell
+    // when the strip is rebuilt or released.
+    public void Drop()
+    {
+        Thumbnail = null;
+        Requested = false;
+        AskedAhead = false;
+        _dropped = true;
+    }
+
     public ImageSource? Thumbnail
     {
         get => _thumbnail;
         set
         {
+            if (_dropped)
+            {
+                value = null;
+            }
+
             if (Equals(_thumbnail, value))
             {
                 return;
