@@ -5277,11 +5277,23 @@
                  it never takes a pixel from the tree. Below the header row
                  only - the header spans all three columns above it. The
                  divider border side is set in code to face the tree. -->
+            <!-- TWO PIXELS OFF THE TOP, and they are the header divider's
+                 (2026-08-11). That line is drawn 2px below the header row on
+                 purpose, so it lands inside whatever sits at the top of row 1 -
+                 on the tree's side that is a list's background and nobody ever
+                 saw it, but here a zoomed picture reaches the panel's own top
+                 edge and the line lay ON the photograph. The inset puts the
+                 panel's backdrop under the line instead, so it reads as a
+                 boundary above the picture rather than a scratch across it.
+                 Full screen clears this along with the border and the margins -
+                 see SetViewerFullscreen, where every pixel goes back to the
+                 picture. -->
             <Border x:Name="ViewerPanel"
                     Grid.Row="1"
                     Grid.RowSpan="4"
                     Grid.Column="2"
                     Visibility="Collapsed"
+                    Padding="0,2,0,0"
                     Background="{DynamicResource ViewerBackground}"
                     BorderBrush="{DynamicResource PanelDividerBrush}"
                     BorderThickness="1,0,0,0"

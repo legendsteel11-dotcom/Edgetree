@@ -920,6 +920,10 @@ public partial class MainWindow : Window
         SetBrushColor("HeaderBackground", light ? _settings.LightHeaderBackgroundColorHex : _settings.HeaderBackgroundColorHex);
         SetBrushColor("AutoHideHandleBackground", light ? _settings.LightAutoHideHandleColorHex : _settings.AutoHideHandleColorHex);
         UpdateDerivedEdgeInks(light);
+        // Full screen's backdrop is a THEME question now (black in the dark
+        // theme only), so a theme flip has to reach it even though nothing about
+        // the viewer's own state moved.
+        ApplyViewerBackdrop();
 
         // The results sort button's icon has its own light/dark variants (same
         // as the folder override icon) - re-resolve it now that IsLightMode
@@ -17603,6 +17607,58 @@ public partial class MainWindow : Window
     // has to have something to put back.
     private static readonly Thickness ViewerMediaBarMargin = new(0, 8, 0, 0);
 
+    // Declared here for the same reason as the one above: full screen writes the
+    // panel's Padding and has to have something to put back. The XAML carries
+    // the same value and the note explaining what the two pixels are for.
+    private static readonly Thickness ViewerPanelTopInset = new(0, 2, 0, 0);
+
+    // ----- 뷰어 뒤에 무엇이 깔리는가 --------------------------------------------
+    //
+    // BLACK BEHIND A FULL-SCREEN PICTURE, but only in the dark theme. The
+    // panel's own backdrop is a colour chosen to sit beside a tree, and it is
+    // the right one there - a picture in a sidebar is an object on a surface.
+    // Full screen is not that: the letterbox bars are all that is left around
+    // the picture, and any colour in them is a frame the picture is being shown
+    // inside. In a dark theme black is the absence of one.
+    //
+    // IN THE LIGHT THEME IT IS NOT (user, 2026-08-11). Black bars around a
+    // picture on a light desktop are the most emphatic frame available - the
+    // opposite of what the paragraph above is reaching for. There the viewer's
+    // own backdrop is already the quiet answer, so full screen keeps it.
+    //
+    // THE WAY BACK IS A RESOURCE REFERENCE, NOT A BRUSH (2026-08-11). Read once
+    // with FindResource, what came back was a plain local value - and a local
+    // value is exactly what the XAML's DynamicResource was, so assigning over it
+    // does not "restore" the binding, it destroys it. The panel then held one
+    // brush object for good.
+    //
+    // That is invisible until the resource is REPLACED rather than recoloured,
+    // and colorperf.log names ViewerBackground as one of the keys replaced every
+    // session (SetBrushColor can only recolour an unfrozen brush, and this one
+    // arrives frozen). So switching dark/light - by hand or through a preset -
+    // left the panel on the old theme's backdrop until something happened to
+    // write the property again. Going full screen and back was that something,
+    // which is what made it look like a full-screen bug. It was never only about
+    // full screen either: ApplyViewerSide calls the exit path on every open,
+    // dock, undock and side change, so the reference was gone long before anyone
+    // pressed Enter on a picture.
+    //
+    // Called from the colour pass as well as from the full-screen switch,
+    // because the answer now depends on the THEME: flipping to light while
+    // already full screen has to take the black away, and back to dark has to
+    // bring it.
+    private void ApplyViewerBackdrop()
+    {
+        if (_viewerFullscreen && !_settings.IsLightMode)
+        {
+            ViewerPanel.Background = System.Windows.Media.Brushes.Black;
+            return;
+        }
+
+        ViewerPanel.SetResourceReference(
+            System.Windows.Controls.Border.BackgroundProperty, "ViewerBackground");
+    }
+
     private bool _fittingViewerMediaRow;
 
     private void ViewerMediaBar_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -19542,42 +19598,15 @@ public partial class MainWindow : Window
         // removed by cropping it (2026-08-11).
         ViewerMedia.Margin = on ? default : new Thickness(10);
 
-        // BLACK behind the picture in full screen, and only there. The panel's
-        // own backdrop is a colour someone chose to sit beside their tree, and
-        // it is the right one there - a picture in a sidebar is an object on a
-        // surface. Full screen is not that: the letterbox bars are the only
-        // thing left around the picture, and any colour at all in them is a
-        // frame the picture is being shown inside. Black is the absence of one.
-        // THE WAY BACK IS A RESOURCE REFERENCE, NOT A BRUSH (2026-08-11). Read
-        // once with FindResource, what came back was a plain local value - and a
-        // local value is exactly what the XAML's DynamicResource was, so
-        // assigning over it does not "restore" the binding, it destroys it. The
-        // panel then held one brush object for good.
-        //
-        // That is invisible until the resource is REPLACED rather than
-        // recoloured, and colorperf.log names ViewerBackground as one of the
-        // keys that is replaced every session (SetBrushColor can only recolour
-        // an unfrozen brush, and this one arrives frozen). So switching
-        // dark/light - by hand or through a preset - left the panel on the old
-        // theme's backdrop until something happened to write the property
-        // again. Going full screen and back was that something, which is what
-        // made it look like a full-screen bug.
-        //
-        // It was never only about full screen either: ApplyViewerSide calls this
-        // with false on every open, dock, undock and side change, so the
-        // reference was gone long before anyone pressed Enter on a picture.
-        if (on)
-        {
-            ViewerPanel.Background = System.Windows.Media.Brushes.Black;
-        }
-        else
-        {
-            ViewerPanel.SetResourceReference(
-                System.Windows.Controls.Border.BackgroundProperty, "ViewerBackground");
-        }
+        ApplyViewerBackdrop();
         ViewerPanel.BorderThickness = on
             ? default
             : (_viewerOnLeft ? new Thickness(0, 0, 1, 0) : new Thickness(1, 0, 0, 0));
+        // The 2px that hold the header's divider off the picture go with the
+        // divider itself, which full screen collapses outright. Two pixels the
+        // picture does not get is the same argument the border and the margins
+        // already lost here.
+        ViewerPanel.Padding = on ? default : ViewerPanelTopInset;
 
         // Nothing to split while the viewer is the whole window.
         ViewerSplitThumb.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
