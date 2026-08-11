@@ -20691,9 +20691,25 @@ public partial class MainWindow : Window
         if (Math.Abs(thumbWidth - _lastFilmstripThumbWidth) > 0.5)
         {
             _lastFilmstripThumbWidth = thumbWidth;
+            // The TREE's thumb rides along, because the same floor is supposed
+            // to hold it up and "it looks the same size" is not something two
+            // people can settle by looking (2026-08-12). Vertical, so its
+            // length is a height.
+            double treeThumb = 0, treeBar = 0;
+            if (FindTreeScrollViewer() is { } treeScroller &&
+                treeScroller.Template?.FindName("PART_VerticalScrollBar", treeScroller)
+                    is System.Windows.Controls.Primitives.ScrollBar treeBarControl)
+            {
+                treeBar = treeBarControl.ActualHeight;
+                treeThumb =
+                    (treeBarControl.Template?.FindName("PART_Track", treeBarControl)
+                        as System.Windows.Controls.Primitives.Track)?.Thumb?.ActualHeight ?? 0;
+            }
+
             LogClickLine(
                 $"strip bar: thumb={thumbWidth:F0}px  bar={bar.ActualWidth:F0}px  " +
-                $"max={bar.Maximum:F0}  viewport={bar.ViewportSize:F0}  cells={_filmstripCells.Count}");
+                $"max={bar.Maximum:F0}  viewport={bar.ViewportSize:F0}  cells={_filmstripCells.Count}  " +
+                $"tree thumb={treeThumb:F0}px  bar={treeBar:F0}px");
         }
 
         var origin = bar.TransformToVisual(ViewerFilmstripMarkerLayer)
