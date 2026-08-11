@@ -2878,9 +2878,28 @@ public partial class MainWindow : Window
         double cursorX = cursor.X / dpi.DpiScaleX;
         double cursorY = cursor.Y / dpi.DpiScaleY;
         const double margin = 8;
+
+        // THE WINDOW IS NOT THE BAND (2026-08-11). A short docked band is not a
+        // shorter window - the window still covers the work area top to bottom
+        // and shows a slice of itself through a clip region (see the region
+        // note above PositionToWorkArea and [[wpf-resize-no-geometry]]). So
+        // Top/Height describe a strip of screen the user can neither see nor
+        // touch, and a cursor resting anywhere in it read as "still on the
+        // sidebar" for as long as it stayed there: shorten the band, move the
+        // pointer off it, and the reveal never closed.
+        //
+        // Only the vertical extent is wrong. Left/Width are the sidebar's real
+        // edges - nothing clips it sideways.
+        double top = Top;
+        double height = Height;
+        if (_isDocked)
+        {
+            (top, height) = DockedBand(GetCurrentMonitorWorkArea(dpi));
+        }
+
         bool stillNearWindow =
             cursorX >= Left - margin && cursorX <= Left + Width + margin &&
-            cursorY >= Top - margin && cursorY <= Top + Height + margin;
+            cursorY >= top - margin && cursorY <= top + height + margin;
         if (stillNearWindow)
         {
             _autoHideRehideTimer.Start();
