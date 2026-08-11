@@ -6696,6 +6696,41 @@
                                                     RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
                                     </Grid>
                                 </ToggleButton>
+                                <!-- 이전 곡 / 다음 곡, one on each side of play
+                                     (2026-08-11). They move PLAYBACK, where the
+                                     carousel's own chevrons a few lines up move
+                                     the PANEL - the same gesture until
+                                     background play lets the two come apart, and
+                                     from then on the only way to change track
+                                     without dragging the tree along.
+
+                                     They walk the folder BY NUMBER in both
+                                     directions, 랜덤 included: a random "previous"
+                                     would need a history of what was drawn, and
+                                     a second idea of order is a worse price than
+                                     the button being literal. Automatic advance
+                                     is untouched - 랜덤 carries on shuffling from
+                                     whichever track a press lands on.
+
+                                     Material Symbols "skip_previous" /
+                                     "skip_next". These took the |◀ 처음으로
+                                     button's place rather than joining it: at
+                                     chip size the two marks are a bar and a
+                                     triangle either way, and a row that offers
+                                     both is a row where neither is read. Home
+                                     still goes back to the start, and the help
+                                     already documents it as that. -->
+                                <Button x:Name="ViewerMediaPrevTrack"
+                                        Style="{StaticResource FooterActionGlyphChipStyle}"
+                                        Margin="{DynamicResource ViewerChipGroupMargin}"
+                                        Click="ViewerMediaPrevTrack_Click">
+                                    <Path Data="M216-216v-528h72v528h-72Zm528 0v-528L336-480l408 264Zm-72-132v-264L468-480l204 132Z"
+                                            Stretch="Uniform"
+                                            Width="{DynamicResource ViewerChipIconSize}"
+                                            Height="{DynamicResource ViewerChipIconSize}"
+                                            Fill="{Binding Foreground,
+                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
                                 <Button x:Name="ViewerMediaPlayPause"
                                         Style="{StaticResource FooterActionGlyphChipStyle}"
                                         Click="ViewerMediaPlayPause_Click">
@@ -6717,6 +6752,16 @@
                                                     RelativeSource={RelativeSource AncestorType=Button}}"/>
                                     </Grid>
                                 </Button>
+                                <Button x:Name="ViewerMediaNextTrack"
+                                        Style="{StaticResource FooterActionGlyphChipStyle}"
+                                        Click="ViewerMediaNextTrack_Click">
+                                    <Path Data="M672-216v-528h72v528h-72ZM216-216v-528l408 264-408 264Zm72-132 204-132-204-132v264Z"
+                                            Stretch="Uniform"
+                                            Width="{DynamicResource ViewerChipIconSize}"
+                                            Height="{DynamicResource ViewerChipIconSize}"
+                                            Fill="{Binding Foreground,
+                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
                                 <!-- Material Symbols "stop" (
                                      2026-08-10). Outlined rather than solid,
                                      like the rest of this set - which is why
@@ -6730,31 +6775,6 @@
                                         Click="ViewerMediaStop_Click"
                                         ToolTip="{x:Static services:Strings.ViewerStop}">
                                     <Path Data="M336-624v288-288Zm-72 360v-432h432v432H264Zm72-72h288v-288H336v288Z"
-                                            Stretch="Uniform"
-                                            Width="{DynamicResource ViewerChipIconSize}"
-                                            Height="{DynamicResource ViewerChipIconSize}"
-                                            Fill="{Binding Foreground,
-                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
-                                </Button>
-                                <!-- Back to the beginning. The strip had a mark
-                                     button here and this replaced it (
-                                     2026-08-10): marking a position is a thing
-                                     you do occasionally and can reach for in a
-                                     menu, while starting over is the control
-                                     every player has in front of you - and the
-                                     blue ribbon was the one loud thing in a row
-                                     of quiet glyphs. -->
-                                <!-- Material Symbols "first_page" (
-                                     2026-08-10), and the right pick over
-                                     skip_previous: this button goes to the
-                                     START of the film, where skip_previous
-                                     promises a previous TRACK - and ↑↓ already
-                                     own moving between files. -->
-                                <Button x:Name="ViewerMediaRewind"
-                                        Style="{StaticResource FooterActionGlyphChipStyle}"
-                                        Click="ViewerMediaRewind_Click"
-                                        ToolTip="{x:Static services:Strings.ViewerRewind}">
-                                    <Path Data="M288-288v-384h72v384h-72Zm384 0L480-480l192-192 51 51-141 141 141 141-51 51Z"
                                             Stretch="Uniform"
                                             Width="{DynamicResource ViewerChipIconSize}"
                                             Height="{DynamicResource ViewerChipIconSize}"
@@ -6835,6 +6855,43 @@
                                         PreviewMouseMove="ViewerMediaVolume_PreviewMouseMove"
                                         PreviewMouseLeftButtonUp="ViewerMediaVolume_PreviewMouseLeftButtonUp"
                                         ValueChanged="ViewerMediaVolume_ValueChanged"/>
+                                <!-- WHERE THE SOUND IS COMING FROM, in the tree
+                                     (2026-08-11). It answers a question only
+                                     this row can raise: background play and the
+                                     search results both let the transport hold a
+                                     file the tree is nowhere near, and the file
+                                     name above it names the track without saying
+                                     where it lives.
+
+                                     It goes to the FILE, not to its folder - the
+                                     folder is where the file is, and landing on
+                                     the row itself also hands the panel back, so
+                                     the transport is attached again afterwards.
+
+                                     Grouped with 기본 프로그램에서 열기 because the
+                                     two are the same kind of thing: both leave
+                                     this row for somewhere else. First two out
+                                     when the panel narrows, for the same reason.
+
+                                     Material Symbols "folder" - the SAME path
+                                     the search box's folder button draws, minus
+                                     the box tail that one carries because its
+                                     whole set does. Its own width, not the
+                                     square icon size: see ViewerChipWideIconSize
+                                     for why a wide mark in a square box came out
+                                     short. -->
+                                <Button x:Name="ViewerMediaRevealInTree"
+                                        Style="{StaticResource FooterActionGlyphChipStyle}"
+                                        Margin="{DynamicResource ViewerChipGroupMargin}"
+                                        Click="ViewerMediaRevealInTree_Click"
+                                        ToolTip="{x:Static services:Strings.MenuRevealInTree}">
+                                    <Path Data="M168-192q-29 0-50.5-21.5T96-264v-432q0-29.7 21.5-50.85Q139-768 168-768h216l96 96h312q29.7 0 50.85 21.15Q864-629.7 864-600v336q0 29-21.15 50.5T792-192H168Zm0-72h624v-336H450l-96-96H168v432Z"
+                                            Stretch="Uniform"
+                                            Width="{DynamicResource ViewerChipWideIconSize}"
+                                            Height="{DynamicResource ViewerChipIconSize}"
+                                            Fill="{Binding Foreground,
+                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
                                 <!-- The way out, at the end of the strip the
                                      hand is already on while a video is up.
                                      This panel previews; a codec it hasn't got
@@ -6848,9 +6905,12 @@
                                      key.
                                      An arrow leaving a box, the same glyph
                                      every app uses for "opens elsewhere". -->
+                                <!-- No group margin of its own any more: the
+                                     jump button beside it opens this group now,
+                                     and two group gaps in a row would read as
+                                     two groups of one. -->
                                 <Button x:Name="ViewerMediaOpenExternal"
                                         Style="{StaticResource FooterActionGlyphChipStyle}"
-                                        Margin="{DynamicResource ViewerChipGroupMargin}"
                                         Click="ViewerMediaOpenExternal_Click"
                                         ToolTip="{x:Static services:Strings.ViewerOpenExternally}">
                                     <!-- Material Symbols "open_in_new"

@@ -1291,7 +1291,7 @@ public partial class MainWindow : Window
         {
             if (e.Key == Key.Home)
             {
-                ViewerMediaRewind_Click(this, new RoutedEventArgs());
+                RewindViewerMedia();
                 e.Handled = true;
                 return;
             }
@@ -9186,6 +9186,19 @@ public partial class MainWindow : Window
         // glyph buttons carry, and the taller line box a font leaves around a
         // character.
         Resources["ViewerChipBoxWidth"] = chipIconSize + 10.0;
+        // THE ONE WIDE GLYPH in the transport row. A folder is 768x576 on the
+        // 960 grid where its neighbours are square-ish, and Stretch="Uniform"
+        // fits a path's own INK rather than the grid - so in a square box the
+        // folder came out full width but three quarters of the height, and read
+        // as a smaller mark rather than a wider one (reported with a screenshot,
+        // 2026-08-11). Given the width its shape actually wants, Uniform fits by
+        // HEIGHT instead and it stands as tall as everything beside it. The chip
+        // box is MinWidth, so the button simply grows the few pixels to suit.
+        //
+        // Not the "M0-960H960M0 0H960" tail the header's glyphs carry: that
+        // fits a mark to the whole 960 box, which is right when the WHOLE set
+        // carries it and smaller still when only one does.
+        Resources["ViewerChipWideIconSize"] = chipIconSize * 4.0 / 3.0;
         Resources["ViewerChipBoxHeight"] = chipIconSize + 6.0;
         Resources["ViewerChipMargin"] = new Thickness(0, 0, ViewerChipGap, 0);
         Resources["ViewerChipGroupMargin"] =
@@ -16273,6 +16286,13 @@ public partial class MainWindow : Window
         {
             ViewerNowPlaying.Text = Path.GetFileName(path);
         }
+
+        // Attaching and detaching CHANGES THE LIST the track buttons walk -
+        // ViewerPlaybackSiblings answers with the panel's list or the playing
+        // file's folder depending on exactly this - so the ends of it move too.
+        // Hung here because this is already called at every moment the two can
+        // come apart or back together.
+        UpdateViewerTrackButtons();
     }
 
     // "The panel can show this" - pictures and films together. Films arrived in
@@ -16546,6 +16566,10 @@ public partial class MainWindow : Window
         // put on it here rather than at startup - it has to be right every time
         // the strip appears, not once.
         UpdateViewerRepeatChip();
+        // Same argument: which of 이전 곡/다음 곡 is reachable depends on where in
+        // the folder this file sits, so it is answered every time the row
+        // appears rather than once.
+        UpdateViewerTrackButtons();
         // And the row has to be thinned for the width it is appearing at: its
         // SizeChanged does not fire for a panel that has not moved since the
         // last file played.
@@ -17070,6 +17094,111 @@ public partial class MainWindow : Window
         return left.Count == 0 ? null : left[_viewerShuffle.Next(left.Count)];
     }
 
+    // ----- 이전 곡 / 다음 곡 -----------------------------------------------------
+    //
+    // BY NUMBER, in every repeat mode. The automatic advance above is allowed to
+    // be clever - 랜덤 draws from a bag - but a button is a step someone takes,
+    // and "the previous one" has to mean the same thing every time it is
+    // pressed. A random previous would have to mean "the one I just heard",
+    // which needs a history of the draws; the folder's own order needs nothing
+    // and can be predicted from the row above it.
+    //
+    // The bag is deliberately left alone, so 랜덤 carries on shuffling from
+    // whichever track a press lands on rather than restarting its round.
+    private void ViewerMediaPrevTrack_Click(object sender, RoutedEventArgs e) => StepViewerTrack(-1);
+
+    private void ViewerMediaNextTrack_Click(object sender, RoutedEventArgs e) => StepViewerTrack(+1);
+
+    private void StepViewerTrack(int direction)
+    {
+        if (StepViewerTrackTarget(direction) is not { } target)
+        {
+            return;
+        }
+
+        // The same fork the automatic advance takes, and for the same reason:
+        // playing in the background must not drag the tree out of the folder
+        // someone is working in.
+        if (ViewerBackgroundPlaying && !ViewerMediaIsSelection)
+        {
+            PlayViewerAudioDetached(target);
+            return;
+        }
+
+        _viewerAutoPlayPath = target.FullPath;
+        MoveViewerTo(target);
+        UpdateViewerTrackButtons();
+    }
+
+    // Null means the button is dead - which is the whole of the enabled rule.
+    // ONLY 반복 꺼짐 STOPS AT THE ENDS. The other three modes are loops, and a
+    // button that refused to wrap while the folder wrapped by itself a moment
+    // later would be contradicting the mode it is sitting next to.
+    private FileSystemItem? StepViewerTrackTarget(int direction)
+    {
+        if (_viewerVideoPath is not { } current)
+        {
+            return null;
+        }
+
+        // Same anchor question the automatic advance asks: the file the
+        // TRANSPORT is on, which is the selection only while the two agree.
+        if ((ViewerMediaIsSelection ? ViewerItem : _viewerPlayingItem) is not { } shown)
+        {
+            return null;
+        }
+
+        // Sound steps through sound and film through film, so a folder holding
+        // both never hands the transport the other kind mid-round.
+        bool audio = IsViewerAudio(current);
+        var kin = ViewerPlaybackSiblings(shown)
+            .Where(i => IsViewerPlayable(i.FullPath) && IsViewerAudio(i.FullPath) == audio)
+            .ToList();
+        if (kin.Count < 2)
+        {
+            return null;
+        }
+
+        int index = kin.FindIndex(i => string.Equals(i.FullPath, current, StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+        {
+            return null;
+        }
+
+        int next = index + direction;
+        if (ViewerRepeat is ViewerRepeatMode.Off)
+        {
+            return next < 0 || next >= kin.Count ? null : kin[next];
+        }
+
+        return kin[(next + kin.Count) % kin.Count];
+    }
+
+    // Asked again whenever the transport changes file or the repeat mode moves,
+    // since both change the answer. The tooltips are set here too: this row
+    // serves sound and film alike, and 다음 곡 over a folder of films would be
+    // naming the wrong thing.
+    private void UpdateViewerTrackButtons()
+    {
+        ViewerMediaPrevTrack.IsEnabled = StepViewerTrackTarget(-1) is not null;
+        ViewerMediaNextTrack.IsEnabled = StepViewerTrackTarget(+1) is not null;
+
+        bool audio = _viewerVideoPath is { } path && IsViewerAudio(path);
+        ViewerMediaPrevTrack.ToolTip = audio ? Strings.ViewerPrevTrack : Strings.ViewerPrevVideo;
+        ViewerMediaNextTrack.ToolTip = audio ? Strings.ViewerNextTrack : Strings.ViewerNextVideo;
+    }
+
+    // To the FILE rather than to its folder: the folder is where the file is,
+    // and landing on the row itself is also what hands the panel back, so the
+    // transport is attached to the selection again once the jump lands.
+    private void ViewerMediaRevealInTree_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewerVideoPath is { } path)
+        {
+            NavigateToPath(path, source: "nowplaying");
+        }
+    }
+
     // The set the advance walks. Normally the panel's own list, which is what
     // lets the search results drive it - but a track left playing in another
     // folder belongs to THAT folder, and the results list on screen has nothing
@@ -17116,18 +17245,23 @@ public partial class MainWindow : Window
     // and a clock, with play gone off the edge (2026-08-11).
     //
     // So the row is measured and thinned instead, in an order the user set:
-    // the way out first, then the clock, then the two transport buttons that
-    // duplicate what the seek bar already does, then the volume. WHAT SURVIVES
-    // AT ANY WIDTH: background play, shuffle, play/pause.
+    // the two that leave this row for somewhere else first, then the clock,
+    // then the transport button the seek bar already duplicates, then the
+    // volume. WHAT SURVIVES AT ANY WIDTH: background play, repeat, and the
+    // three that move sound - 이전 곡, 재생/일시정지, 다음 곡.
+    //
+    // 이전 곡/다음 곡 outrank the clock and 정지 because nothing else in the row
+    // can do what they do, where the seek bar carries both position and a way
+    // back to the start (2026-08-11).
     //
     // Measured rather than stepped at fixed widths, because the row's own size
     // moves with Ctrl +/- and with the strings in it.
     private UIElement[] ViewerMediaRowDropOrder => new UIElement[]
     {
         ViewerMediaOpenExternal,
+        ViewerMediaRevealInTree,
         ViewerMediaTimeBox,
         ViewerMediaStop,
-        ViewerMediaRewind,
         ViewerMediaVolume,
         ViewerMediaMute,
     };
@@ -17219,6 +17353,9 @@ public partial class MainWindow : Window
         // would decide which tracks the first few draws can even reach.
         _viewerShuffleDone.Clear();
         UpdateViewerRepeatChip();
+        // 반복 꺼짐 is the only mode that stops at the ends, so turning it on or
+        // off is what decides whether the two track buttons ever go dead.
+        UpdateViewerTrackButtons();
     }
 
     private void ViewerRepeatContextMenu_Opened(object sender, RoutedEventArgs e)
@@ -17757,7 +17894,16 @@ public partial class MainWindow : Window
     // that was running keeps running from the top, and one that was paused
     // stays paused on the first frame. Through the same seek every other route
     // takes, so the bar's latch and the readout behave identically.
+    //
+    // NO BUTTON since 2026-08-11 - the chip it sat behind gave its place to
+    // 이전 곡, which nothing else in the row could do. It kept the two routes it
+    // already had: the Home key, documented as that in the help, and the film's
+    // own right-click menu, which names it and shows the key beside it. The
+    // seek bar's left end is the same gesture with a mouse.
     private void ViewerMediaRewind_Click(object sender, RoutedEventArgs e)
+        => RewindViewerMedia();
+
+    private void RewindViewerMedia()
     {
         if (_viewerVideoPath is not null)
         {

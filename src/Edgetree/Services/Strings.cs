@@ -320,6 +320,14 @@ public static class Strings
     public static string ViewerMarkAdd = "북마크";
     public static string ViewerMarkList = "북마크 목록";
     public static string ViewerRewind = "처음으로";
+    // Two pairs because the transport serves sound and film from the same row,
+    // and the tooltip is set to whichever the loaded file is. 곡 over a folder
+    // of films would be naming the wrong thing, and "이전 항목" would be naming
+    // nothing in particular.
+    public static string ViewerPrevTrack = "이전 곡";
+    public static string ViewerNextTrack = "다음 곡";
+    public static string ViewerPrevVideo = "이전 영상";
+    public static string ViewerNextVideo = "다음 영상";
     // "영상 크기" rather than "확대": the row's middle button is 맞춤, which is
     // not a magnification - the row is about what SIZE the film is shown at,
     // and one of the three answers is "as big as it fits" (2026-08-10).
@@ -767,6 +775,10 @@ public static class Strings
         ViewerMarkAdd = "Bookmark";
         ViewerMarkList = "Bookmarks";
         ViewerRewind = "Back to start";
+        ViewerPrevTrack = "Previous track";
+        ViewerNextTrack = "Next track";
+        ViewerPrevVideo = "Previous video";
+        ViewerNextVideo = "Next video";
         ViewerZoom = "Video size";
         ViewerSubtitles = "Subtitles";
         ViewerSubtitleSize = "Subtitle size";
