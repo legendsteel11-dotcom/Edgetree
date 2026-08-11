@@ -1291,9 +1291,21 @@
              it is the only row here that does not change anything. -->
         <ContextMenu x:Key="HeaderContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
-                Opened="AnyMenu_Opened"
+                Opened="HeaderContextMenu_Opened"
                 Closed="AnyMenu_Closed"
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
+            <!-- THE PRESETS GO ABOVE THIS LINE, inserted in code every time the
+                 menu opens (see BuildPresetMenu). They were behind a 프리셋
+                 parent item until 2026-08-11; opening this menu to switch the
+                 whole app's shape is the common reason to open it at all, so
+                 the rows now start where the eye does.
+
+                 This separator is the ANCHOR the insert works against, which is
+                 why it carries a Tag: everything above it belongs to the
+                 presets and is replaced wholesale on each open. Found by Tag
+                 rather than by position - addressing a menu by index has broken
+                 two menus in this app already. -->
+            <Separator Tag="presets"/>
             <MenuItem Header="{x:Static services:Strings.MenuHelp}"
                     InputGestureText="F1"
                     Click="HelpMenuItem_Click"/>

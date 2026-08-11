@@ -444,6 +444,22 @@ public class AppSettings
     // anchored instead of the left one.
     public bool DockOnRight { get; set; } = false;
 
+    // Named snapshots of the app's shape, applied from the header's right-click
+    // menu - see AppPreset, which is also the one place deciding what a preset
+    // contains. Capped at AppPreset.MaxPresets.
+    public List<AppPreset> Presets { get; set; } = new();
+
+    // Which one was put on last, so the menu can mark it. REMEMBERED rather
+    // than worked out: the first version compared every field a preset holds
+    // against the live settings, and one value drifting - a width nudged, a
+    // ratio recomputed - was enough for the mark to vanish while the app was
+    // plainly still in that shape (2026-08-11).
+    //
+    // By NAME, not by index: an index moves when a slot above it is deleted,
+    // and a name is what the user is looking at. Two slots named the same would
+    // both be marked, which is a fair answer to having named them the same.
+    public string ActivePreset { get; set; } = string.Empty;
+
     // Which folders (including drive roots) were expanded when the app last
     // closed, restored on the next launch - see MainWindow.xaml.cs's
     // MainWindow_Loaded/SaveCurrentWidth. A path that no longer exists (drive

@@ -8256,6 +8256,441 @@ public partial class MainWindow : Window
         }
     }
 
+    // ----- 앱 프리셋 ---------------------------------------------------------
+    //
+    // A named shape of the whole app, put on from the header's right-click menu.
+    // What is in one is decided in AppPreset and nowhere else; what is HERE is
+    // the other half, which is harder: putting those values on a window that is
+    // already open.
+    //
+    // THE RULE THIS MUST NOT BREAK: a preset is not a second way to apply a
+    // setting. Every value below goes through the method the options UI already
+    // calls for it - ApplyColorSettings, ApplyFileFilter, SetTreeFontSize,
+    // PositionToWorkArea and the rest - so a setting can never behave one way
+    // when changed by hand and another when it arrives in a preset. The order
+    // is startup's order, because startup is the one sequence already proven to
+    // turn a settings file into a correct window.
+    //
+    // The three states the geometry code treats specially are LEFT FIRST rather
+    // than crossed: floating, auto-hidden, and viewer-open all change what
+    // Width and Left mean, and applying a shape on top of any of them is how
+    // this feature would grow its own geometry bugs (see wpf-resize-no-geometry
+    // for how expensive those have been). So: dock, come out of hiding, close
+    // the panel, apply, then put the panel and the hiding back on as the preset
+    // asks for them.
+    private void HeaderContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        AnyMenu_Opened(sender, e);
+        if (sender is ContextMenu menu)
+        {
+            BuildPresetMenu(menu);
+        }
+    }
+
+    // Rebuilt on every open rather than kept in step with the list: the rows ARE
+    // the presets, and rebuilding is also what keeps the Click handlers from
+    // stacking up on items that survived.
+    //
+    // The rows are inserted straight into the header menu now, at the top, with
+    // the tagged Separator in the XAML as the anchor - everything above it is
+    // this method's and is thrown away before each rebuild. That is also what
+    // makes "everything above the anchor" a safe thing to delete: no declared
+    // item is ever up there.
+    private void BuildPresetMenu(ContextMenu menu)
+    {
+        int anchor = -1;
+        for (int i = 0; i < menu.Items.Count; i++)
+        {
+            if (menu.Items[i] is Separator separator && separator.Tag as string == "presets")
+            {
+                anchor = i;
+                break;
+            }
+        }
+
+        if (anchor < 0)
+        {
+            return;
+        }
+
+        while (anchor > 0)
+        {
+            menu.Items.RemoveAt(0);
+            anchor--;
+        }
+
+        // NOTHING AT ALL when there are none, rather than the disabled
+        // "저장된 프리셋 없음" line a submenu would use: at the top of the
+        // header's own menu that line would be the first thing anyone reads,
+        // and the item below it already says what to do about it.
+        int at = 0;
+        var presets = _settings.Presets;
+        for (int i = 0; i < presets.Count; i++)
+        {
+            menu.Items.Insert(at++, BuildPresetRow(presets[i], i));
+        }
+
+        // GONE when the slots are full, rather than greyed. A disabled row is
+        // worth showing when it explains something the user can fix by doing
+        // something else first; here it would only take up a line to say the
+        // list above it is as long as it gets, which the list already says.
+        if (presets.Count < AppPreset.MaxPresets)
+        {
+            var add = new MenuItem { Header = Strings.MenuPresetAdd };
+            add.Click += PresetAdd_Click;
+            menu.Items.Insert(at, add);
+        }
+    }
+
+    // ONE ROW PER PRESET, and everything that row can do is behind its arrow
+    // (2026-08-11). Two other shapes were built on the way here and both are
+    // worth remembering, because each looked better than this one on paper:
+    //
+    //   - the three management actions in a SECOND 프리셋 관리 branch beside
+    //     the list. The same five names then appeared twice in one menu and the
+    //     tree ran four levels deep.
+    //   - the row carrying an 적용 BUTTON in its header, next to a 관리 label,
+    //     so applying stayed one click. It worked, and it cost: a button inside
+    //     a MenuItem's header is still inside the item as far as HOVER is
+    //     concerned, so the submenu popped out over the row while the hand was
+    //     on its way to the button, and holding it shut - then letting it open
+    //     again on the way out - took three handlers. The header also had to be
+    //     built out of controls, and a TextBlock made in code inherits nothing
+    //     from the menu's templates: it landed on WPF's default black and was
+    //     invisible on the dark menu.
+    //
+    // Putting 적용 at the TOP of the submenu costs one more click and takes all
+    // of that away. The row is a plain menu row again, its header is a string
+    // (so it takes the menu's own foreground and cannot go black), and there is
+    // one place to look for everything a preset can do.
+    private MenuItem BuildPresetRow(AppPreset preset, int index)
+    {
+        // WHICH ONE IS ON, marked with the menu's own check rather than a
+        // character in the label: the template draws the check in its own
+        // column, apart from the submenu arrow, so one row can carry both.
+        //
+        // IsChecked ALONE, never IsCheckable - that was tried first and it
+        // BROKE THE SUBMENU (2026-08-11): a checkable item takes a click as a
+        // toggle, so the row stopped opening its own menu. The template's mark
+        // is driven by IsChecked, which can simply be set.
+        //
+        // The unmarked rows reserve the same column through the template's
+        // "reserve-check-column" Tag, the opt-in the options menu already uses
+        // for exactly this - otherwise the marked name would sit indented from
+        // its neighbours.
+        //
+        // The answer comes from ActivePreset, which is simply the last one put
+        // on. Comparing the live settings against everything a preset holds was
+        // tried first and marked nothing: one value drifting out of seventy is
+        // enough, and the app was plainly still in that shape.
+        bool current = preset.Name.Length > 0
+            && string.Equals(preset.Name, _settings.ActivePreset, StringComparison.Ordinal);
+        var row = new MenuItem
+        {
+            Header = preset.Name,
+            IsChecked = current,
+            Tag = current ? null : "reserve-check-column",
+        };
+        row.Items.Add(PresetActionItem(Strings.MenuPresetApply, index, PresetApply_Click));
+        row.Items.Add(new Separator());
+        row.Items.Add(PresetActionItem(Strings.MenuPresetOverwrite, index, PresetOverwrite_Click));
+        row.Items.Add(PresetActionItem(Strings.MenuPresetRename, index, PresetRename_Click));
+        row.Items.Add(new Separator());
+        row.Items.Add(PresetActionItem(Strings.MenuPresetDelete, index, PresetDelete_Click));
+        return row;
+    }
+
+    private void PresetApply_Click(object sender, RoutedEventArgs e)
+    {
+        if (PresetFor(sender) is { } preset)
+        {
+            ApplyPreset(preset);
+        }
+    }
+
+    private static MenuItem PresetActionItem(string header, int index, RoutedEventHandler handler)
+    {
+        var item = new MenuItem { Header = header, Tag = index };
+        item.Click += handler;
+        return item;
+    }
+
+    // The Tag is the slot's index, which is safe here in a way that reading a
+    // menu BY position is not: these rows are built from the list microseconds
+    // earlier and acted on before the menu can close, so the index cannot go
+    // stale between the two. The bound check is there for the case it does.
+    private AppPreset? PresetFor(object sender)
+        => sender is MenuItem { Tag: int index } && index >= 0 && index < _settings.Presets.Count
+            ? _settings.Presets[index]
+            : null;
+
+    private void PresetAdd_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settings.Presets.Count >= AppPreset.MaxPresets)
+        {
+            return;
+        }
+
+        string fallback = string.Format(Strings.PresetDefaultName, _settings.Presets.Count + 1);
+        if (AskPresetName(string.Empty, fallback, Strings.PresetNameTitle, Strings.PresetNameHint)
+            is not { } name)
+        {
+            return;
+        }
+
+        NoteCurrentPlace();
+        _settings.Presets.Add(AppPreset.Capture(_settings, name));
+        // A slot just filled with what the app looks like right now IS what the
+        // app is in - the mark would be wrong for the one press where it is
+        // most obviously right.
+        _settings.ActivePreset = name;
+        _settingsService.Save(_settings);
+    }
+
+    // Name ONLY - the shape already stored is left alone. This is the narrow
+    // one; the item above it does both, which is what someone updating a slot
+    // actually wants.
+    private void PresetRename_Click(object sender, RoutedEventArgs e)
+    {
+        if (PresetFor(sender) is not { } preset ||
+            AskPresetName(preset.Name, preset.Name, Strings.PresetRenameTitle) is not { } name)
+        {
+            return;
+        }
+
+        // The mark follows the name it was on, or renaming the preset that is
+        // currently applied would quietly unmark it.
+        if (string.Equals(preset.Name, _settings.ActivePreset, StringComparison.Ordinal))
+        {
+            _settings.ActivePreset = name;
+        }
+
+        preset.Name = name;
+        _settingsService.Save(_settings);
+    }
+
+    // Saving over a slot ASKS FOR THE NAME TOO, and that is the whole point of
+    // this item: renaming and overwriting were two separate rows, and doing
+    // only the first left a preset wearing a new name over the old shape, with
+    // nothing on screen to say the other half had not happened (2026-08-11).
+    // One press now settles both.
+    //
+    // Cancelling the name box cancels the save with it. That is the only way
+    // out once this is pressed, and it is also what makes the box a
+    // confirmation for an item that would otherwise throw away a stored shape
+    // with no warning at all.
+    private void PresetOverwrite_Click(object sender, RoutedEventArgs e)
+    {
+        if (PresetFor(sender) is not { } preset ||
+            AskPresetName(preset.Name, preset.Name, Strings.PresetSaveTitle, Strings.PresetNameHint)
+                is not { } name)
+        {
+            return;
+        }
+
+        NoteCurrentPlace();
+        preset.Name = name;
+        preset.Overwrite(_settings);
+        // Same reasoning as adding one: this slot now holds exactly what is on
+        // screen, so it is the one the app is in.
+        _settings.ActivePreset = name;
+        _settingsService.Save(_settings);
+    }
+
+    private void PresetDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (PresetFor(sender) is { } preset)
+        {
+            _settings.Presets.Remove(preset);
+            // The shape it held is still on screen, but there is no longer a
+            // slot to point at - a mark left behind would name something that
+            // is not in the menu.
+            if (string.Equals(preset.Name, _settings.ActivePreset, StringComparison.Ordinal))
+            {
+                _settings.ActivePreset = string.Empty;
+            }
+
+            _settingsService.Save(_settings);
+        }
+    }
+
+    // Where the tree is RIGHT NOW, written into the settings a preset is about
+    // to be taken from. Without this a preset would record whatever the last
+    // shutdown wrote there: LastSelectedPath is normally only filled in on the
+    // way out, so mid-session it is either stale or empty.
+    private void NoteCurrentPlace()
+        => _settings.LastSelectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
+
+    private string? AskPresetName(string current, string fallback, string title, string hint = "")
+    {
+        var window = new PresetNameWindow(current, fallback, title, hint) { Owner = this };
+        PositionNearOptionsButton(window);
+        return window.ShowDialog() == true ? window.Result : null;
+    }
+
+    private void ApplyPreset(AppPreset preset)
+    {
+        // ---- 0. What actually differs ----------------------------------------
+        //
+        // ASKED BEFORE ANYTHING MOVES, because two of these groups are the whole
+        // cost of a preset press: the colours repaint every row in the tree, and
+        // the content group sends every open folder back to disk. Switching
+        // between two presets that share a palette used to pay for both anyway
+        // (reported as the press feeling heavy, 2026-08-11). A preset that
+        // differs only in where the window sits should cost only that.
+        bool colorsChanged = preset.Differs(_settings, AppPreset.ColorFields);
+        bool lookChanged = preset.Differs(_settings, AppPreset.LookFields);
+        bool contentChanged = preset.Differs(_settings, AppPreset.ContentFields);
+        bool viewerLookChanged = preset.Differs(_settings, AppPreset.ViewerLookFields);
+        // Asked against the LIVE selection rather than the stored one, which is
+        // only written on the way out - see NoteCurrentPlace. Without this a
+        // preset would walk the tree on every press, including the presses that
+        // land where the tree already is.
+        NoteCurrentPlace();
+        bool placeChanged = preset.Differs(_settings, AppPreset.PlaceFields);
+        // The panel only has to be closed and reopened when a WIDTH moves - that
+        // is the only reason it is taken down at all. Left open otherwise, which
+        // also spares it rebuilding its picture and its strip.
+        bool sizeChanged = preset.Differs(_settings, AppPreset.SizeFields);
+
+        // Read from the preset BEFORE it is applied, because the order below
+        // depends on both and neither can be asked for afterwards.
+        bool wantsViewer = preset.ValueOr(nameof(AppSettings.ViewerOpen), _settings.ViewerOpen);
+        bool wantsAutoHide = preset.ValueOr(nameof(AppSettings.IsAutoHidden), _settings.IsAutoHidden);
+
+        // ---- 1. Down to a plain docked window first --------------------------
+        // Each of these changes what the window's own Width and Left mean, and
+        // none of them can be crossed by writing settings.
+        Dock();
+        if (_settings.IsAutoHidden)
+        {
+            ExitAutoHide();
+        }
+
+        // Taken down when the preset does not want it, and also when it DOES but
+        // a width moved - reopening is how the new widths are worked out.
+        if (_viewerOpen && (sizeChanged || !wantsViewer))
+        {
+            CloseViewer();
+        }
+
+        // ---- 2. The values ---------------------------------------------------
+        preset.ApplyTo(_settings);
+
+        // THE WINDOW IS ON SCREEN FOR THE WHOLE OF THE REST OF THIS, and the
+        // setting has to say so. Everything below is applied to a visible
+        // window and the hiding is put back on at the very end - but the line
+        // above has already written the preset's own answer, and OpenViewer
+        // DECLINES while that answer is "hidden" (there is no window to widen).
+        // A preset that was both auto-hidden and had the panel open therefore
+        // came back with no panel, and the setting saying otherwise
+        // (2026-08-11). EnterAutoHide sets this back itself.
+        _settings.IsAutoHidden = false;
+
+        // ---- 3. Look, through the paths that already own each of these -------
+        if (colorsChanged)
+        {
+            ApplyColorSettings();
+        }
+
+        if (lookChanged)
+        {
+            SetTreeFontSize(_settings.TreeFontSize);
+            ApplyTreeFontWeight();
+            ApplyHeaderMetrics();
+            ApplyIconStyle();
+            ApplyFolderIconVisibility();
+            ApplyFileIconVisibility();
+            ApplyTitleTextVisibility();
+            ApplyPathBarVisibility();
+            ApplyFavoritesPosition();
+            ApplySidePanelMode();
+        }
+
+        // Cheap and it is a window-manager state rather than a repaint, so it is
+        // simply asked every time.
+        ApplyTopmostState("preset");
+
+        // ---- 4. What the tree is showing -------------------------------------
+        // The sort mirror into FileSystemService is the same one the sort menu
+        // writes; ApplyFileFilter re-reads every open folder, which is also what
+        // a new sort needs, so the two are done in that order and the folders
+        // are read once rather than twice.
+        if (contentChanged)
+        {
+            FileSystemService.SortField = FileSystemService.ParseSortField(_settings.SortField);
+            FileSystemService.SortDescending = _settings.SortDescending;
+            // REBUILD, not build: the builder only ever appends, because until
+            // now it ran once at startup. Called a second time it left the old
+            // strip in place and stacked a new one under it, growing the footer
+            // by a whole row of chips per preset press (2026-08-11). The rebuild
+            // takes the old chips off the panel first, by the list that tracks
+            // them - the panel itself also holds the version text.
+            RebuildFooterFilterChips();
+            ApplyFileFilter();
+        }
+
+        // ---- 5. Shape ---------------------------------------------------------
+        if (sizeChanged)
+        {
+            // Width before PositionToWorkArea, which reads it to work out where
+            // the docked edge puts the window; the viewer-open case keeps the
+            // TREE's own width, because OpenViewer below adds the panel's on top
+            // of it. Only written when a width moved - with the panel still open
+            // this line would otherwise shrink the window to the tree alone.
+            Width = _settings.ViewerOpen
+                ? Math.Clamp(_settings.ExpandedWidth, MinTreeSplitWidth, MaxExpandedWidth)
+                : ClampExpandedWidth(_settings.ExpandedWidth);
+        }
+
+        SetExpandedContentVisibility(Visibility.Visible);
+        PositionToWorkArea();
+        UpdateResizeThumbVisibility();
+        UpdatePinButtonVisibility();
+
+        // Asked as "is it open, and should it be" rather than off the size flag:
+        // a preset whose only difference is that the panel is open changes no
+        // width at all until the panel is actually there, so hanging the open on
+        // sizeChanged left it shut.
+        if (wantsViewer && !_viewerOpen)
+        {
+            OpenViewer();
+        }
+        else if (viewerLookChanged && _viewerOpen)
+        {
+            // The panel stayed up, so its own switches are the only thing to
+            // put on it.
+            UpdateViewerNavigator();
+            _filmstripBuiltFor = default;
+            UpdateViewerCarousel();
+            ApplyFilmstripCellSize();
+        }
+
+        // ---- 6. The folder it was saved in ------------------------------------
+        //
+        // After the shape, because the walk expands folders and scrolls, and
+        // doing that into a window that is still being resized would land the
+        // target against the wrong edge. Through NavigateToPath, the same route
+        // a favourite or a bookmark takes - so a preset cannot grow a second
+        // idea of "go here", and a path that no longer exists is skipped there
+        // rather than failing here.
+        if (placeChanged && _settings.LastSelectedPath is { Length: > 0 } place)
+        {
+            NavigateToPath(place, source: "preset");
+        }
+
+        // Last, because it is the one that takes the window away: everything
+        // above has to have landed on a window that is still on screen, or the
+        // reveal would come back to a shape nothing ever applied.
+        if (wantsAutoHide)
+        {
+            EnterAutoHide();
+        }
+
+        _settings.ActivePreset = preset.Name;
+        _settingsService.Save(_settings);
+    }
+
     private void DockOnRightMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem menuItem)

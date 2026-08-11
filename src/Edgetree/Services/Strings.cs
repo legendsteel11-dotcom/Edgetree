@@ -23,6 +23,42 @@ public static class Strings
     // category - picking it clears the rest.
     // "파일 종류"로 시작했다가 바꿈 - 그것만으로는 무엇을 하는 줄인지 안 읽힘.
     // 라벨이 그 자리에서 동작을 말해야 함(설명은 아무도 안 읽으므로).
+    // ----- 프리셋 ------------------------------------------------------------
+    //
+    // The saved shapes of the whole app, at the TOP of the header's right-click
+    // menu - no 프리셋 parent row, because the names are the rows.
+    //
+    // "현재 상태를 프리셋으로 지정" was the first wording and it was explaining
+    // rather than labelling: anyone in this menu, looking at a list of their own
+    // saved presets, already knows what adding one takes a snapshot of.
+    public static string MenuPresetAdd = "프리셋 추가";
+    // First item inside a preset's own submenu, and the only one of the four
+    // that is not about editing the preset.
+    public static string MenuPresetApply = "적용";
+    // THE PRIMARY ONE, and it does both: the name box comes up with the slot's
+    // current name in it, and pressing 확인 stores the app's present shape under
+    // whatever name is left in the box. Renaming and overwriting used to be two
+    // separate items, and doing only the first left a preset renamed but still
+    // holding the old shape - a half-finished update with nothing to show it
+    // (2026-08-11).
+    public static string MenuPresetOverwrite = "덮어쓰기…";
+    // Kept for the case the item above cannot serve: fixing a name WITHOUT
+    // giving up the shape already stored. It sat directly under 덮어쓰기 as
+    // "이름만 바꾸기" for a while - the qualifier stopped earning its place once
+    // the two were one under the other in a four-item menu, where what each
+    // does is read off the pair.
+    public static string MenuPresetRename = "이름 바꾸기…";
+    public static string MenuPresetDelete = "삭제";
+    public static string PresetNameTitle = "프리셋 이름";
+    // The name box is the same box for all three, so its TITLE is the only
+    // thing saying which one is happening.
+    public static string PresetSaveTitle = "현재 상태로 저장";
+    public static string PresetRenameTitle = "이름 바꾸기";
+    public static string PresetNameHint = "창 위치·크기·도킹·색상·파일 종류·현재 폴더가 함께 저장됩니다";
+    // The default name for slot N. Deliberately dull - the user renames it to
+    // what the shape is for, and a clever default would get in the way of that.
+    public static string PresetDefaultName = "프리셋{0}";
+
     public static string MenuFileFilter = "표시할 파일 종류";
     // 푸터 칩은 여덟 개가 한 줄에 서야 해서 가장 긴 라벨만 줄여 씀. 나머지는
     // 메뉴와 같은 말을 그대로 쓴다 - 두 곳이 다른 이름을 부르면 같은 것인지
@@ -553,6 +589,17 @@ public static class Strings
         MenuBookmarkRemove = "Remove Bookmark";
         MenuBookmarkList = "Bookmarks";
         MenuBookmarkListEmpty = "No bookmarks";
+        MenuPresetAdd = "Add preset";
+        MenuPresetApply = "Apply";
+        MenuPresetOverwrite = "Overwrite…";
+        MenuPresetRename = "Rename…";
+        PresetSaveTitle = "Save current setup";
+        PresetRenameTitle = "Rename preset";
+        MenuPresetDelete = "Delete";
+        PresetNameTitle = "Preset name";
+        PresetNameHint = "Saves position, size, docking, colours, file types and the current folder";
+        PresetDefaultName = "Preset {0}";
+
         MenuFileFilter = "Show File Types";
         FilterChipExecutable = "Programs";
         MenuFileFilterAll = "All";
