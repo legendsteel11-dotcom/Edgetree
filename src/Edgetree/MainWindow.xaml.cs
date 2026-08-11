@@ -8667,7 +8667,7 @@ public partial class MainWindow : Window
         // not so much that the window comes out square: 620 against a 640-tall
         // first size read as a box rather than a page. Long gesture labels were
         // shortened instead of the window widened.
-        appResources["HelpDialogWidth"] = Math.Round(540.0 * scale);
+        appResources["HelpDialogWidth"] = Math.Round(520.0 * scale);
         // The colour window's hex box and the line under it. Wide enough for
         // "#RRGGBB" with room to spare, and the hint a step smaller - set apart
         // by size, never by fading.
@@ -8860,7 +8860,12 @@ public partial class MainWindow : Window
         // trying the thing it describes, so it must not lock the tree behind it.
         _helpWindow = new HelpWindow(_settings, () => _settingsService.Save(_settings)) { Owner = this };
         _helpWindow.Closed += (_, _) => _helpWindow = null;
-        PositionNearOptionsButton(_helpWindow);
+        // Level with the header, not hanging off the options button like the
+        // other dialogs. Those are small and land where the click was; this one
+        // is tall and stands BESIDE the app, so two title bars at two different
+        // heights read as a mistake. The other dialogs keep their old placement
+        // - a short box at the point of the click is right for them.
+        PositionBesideHeader(_helpWindow);
         _helpWindow.Show();
     }
 
@@ -8895,6 +8900,36 @@ public partial class MainWindow : Window
         double screenRight = screenLeft + SystemParameters.VirtualScreenWidth;
         window.Left = Math.Clamp(left, screenLeft, Math.Max(screenLeft, screenRight - window.Width));
         window.Top = Math.Max(top, SystemParameters.VirtualScreenTop);
+    }
+
+    // Top edge level with the app's own header row, left edge just past the
+    // sidebar. Both read off the HEADER rather than off the window, because the
+    // window's Top is the frame and the header is the line the eye actually
+    // lines things up against.
+    private void PositionBesideHeader(Window window)
+    {
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+
+        var headerTopLeft = HeaderGrid.PointToScreen(new System.Windows.Point(0, 0));
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double top = headerTopLeft.Y / dpi.DpiScaleY;
+        double left = (headerTopLeft.X + HeaderGrid.ActualWidth * dpi.DpiScaleX) / dpi.DpiScaleX;
+
+        // Docked on the right, the sidebar's right edge is the screen's - so
+        // the help window would open off it. Put it on the other side there.
+        double screenLeft = SystemParameters.VirtualScreenLeft;
+        double screenRight = screenLeft + SystemParameters.VirtualScreenWidth;
+        if (left + window.Width > screenRight)
+        {
+            left = headerTopLeft.X / dpi.DpiScaleX - window.Width;
+        }
+
+        window.Left = Math.Clamp(left, screenLeft, Math.Max(screenLeft, screenRight - window.Width));
+        window.Top = Math.Clamp(
+            top,
+            SystemParameters.VirtualScreenTop,
+            Math.Max(SystemParameters.VirtualScreenTop,
+                SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - window.Height));
     }
 
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";

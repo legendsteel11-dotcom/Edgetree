@@ -71,8 +71,6 @@ public partial class HelpWindow : Window
             SectionHost.Children.Add(BuildSectionTitle(section.Title, first));
             first = false;
 
-            AddProse(section.Intro, secondary: true, topGap: 0);
-
             foreach (var group in section.Groups)
             {
                 if (!string.IsNullOrEmpty(group.SubTitle))
@@ -88,7 +86,6 @@ public partial class HelpWindow : Window
                 }
 
                 SectionHost.Children.Add(BuildRows(group.Rows));
-                AddProse(group.Note, secondary: true, topGap: 8);
             }
         }
     }
@@ -254,25 +251,6 @@ public partial class HelpWindow : Window
         }
 
         return grid;
-    }
-
-    // A step SMALLER, not dimmer - the same rule the rest of the app follows for
-    // secondary text.
-    private void AddProse(string text, bool secondary, double topGap)
-    {
-        if (string.IsNullOrEmpty(text))
-        {
-            return;
-        }
-
-        SectionHost.Children.Add(new TextBlock
-        {
-            Text = text,
-            Foreground = (Brush)FindResource(secondary ? "SecondaryForeground" : "DialogForeground"),
-            FontSize = (double)FindResource("DialogHintFontSize"),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, topGap, 0, 0),
-        });
     }
 
     // F1 opens it and F1 closes it. A key that only opens leaves the window as

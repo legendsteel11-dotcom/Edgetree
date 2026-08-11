@@ -1279,14 +1279,25 @@
              way to quit - and the tray icon is optional. A title bar answering
              a right-click with 종료 is the oldest convention there is, and it
              costs no pixels in a strip that has none to give.
-             Deliberately three lines. This is not a second options menu; it is
-             the window's own verbs, and 종료 is the one that had nowhere else
-             to live. -->
+             Deliberately short. This is not a second options menu; it is the
+             window's own verbs, and 종료 is the one that had nowhere else to
+             live.
+             도움말 joined it 2026-08-11 instead of taking a header BUTTON, which
+             was considered and turned down: the header is for what gets used
+             daily, help is opened once or twice in a lifetime, and a seventh
+             button there means moving the three width thresholds and the grid
+             again - which has already gone wrong twice. It leads the menu, and
+             sits behind a separator from the three that act on the app, because
+             it is the only row here that does not change anything. -->
         <ContextMenu x:Key="HeaderContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
                 Opened="AnyMenu_Opened"
                 Closed="AnyMenu_Closed"
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
+            <MenuItem Header="{x:Static services:Strings.MenuHelp}"
+                    InputGestureText="F1"
+                    Click="HelpMenuItem_Click"/>
+            <Separator/>
             <MenuItem Header="{x:Static services:Strings.ToolTipMinimize}"
                     Click="MinimizeButton_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuRestart}"
@@ -4288,7 +4299,7 @@
                         Click="CloseButton_Click"
                         Margin="{DynamicResource HeaderCloseButtonMargin}"
                         RenderTransform="{StaticResource ShiftUp2px}"
-                        ToolTip="{x:Static services:Strings.ToolTipMinimize}"
+                        ToolTip="{x:Static services:Strings.ToolTipPutAway}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <!-- Material Symbols "minimize" (2026-08-11).
                          It was a "close" X until this button stopped closing
@@ -4296,8 +4307,8 @@
                          way the current mode offers - and an X that ends
                          nothing is a drawing that lies.
 
-                         Three better-sounding candidates were rejected by the
-                         user, each for the same reason and each correctly:
+                         Three better-sounding candidates were rejected,
+                         each for the same reason and each correctly:
                          keyboard_double_arrow_right collides with the PIN,
                          which already says which edge things go to;
                          close_fullscreen with the viewer's full screen;

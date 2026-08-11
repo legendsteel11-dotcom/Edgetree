@@ -228,6 +228,11 @@ public static class Strings
     public static string ToolTipOptions = "옵션";
     public static string ToolTipUpdateAvailable = "새 버전 {0} 다운로드 가능";
     public static string ToolTipMinimize = "트레이로 최소화";
+    // The HEADER button, which is not the same action as the menu rows above:
+    // those go to the tray, this puts the sidebar away in whichever way the
+    // current mode offers (tray, auto-hide, or minimise). It wore the menu's
+    // words until 2026-08-11 and so promised the tray in two modes out of three.
+    public static string ToolTipPutAway = "사이드바 치우기";
     public static string ToolTipClose = "종료";
     public static string RootPathLabel = "내 PC";
 
@@ -622,6 +627,7 @@ public static class Strings
         ToolTipOptions = "Options";
         ToolTipUpdateAvailable = "Version {0} available for download";
         ToolTipMinimize = "Minimize to Tray";
+        ToolTipPutAway = "Put the sidebar away";
         ToolTipClose = "Exit";
         RootPathLabel = "This PC";
         ShowMoreFormat = "… Show {0} more";
