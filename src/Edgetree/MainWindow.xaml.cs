@@ -7555,8 +7555,15 @@ public partial class MainWindow : Window
 
     // Applies the current icon mode to everything already on screen, without a
     // reload: every realized tree item re-raises Icon, the favorites' shared
-    // folder-icon resource is swapped, and the search results (whose rows
-    // resolve their icon at creation) are rebuilt from the live index.
+    // folder-icon resource is swapped, and the two lists whose rows resolve
+    // their icon AT CREATION - the search results and the bookmark panel - are
+    // rebuilt.
+    //
+    // The bookmark panel was missed here until 2026-08-11: its rows only ever
+    // rebuild on a bookmark being added or removed, so switching icon style
+    // left them on the old set until something happened to the list. That is
+    // the test to run against any list added later - if its rows read the icon
+    // service in their constructor, this method has to name it.
     private void ApplyIconStyle()
     {
         Resources["FavoriteFolderIconSource"] = ShellIconService.GetFavoritesFolderIcon();
@@ -7565,6 +7572,11 @@ public partial class MainWindow : Window
         {
             RefreshIconsRecursively(root);
         }
+
+        // Carries its own "only while that panel is the one showing" guard, so
+        // the tree walk it costs is not paid by anyone running the other two
+        // side-panel modes.
+        RefreshBookmarkPanelIfShowing();
 
         if (_searchEntries.Count > 0)
         {
@@ -7781,6 +7793,13 @@ public partial class MainWindow : Window
         {
             _settings.ShowFolderIcons = menuItem.IsChecked;
             ApplyFolderIconVisibility();
+            // The tree follows this through a resource; the bookmark panel does
+            // not - its rows read the two toggles when they are BUILT and store
+            // a null icon for "off". Same gap 아이콘 종류 had, and it is here
+            // rather than inside ApplyFolderIconVisibility because that one also
+            // runs at startup, where a rebuild would resolve every bookmark
+            // straight off disk before the tree is loaded to answer for them.
+            RefreshBookmarkPanelIfShowing();
         }
     }
 
@@ -7790,6 +7809,8 @@ public partial class MainWindow : Window
         {
             _settings.ShowFileIcons = menuItem.IsChecked;
             ApplyFileIconVisibility();
+            // See the folder toggle above.
+            RefreshBookmarkPanelIfShowing();
         }
     }
 
