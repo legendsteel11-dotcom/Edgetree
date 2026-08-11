@@ -94,7 +94,9 @@ public class AppPreset
         nameof(AppSettings.ShowFolderIcons),
         nameof(AppSettings.ShowFileIcons),
         nameof(AppSettings.UseShellIcons),
-        nameof(AppSettings.ShowPathBar),
+        // ShowPathBar is deliberately absent since 2026-08-11: the strip is
+        // always on, so a preset carrying it would be storing an answer to a
+        // question nobody asks.
         nameof(AppSettings.HideTitleBarTitle),
 
         // 옆 패널들.

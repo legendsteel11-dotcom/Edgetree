@@ -159,11 +159,8 @@ public static class Strings
     public static string MenuShowFolderIcons = "폴더 아이콘";
     public static string MenuShowFileIcons = "파일 아이콘";
     public static string MenuHideTitleBarTitle = "제목 표시줄 타이틀 제거";
-    // Named after what it SHOWS, not what it accepts: the strip spends almost
-    // all its time displaying where the tree currently is, and typing into it
-    // is the occasional half. "경로" rather than "주소" because that is the
-    // word the rest of the app already uses (경로 복사, the full-path tooltips).
-    public static string MenuShowPathBar = "경로 표시줄";
+    // MenuShowPathBar removed 2026-08-11 along with the toggle it labelled -
+    // the strip is always on now that it carries the history chevrons.
     // Named after the PANEL, not favorites: it now holds either list. Lives
     // inside the 패널 표시 submenu, under the three modes.
     public static string MenuFavoritesAtBottom = "아래에 표시";
@@ -707,7 +704,6 @@ public static class Strings
         MenuShowFolderIcons = "Show Folder Icons";
         MenuShowFileIcons = "Show File Icons";
         MenuHideTitleBarTitle = "Hide Title Bar Text";
-        MenuShowPathBar = "Path Bar";
         MenuFavoritesAtBottom = "Show at Bottom";
         MenuDockOnRight = "Pin to Right Edge";
         MenuAutoHideCloseOnLeave = "Close on Mouse Leave";

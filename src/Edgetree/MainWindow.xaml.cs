@@ -6149,7 +6149,11 @@ public partial class MainWindow : Window
                 FindMenuItem(generalSettings, "showFolderIcons") is { } showFolderIcons &&
                 FindMenuItem(generalSettings, "showFileIcons") is { } showFileIcons &&
                 FindMenuItem(generalSettings, "hideTitleBarTitle") is { } hideTitleBarTitle &&
-                FindMenuItem(generalSettings, "showPathBar") is { } showPathBar &&
+                // showPathBar left the menu on 2026-08-11 and had to leave this
+                // chain in the same edit: an id that no longer exists fails the
+                // whole conjunction and takes every setting below it down
+                // silently, which is precisely the v1.3.4/v1.4.0 shape the note
+                // above warns about.
                 FindMenuItem(generalSettings, "autoCollapse") is { } autoCollapse &&
                 FindMenuItem(generalSettings, "autoHideCloseOnLeave") is { } autoHideCloseOnLeave &&
                 FindMenuItem(generalSettings, "autoHideUseHandle") is { } autoHideUseHandle &&
@@ -6162,7 +6166,6 @@ public partial class MainWindow : Window
                 showFolderIcons.IsChecked = _settings.ShowFolderIcons;
                 showFileIcons.IsChecked = _settings.ShowFileIcons;
                 hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
-                showPathBar.IsChecked = _settings.ShowPathBar;
                 autoCollapse.IsChecked = _settings.AutoCollapseFolders;
                 autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
                 autoHideUseHandle.IsChecked = _settings.AutoHideUseHandle;
@@ -7843,15 +7846,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ShowPathBarMenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is MenuItem menuItem)
-        {
-            _settings.ShowPathBar = menuItem.IsChecked;
-            ApplyPathBarVisibility();
-        }
-    }
-
     private static string FormatCacheSize(long bytes)
         => bytes >= 1024L * 1024 * 1024
             ? $"{bytes / (1024.0 * 1024 * 1024):F1} GB"
@@ -8077,28 +8071,29 @@ public partial class MainWindow : Window
             && _treeHistoryIndex < _treeHistory.Count - 1;
     }
 
+    // ALWAYS ON since 2026-08-11 - the toggle is gone from the options menu (see
+    // the note where it stood). The strip stopped being a display of where you
+    // are the moment it grew the history chevrons, so hiding it took a way of
+    // MOVING with it. What is left here is the placement: which of the two
+    // views the one strip currently belongs to.
+    //
+    // AppSettings.ShowPathBar is kept and left at its default rather than
+    // deleted, so a settings file written by an older build still reads without
+    // a missing-member fault; nothing asks it any more.
     private void ApplyPathBarVisibility()
     {
-        PathBarRow.Visibility = _settings.ShowPathBar ? Visibility.Visible : Visibility.Collapsed;
-        // The host is a bordered strip of its own, so it has to go with the row
-        // it holds - left showing it would draw a rule under the results with
-        // nothing beneath it.
-        SearchPathBarHost.Visibility = _settings.ShowPathBar && _isSearchViewActive
+        PathBarRow.Visibility = Visibility.Visible;
+        // The host is a bordered strip of its own, so it only stands while the
+        // search view it belongs to is up - showing it otherwise would draw a
+        // rule under the results with nothing beneath it.
+        SearchPathBarHost.Visibility = _isSearchViewActive
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        if (_settings.ShowPathBar)
-        {
-            // Turning it on mid-session has to fill it immediately - waiting
-            // for the next selection change would show an empty box under a
-            // tree that is plainly sitting somewhere.
-            UpdatePathBarFromSelection();
-        }
-        else
-        {
-            // An abandoned edit must not survive being hidden and shown again.
-            _isPathBarDirty = false;
-        }
+        // Filled immediately rather than at the next selection change, which
+        // matters on the crossing between views: the strip arriving empty under
+        // a tree that is plainly sitting somewhere reads as broken.
+        UpdatePathBarFromSelection();
     }
 
     // Moves the one path strip between the footer and the bottom of the search
