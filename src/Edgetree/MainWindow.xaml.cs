@@ -19491,11 +19491,33 @@ public partial class MainWindow : Window
         // surface. Full screen is not that: the letterbox bars are the only
         // thing left around the picture, and any colour at all in them is a
         // frame the picture is being shown inside. Black is the absence of one.
-        // Restored rather than switched, so a picker change made while full
-        // screen still lands correctly on the way out.
-        ViewerPanel.Background = on
-            ? System.Windows.Media.Brushes.Black
-            : (System.Windows.Media.Brush)FindResource("ViewerBackground");
+        // THE WAY BACK IS A RESOURCE REFERENCE, NOT A BRUSH (2026-08-11). Read
+        // once with FindResource, what came back was a plain local value - and a
+        // local value is exactly what the XAML's DynamicResource was, so
+        // assigning over it does not "restore" the binding, it destroys it. The
+        // panel then held one brush object for good.
+        //
+        // That is invisible until the resource is REPLACED rather than
+        // recoloured, and colorperf.log names ViewerBackground as one of the
+        // keys that is replaced every session (SetBrushColor can only recolour
+        // an unfrozen brush, and this one arrives frozen). So switching
+        // dark/light - by hand or through a preset - left the panel on the old
+        // theme's backdrop until something happened to write the property
+        // again. Going full screen and back was that something, which is what
+        // made it look like a full-screen bug.
+        //
+        // It was never only about full screen either: ApplyViewerSide calls this
+        // with false on every open, dock, undock and side change, so the
+        // reference was gone long before anyone pressed Enter on a picture.
+        if (on)
+        {
+            ViewerPanel.Background = System.Windows.Media.Brushes.Black;
+        }
+        else
+        {
+            ViewerPanel.SetResourceReference(
+                System.Windows.Controls.Border.BackgroundProperty, "ViewerBackground");
+        }
         ViewerPanel.BorderThickness = on
             ? default
             : (_viewerOnLeft ? new Thickness(0, 0, 1, 0) : new Thickness(1, 0, 0, 0));
