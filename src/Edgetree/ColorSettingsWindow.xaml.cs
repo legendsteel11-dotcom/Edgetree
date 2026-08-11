@@ -85,15 +85,30 @@ public partial class ColorSettingsWindow : Window
             return;
         }
 
+        // A brush of its own to animate, because the one the border carries is
+        // a shared theme resource and frozen. The cost of that is the line
+        // below: assigning it REPLACES the resource reference, so from here on
+        // the border no longer follows the theme - and the flash has to put
+        // that back when it is done.
+        //
+        // Without the restore, one flash in the light theme left a #D4D4D4
+        // border standing in the dark one for the rest of the session (seen
+        // 2026-08-11: "테두리가 이렇게 밝지 않았던 것 같은데"). Nothing said it
+        // had happened, because the flash itself ends on the right colour - it
+        // is only the NEXT theme change that the border no longer hears.
         var flashBrush = new SolidColorBrush(((SolidColorBrush)RootBorder.BorderBrush).Color);
         RootBorder.BorderBrush = flashBrush;
-        flashBrush.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation
+
+        var flash = new ColorAnimation
         {
             To = Color.FromRgb(0x4F, 0xA8, 0xFF),
             Duration = TimeSpan.FromMilliseconds(150),
             AutoReverse = true,
             RepeatBehavior = new RepeatBehavior(2)
-        });
+        };
+        flash.Completed += (_, _) =>
+            RootBorder.SetResourceReference(Border.BorderBrushProperty, "PanelBorder");
+        flashBrush.BeginAnimation(SolidColorBrush.ColorProperty, flash);
     }
 
     private void RefreshSwatches()
