@@ -3510,9 +3510,32 @@ public partial class MainWindow : Window
         // Right-docked, the window grows toward the left (see
         // ResizeThumb_DragDelta), so the grab handle needs to be on the left
         // edge instead of the right one.
-        ResizeThumb.HorizontalAlignment = _settings.DockOnRight
+        var outerEdge = _settings.DockOnRight
             ? System.Windows.HorizontalAlignment.Left
             : System.Windows.HorizontalAlignment.Right;
+        ResizeThumb.HorizontalAlignment = outerEdge;
+
+        // The corners ride the same edge, and only while the viewer is open -
+        // see their note in the XAML. The diagonal a corner points along
+        // depends on which side that edge is, so the two cursors swap with the
+        // dock: a top-LEFT corner runs ↖↘ where a top-RIGHT one runs ↗↙.
+        bool corners = show && _viewerOpen;
+        var cornerVisibility = corners ? Visibility.Visible : Visibility.Collapsed;
+        bool onLeftEdge = _settings.DockOnRight;
+
+        TopCornerResizeThumb.Visibility = cornerVisibility;
+        TopCornerResizeThumb.IsHitTestVisible = corners;
+        TopCornerResizeThumb.HorizontalAlignment = outerEdge;
+        TopCornerResizeThumb.Cursor = onLeftEdge
+            ? System.Windows.Input.Cursors.SizeNWSE
+            : System.Windows.Input.Cursors.SizeNESW;
+
+        BottomCornerResizeThumb.Visibility = cornerVisibility;
+        BottomCornerResizeThumb.IsHitTestVisible = corners;
+        BottomCornerResizeThumb.HorizontalAlignment = outerEdge;
+        BottomCornerResizeThumb.Cursor = onLeftEdge
+            ? System.Windows.Input.Cursors.SizeNESW
+            : System.Windows.Input.Cursors.SizeNWSE;
     }
 
     // Same button, three jobs by state (see PinButton_Click): floating ->
@@ -13969,6 +13992,44 @@ public partial class MainWindow : Window
         FlushResizeLog();
     }
 
+    // ----- 모서리: 두 축을 한 번에 -------------------------------------------------
+    //
+    // Delegation, deliberately - no arithmetic of its own. The band handlers own
+    // the vertical half (anchors captured on start, absolute cursor per frame)
+    // and the width handler owns the horizontal (stateless, reads the delta),
+    // and they stay independent because changing the width moves Left while
+    // leaving Top where the band drag anchored it. A third path that did both
+    // itself would be a second copy of two things that already work.
+    private void TopCornerResizeThumb_DragStarted(object sender, DragStartedEventArgs e)
+        => TopResizeThumb_DragStarted(sender, e);
+
+    private void TopCornerResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
+    {
+        TopResizeThumb_DragDelta(sender, e);
+        ResizeThumb_DragDelta(sender, e);
+    }
+
+    private void TopCornerResizeThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        TopResizeThumb_DragCompleted(sender, e);
+        ResizeThumb_DragCompleted(sender, e);
+    }
+
+    private void BottomCornerResizeThumb_DragStarted(object sender, DragStartedEventArgs e)
+        => BottomResizeThumb_DragStarted(sender, e);
+
+    private void BottomCornerResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
+    {
+        BottomResizeThumb_DragDelta(sender, e);
+        ResizeThumb_DragDelta(sender, e);
+    }
+
+    private void BottomCornerResizeThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        BottomResizeThumb_DragCompleted(sender, e);
+        ResizeThumb_DragCompleted(sender, e);
+    }
+
     // Stored as they will be read back - a fraction of the work area, and a
     // fraction of whatever space that leaves (see AppSettings). The slack guard
     // is not a formality: at full height it is zero, and the division would put
@@ -14556,6 +14617,7 @@ public partial class MainWindow : Window
         HookShellThumbnailTrace();
 
         _viewerOpen = true;
+        UpdateResizeThumbVisibility();
 
         bool onLeft = _isDocked && _settings.DockOnRight;
 
@@ -14628,6 +14690,9 @@ public partial class MainWindow : Window
         double panelWidth = LiveViewerPanelWidth;
 
         _viewerOpen = false;
+        // The band's corner grips only exist while the panel does - see their
+        // note in the XAML.
+        UpdateResizeThumbVisibility();
         _pendingViewerPath = null;
         _viewerTreeShare = null;
         // Nothing is being shown, so nothing is driving what is shown. Reopening
@@ -14757,7 +14822,7 @@ public partial class MainWindow : Window
             _viewerShowingDecodedImage = false;
             ViewerIconImage.Source = null;
             ViewerFileName.Text = string.Empty;
-            ViewerFileInfo.Text = string.Empty;
+            SetViewerCaption(string.Empty);
             ClearViewerZoom();
             UpdateViewerCarousel();
             return;
@@ -14785,7 +14850,7 @@ public partial class MainWindow : Window
         ViewerPlayOverlay.Visibility = Visibility.Collapsed;
 
         ViewerFileName.Text = item.Name;
-        ViewerFileInfo.Text = string.Empty;
+        SetViewerCaption(string.Empty);
         UpdateViewerCarousel();
 
         bool isImage = !item.IsDirectory && ThumbnailExtensions.Contains(Path.GetExtension(path));
@@ -15255,8 +15320,8 @@ public partial class MainWindow : Window
             ViewerImage.Visibility = Visibility.Visible;
             ViewerImage.Source = bitmap;
             _viewerShowingDecodedImage = true;
-            ViewerFileInfo.Text =
-                $"{pixelWidth} × {pixelHeight}  ·  {FormatFileSize(fileLength)}  ·  {modified:yyyy-MM-dd HH:mm}";
+            SetViewerCaption(
+                $"{pixelWidth} × {pixelHeight}  ·  {FormatFileSize(fileLength)}  ·  {modified:yyyy-MM-dd HH:mm}");
 
             _viewerPixelWidth = pixelWidth;
             _viewerPixelHeight = pixelHeight;
@@ -15443,8 +15508,8 @@ public partial class MainWindow : Window
         ViewerImage.Visibility = Visibility.Visible;
         ViewerImage.Source = _viewerGifCanvas;
         _viewerShowingDecodedImage = true;
-        ViewerFileInfo.Text =
-            $"{width} × {height}  ·  {FormatFileSize(bytes.LongLength)}  ·  {modified:yyyy-MM-dd HH:mm}";
+        SetViewerCaption(
+            $"{width} × {height}  ·  {FormatFileSize(bytes.LongLength)}  ·  {modified:yyyy-MM-dd HH:mm}");
 
         _viewerPixelWidth = width;
         _viewerPixelHeight = height;
@@ -15812,9 +15877,75 @@ public partial class MainWindow : Window
         // until the engine knows what it has opened.
         _pendingResumeSeconds = FindVideoMarks(path)?.Resume ?? 0;
         LoadSubtitlesFor(path);
+        ApplyViewerHdrToneMap();
         ViewerMedia.Play();
         SetViewerVideoPlaying(true);
+        StartViewerOpeningWatch();
         VideoLogStart(path);
+    }
+
+    // ----- 여는 동안, 그리고 읽다 멈춘 동안 --------------------------------------
+    //
+    // Selecting a film costs nothing over the network - the panel draws the
+    // shell's still and waits for the play button, so browsing a NAS folder
+    // never opens one. The cost is all HERE, between Play() and MediaOpened,
+    // and until now that gap said nothing at all: the still stayed up, the
+    // transport said "playing" and the clock said 0:00. On a cold share that is
+    // seconds, and it is indistinguishable from a file that will never open.
+    //
+    // NOTHING IS ABORTED. A slow open is still an open, and a guard that gave
+    // up on it would be killing the case it was built for - the same rule the
+    // drive-offline watch already follows ("one slow read is not a dead
+    // drive"). The long wait gets a longer sentence, not a cancellation.
+    private System.Windows.Threading.DispatcherTimer? _viewerOpeningTimer;
+    private long _viewerOpeningStartedAt;
+    private bool _viewerMediaOpening;
+
+    // Under this, saying anything is noise: a local file opens in under a
+    // tenth of a second and the line would flash.
+    private const int ViewerOpeningQuietMs = 400;
+    // Past this it is worth saying that the wait is not normal, without
+    // claiming anything has failed.
+    private const int ViewerOpeningSlowMs = 5000;
+
+    private void StartViewerOpeningWatch()
+    {
+        _viewerMediaOpening = true;
+        _viewerOpeningStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        _viewerOpeningTimer ??= CreateViewerOpeningTimer();
+        _viewerOpeningTimer.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateViewerOpeningTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(ViewerOpeningQuietMs)
+        };
+        timer.Tick += (_, _) => TickViewerOpeningWatch();
+        return timer;
+    }
+
+    private void TickViewerOpeningWatch()
+    {
+        if (!_viewerMediaOpening)
+        {
+            StopViewerOpeningWatch();
+            return;
+        }
+
+        double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - _viewerOpeningStartedAt)
+            * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        SetViewerPlaybackStatus(ms >= ViewerOpeningSlowMs
+            ? Strings.ViewerMediaOpeningSlow
+            : Strings.ViewerMediaOpening);
+    }
+
+    private void StopViewerOpeningWatch()
+    {
+        _viewerMediaOpening = false;
+        _viewerOpeningTimer?.Stop();
+        SetViewerPlaybackStatus(null);
     }
 
     // Where the film should pick up, held between the click and MediaOpened.
@@ -15832,8 +15963,160 @@ public partial class MainWindow : Window
         ViewerMedia.ContextMenuOpening += ViewerImageHost_ContextMenuOpening;
     }
 
+    // ----- HDR 색 보정 -----------------------------------------------------------
+    //
+    // See Services/HdrToneMapEffect for what it does and why it can be done at
+    // all. Applied to the MEDIA ELEMENT alone: the shell still that the panel
+    // draws before playback is an ordinary SDR thumbnail, so running it through
+    // an inverse-PQ curve would wreck the one picture that was already right.
+    // What the two steppers move between. Wide enough to cover a film graded
+    // dark and one graded bright, and stepped coarsely enough that a press is
+    // visible - a dial nobody can see moving gets pressed twenty times.
+    private const double ViewerHdrExposureMin = 20;
+    private const double ViewerHdrExposureMax = 400;
+    private const double ViewerHdrExposureStep = 10;
+    private const double ViewerHdrSaturationMin = 0.6;
+    private const double ViewerHdrSaturationMax = 2.0;
+    private const double ViewerHdrSaturationStep = 0.05;
+    private const double ViewerHdrContrastMin = 0.6;
+    private const double ViewerHdrContrastMax = 1.8;
+    private const double ViewerHdrContrastStep = 0.05;
+
+    // ----- 영상별로 기억하기 -----------------------------------------------------
+    //
+    // Read: this film's own answer if it has one, otherwise the last one used.
+    // Write: always to the film AND to the last-used, so tuning one film sets
+    // the starting point for the next without disturbing any film already
+    // answered. See VideoMarkEntry for why the stored fields are nullable.
+    private bool ViewerHdrOn => _viewerVideoPath is { } path
+        ? FindVideoMarks(path)?.HdrToneMap ?? _settings.ViewerHdrToneMap
+        : _settings.ViewerHdrToneMap;
+
+    private double ViewerHdrExposure => _viewerVideoPath is { } path
+        ? FindVideoMarks(path)?.HdrExposure ?? _settings.ViewerHdrExposure
+        : _settings.ViewerHdrExposure;
+
+    private double ViewerHdrSaturation => _viewerVideoPath is { } path
+        ? FindVideoMarks(path)?.HdrSaturation ?? _settings.ViewerHdrSaturation
+        : _settings.ViewerHdrSaturation;
+
+    private double ViewerHdrContrast => _viewerVideoPath is { } path
+        ? FindVideoMarks(path)?.HdrContrast ?? _settings.ViewerHdrContrast
+        : _settings.ViewerHdrContrast;
+
+    private void WriteViewerHdr(Action<VideoMarkEntry> toFilm)
+    {
+        if (_viewerVideoPath is { } path && EnsureVideoMarks(path) is { } entry)
+        {
+            toFilm(entry);
+        }
+        _settingsService.Save(_settings);
+        ApplyViewerHdrToneMap();
+    }
+
+    // The effect is built once and then TUNED. Rebuilding it per press would
+    // recompile nothing but would throw away the composited surface on every
+    // step, and the whole point of a stepper is watching the picture change
+    // while the finger is still on the button.
+    private HdrToneMapEffect? _viewerHdrEffect;
+
+    private void ApplyViewerHdrToneMap()
+    {
+        if (!ViewerHdrOn)
+        {
+            ViewerMedia.Effect = null;
+            _viewerHdrEffect = null;
+            UpdateViewerHdrReadout();
+            return;
+        }
+
+        _viewerHdrEffect ??= new HdrToneMapEffect();
+        _viewerHdrEffect.Exposure = ViewerHdrExposure;
+        _viewerHdrEffect.Saturation = ViewerHdrSaturation;
+        _viewerHdrEffect.Contrast = ViewerHdrContrast;
+        if (!ReferenceEquals(ViewerMedia.Effect, _viewerHdrEffect))
+        {
+            ViewerMedia.Effect = _viewerHdrEffect;
+        }
+        UpdateViewerHdrReadout();
+    }
+
+    private void UpdateViewerHdrReadout()
+    {
+        var rows = ViewerHdrOn && IsViewerShowingVideo
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ViewerHdrBrightnessItem.Visibility = rows;
+        ViewerHdrSaturationItem.Visibility = rows;
+        ViewerHdrContrastItem.Visibility = rows;
+
+        // Bare numbers, all three. The unit sign was on two of them and not on
+        // the first, which made one column read as three different kinds of
+        // thing - and none of these is a measurement anyone converts. What a
+        // hand wants here is only which way it moved and how far from 100.
+        ViewerHdrBrightnessText.Text = $"{ViewerHdrExposure:F0}";
+        ViewerHdrSaturationText.Text = $"{ViewerHdrSaturation * 100:F0}";
+        ViewerHdrContrastText.Text = $"{ViewerHdrContrast * 100:F0}";
+    }
+
+    private void ViewerHdrToneMap_Click(object sender, RoutedEventArgs e)
+    {
+        bool on = ViewerHdrItem.IsChecked;
+        _settings.ViewerHdrToneMap = on;
+        WriteViewerHdr(entry => entry.HdrToneMap = on);
+    }
+
+    private void StepViewerHdrExposure(double delta)
+    {
+        double value = Math.Clamp(
+            Math.Round(ViewerHdrExposure + delta), ViewerHdrExposureMin, ViewerHdrExposureMax);
+        _settings.ViewerHdrExposure = value;
+        WriteViewerHdr(entry => entry.HdrExposure = value);
+    }
+
+    private void StepViewerHdrSaturation(double delta)
+    {
+        double value = Math.Clamp(
+            Math.Round(ViewerHdrSaturation + delta, 2),
+            ViewerHdrSaturationMin, ViewerHdrSaturationMax);
+        _settings.ViewerHdrSaturation = value;
+        WriteViewerHdr(entry => entry.HdrSaturation = value);
+    }
+
+    private void StepViewerHdrContrast(double delta)
+    {
+        double value = Math.Clamp(
+            Math.Round(ViewerHdrContrast + delta, 2),
+            ViewerHdrContrastMin, ViewerHdrContrastMax);
+        _settings.ViewerHdrContrast = value;
+        WriteViewerHdr(entry => entry.HdrContrast = value);
+    }
+
+    private void ViewerHdrBrightnessDown_Click(object sender, RoutedEventArgs e)
+        => StepViewerHdrExposure(-ViewerHdrExposureStep);
+
+    private void ViewerHdrBrightnessUp_Click(object sender, RoutedEventArgs e)
+        => StepViewerHdrExposure(+ViewerHdrExposureStep);
+
+    private void ViewerHdrSaturationDown_Click(object sender, RoutedEventArgs e)
+        => StepViewerHdrSaturation(-ViewerHdrSaturationStep);
+
+    private void ViewerHdrSaturationUp_Click(object sender, RoutedEventArgs e)
+        => StepViewerHdrSaturation(+ViewerHdrSaturationStep);
+
+    private void ViewerHdrContrastDown_Click(object sender, RoutedEventArgs e)
+        => StepViewerHdrContrast(-ViewerHdrContrastStep);
+
+    private void ViewerHdrContrastUp_Click(object sender, RoutedEventArgs e)
+        => StepViewerHdrContrast(+ViewerHdrContrastStep);
+
     private void ViewerMedia_MediaOpened(object sender, RoutedEventArgs e)
     {
+        // First, so the caption is back to the file's facts before the no-audio
+        // note below appends to it - appending to "여는 중…" would keep the
+        // status on screen with a fact stuck on the end of it.
+        StopViewerOpeningWatch();
+
         // How long the engine took to open the file, and what it found -
         // whether the run that stutters differs here from the run that
         // doesn't is one of the first things the log can answer.
@@ -15900,11 +16183,11 @@ public partial class MainWindow : Window
         // background property-store read, and whether the sound decoded is
         // only known once the engine has opened the file. Whichever lands
         // second adds the note; the guard keeps it from being said twice.
-        if (_viewerVideoHasNoAudio && !ViewerFileInfo.Text.Contains(Strings.ViewerNoAudio, StringComparison.Ordinal))
+        if (_viewerVideoHasNoAudio && !_viewerCaptionFacts.Contains(Strings.ViewerNoAudio, StringComparison.Ordinal))
         {
-            ViewerFileInfo.Text = ViewerFileInfo.Text.Length == 0
+            SetViewerCaption(_viewerCaptionFacts.Length == 0
                 ? Strings.ViewerNoAudio
-                : $"{ViewerFileInfo.Text}  ·  {Strings.ViewerNoAudio}";
+                : $"{_viewerCaptionFacts}  ·  {Strings.ViewerNoAudio}");
         }
 
         UpdateViewerMediaReadout();
@@ -15959,15 +16242,21 @@ public partial class MainWindow : Window
         // twenty seconds of it playing sends them looking for a codec they
         // already have. MediaOpened is what tells the two apart.
         bool wasPlaying = ViewerMedia.NaturalDuration.HasTimeSpan;
+        // The wait is over, whichever way it went - and the message below is
+        // the one that should be left standing.
+        StopViewerOpeningWatch();
         LogViewerMediaFailure(path, e.ErrorException);
         VideoLog($"FAILED  hr=0x{e.ErrorException?.HResult ?? 0:X8}  playing={wasPlaying}");
         _videoLogEndReason = $"FAILED after playing (hr=0x{e.ErrorException?.HResult ?? 0:X8})";
         StopViewerVideo();
         if (string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
         {
-            ViewerFileInfo.Text = wasPlaying
+            // Through the caption helper, so this becomes what the line HOLDS
+            // rather than something a later status could wipe back to the
+            // file's facts.
+            SetViewerCaption(wasPlaying
                 ? Strings.ViewerPlaybackInterrupted
-                : Strings.ViewerPlaybackUnsupported;
+                : Strings.ViewerPlaybackUnsupported);
         }
     }
 
@@ -16272,6 +16561,31 @@ public partial class MainWindow : Window
         => _settings.VideoMarks.FirstOrDefault(entry =>
             string.Equals(entry.Path, path, StringComparison.OrdinalIgnoreCase));
 
+    // The same lookup, but it makes the entry when there is none and moves it
+    // to the front - newest first, so the cap below drops whichever film has
+    // gone longest without being touched. Split out when the colour settings
+    // joined the marks: two callers creating entries their own way is two
+    // places for the ordering rule to be forgotten.
+    private VideoMarkEntry EnsureVideoMarks(string path)
+    {
+        var entry = FindVideoMarks(path);
+        if (entry is null)
+        {
+            entry = new VideoMarkEntry { Path = path };
+        }
+        else
+        {
+            _settings.VideoMarks.Remove(entry);
+        }
+
+        _settings.VideoMarks.Insert(0, entry);
+        while (_settings.VideoMarks.Count > MaxMarkedVideos)
+        {
+            _settings.VideoMarks.RemoveAt(_settings.VideoMarks.Count - 1);
+        }
+        return entry;
+    }
+
     private void ViewerMediaMark_Click(object sender, RoutedEventArgs e)
     {
         if (_viewerVideoPath is not { } path)
@@ -16280,18 +16594,7 @@ public partial class MainWindow : Window
         }
 
         double seconds = ViewerMedia.Position.TotalSeconds;
-        var entry = FindVideoMarks(path);
-        if (entry is null)
-        {
-            entry = new VideoMarkEntry { Path = path };
-            _settings.VideoMarks.Add(entry);
-        }
-
-        // Newest file first, so the cap below drops whichever film has gone
-        // longest without being touched rather than whichever one happens to
-        // sit at the end of the list.
-        _settings.VideoMarks.Remove(entry);
-        _settings.VideoMarks.Insert(0, entry);
+        var entry = EnsureVideoMarks(path);
 
         // Pressing it twice at the same place TAKES THE MARK AWAY. The button
         // is the only control there is room for in that strip, and a mark you
@@ -16312,13 +16615,12 @@ public partial class MainWindow : Window
             }
         }
 
-        if (entry.Seconds.Count == 0)
+        // IsEmpty, not "no marks left": the entry also carries the resume
+        // position, the subtitle offset and this film's colour settings, and
+        // dropping it on the last mark used to take those with it.
+        if (entry.IsEmpty)
         {
             _settings.VideoMarks.Remove(entry);
-        }
-        while (_settings.VideoMarks.Count > MaxMarkedVideos)
-        {
-            _settings.VideoMarks.RemoveAt(_settings.VideoMarks.Count - 1);
         }
 
         // Saved at once, the same reasoning the file bookmarks and the colours
@@ -16750,6 +17052,73 @@ public partial class MainWindow : Window
         else
         {
             _viewerMediaTimer.Stop();
+            // The watch below only runs on that tick, so pausing while it was
+            // saying "waiting for the file" would leave the sentence standing
+            // over a film that is no longer waiting for anything. Not folded
+            // into the opening watch: this is about the readout stopping, and
+            // that is decided here.
+            _viewerStallSince = 0;
+            _viewerLastPositionSeconds = -1;
+            if (!_viewerMediaOpening)
+            {
+                SetViewerPlaybackStatus(null);
+            }
+        }
+    }
+
+    // The mid-film half of the same question, and the reason it is measured
+    // rather than asked: BufferingStarted/Ended are wired up, but the engine
+    // raises them for a STREAM, and a file on a share is not one - so a film
+    // that advances a frame a second can be, as far as those events are
+    // concerned, perfectly fed. What cannot be argued with is the clock: this
+    // readout runs four times a second, so a position that has not moved across
+    // several ticks while the transport says playing is the panel waiting on
+    // the file, whatever the engine calls it.
+    //
+    // The same comparison the Debug instrument writes as `drift` - promoted out
+    // of the log because the person watching the film should not have to read a
+    // file to find out why it is stuttering.
+    private double _viewerLastPositionSeconds = -1;
+    private long _viewerStallSince;
+
+    // Three ticks. One is a rounding artifact, two is a hiccup; by 750ms of a
+    // still picture the eye has already asked the question this answers.
+    private const int ViewerStallMs = 750;
+
+    private void WatchViewerPlaybackStall()
+    {
+        // A seek is a position that is DELIBERATELY not where it was, and the
+        // opening watch owns the line until MediaOpened lands.
+        if (!_viewerVideoPlaying || _viewerMediaOpening || _viewerSeekTargetSeconds is not null)
+        {
+            _viewerLastPositionSeconds = -1;
+            _viewerStallSince = 0;
+            return;
+        }
+
+        double now = ViewerMedia.Position.TotalSeconds;
+        long stamp = System.Diagnostics.Stopwatch.GetTimestamp();
+
+        // Anything at all counts as movement: the question is whether the film
+        // is advancing, not how fast.
+        if (_viewerLastPositionSeconds < 0 || now > _viewerLastPositionSeconds + 0.001)
+        {
+            _viewerLastPositionSeconds = now;
+            _viewerStallSince = stamp;
+            SetViewerPlaybackStatus(null);
+            return;
+        }
+
+        if (_viewerStallSince == 0)
+        {
+            _viewerStallSince = stamp;
+            return;
+        }
+
+        double stalledMs = (stamp - _viewerStallSince) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        if (stalledMs >= ViewerStallMs)
+        {
+            SetViewerPlaybackStatus(Strings.ViewerMediaStalled);
         }
     }
 
@@ -16771,6 +17140,7 @@ public partial class MainWindow : Window
         }
 
         VideoLogTick();
+        WatchViewerPlaybackStall();
 
         var position = ViewerMedia.Position;
 
@@ -16866,6 +17236,9 @@ public partial class MainWindow : Window
         VideoLogFlush("stopped");
         _viewerMediaTimer?.Stop();
         _viewerSeekDebounce?.Stop();
+        StopViewerOpeningWatch();
+        _viewerStallSince = 0;
+        _viewerLastPositionSeconds = -1;
         _viewerMediaSeeking = false;
         _viewerSeekTargetSeconds = null;
 
@@ -17619,6 +17992,11 @@ public partial class MainWindow : Window
         // The playback group, only for a film.
         var playbackRows = showingVideo ? Visibility.Visible : Visibility.Collapsed;
         ViewerPlaybackSeparator.Visibility = playbackRows;
+        // Closes the bookmark fence. It follows the GROUP rather than the mark
+        // list, which comes and goes with whether the film has any: a fence
+        // that disappeared with its second row would leave the first one
+        // floating against the rows below it.
+        ViewerMarkSeparator.Visibility = playbackRows;
         ViewerPlayPauseItem.Visibility = playbackRows;
         ViewerPlayPauseItem.Header = _viewerVideoPlaying ? Strings.ViewerPause : Strings.ViewerPlay;
         ViewerRewindItem.Visibility = playbackRows;
@@ -17640,6 +18018,12 @@ public partial class MainWindow : Window
         ViewerMarkListItem.Visibility = showingVideo && FindVideoMarks(item.FullPath) is { Seconds.Count: > 0 }
             ? Visibility.Visible
             : Visibility.Collapsed;
+
+        // Only for a film: the correction undoes a PQ curve, and a picture that
+        // never had one would come out worse than it went in.
+        ViewerHdrItem.Visibility = showingVideo ? Visibility.Visible : Visibility.Collapsed;
+        ViewerHdrItem.IsChecked = ViewerHdrOn;
+        UpdateViewerHdrReadout();
 
         // A loaded MediaElement holds the file open, so the OS refuses these -
         // rename and delete fail outright, and a cut marks a file for a move
@@ -19471,7 +19855,7 @@ public partial class MainWindow : Window
     {
         if (_viewerOpen && string.Equals(_pendingViewerPath, path, StringComparison.OrdinalIgnoreCase))
         {
-            ViewerFileInfo.Text = string.Empty;
+            SetViewerCaption(string.Empty);
         }
     }
 
@@ -19494,8 +19878,8 @@ public partial class MainWindow : Window
         // caption this line then rewrites - so this line has to carry it too.
         // Same "whichever arrives second says it" arrangement the note already
         // ran on (see ViewerMedia_MediaOpened), with one more arrival in it.
-        ViewerFileInfo.Text = string.Join("  ·  ",
-            new[] { head, body, NoAudioNote() }.Where(part => part.Length > 0));
+        SetViewerCaption(string.Join("  ·  ",
+            new[] { head, body, NoAudioNote() }.Where(part => part.Length > 0)));
 
         if (!withMediaInfo)
         {
@@ -19518,16 +19902,54 @@ public partial class MainWindow : Window
             string mediaHead = media.HasFrameSize ? $"{media.Width} × {media.Height}" : head;
             string duration = media.Duration is { } span ? FormatDuration(span) : string.Empty;
 
-            ViewerFileInfo.Text = string.Join("  ·  ",
-                new[] { mediaHead, duration, body, NoAudioNote() }.Where(part => part.Length > 0));
+            SetViewerCaption(string.Join("  ·  ",
+                new[] { mediaHead, duration, body, NoAudioNote() }.Where(part => part.Length > 0)));
         });
     }
 
-    // h:mm:ss once there is an hour to show, m:ss below that - what a player's
-    // own readout does, and what the file's length is actually compared against.
-    private static string FormatDuration(TimeSpan span) => span.TotalHours >= 1
-        ? $"{(int)span.TotalHours}:{span.Minutes:00}:{span.Seconds:00}"
-        : $"{span.Minutes}:{span.Seconds:00}";
+    // ----- 캡션 줄 위에 잠깐 올라가는 상태 ---------------------------------------
+    //
+    // The caption is the one place this panel already talks (it is where "이
+    // 형식은 재생할 수 없습니다" lands), so playback状 status goes there rather
+    // than into a new control. What it must not do is EAT the file's facts: the
+    // line underneath is rebuilt from a background stat and a shell property
+    // read, and on the drive this exists for those are exactly the reads worth
+    // not repeating. So the facts are held aside and put back, and every write
+    // to the line goes through these two - a caption arriving from a worker
+    // while a status is up updates what will be RESTORED, not what is on
+    // screen.
+    private string _viewerCaptionFacts = string.Empty;
+    private string? _viewerCaptionStatus;
+
+    private void SetViewerCaption(string text)
+    {
+        _viewerCaptionFacts = text;
+        if (_viewerCaptionStatus is null)
+        {
+            ViewerFileInfo.Text = text;
+        }
+    }
+
+    private void SetViewerPlaybackStatus(string? status)
+    {
+        if (string.Equals(_viewerCaptionStatus, status, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _viewerCaptionStatus = status;
+        ViewerFileInfo.Text = status ?? _viewerCaptionFacts;
+    }
+
+    // ALWAYS hh:mm:ss, however short the film. It used to drop the hours below
+    // one and the leading zero with them - which is what a player's own readout
+    // does - and the cost showed up in use (2026-08-11): the same film reads as
+    // "3:21" in one place and "0:03:21" in another the moment it crosses an
+    // hour, the transport and the bookmark list disagree about the shape of a
+    // time, and a number whose LENGTH changes has to be re-read rather than
+    // glanced at. One shape everywhere is worth the two characters.
+    private static string FormatDuration(TimeSpan span) =>
+        $"{(int)span.TotalHours:00}:{span.Minutes:00}:{span.Seconds:00}";
 
     // ===================================================================
     // File search (Ctrl+F view). Phase 1: one folder scope, an in-memory,

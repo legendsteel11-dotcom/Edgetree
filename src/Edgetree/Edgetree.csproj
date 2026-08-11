@@ -35,6 +35,15 @@
          folder to drop a text file into. So it rides inside the exe, and the
          About window writes it out and opens it on request. -->
     <Resource Include="Resources\APACHE-2.0.txt" />
+    <!-- Compiled ps_2_0 bytecode for the HDR tone map, committed rather than
+         built: WPF's ShaderEffect wants a .ps blob, and producing one needs an
+         HLSL compiler that is not part of this toolchain (no Windows SDK on the
+         build machine, and this project carries no package dependencies).
+         The .hlsl beside it is the source of truth for a human; regenerate the
+         blob with tools\compile-shader.ps1, which borrows the D3DCompile that
+         already ships inside Windows. -->
+    <Resource Include="Resources\HdrToneMap.ps" />
+    <None Include="Resources\HdrToneMap.hlsl" />
   </ItemGroup>
 
   <!-- Microsoft.VisualBasic.FileIO.FileSystem.Delete*(..., RecycleOption.SendToRecycleBin)

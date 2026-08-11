@@ -5238,6 +5238,34 @@
                                      start the film again reads as half a menu. -->
                                 <Separator x:Name="ViewerPlaybackSeparator"
                                         Visibility="Collapsed"/>
+                                <!-- The bookmarks come FIRST and are fenced off
+                                     on their own (2026-08-11). They are the one
+                                     thing in this menu that is about THIS film
+                                     rather than about playing it - marking a
+                                     place is a decision, where play, rewind,
+                                     size and subtitles are all the same act of
+                                     watching. Fencing them also puts the row a
+                                     hand comes here for at the top of the
+                                     group, instead of below four rows the strip
+                                     already carries. -->
+                                <MenuItem x:Name="ViewerMarkAddItem"
+                                        Header="{x:Static services:Strings.ViewerMarkAdd}"
+                                        InputGestureText="P · Insert"
+                                        Click="ViewerMediaMark_Click"
+                                        Visibility="Collapsed"/>
+                                <!-- The film's own marks. Built when the menu
+                                     opens (ViewerMarkSubmenu_Opened) and shown
+                                     only for a video that has any - a submenu
+                                     that is always there and usually empty is a
+                                     row of nothing to read past. -->
+                                <MenuItem x:Name="ViewerMarkListItem"
+                                        Header="{x:Static services:Strings.ViewerMarkList}"
+                                        SubmenuOpened="ViewerMarkSubmenu_Opened"
+                                        Visibility="Collapsed">
+                                    <MenuItem Header=""/>
+                                </MenuItem>
+                                <Separator x:Name="ViewerMarkSeparator"
+                                        Visibility="Collapsed"/>
                                 <MenuItem x:Name="ViewerPlayPauseItem"
                                         Header="{x:Static services:Strings.ViewerPlay}"
                                         InputGestureText="Space"
@@ -5453,21 +5481,126 @@
                                         </Grid>
                                     </MenuItem.Header>
                                 </MenuItem>
-                                <MenuItem x:Name="ViewerMarkAddItem"
-                                        Header="{x:Static services:Strings.ViewerMarkAdd}"
-                                        InputGestureText="P · Insert"
-                                        Click="ViewerMediaMark_Click"
+                                <!-- A switch rather than something automatic,
+                                     for now: the correction is an approximation
+                                     and whether a given film needs it is
+                                     something only the eye in front of it can
+                                     say. Detecting HDR from the container would
+                                     let it apply itself, and that is the next
+                                     step if this one turns out to be worth
+                                     keeping. -->
+                                <MenuItem x:Name="ViewerHdrItem"
+                                        Header="{x:Static services:Strings.ViewerHdrToneMap}"
+                                        IsCheckable="True"
+                                        Click="ViewerHdrToneMap_Click"
                                         Visibility="Collapsed"/>
-                                <!-- The film's own marks. Built when the menu
-                                     opens (ViewerMarkSubmenu_Opened) and shown
-                                     only for a video that has any - a submenu
-                                     that is always there and usually empty is a
-                                     row of nothing to read past. -->
-                                <MenuItem x:Name="ViewerMarkListItem"
-                                        Header="{x:Static services:Strings.ViewerMarkList}"
-                                        SubmenuOpened="ViewerMarkSubmenu_Opened"
+                                <!-- The two dials, in the same stepper row the
+                                     subtitle size uses. They only appear with
+                                     the correction switched ON: with it off
+                                     they change nothing, and a row that does
+                                     nothing is worse than a row that is not
+                                     there. How much either wants depends on how
+                                     the film was graded, so these are not
+                                     settings to get right once - they are
+                                     something to nudge while looking. -->
+                                <MenuItem x:Name="ViewerHdrBrightnessItem"
+                                        StaysOpenOnClick="True"
+                                        Focusable="False"
+                                        Padding="{DynamicResource MenuStepperRowPadding}"
                                         Visibility="Collapsed">
-                                    <MenuItem Header=""/>
+                                    <MenuItem.Header>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                    Text="{x:Static services:Strings.ViewerHdrBrightness}"
+                                                    Foreground="{DynamicResource MenuForeground}"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,8,0"/>
+                                            <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal">
+                                                <Button Content="−"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerHdrBrightnessDown_Click"/>
+                                                <TextBlock x:Name="ViewerHdrBrightnessText"
+                                                        Foreground="{DynamicResource MenuForeground}"
+                                                        Width="{DynamicResource MenuStepperValueWidth}"
+                                                        TextAlignment="Center"
+                                                        VerticalAlignment="Center"/>
+                                                <Button Content="+"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerHdrBrightnessUp_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </MenuItem.Header>
+                                </MenuItem>
+                                <MenuItem x:Name="ViewerHdrSaturationItem"
+                                        StaysOpenOnClick="True"
+                                        Focusable="False"
+                                        Padding="{DynamicResource MenuStepperRowPadding}"
+                                        Visibility="Collapsed">
+                                    <MenuItem.Header>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                    Text="{x:Static services:Strings.ViewerHdrSaturation}"
+                                                    Foreground="{DynamicResource MenuForeground}"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,8,0"/>
+                                            <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal">
+                                                <Button Content="−"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerHdrSaturationDown_Click"/>
+                                                <TextBlock x:Name="ViewerHdrSaturationText"
+                                                        Foreground="{DynamicResource MenuForeground}"
+                                                        Width="{DynamicResource MenuStepperValueWidth}"
+                                                        TextAlignment="Center"
+                                                        VerticalAlignment="Center"/>
+                                                <Button Content="+"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerHdrSaturationUp_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </MenuItem.Header>
+                                </MenuItem>
+                                <MenuItem x:Name="ViewerHdrContrastItem"
+                                        StaysOpenOnClick="True"
+                                        Focusable="False"
+                                        Padding="{DynamicResource MenuStepperRowPadding}"
+                                        Visibility="Collapsed">
+                                    <MenuItem.Header>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                    Text="{x:Static services:Strings.ViewerHdrContrast}"
+                                                    Foreground="{DynamicResource MenuForeground}"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,8,0"/>
+                                            <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal">
+                                                <Button Content="−"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerHdrContrastDown_Click"/>
+                                                <TextBlock x:Name="ViewerHdrContrastText"
+                                                        Foreground="{DynamicResource MenuForeground}"
+                                                        Width="{DynamicResource MenuStepperValueWidth}"
+                                                        TextAlignment="Center"
+                                                        VerticalAlignment="Center"/>
+                                                <Button Content="+"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerHdrContrastUp_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </MenuItem.Header>
                                 </MenuItem>
                                 <Separator/>
                                 <!-- All four are refused while a film is loaded:
@@ -6413,7 +6546,12 @@
                                      shape this readout can take. -->
                                 <Grid VerticalAlignment="Center"
                                         Margin="{DynamicResource ViewerChipGroupMargin}">
-                                    <TextBlock Text="0:00:00 / 0:00:00"
+                                    <!-- Now two digits of hours, since the
+                                         readout stopped dropping them (see
+                                         FormatDuration). The twin has to carry
+                                         the shape the real one can reach or the
+                                         row starts wobbling again. -->
+                                    <TextBlock Text="00:00:00 / 00:00:00"
                                             Visibility="Hidden"
                                             FontSize="{DynamicResource FooterChipFontSize}"/>
                                     <TextBlock x:Name="ViewerMediaTime"
@@ -6712,6 +6850,46 @@
                DragDelta="ResizeThumb_DragDelta"
                DragCompleted="ResizeThumb_DragCompleted"
                MouseDoubleClick="ResizeThumb_MouseDoubleClick"/>
+
+        <!-- The two corners, where the outer edge already crosses the band's
+             top and bottom. THEY TAKE NO NEW PIXELS: those 6×6 squares are
+             already grips, and until now the width one simply won the hit test
+             there because it is declared last. All this does is let the square
+             move both axes instead of one - which is why it can exist at all in
+             a place where a mis-click is expensive.
+             Declared after the three so they keep winning their own corners.
+
+             Both jobs are done by CALLING the existing handlers rather than by
+             new arithmetic: the width path is stateless and reads the drag
+             delta, the band path captures anchors on start and reads the
+             absolute cursor, and a width change moves Left while leaving Top
+             alone - so the two do not disturb each other. Writing a third
+             geometry path here is exactly how this area has gone wrong before.
+
+             VIEWER ONLY, on the user's call (2026-08-11): with the panel closed
+             the sidebar is narrow and the corner sits among controls that get
+             used, and a resize started by accident there is not a cheap
+             mistake. Side and cursor are set in UpdateResizeThumbVisibility,
+             since which corner it is depends on which edge the window docks
+             to. -->
+        <Thumb x:Name="TopCornerResizeThumb"
+                VerticalAlignment="Top"
+                Width="6"
+                Height="6"
+                Style="{StaticResource ResizeThumbStyle}"
+                Visibility="Collapsed"
+                DragStarted="TopCornerResizeThumb_DragStarted"
+                DragDelta="TopCornerResizeThumb_DragDelta"
+                DragCompleted="TopCornerResizeThumb_DragCompleted"/>
+        <Thumb x:Name="BottomCornerResizeThumb"
+                VerticalAlignment="Bottom"
+                Width="6"
+                Height="6"
+                Style="{StaticResource ResizeThumbStyle}"
+                Visibility="Collapsed"
+                DragStarted="BottomCornerResizeThumb_DragStarted"
+                DragDelta="BottomCornerResizeThumb_DragDelta"
+                DragCompleted="BottomCornerResizeThumb_DragCompleted"/>
 
         <!-- Hands the window's top edge back to Windows so a floating window can
              be resized upwards.

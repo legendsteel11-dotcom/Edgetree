@@ -296,6 +296,24 @@ public static class Strings
     // everywhere else in this app, and it would have needed qualifying if it
     // sat anywhere the file rows could be mistaken for its subject.
     public static string ViewerMarkClear = "전체 삭제";
+    // The gap between pressing play and the engine reporting the file open -
+    // seconds on a sleeping share, and silent until now. Said in the caption,
+    // which is where this panel already talks.
+    // Named for the file, not for the maths: nobody looking at a washed-out
+    // film is thinking "tone mapping", they are thinking "this is an HDR one".
+    public static string ViewerHdrToneMap = "HDR 색 보정";
+    // 밝기 rather than 노출: the row is a dial someone turns while looking at
+    // the picture, and 노출 names the maths behind it instead of the change.
+    public static string ViewerHdrBrightness = "  밝기";
+    public static string ViewerHdrSaturation = "  채도";
+    public static string ViewerHdrContrast = "  대비";
+    public static string ViewerMediaOpening = "여는 중…";
+    // Nothing has failed and nothing is being cancelled; the wait is just
+    // longer than a wait usually is, and saying so beats a still picture.
+    public static string ViewerMediaOpeningSlow = "여는 중… 조금 오래 걸리고 있습니다";
+    // Playing, but the picture has stopped moving - the file is not arriving
+    // fast enough to decode. Named for the cause rather than for the symptom.
+    public static string ViewerMediaStalled = "파일을 기다리는 중…";
     public static string ViewerPlay = "재생";
     public static string ViewerPause = "일시정지";
     public static string ViewerStop = "정지";
@@ -671,6 +689,13 @@ public static class Strings
         ViewerSubtitleSize = "Subtitle size";
         ViewerSubtitleSync = "Subtitle sync";
         ViewerMarkClear = "Clear all";
+        ViewerHdrToneMap = "HDR colour correction";
+        ViewerHdrBrightness = "  Brightness";
+        ViewerHdrSaturation = "  Saturation";
+        ViewerHdrContrast = "  Contrast";
+        ViewerMediaOpening = "Opening…";
+        ViewerMediaOpeningSlow = "Opening… this is taking a while";
+        ViewerMediaStalled = "Waiting for the file…";
         ViewerPlay = "Play";
         ViewerPause = "Pause";
         ViewerStop = "Stop";

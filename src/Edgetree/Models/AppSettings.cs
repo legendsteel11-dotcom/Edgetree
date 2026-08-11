@@ -36,6 +36,26 @@ public class AppSettings
     public bool ViewerFilmstrip { get; set; } = false;
     public double ViewerFilmstripCellHeight { get; set; } = 64;
 
+    // Pulls an HDR film's colour back for an SDR screen (see
+    // HdrToneMapEffect). Off by default and remembered once switched on:
+    // applying it to a film that is NOT HDR makes it worse, and nothing here
+    // yet reads the file's colour flags to tell them apart - so the choice is
+    // the eye's, and it is worth only making once.
+    public bool ViewerHdrToneMap { get; set; } = false;
+
+    // The dials on that correction, in the shader's own units rather than as
+    // percentages: 100 is where 100-nit diffuse white lands at screen white,
+    // and 1.0 means "leave it alone" - so the defaults say what they mean, and
+    // a settings file edited by hand still does.
+    //
+    // These four are the LAST USED values, not the only ones. Each film keeps
+    // its own once it has been tuned (VideoMarkEntry.Hdr*); these are what a
+    // film that has never been touched starts from, so a preference set on one
+    // carries to the next without overwriting a film that was already answered.
+    public double ViewerHdrExposure { get; set; } = 100;
+    public double ViewerHdrSaturation { get; set; } = 1.15;
+    public double ViewerHdrContrast { get; set; } = 1.0;
+
     // Whether the strip fetches the WHOLE folder rather than only the part
     // around what is on screen. Off by default because it is a trade, not an
     // improvement: on a folder of 1359 photos over SMB it is a few minutes of

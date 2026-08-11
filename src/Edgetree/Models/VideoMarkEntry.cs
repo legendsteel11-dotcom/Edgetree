@@ -33,4 +33,32 @@ public class VideoMarkEntry
     // the same - the video's path - and a second list keyed identically would
     // be two things to prune, two things to cap, and two chances to disagree.
     public double SubtitleOffset { get; set; }
+
+    // The HDR correction, per film, for the same reason the subtitle offset is:
+    // whether a film needs it and how much depends on how that film was
+    // graded, so a number that fixed one is wrong on the next.
+    //
+    // NULLABLE, and that is the whole design. Null means "this film has never
+    // been touched", and an untouched film starts from whatever was last used
+    // (AppSettings.ViewerHdr*) rather than from a factory number - so setting
+    // it once on one film carries to the next, while a film that WAS tuned
+    // keeps its own answer forever. A plain default would have forced a choice
+    // between those two, and both are wanted.
+    public bool? HdrToneMap { get; set; }
+    public double? HdrExposure { get; set; }
+    public double? HdrSaturation { get; set; }
+    public double? HdrContrast { get; set; }
+
+    // Whether this entry is worth keeping at all. It exists because the entry
+    // used to be dropped the moment its last MARK was removed - which was fine
+    // while marks were all it held, and would quietly throw away a film's
+    // colour settings and its resume position now that they live here too.
+    public bool IsEmpty =>
+        Seconds.Count == 0 &&
+        Resume <= 0 &&
+        SubtitleOffset == 0 &&
+        HdrToneMap is null &&
+        HdrExposure is null &&
+        HdrSaturation is null &&
+        HdrContrast is null;
 }
