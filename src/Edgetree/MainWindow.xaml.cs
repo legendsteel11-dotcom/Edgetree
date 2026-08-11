@@ -19009,10 +19009,21 @@ public partial class MainWindow : Window
 
     private void UpdateViewerZoomBar()
     {
-        // Never while a video is loaded: the transport strip stands in this
-        // strip's place, and the two would otherwise both appear the moment
-        // anything called in here mid-playback.
-        bool hasImage = _viewerPixelWidth > 0 && ViewerImage.Source is not null && _viewerVideoPath is null;
+        // ViewerMediaIsSelection, not "is anything loaded" (2026-08-11, and the
+        // third guard in this panel to need the same correction). The two strips
+        // take turns because they describe the SAME file in ways that cannot
+        // both apply - a film has no fit-to-window and a picture has no
+        // timeline. Once background play let the transport hold a track while
+        // the panel shows a picture, that stopped being true: there is a real
+        // picture to fit and real sound to pause, and both controls apply to
+        // their own subject. Written as a null check it hid the zoom row for
+        // every picture browsed while music played (reported with a screenshot).
+        //
+        // The cost is one row of height, and only in that state. Folding these
+        // chips into the carousel row above instead would put eight controls on
+        // a row that has no thinning device of its own - FitViewerMediaRow
+        // belongs to the transport - so a narrow panel would simply clip them.
+        bool hasImage = _viewerPixelWidth > 0 && ViewerImage.Source is not null && !ViewerMediaIsSelection;
         ViewerZoomBar.Visibility = hasImage ? Visibility.Visible : Visibility.Collapsed;
         if (!hasImage)
         {
