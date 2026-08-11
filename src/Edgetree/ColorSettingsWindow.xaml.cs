@@ -681,16 +681,35 @@ public partial class ColorSettingsWindow : Window
         //
         // The bolder roll always takes at least TWO, so there is a real second
         // colour in the palette rather than one hue at several brightnesses.
-        double baseHue = daring
-            ? Wrap(PrimaryHues[rng.Next(PrimaryHues.Length)] + (rng.NextDouble() * 24 - 12))
-            : rng.NextDouble() * 360;
-        int hueCount = daring ? 2 + rng.Next(2) : 1 + rng.Next(3);
+        double baseHue = rng.NextDouble() * 360;
+        int hueCount = 1 + rng.Next(3);
         double accentHue = hueCount >= 2
             ? Wrap(baseHue + (rng.Next(2) == 0 ? -1 : 1) * (150 + rng.NextDouble() * 60))
             : baseHue;
         double neighborHue = hueCount == 3
             ? Wrap(baseHue + (rng.Next(2) == 0 ? -1 : 1) * (25 + rng.NextDouble() * 20))
             : baseHue;
+
+        // THE BOLDER ROLL DRAWS FOUR SEPARATE PRIMARIES instead (2026-08-11).
+        // Deriving them by angle was the reason it still came out looking like
+        // one colour: a complement and an analogous neighbour of the same base
+        // are a HARMONY, which is the opposite of what this button is for. Four
+        // draws from red/yellow/green/cyan/blue/magenta with a little play
+        // either side give surfaces that are genuinely different colours.
+        //
+        // Four rather than one per surface: the tree, the panel behind it and
+        // the viewer being three unrelated colours is the effect asked for -
+        // every element having its own would be noise rather than a palette.
+        double[] party = daring
+            ? PrimaryHues.OrderBy(_ => rng.Next()).Take(4)
+                .Select(h => Wrap(h + (rng.NextDouble() * 24 - 12))).ToArray()
+            : Array.Empty<double>();
+        if (daring)
+        {
+            baseHue = party[0];
+            accentHue = party[1];
+            neighborHue = party[2];
+        }
 
         // Roughly one roll in four is a BOLD one: same rules, saturation
         // ceilings lifted. The calm band on its own read as timid - every roll
@@ -700,10 +719,14 @@ public partial class ColorSettingsWindow : Window
         // (2026-08-09). The readability floors below are what make a bolder
         // ceiling safe to sell.
         bool bold = daring || rng.NextDouble() < 0.28;
+        // The daring bands are far above the others, and that alone was not
+        // enough: a surface at 0.08 BRIGHTNESS is near-black whatever its
+        // saturation, so the tree's ground could never actually look red. The
+        // brightness moves too - see bgVal in each branch.
         double surfaceSat = light
-            ? (daring ? 0.09 + rng.NextDouble() * 0.14
+            ? (daring ? 0.22 + rng.NextDouble() * 0.34
                 : bold ? 0.05 + rng.NextDouble() * 0.11 : 0.02 + rng.NextDouble() * 0.07)
-            : (daring ? 0.11 + rng.NextDouble() * 0.20
+            : (daring ? 0.42 + rng.NextDouble() * 0.42
                 : bold ? 0.06 + rng.NextDouble() * 0.16 : 0.03 + rng.NextDouble() * 0.10);
         double accentSat = daring
             ? 0.56 + rng.NextDouble() * 0.32
@@ -722,7 +745,12 @@ public partial class ColorSettingsWindow : Window
             // than as a dark theme. Everything else on this branch is derived
             // from bgVal by fixed offsets, so the surfaces keep their
             // relationships to each other and only the ground moves down.
-            double bgVal = 0.05 + rng.NextDouble() * 0.06;
+            // The daring band sits well above the ordinary one. A dark theme
+            // still, but far enough up that a saturated hue reads as that hue
+            // rather than as black with a rumour of colour in it.
+            double bgVal = daring
+                ? 0.13 + rng.NextDouble() * 0.15
+                : 0.05 + rng.NextDouble() * 0.06;
             var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
             var hover = FromHsv(neighborHue, Math.Min(hoverCap, surfaceSat + 0.06), bgVal + 0.08, 255);
             // A step up in both saturation and brightness, so the selection box
@@ -737,13 +765,16 @@ public partial class ColorSettingsWindow : Window
             // surface" is no longer necessarily hover - the text is walked
             // against whichever of the tree's own three it reads worst on.
             var header = daring
-                ? FromHsv(neighborHue, Math.Min(satCap, surfaceSat + 0.18), bgVal + 0.06 + rng.NextDouble() * 0.16, 255)
+                ? FromHsv(party[2], Math.Min(satCap, surfaceSat + 0.10), bgVal + 0.02 + rng.NextDouble() * 0.16, 255)
                 : FromHsv(baseHue, surfaceSat, bgVal + 0.025, 255);
             var history = daring
-                ? FromHsv(accentHue, Math.Min(satCap, surfaceSat + 0.12), bgVal + 0.03 + rng.NextDouble() * 0.12, 255)
+                ? FromHsv(party[3], Math.Min(satCap, surfaceSat + 0.06), bgVal - 0.04 + rng.NextDouble() * 0.14, 255)
                 : FromHsv(baseHue, surfaceSat, bgVal + 0.015, 255);
+            // Against the BACKGROUND too now: once the ground itself carries a
+            // real colour at a real brightness, it is a surface names have to
+            // survive on, which it was not while it sat at near-black.
             var text = EnsureContrast(baseHue, 0.05 + rng.NextDouble() * 0.05, 0.76,
-                Worst(hover, history), 4.5, towardLight: true);
+                Worst(Worst(hover, history), background), 4.5, towardLight: true);
             return new RandomPalette(
                 Background: background,
                 Header: header,
@@ -753,7 +784,7 @@ public partial class ColorSettingsWindow : Window
                 // readable on it - which makes it the one surface that can take
                 // a whole other colour without costing anything.
                 Viewer: daring
-                    ? FromHsv(accentHue, Math.Min(satCap, surfaceSat + 0.22), bgVal + rng.NextDouble() * 0.14, 255)
+                    ? FromHsv(party[1], Math.Min(satCap, surfaceSat + 0.14), bgVal - 0.02 + rng.NextDouble() * 0.20, 255)
                     : background,
                 Hover: hover,
                 Selection: selection,
@@ -783,8 +814,12 @@ public partial class ColorSettingsWindow : Window
                 surfaceSat *= 0.25;
             }
 
+            // Down off pure white for a daring roll, the mirror of the dark
+            // branch coming up off black: at 0.97 a saturated hue is a tint,
+            // and a tint is what this button exists not to be.
             double bgVal = nearWhite
                 ? 0.985 + rng.NextDouble() * 0.015
+                : daring ? 0.80 + rng.NextDouble() * 0.14
                 : 0.95 + rng.NextDouble() * 0.04;
             var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
             var hover = FromHsv(neighborHue,
@@ -798,19 +833,19 @@ public partial class ColorSettingsWindow : Window
             // Same as the dark branch: a daring roll pulls the surfaces apart,
             // so the text is walked against the worst of the tree's own.
             var header = daring
-                ? FromHsv(neighborHue, Math.Min(satCap, surfaceSat + 0.20), bgVal - 0.06 - rng.NextDouble() * 0.16, 255)
+                ? FromHsv(party[2], Math.Min(satCap, surfaceSat + 0.12), bgVal - 0.02 - rng.NextDouble() * 0.14, 255)
                 : FromHsv(baseHue, surfaceSat, bgVal - 0.035, 255);
             var history = daring
-                ? FromHsv(accentHue, Math.Min(satCap, surfaceSat + 0.14), bgVal - 0.03 - rng.NextDouble() * 0.12, 255)
+                ? FromHsv(party[3], Math.Min(satCap, surfaceSat + 0.08), bgVal + 0.03 - rng.NextDouble() * 0.14, 255)
                 : FromHsv(baseHue, surfaceSat, bgVal - 0.02, 255);
             var text = EnsureContrast(baseHue, 0.10 + rng.NextDouble() * 0.10, 0.27,
-                Worst(hover, history), 4.5, towardLight: false);
+                Worst(Worst(hover, history), background), 4.5, towardLight: false);
             return new RandomPalette(
                 Background: background,
                 Header: header,
                 History: history,
                 Viewer: daring
-                    ? FromHsv(accentHue, Math.Min(satCap, surfaceSat + 0.24), bgVal - rng.NextDouble() * 0.16, 255)
+                    ? FromHsv(party[1], Math.Min(satCap, surfaceSat + 0.16), bgVal + 0.02 - rng.NextDouble() * 0.22, 255)
                     : background,
                 Hover: hover,
                 Selection: selection,
