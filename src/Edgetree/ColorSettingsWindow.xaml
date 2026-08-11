@@ -209,11 +209,26 @@
             <Grid Grid.Row="0"
                     Background="{DynamicResource DialogHeaderBackground}"
                     MouseLeftButtonDown="HeaderGrid_MouseLeftButtonDown">
-                <TextBlock Text="{x:Static services:Strings.ColorSettingsTitle}"
-                        Foreground="{DynamicResource DialogForeground}"
-                        FontSize="{DynamicResource DialogTitleTextSize}"
+                <!-- The app's own icon beside the title, the same arrangement
+                     the help window uses: these windows carry no taskbar entry
+                     and no system title bar, so without it a bare "색상 설정"
+                     floating over the desktop does not say whose it is. -->
+                <StackPanel Orientation="Horizontal"
                         VerticalAlignment="Center"
-                        Margin="{DynamicResource DialogTitleIndent}"/>
+                        Margin="{DynamicResource DialogTitleIndent}">
+                    <!-- The TITLE's size, not the tree's icon size: it stands
+                         beside a line of type rather than in a row of other
+                         icons, so what it has to match is the letters. -->
+                    <Image Source="pack://application:,,,/Resources/icon.png"
+                            Width="{DynamicResource DialogTitleTextSize}"
+                            Height="{DynamicResource DialogTitleTextSize}"
+                            Margin="0,0,7,0"
+                            RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Text="{x:Static services:Strings.ColorSettingsTitle}"
+                            Foreground="{DynamicResource DialogForeground}"
+                            FontSize="{DynamicResource DialogTitleTextSize}"
+                            VerticalAlignment="Center"/>
+                </StackPanel>
                 <Button Style="{StaticResource DialogCloseButtonStyle}"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Center"
