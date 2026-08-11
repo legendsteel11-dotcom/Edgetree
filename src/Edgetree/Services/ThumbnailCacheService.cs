@@ -144,9 +144,32 @@ public static class ThumbnailCacheService
             // draws nothing at all - the same trap the embedded-thumbnail path
             // fell into (2026-08-11).
             var buffer = new MemoryStream(reader.ReadBytes((int)(stream.Length - stream.Position)));
-            var frame = BitmapFrame.Create(buffer, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
-            frame.Freeze();
-            return frame;
+
+            // DECODED AT THE SIZE ASKED FOR, not at the size stored. An entry
+            // written for a 256px strip is still the right answer for a 128px
+            // one - that is what "cachedSize < requestedSize" above is for - but
+            // decoding it whole and shrinking afterwards materialises the big
+            // picture anyway, and its pixels are unmanaged, so the discarded
+            // copy sits in the process until something collects it. A strip of
+            // 2,402 files made roughly 470MB of exactly that (2026-08-12).
+            //
+            // Width only, so the aspect ratio is kept. A portrait thumbnail
+            // therefore comes back a little taller than the ask rather than
+            // exactly within it, which is a rounding error next to decoding it
+            // at full size - and the caller trims anything still over.
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.StreamSource = buffer;
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.CreateOptions = BitmapCreateOptions.None;
+            if (cachedSize > requestedSize)
+            {
+                image.DecodePixelWidth = requestedSize;
+            }
+
+            image.EndInit();
+            image.Freeze();
+            return image;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException
                                      or EndOfStreamException or NotSupportedException

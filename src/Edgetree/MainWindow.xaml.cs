@@ -20318,7 +20318,46 @@ public partial class MainWindow : Window
     // One step above the tallest cell, so no size the grip can reach is ever
     // upscaled - and a step the shell actually keeps, rather than a number
     // between two of them.
-    private const int FilmstripFetchSize = 256;
+    // ASKED FOR AT THE SIZE THE STRIP IS ACTUALLY SHOWING, snapped to a step
+    // the shell keeps so nothing is ever upscaled.
+    //
+    // It used to be a flat 256 - the step above the TALLEST the strip can be
+    // dragged to - so that a height drag never had to re-fetch. That is a fine
+    // trade for one folder and a terrible one for a large one: at the default
+    // 64px cell a 256px thumbnail is four times the width, SIXTEEN times the
+    // pixels, and none of them are drawn. 2,400 files at 256 is 630MB of
+    // memory to show 86MB of picture (2026-08-12, after a strip of 2,400 took
+    // the process past 1.7GB and the size was rightly called unreasonable).
+    //
+    // The cost that buys it back is a re-fetch when a height drag crosses a
+    // step, which is rare and cheap - the app's own cache answers in about a
+    // millisecond, so the strip refills without touching the files again.
+    // Steps of the app's own choosing, not the shell's. Snapping to what the
+    // shell stores (32/48/96/256) made sense while its answer was kept as it
+    // came; now that the picture is brought down to the asked size on arrival,
+    // any target works - and the shell's list has a canyon in it. A cell only
+    // 73px tall needs 97 across, which under those steps jumped straight to
+    // 256: four times the pixels for one pixel of growth, and most useful strip
+    // heights land in that gap. Measured as 318MB of thumbnails where 63MB
+    // would have drawn the same strip (2026-08-12).
+    private static readonly int[] FilmstripFetchSteps = { 32, 48, 64, 96, 128, 160, 192, 224, 256 };
+
+    private int FilmstripFetchSize
+    {
+        get
+        {
+            double needed = FilmstripCellHeight * FilmstripAspect;
+            foreach (int step in FilmstripFetchSteps)
+            {
+                if (step >= needed)
+                {
+                    return step;
+                }
+            }
+
+            return FilmstripFetchSteps[^1];
+        }
+    }
 
     private double FilmstripCellHeight => Math.Clamp(
         _settings.ViewerFilmstripCellHeight, FilmstripMinCellHeight, FilmstripMaxCellHeight);
@@ -20376,6 +20415,7 @@ public partial class MainWindow : Window
             // for them go too, since they are asking for a folder nobody is
             // looking at any more and would only compete with this one.
             ClearFilmstripCells();
+            _filmstripFetchStep = FilmstripFetchSize;
             foreach (var item in items)
             {
                 _filmstripCells.Add(new FilmstripCell(item, IsViewerPlayable(item.FullPath)));
@@ -20946,7 +20986,19 @@ public partial class MainWindow : Window
     // away the file is (see ShellThumbnailService). The second visit to a place
     // is a millisecond read, not the 869ms the cold NAS pass measured - and that
     // cache holds ~20,000 thumbnails, so a folder of this size fits whole.
-    private const int FilmstripRetainReach = 1000;
+    // RAISED FROM 1000 TO 2500 (2026-08-12). At 1000 a folder of 2,400 was
+    // permanently half in and half out of the window, so moving along the strip
+    // and back re-fetched what had just been dropped - and the strip announced
+    // it every time, which reads as the app redoing work nobody asked for. The
+    // ceiling was written to bound memory before the release path worked; now
+    // that letting go actually returns the pixels, an unpredictable refill is
+    // the worse of the two costs. A folder of this size never trims at all now.
+    //
+    // This is a DIAL, and the trade is stated plainly: at the ceiling the strip
+    // can hold ~625MB of thumbnails, against re-reading them whenever the eye
+    // moves more than a screen. Lower it if a folder appears where the memory
+    // matters more than the smoothness.
+    private const int FilmstripRetainReach = 2500;
 
     // Walks only what is OUTSIDE the window, so the scan costs nothing on the
     // folders where there is nothing to drop. The visible cells are a few dozen
@@ -21423,7 +21475,32 @@ public partial class MainWindow : Window
     // covers the whole range (see FilmstripFetchSize), so the drag costs no
     // disk at all.
     private void ViewerFilmstripThumb_DragCompleted(object sender, DragCompletedEventArgs e)
-        => _settingsService.Save(_settings);
+    {
+        _settingsService.Save(_settings);
+
+        // A drag that crossed a fetch step leaves every thumbnail at the wrong
+        // size - too small to draw cleanly if the strip grew, needlessly large
+        // if it shrank. Handed back and asked for again at the new step; the
+        // app's own cache makes that a refill rather than a re-read.
+        if (FilmstripFetchSize == _filmstripFetchStep)
+        {
+            return;
+        }
+
+        _filmstripFetchStep = FilmstripFetchSize;
+        foreach (var cell in _filmstripCells)
+        {
+            cell.Thumbnail = null;
+            cell.Requested = false;
+            cell.AskedAhead = false;
+        }
+
+        ScheduleFilmstripThumbnails();
+    }
+
+    // The step the cells currently hold, so a drag that stays inside one costs
+    // nothing at all.
+    private int _filmstripFetchStep;
 
     private void ViewerFilmstripChip_Click(object sender, RoutedEventArgs e)
     {

@@ -419,6 +419,17 @@ public static class ShellThumbnailService
                 }
             }
 
+            // BROUGHT DOWN TO THE SIZE ASKED FOR HERE, where every source
+            // meets. Doing it inside the shell call covered a third of the
+            // answers and left the number unmoved: most of a filmstrip comes
+            // back from this app's OWN cache or from a JPEG's embedded
+            // thumbnail, neither of which passes through Extract, and both of
+            // which hand over whatever size they happen to hold - measured
+            // 256x193 against a 96px request, for 2,402 files, twice over
+            // (2026-08-12). A caller that asks for 96 should be given 96
+            // whatever answered it.
+            thumbnail = ShrinkToAsked(thumbnail, pixelSize);
+
             Application.Current?.Dispatcher.BeginInvoke(() => onCompleted(thumbnail, pixelWidth, pixelHeight));
         }
         finally
@@ -454,7 +465,7 @@ public static class ShellThumbnailService
                 return null;
             }
 
-            return ToBitmapSource(hBitmap);
+            return ShrinkToAsked(ToBitmapSource(hBitmap), pixelSize);
         }
         catch (Exception e) when (e is COMException or ArgumentException or InvalidCastException)
         {
@@ -470,6 +481,42 @@ public static class ShellThumbnailService
             {
                 Marshal.ReleaseComObject(factory);
             }
+        }
+    }
+
+    // BIGGERSIZEOK means the shell may answer with whatever it already has, and
+    // it does: a 96px request came back 256x193, because 256 is the size its
+    // own cache keeps (measured 2026-08-12). Receiving that is exactly what the
+    // flag is for - it is the fast answer, with no rescale at the shell's end -
+    // but KEEPING it is a different question. A filmstrip of 2,400 frames held
+    // 600MB of 256px pictures to draw 86MB of 96px ones.
+    //
+    // So the picture is brought down to the size that was asked for, once, here
+    // where it arrives. The pixels are COPIED rather than wrapped:
+    // TransformedBitmap is a lazy view that keeps its source alive, so wrapping
+    // would hold both the big one and the small one and save nothing at all.
+    private static ImageSource? ShrinkToAsked(ImageSource? source, int pixelSize)
+    {
+        // Only a real pixel buffer can be shrunk, and only one that is bigger
+        // than the ask needs to be.
+        if (source is not BitmapSource image ||
+            (image.PixelWidth <= pixelSize && image.PixelHeight <= pixelSize))
+        {
+            return source;
+        }
+
+        try
+        {
+            double factor = pixelSize / (double)Math.Max(image.PixelWidth, image.PixelHeight);
+            var scaled = new TransformedBitmap(image, new ScaleTransform(factor, factor));
+            var copy = new WriteableBitmap(scaled);
+            copy.Freeze();
+            return copy;
+        }
+        catch (Exception e) when (e is COMException or ArgumentException or InvalidOperationException)
+        {
+            // Better the oversized picture than none.
+            return image;
         }
     }
 
