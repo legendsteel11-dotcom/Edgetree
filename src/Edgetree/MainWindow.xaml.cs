@@ -15289,7 +15289,19 @@ public partial class MainWindow : Window
         {
             _pendingViewerPath = null;
             StopViewerGif();
-            StopViewerVideo();
+            // AND NOT THE SOUND - the same skip the file branch below already
+            // makes (2026-08-11). This is the path an empty panel takes, and
+            // opening the search view with nothing in the box takes it: the
+            // results list has no top row to hand over, so the panel is asked to
+            // show nothing at all and the track was going down with it.
+            //
+            // The transport stays up with it, which is worth having rather than
+            // merely harmless: the file name moves to the 지금 재생 중 line, so
+            // there is still somewhere to pause from without leaving the search.
+            if (!ViewerBackgroundPlaying)
+            {
+                StopViewerVideo();
+            }
             ViewerPlayOverlay.Visibility = Visibility.Collapsed;
             ViewerImage.Source = null;
             _viewerShowingDecodedImage = false;
@@ -15297,6 +15309,9 @@ public partial class MainWindow : Window
             ViewerFileName.Text = string.Empty;
             SetViewerCaption(string.Empty);
             ClearViewerZoom();
+            // After _pendingViewerPath is cleared, or the line would still
+            // believe the transport is holding the panel's own file.
+            UpdateViewerNowPlaying();
             UpdateViewerCarousel();
             return;
         }
@@ -20710,7 +20725,14 @@ public partial class MainWindow : Window
 
     private void StartViewerFlick(MouseButtonEventArgs e)
     {
-        if (_viewerVideoPath is not null || !_viewerShowingDecodedImage)
+        // ViewerMediaIsSelection, not "anything is loaded" (2026-08-11). The
+        // guard exists so a drag across a FILM does not page the folder out from
+        // under it - but written as a null check it also refused the gesture
+        // whenever sound was running somewhere else, which is precisely when the
+        // thing under the pointer is an ordinary picture with nothing to do with
+        // the track. Same correction the click-to-pause branch above already
+        // carries; this path was missed at the time.
+        if (ViewerMediaIsSelection || !_viewerShowingDecodedImage)
         {
             return;
         }
