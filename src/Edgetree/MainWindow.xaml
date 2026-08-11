@@ -1342,6 +1342,36 @@
                     Click="FolderSortFollowGlobalMenuItem_Click"/>
         </ContextMenu>
 
+        <!-- What happens when a file finishes playing. Four states rather than
+             a switch plus a mode, because they are mutually exclusive answers
+             to one question and a checkmark can say which one is in force.
+
+             On the BUTTON rather than on the picture: right-clicking the
+             picture already opens the file's own menu, and this is a property
+             of the transport, not of the file. -->
+        <ContextMenu x:Key="ViewerRepeatContextMenu"
+                Style="{StaticResource DarkContextMenuStyle}"
+                Opened="ViewerRepeatContextMenu_Opened"
+                Closed="AnyMenu_Closed"
+                PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
+            <MenuItem Header="{x:Static services:Strings.ViewerRepeatOff}"
+                    IsCheckable="True"
+                    Tag="off"
+                    Click="ViewerRepeatMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.ViewerRepeatAll}"
+                    IsCheckable="True"
+                    Tag="all"
+                    Click="ViewerRepeatMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.ViewerRepeatOne}"
+                    IsCheckable="True"
+                    Tag="one"
+                    Click="ViewerRepeatMenuItem_Click"/>
+            <MenuItem Header="{x:Static services:Strings.ViewerRepeatShuffle}"
+                    IsCheckable="True"
+                    Tag="shuffle"
+                    Click="ViewerRepeatMenuItem_Click"/>
+        </ContextMenu>
+
         <!-- The search results' own sort menu. Deliberately NOT the folder menu
              above: these are different states over a different list - a flat
              result set has no 유형/크기 to sort by, and it has 폴더 그룹 which no
@@ -6080,8 +6110,9 @@
                                         <Image Source="{Binding Thumbnail}"
                                                 Stretch="Uniform"
                                                 RenderOptions.BitmapScalingMode="HighQuality"/>
-                                        <!-- A film's thumbnail is just a frame,
-                                             so nothing else in the strip would
+                                        <!-- A film's thumbnail is just a frame
+                                             and a track's is its album art, so
+                                             nothing else in the strip would
                                              say which ones play. The panel's own
                                              play button in miniature - same
                                              light plate, same dark mark - in the
@@ -6112,7 +6143,7 @@
                                                 <Style TargetType="Border">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsVideo}" Value="True">
+                                                        <DataTrigger Binding="{Binding IsPlayable}" Value="True">
                                                             <Setter Property="Visibility" Value="Visible"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
@@ -6322,6 +6353,53 @@
                              row of chips under a caption is also exactly what
                              the footer filter strip already looks like, which
                              is where the user pointed. -->
+                        <!-- A SELECTED FOLDER'S OWN TWO CONTROLS (2026-08-11).
+                             In the row the zoom chips use, because a folder has
+                             nothing to zoom and the row is otherwise empty for
+                             it - and one press hands the panel to a FILE, at
+                             which point this row is replaced by that file's
+                             transport and never seen again until the next
+                             folder.
+
+                             Only two, and only for a folder holding sound or
+                             film. Everything else about playing a folder
+                             already exists: the press picks the first (or a
+                             random) file and 이어서 재생 carries it from there,
+                             so there is no queue, no playlist and no second
+                             idea of what is playing. -->
+                        <StackPanel x:Name="ViewerFolderPlayBar"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Visibility="Collapsed"
+                                Margin="{DynamicResource ViewerCaptionChipRowGap}">
+                            <!-- The transport's own play_arrow, at the same
+                                 size: this is the same verb one level up. -->
+                            <Button x:Name="ViewerFolderPlayButton"
+                                    Style="{StaticResource FooterActionGlyphChipStyle}"
+                                    Click="ViewerFolderPlay_Click"
+                                    ToolTip="{x:Static services:Strings.ViewerFolderPlayAll}">
+                                <Path Data="M336-216v-528l408 264-408 264Zm73-265Zm-1 133 204-132-204-132v264Z"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
+                            <!-- The same shuffle mark the repeat switch shows,
+                                 so the button and the mode it turns on are
+                                 recognisably the same thing. -->
+                            <Button x:Name="ViewerFolderShuffleButton"
+                                    Style="{StaticResource FooterActionGlyphChipStyle}"
+                                    Click="ViewerFolderShuffle_Click"
+                                    ToolTip="{x:Static services:Strings.ViewerRepeatShuffle}">
+                                <Path Data="M576-192v-72h69L531-378l51-51 114 114v-69h72v192H576Zm-333 0-51-51 453-453h-69v-72h192v192h-72v-69L243-192Zm135-339L192-717l51-51 186 186-51 51Z"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
+                        </StackPanel>
                         <StackPanel x:Name="ViewerZoomBar"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
@@ -6472,6 +6550,59 @@
                                      characters, but a Path assigned from code
                                      would put the artwork in the code-behind
                                      and out of reach of the row's own sizing. -->
+                                <!-- 이어서 재생, and it sits LEFT of play because
+                                     that is where the user put it: it decides
+                                     what the play button's press turns into
+                                     once the file ends, so it reads left to
+                                     right as a condition on the transport
+                                     rather than as another transport control.
+
+                                     A SWITCH, not an action - the outlined box
+                                     belongs to the buttons that do something
+                                     when pressed, and this one only changes
+                                     what the row will do later. Left click
+                                     turns it on and off; the mode is the
+                                     right-click menu, which is where a choice
+                                     between four things belongs.
+
+                                     Material Symbols "repeat", "repeat_one" and
+                                     "shuffle" (2026-08-11). No
+                                     "M0-960H960M0 0H960" tail on these three,
+                                     unlike the header's glyphs: nothing else in
+                                     this transport row carries it either, and a
+                                     mark padded to the full box beside marks
+                                     fitted to their own ink would be the one
+                                     that reads small. -->
+                                <ToggleButton x:Name="ViewerRepeatChip"
+                                        Style="{StaticResource FooterFilterGlyphChipStyle}"
+                                        Click="ViewerRepeatChip_Click"
+                                        ContextMenu="{StaticResource ViewerRepeatContextMenu}">
+                                    <Grid>
+                                        <Path x:Name="ViewerRepeatAllIcon"
+                                                Data="M288-96 144-240l144-144 51 51-57 57h414v-156h72v228H282l57 57-51 51Zm-96-432v-228h486l-57-57 51-51 144 144-144 144-51-51 57-57H264v156h-72Z"
+                                                Stretch="Uniform"
+                                                Width="{DynamicResource ViewerChipIconSize}"
+                                                Height="{DynamicResource ViewerChipIconSize}"
+                                                Fill="{Binding Foreground,
+                                                    RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                                        <Path x:Name="ViewerRepeatOneIcon"
+                                                Data="M480-384v-144h-48v-48h96v192h-48ZM288-96 144-240l144-144 51 51-57 57h414v-156h72v228H282l57 57-51 51Zm-96-432v-228h486l-57-57 51-51 144 144-144 144-51-51 57-57H264v156h-72Z"
+                                                Visibility="Collapsed"
+                                                Stretch="Uniform"
+                                                Width="{DynamicResource ViewerChipIconSize}"
+                                                Height="{DynamicResource ViewerChipIconSize}"
+                                                Fill="{Binding Foreground,
+                                                    RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                                        <Path x:Name="ViewerRepeatShuffleIcon"
+                                                Data="M576-192v-72h69L531-378l51-51 114 114v-69h72v192H576Zm-333 0-51-51 453-453h-69v-72h192v192h-72v-69L243-192Zm135-339L192-717l51-51 186 186-51 51Z"
+                                                Visibility="Collapsed"
+                                                Stretch="Uniform"
+                                                Width="{DynamicResource ViewerChipIconSize}"
+                                                Height="{DynamicResource ViewerChipIconSize}"
+                                                Fill="{Binding Foreground,
+                                                    RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                                    </Grid>
+                                </ToggleButton>
                                 <Button x:Name="ViewerMediaPlayPause"
                                         Style="{StaticResource FooterActionGlyphChipStyle}"
                                         Click="ViewerMediaPlayPause_Click">

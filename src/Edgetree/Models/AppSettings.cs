@@ -100,6 +100,21 @@ public class AppSettings
     public bool ViewerSubtitles { get; set; } = true;
     public double ViewerSubtitleFontSize { get; set; } = 16;
 
+    // What happens when a file finishes playing: "off" (stay on it, which is
+    // what the panel always did), "all" (the next one in the folder), "one"
+    // (the same file again) or "shuffle".
+    //
+    // A STRING rather than an enum, like every other choice in this file: the
+    // settings are meant to survive being opened in an editor, and a number
+    // whose meaning lives in a C# file is not a setting anyone can read. An
+    // unknown value reads as "off", so a typo costs the feature and not the
+    // launch.
+    //
+    // Off by default. Music wants this and a folder of films does not, and the
+    // panel is not a player anyone opened on purpose - it is what a selected
+    // file turned into.
+    public string ViewerRepeat { get; set; } = "off";
+
     // Collapsed to a bare sliver at the screen edge that peeks open on
     // mouse-over - see MainWindow.xaml.cs's EnterAutoHide/ExitAutoHide.
     // Entered by a single click on the app icon while docked and expanded.

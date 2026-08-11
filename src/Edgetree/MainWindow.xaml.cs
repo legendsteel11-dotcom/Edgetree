@@ -14889,6 +14889,30 @@ public partial class MainWindow : Window
         {
             ShowViewerIcon(path);
         }
+
+        // The other half of 이어서 재생 (see ContinueViewerPlayback). The
+        // advance is a selection change, and this is where the panel commits to
+        // the file it landed on - so pressing play here is the same press the
+        // hand would have made, through the same handler.
+        //
+        // Deliberately not waiting for the picture: the album art is a shell
+        // call that may take a moment on a share, and a gap of silence between
+        // two tracks is the thing this feature exists to remove. The art lands
+        // behind the sound a moment later.
+        if (_viewerAutoPlayPath is { } queued)
+        {
+            // One shot, and cleared even when the file that arrived is NOT the
+            // one it was queued for. A flag left standing would start playing
+            // some file chosen by hand later, with nothing to explain it.
+            _viewerAutoPlayPath = null;
+            if (string.Equals(queued, path, StringComparison.OrdinalIgnoreCase) && IsViewerPlayable(path))
+            {
+                // From the top, not from wherever this file was last left -
+                // see the flag's own note in ViewerPlayOverlay_Click.
+                _viewerAutoStarted = true;
+                ViewerPlayOverlay_Click(this, new RoutedEventArgs());
+            }
+        }
     }
 
     // Decode at the size of the slot it lands in, not full size: an 8K
@@ -15728,6 +15752,12 @@ public partial class MainWindow : Window
     private static bool IsViewerPlayable(string path)
         => IsViewerVideo(path) || IsViewerAudio(path);
 
+    // "The transport already has this file" - asked by the two thumbnail
+    // callbacks, which arrive AFTER 이어서 재생 has started the next track and
+    // would otherwise draw the play button back over it.
+    private bool IsViewerMediaLoaded(string path)
+        => string.Equals(_viewerVideoPath, path, StringComparison.OrdinalIgnoreCase);
+
     // "The panel can show this" - pictures and films together. Films arrived in
     // this answer on 2026-08-10 with the filmstrip, and two places were still
     // asking the picture-only question afterwards: the row menu's thumbnail
@@ -15749,6 +15779,11 @@ public partial class MainWindow : Window
     // The file currently handed to MediaElement - null whenever nothing is
     // loaded, which is also the app's promise that the file is not held open.
     private string? _viewerVideoPath;
+    // The last file MediaOpened actually reported on - kept apart from the one
+    // above because it must OUTLIVE it: it is read after a failure, to ask
+    // whether the file that just failed had ever been open. Never cleared, and
+    // that is the point; a stale value from another file simply does not match.
+    private string? _viewerMediaOpenedPath;
     private bool _viewerVideoPlaying;
     private bool _viewerMediaSeeking;
     // Where a seek was aimed, held until the element reports arriving there -
@@ -15903,6 +15938,26 @@ public partial class MainWindow : Window
             return;
         }
 
+        // ALREADY LOADED MEANS RESUME, not open again. The button now appears
+        // whenever playback is paused (see SetViewerVideoPlaying), and the rest
+        // of this method opens the file from scratch - which would throw away
+        // the place it was paused at and re-read the file to arrive back where
+        // it already was.
+        if (IsViewerMediaLoaded(path))
+        {
+            ViewerMediaPlayPause_Click(this, new RoutedEventArgs());
+            return;
+        }
+
+        // Where it left off LAST time - which applies to a FILM and to nothing
+        // else (2026-08-11). Two ways it does not apply here: 이어서 재생
+        // handing over the next file is not someone returning to one, and a
+        // track has no middle worth returning to at all. Read and cleared in
+        // one breath so a play that returns early below cannot leave the flag
+        // set for the next one.
+        bool fromStart = _viewerAutoStarted || IsViewerAudio(path);
+        _viewerAutoStarted = false;
+
         // SOUND KEEPS THE PICTURE IT ALREADY HAS: a film replaces its still
         // frame with the moving one, a track has no frame, so the album art
         // stays where it is.
@@ -15966,9 +16021,13 @@ public partial class MainWindow : Window
         // apply, so they take turns rather than stack.
         ViewerZoomBar.Visibility = Visibility.Collapsed;
         ViewerMediaBar.Visibility = Visibility.Visible;
+        // The row is built once and shown many times, so the switch's state is
+        // put on it here rather than at startup - it has to be right every time
+        // the strip appears, not once.
+        UpdateViewerRepeatChip();
         // Picked up here and applied in MediaOpened: Position means nothing
         // until the engine knows what it has opened.
-        _pendingResumeSeconds = FindVideoMarks(path)?.Resume ?? 0;
+        _pendingResumeSeconds = fromStart ? 0 : FindVideoMarks(path)?.Resume ?? 0;
         LoadSubtitlesFor(path);
         ApplyViewerHdrToneMap();
         ViewerMedia.Play();
@@ -16023,6 +16082,24 @@ public partial class MainWindow : Window
     private void TickViewerOpeningWatch()
     {
         if (!_viewerMediaOpening)
+        {
+            StopViewerOpeningWatch();
+            return;
+        }
+
+        // MEDIAOPENED IS NOT GUARANTEED, and the watch cannot be hung on it
+        // alone (2026-08-11). Pressing play again on the file the element
+        // already has open raises no event at all - the engine has nothing to
+        // open - so nothing stopped this timer and a track that was audibly
+        // playing had "여는 중… 조금 오래 걸리고 있습니다" written over it five
+        // seconds in. Visible on a track that ran to its end and was played
+        // again, where the log's second block simply has no `opened` line.
+        //
+        // The clock moving is proof that does not depend on an event, and it
+        // cannot be inherited from the previous file the way NaturalDuration
+        // can: a Source that has not opened reports zero.
+        if (ViewerMedia.Position > TimeSpan.Zero
+            || string.Equals(_viewerMediaOpenedPath, _viewerVideoPath, StringComparison.OrdinalIgnoreCase))
         {
             StopViewerOpeningWatch();
             return;
@@ -16217,6 +16294,9 @@ public partial class MainWindow : Window
         // note below appends to it - appending to "여는 중…" would keep the
         // status on screen with a fact stuck on the end of it.
         StopViewerOpeningWatch();
+        // Which FILE the engine actually got open, which is a different question
+        // from NaturalDuration having a value - see the failure handler.
+        _viewerMediaOpenedPath = _viewerVideoPath;
 
         // How long the engine took to open the file, and what it found -
         // whether the run that stutters differs here from the run that
@@ -16303,6 +16383,237 @@ public partial class MainWindow : Window
         UpdateViewerMediaReadout();
     }
 
+    // ----- 이어서 재생 ------------------------------------------------------
+    //
+    // A track ends and nothing happens, so every next song is a click. That is
+    // fine for a film and wrong for music, and the panel had one answer for
+    // both (2026-08-11).
+    //
+    // WHAT IT WALKS is the set the counter and the filmstrip already walk -
+    // GetViewerCarouselItems, so this cannot grow a second idea of what "the
+    // next one" means, and it follows the search results for free when they are
+    // driving the panel. NO PLAYLIST IS BUILT. Nothing is stored, nothing is
+    // ordered, nothing survives the folder changing; the folder in front of you
+    // IS the list, which is the only version of this that belongs in a sidebar.
+    //
+    // SAME KIND ONLY: a track goes to the next TRACK and a film to the next
+    // FILM. The set holds pictures and both kinds of playable file, and a mixed
+    // folder that answered a finished song with a 4K film would be a surprise
+    // that costs real bandwidth to undo.
+    //
+    // THE TREE MOVES with every advance, because selection is how this panel is
+    // told what to show - and with 랜덤 it moves somewhere unpredictable. That
+    // is the cost of the feature working through one path instead of two, and
+    // it is why the whole thing is OFF by default.
+    private enum ViewerRepeatMode
+    {
+        Off,
+        All,
+        One,
+        Shuffle
+    }
+
+    private ViewerRepeatMode ViewerRepeat => _settings.ViewerRepeat switch
+    {
+        "all" => ViewerRepeatMode.All,
+        "one" => ViewerRepeatMode.One,
+        "shuffle" => ViewerRepeatMode.Shuffle,
+        _ => ViewerRepeatMode.Off
+    };
+
+    private static string ViewerRepeatKey(ViewerRepeatMode mode) => mode switch
+    {
+        ViewerRepeatMode.All => "all",
+        ViewerRepeatMode.One => "one",
+        ViewerRepeatMode.Shuffle => "shuffle",
+        _ => "off"
+    };
+
+    // What the switch turns back ON, so that off → on returns to the mode that
+    // was in force rather than always to 폴더 반복. Session-only: the setting
+    // itself remembers the last mode the app was left in.
+    private ViewerRepeatMode _viewerRepeatLast = ViewerRepeatMode.All;
+
+    // True for exactly one press of the play button, and only when the app made
+    // it: what it buys is that the file starts at zero. See the read in
+    // ViewerPlayOverlay_Click.
+    private bool _viewerAutoStarted;
+
+    // The file the advance is waiting for, handed across the selection change.
+    // A path rather than a flag, so the play that arrives is checked against the
+    // file it was meant for - the preview is debounced and a fast hand can put
+    // a different file in front of it first.
+    private string? _viewerAutoPlayPath;
+
+    // 랜덤 draws from a bag rather than rolling a die per track: a plain random
+    // pick repeats itself often enough that it reads as broken, and the folder
+    // running out is a better moment to reshuffle than any timer.
+    private readonly HashSet<string> _viewerShuffleDone = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Random _viewerShuffle = new();
+
+    private bool ContinueViewerPlayback()
+    {
+        if (ViewerRepeat is ViewerRepeatMode.Off || _viewerVideoPath is not { } current)
+        {
+            return false;
+        }
+
+        if (ViewerRepeat is ViewerRepeatMode.One)
+        {
+            // Straight back to the top of the SAME file, with no selection
+            // change at all: nothing about the panel is different, so nothing
+            // needs reloading and the album art on screen never blinks.
+            ViewerMedia.Position = TimeSpan.Zero;
+            SetViewerMediaSliderValue(0);
+            ViewerMedia.Play();
+            SetViewerVideoPlaying(true);
+            VideoLog("repeat one");
+            return true;
+        }
+
+        if (NextViewerPlaybackItem(current) is not { } next)
+        {
+            return false;
+        }
+
+        _viewerAutoPlayPath = next.FullPath;
+        // The carousel's own move, so the reveal past 더 보기 and the search
+        // list's separate path both come along without being written twice.
+        MoveViewerTo(next);
+        return true;
+    }
+
+    private FileSystemItem? NextViewerPlaybackItem(string current)
+    {
+        if (ViewerItem is not { } shown)
+        {
+            return null;
+        }
+
+        bool audio = IsViewerAudio(current);
+        var kin = GetViewerCarouselItems(shown)
+            .Where(i => IsViewerPlayable(i.FullPath) && IsViewerAudio(i.FullPath) == audio)
+            .ToList();
+        // One file is not a folder to continue through. It falls back to
+        // stopping rather than quietly behaving as 한 곡 반복, which is a
+        // different setting and is one click away.
+        if (kin.Count < 2)
+        {
+            return null;
+        }
+
+        int index = kin.FindIndex(i => string.Equals(i.FullPath, current, StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+        {
+            return null;
+        }
+
+        if (ViewerRepeat is ViewerRepeatMode.All)
+        {
+            // Wraps, where the carousel chevrons deliberately do not: a chevron
+            // is a step someone takes and stopping at the end tells them where
+            // they are, while this is 폴더 반복 and stopping at the end would be
+            // the one thing it promises not to do.
+            return kin[(index + 1) % kin.Count];
+        }
+
+        _viewerShuffleDone.Add(current);
+        var left = kin.Where(i => !_viewerShuffleDone.Contains(i.FullPath)).ToList();
+        if (left.Count == 0)
+        {
+            // Round over. The file just played stays marked so the reshuffle
+            // cannot hand back the same track twice in a row, which is the one
+            // repeat that always gets noticed.
+            _viewerShuffleDone.Clear();
+            _viewerShuffleDone.Add(current);
+            left = kin.Where(i => !_viewerShuffleDone.Contains(i.FullPath)).ToList();
+        }
+
+        return left.Count == 0 ? null : left[_viewerShuffle.Next(left.Count)];
+    }
+
+    private void ViewerRepeatChip_Click(object sender, RoutedEventArgs e)
+    {
+        SetViewerRepeat(ViewerRepeat is ViewerRepeatMode.Off ? _viewerRepeatLast : ViewerRepeatMode.Off);
+    }
+
+    private void ViewerRepeatMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { Tag: string tag })
+        {
+            SetViewerRepeat(tag switch
+            {
+                "all" => ViewerRepeatMode.All,
+                "one" => ViewerRepeatMode.One,
+                "shuffle" => ViewerRepeatMode.Shuffle,
+                _ => ViewerRepeatMode.Off
+            });
+        }
+    }
+
+    private void SetViewerRepeat(ViewerRepeatMode mode)
+    {
+        if (mode is not ViewerRepeatMode.Off)
+        {
+            _viewerRepeatLast = mode;
+        }
+
+        _settings.ViewerRepeat = ViewerRepeatKey(mode);
+        _settingsService.Save(_settings);
+        // A new order means a new round - otherwise the bag from the last one
+        // would decide which tracks the first few draws can even reach.
+        _viewerShuffleDone.Clear();
+        UpdateViewerRepeatChip();
+    }
+
+    private void ViewerRepeatContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        AnyMenu_Opened(sender, e);
+
+        if (sender is not ContextMenu menu)
+        {
+            return;
+        }
+
+        // By Tag, never by position - addressing a menu by index has broken two
+        // menus in this app already.
+        string current = ViewerRepeatKey(ViewerRepeat);
+        foreach (var item in menu.Items.OfType<MenuItem>())
+        {
+            item.IsChecked = item.Tag is string tag &&
+                string.Equals(tag, current, StringComparison.Ordinal);
+        }
+    }
+
+    private void UpdateViewerRepeatChip()
+    {
+        var mode = ViewerRepeat;
+        ViewerRepeatChip.IsChecked = mode is not ViewerRepeatMode.Off;
+        // The mark says WHICH of the three, so the switch does not need a
+        // second control beside it to be readable. Off keeps the 폴더 반복 mark
+        // because an unchecked switch already says it is off, and swapping the
+        // shape as well would make "off" look like a fourth mode.
+        ViewerRepeatAllIcon.Visibility = mode is ViewerRepeatMode.One or ViewerRepeatMode.Shuffle
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        ViewerRepeatOneIcon.Visibility = mode is ViewerRepeatMode.One
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ViewerRepeatShuffleIcon.Visibility = mode is ViewerRepeatMode.Shuffle
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        // The mode it is in, then where the other three are. A switch says on or
+        // off by itself, but nothing about it says a menu is behind it.
+        string name = mode switch
+        {
+            ViewerRepeatMode.All => Strings.ViewerRepeatAll,
+            ViewerRepeatMode.One => Strings.ViewerRepeatOne,
+            ViewerRepeatMode.Shuffle => Strings.ViewerRepeatShuffle,
+            _ => Strings.ViewerRepeatOff
+        };
+        ViewerRepeatChip.ToolTip = $"{name}  ·  {Strings.ViewerRepeatHint}";
+    }
+
     // Set when the opened video turned out to carry no playable sound - see
     // ViewerMedia_MediaOpened. Cleared by StopViewerVideo along with the rest.
     private bool _viewerVideoHasNoAudio;
@@ -16315,6 +16626,14 @@ public partial class MainWindow : Window
 
     private void ViewerMedia_MediaEnded(object sender, RoutedEventArgs e)
     {
+        // Before the file is put back to its first frame, because carrying on
+        // is a different ending: it hands the panel to another file and the
+        // resting state below would then belong to the wrong one.
+        if (ContinueViewerPlayback())
+        {
+            return;
+        }
+
         // Back to the first frame, paused - a preview that vanished at the
         // end would leave the panel empty with no way to tell what it had
         // been showing.
@@ -16357,8 +16676,21 @@ public partial class MainWindow : Window
         // opened is a CODEC answer, and a file that played for a while and then
         // stopped is not - telling someone the format is unsupported after
         // twenty seconds of it playing sends them looking for a codec they
-        // already have. MediaOpened is what tells the two apart.
-        bool wasPlaying = ViewerMedia.NaturalDuration.HasTimeSpan;
+        // already have.
+        //
+        // NaturalDuration used to be the test and it was the WRONG ONE: it is
+        // not cleared when a new Source is assigned, so a file that failed to
+        // open at all still read as "was playing" on the strength of the
+        // PREVIOUS film's duration. An AV1 .mkv - which this engine cannot open
+        // and which raised no MediaOpened at all - was told it had been
+        // interrupted and offered "다시 누르면 이어서", after playing nothing
+        // (2026-08-11, and both AV1 attempts in the log look the same).
+        //
+        // The question is whether THIS path was ever opened, so that is what is
+        // recorded and compared. Not a bool: it has to survive the next Source
+        // being set, or it would have to be cleared exactly where the stale
+        // duration already fails.
+        bool wasPlaying = string.Equals(_viewerMediaOpenedPath, path, StringComparison.OrdinalIgnoreCase);
         // The wait is over, whichever way it went - and the message below is
         // the one that should be left standing.
         StopViewerOpeningWatch();
@@ -17158,6 +17490,16 @@ public partial class MainWindow : Window
         ViewerMediaPauseIcon.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
         ViewerMediaPlayPause.ToolTip = playing ? Strings.ViewerPause : Strings.ViewerPlay;
 
+        // THE BUTTON ON THE PICTURE COMES BACK WHEN IT IS PAUSED (2026-08-11).
+        // It used to return only at the end of a file, so clicking album art to
+        // stop the music left the art with nothing on it - and the one control
+        // that had been offering to start it was the thing that disappeared.
+        // Paused IS the state that button belongs to; the transport's own
+        // play/pause simply says it a second time, in a smaller place.
+        ViewerPlayOverlay.Visibility = !playing && _viewerVideoPath is not null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
         // The readout ticks only while something is moving - four times a
         // second, two property reads and a string. Nothing runs while paused,
         // stopped, or with no video loaded at all.
@@ -17316,7 +17658,15 @@ public partial class MainWindow : Window
 
         double seconds = ViewerMedia.Position.TotalSeconds;
         double duration = ViewerMedia.NaturalDuration.TimeSpan.TotalSeconds;
-        double resume = seconds >= MinResumeSeconds && seconds <= duration - ResumeEndGuardSeconds
+        // SOUND DOES NOT KEEP A PLACE (2026-08-11). Resume was built for a
+        // film, where leaving in the middle means coming back to the middle; a
+        // song is short enough that the middle is nowhere anyone wants to
+        // start, and being dropped there is a surprise rather than a
+        // convenience. Written as zero rather than skipped, so the positions
+        // already stored for tracks are cleared the next time each one stops
+        // instead of lingering in the file.
+        double resume = !IsViewerAudio(path) &&
+            seconds >= MinResumeSeconds && seconds <= duration - ResumeEndGuardSeconds
             ? seconds
             : 0;
 
@@ -17367,6 +17717,12 @@ public partial class MainWindow : Window
             ViewerMedia.Stop();
             ViewerMedia.Source = null;
             _viewerVideoPath = null;
+            // Cleared with the SOURCE, not with the file: while the source
+            // stands, pressing play again reopens nothing and raises no
+            // MediaOpened, which is the case the opening watch reads this for.
+            // Once the source is gone the next play is a real open again, and
+            // the slow-open line has to be allowed to appear for it.
+            _viewerMediaOpenedPath = null;
         }
 
         _viewerVideoPlaying = false;
@@ -18221,10 +18577,16 @@ public partial class MainWindow : Window
     // happens to be installed - so the same folder would hold a different
     // number of pictures on two machines, and the count would be unexplainable
     // on either.
+    //
+    // The kinds are NOT listed again here: this is the same question
+    // HasViewerPreview answers, and the two drifted apart once already when
+    // films joined the panel and only some of the callers heard about it. Sound
+    // arrived the same way on 2026-08-11 - it is in "what the panel can show",
+    // so it is in the set the counter and the strip walk, and there is now one
+    // place to add the next kind.
     private static bool IsViewerCarouselItem(FileSystemItem item)
         => item is { IsDirectory: false, IsPlaceholder: false, IsShowMore: false }
-           && (ThumbnailExtensions.Contains(Path.GetExtension(item.FullPath))
-               || VideoExtensions.Contains(Path.GetExtension(item.FullPath)));
+           && HasViewerPreview(item.FullPath);
 
     // The one place the panel's world is decided, which is why the search link
     // needed nothing else: hand it a different source list and the counter, the
@@ -18240,14 +18602,129 @@ public partial class MainWindow : Window
         return siblings.Where(IsViewerCarouselItem).ToList();
     }
 
+    // "This row is a folder whose contents the panel can stand in for." The
+    // ChildrenLoaded half is the whole cost control - see UpdateViewerCarousel.
+    private static bool IsViewerFolderStripSource(FileSystemItem item)
+        => item is { IsDirectory: true, IsPlaceholder: false, IsShowMore: false, ChildrenLoaded: true };
+
+    // The folder's own children, filtered the same way a folder's siblings are.
+    // AllLoadedChildren rather than Children, so the ones parked behind 더 보기
+    // are in the strip too - the same reason the counter uses it.
+    private List<FileSystemItem> GetViewerFolderItems(FileSystemItem folder)
+        => folder.AllLoadedChildren.Where(IsViewerCarouselItem).ToList();
+
+    // How many previewable files the selected FOLDER holds, and which folder
+    // that was counted for. Read by the caption, which is written from a
+    // background stat and so cannot ask the question itself.
+    private (string Path, int Count) _viewerFolderCount;
+
+    private void ShowViewerFolderPlayBar(bool show)
+        => ViewerFolderPlayBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+
+    // ----- 폴더를 재생한다는 것 ----------------------------------------------
+    //
+    // It is not a new mode and it builds nothing: pressing either button picks
+    // ONE file out of the folder, selects it and plays it. Everything after the
+    // first track is 이어서 재생, which already knows how to walk this exact
+    // list - so "playing a folder" and "playing a file with 이어서 재생 on" are
+    // the same state, and the transport that appears is the file's own.
+    //
+    // Both buttons also SET the repeat mode, and that is the point rather than a
+    // side effect: 전체 재생 that stopped after one track would be a lie, and the
+    // switch on the transport then shows which of the two was pressed. It is
+    // remembered like any other press of that switch.
+    private void ViewerFolderPlay_Click(object sender, RoutedEventArgs e)
+        => StartViewerFolderPlayback(ViewerRepeatMode.All);
+
+    private void ViewerFolderShuffle_Click(object sender, RoutedEventArgs e)
+        => StartViewerFolderPlayback(ViewerRepeatMode.Shuffle);
+
+    private void StartViewerFolderPlayback(ViewerRepeatMode mode)
+    {
+        if (ViewerItem is not { } folder || !IsViewerFolderStripSource(folder))
+        {
+            return;
+        }
+
+        var playable = GetViewerFolderItems(folder)
+            .Where(i => IsViewerPlayable(i.FullPath))
+            .ToList();
+        if (playable.Count == 0)
+        {
+            return;
+        }
+
+        SetViewerRepeat(mode);
+        // 셔플 starts somewhere in the folder, because starting a shuffle at
+        // track 1 every time is the one thing that makes it look broken. The
+        // bag was just cleared by SetViewerRepeat, so this first file is the
+        // round's first draw and takes its place in it below.
+        var first = mode is ViewerRepeatMode.Shuffle
+            ? playable[_viewerShuffle.Next(playable.Count)]
+            : playable[0];
+        if (mode is ViewerRepeatMode.Shuffle)
+        {
+            _viewerShuffleDone.Add(first.FullPath);
+        }
+
+        // The same handoff the end of a track uses: queue the file, move the
+        // selection, and the preview's own path presses play when it lands.
+        _viewerAutoPlayPath = first.FullPath;
+        MoveViewerTo(first);
+    }
+
     // Recomputed on every selection change rather than cached: the list is one
     // Where() over a folder's realized rows, and a cache would go stale on
     // every rename/delete/sort for nothing.
     private void UpdateViewerCarousel()
     {
-        if (!_viewerOpen
-            || ViewerItem is not { } current
-            || !IsViewerCarouselItem(current))
+        if (!_viewerOpen || ViewerItem is not { } current)
+        {
+            ViewerCarouselBar.Visibility = Visibility.Collapsed;
+            _viewerFolderCount = default;
+            ShowViewerFolderPlayBar(false);
+            UpdateFilmstrip(null);
+            return;
+        }
+
+        // A FOLDER SHOWS WHAT IS INSIDE IT (2026-08-11).
+        //
+        // The set the strip walks was always "the folder being looked at" -
+        // for a file that is its parent, and for a folder it is the folder
+        // itself. The code only answered the first half, so selecting a folder
+        // of 257 pictures emptied the panel and the strip both, and one of
+        // those pictures had to be clicked before the app would admit the other
+        // 256 existed. Filling this in is the same rule, not a new one.
+        //
+        // ONLY WHAT THE TREE HAS ALREADY READ (ChildrenLoaded). Enumerating an
+        // unexpanded folder from here would put a directory read on every folder
+        // the selection passes through, which is the one cost this panel has
+        // never had; expanding the folder is the gesture that pays for it, and
+        // the strip fills at that moment.
+        //
+        // NOT while the results are driving the panel: that strip belongs to the
+        // search, and a folder among the results is a result, not a container to
+        // look into.
+        if (_viewerListOverride is null && IsViewerFolderStripSource(current))
+        {
+            var inside = GetViewerFolderItems(current);
+            _viewerFolderCount = (current.FullPath, inside.Count);
+            // The two folder controls, and ONLY for a folder that holds
+            // something to play: a folder of photographs has no use for them,
+            // and a row that appears everywhere says nothing about where it is.
+            ShowViewerFolderPlayBar(inside.Any(i => IsViewerPlayable(i.FullPath)));
+            // The counter stays away. It reads "35 / 257" about the picture in
+            // front of you, and with a folder selected there is no such
+            // picture - the chevrons would have nothing to step from. The count
+            // is said in the caption instead, where the folder's own facts are.
+            ViewerCarouselBar.Visibility = Visibility.Collapsed;
+            UpdateFilmstrip(inside.Count > 0 ? inside : null);
+            return;
+        }
+
+        _viewerFolderCount = default;
+        ShowViewerFolderPlayBar(false);
+        if (!IsViewerCarouselItem(current))
         {
             ViewerCarouselBar.Visibility = Visibility.Collapsed;
             UpdateFilmstrip(null);
@@ -18338,8 +18815,15 @@ public partial class MainWindow : Window
         // Which SET these cells were built for. Usually a folder; while the
         // results list is driving the panel it is the search itself, whose
         // files come from many folders at once and so have no one path to name.
+        // A selected FOLDER names itself here, where a file names its parent -
+        // which is the same answer, since a file's folder IS its parent. That
+        // makes moving from the folder to a file inside it a no-op for the
+        // strip: same key, same count, so the cells are not rebuilt and the
+        // thumbnails already fetched stay put.
         string builtFor = _viewerListOverride is null
-            ? ViewerItem?.Parent?.FullPath ?? string.Empty
+            ? (ViewerItem is { IsDirectory: true } folder
+                ? folder.FullPath
+                : ViewerItem?.Parent?.FullPath ?? string.Empty)
             : SearchFilmstripKey;
         if (_filmstripBuiltFor != (builtFor, items!.Count))
         {
@@ -18355,7 +18839,7 @@ public partial class MainWindow : Window
             _filmstripCells.Clear();
             foreach (var item in items)
             {
-                _filmstripCells.Add(new FilmstripCell(item, IsViewerVideo(item.FullPath)));
+                _filmstripCells.Add(new FilmstripCell(item, IsViewerPlayable(item.FullPath)));
             }
 
             if (ViewerFilmstrip.ItemsSource is null)
@@ -18396,7 +18880,33 @@ public partial class MainWindow : Window
 
         var match = _filmstripCells.FirstOrDefault(cell =>
             ReferenceEquals(cell.Item, ViewerItem));
-        if (match is null || ReferenceEquals(ViewerFilmstrip.SelectedItem, match))
+        if (match is null)
+        {
+            // A FOLDER IS NOT IN ITS OWN STRIP, so there is nothing to light -
+            // and the cell left lit from before would be a file the panel is no
+            // longer showing. Narrowed to directories on purpose: every other
+            // way a selection can miss the cells is a case this method has
+            // always left alone.
+            if (ViewerItem is { IsDirectory: true } && ViewerFilmstrip.SelectedItem is not null)
+            {
+                _filmstripSelfSelect = true;
+                try
+                {
+                    ViewerFilmstrip.SelectedItem = null;
+                }
+                finally
+                {
+                    _filmstripSelfSelect = false;
+                }
+            }
+
+            // The cells are new even though nothing is selected, so the sweep
+            // still has to be asked for or a folder's strip stays blank.
+            ScheduleFilmstripThumbnails();
+            return;
+        }
+
+        if (ReferenceEquals(ViewerFilmstrip.SelectedItem, match))
         {
             return;
         }
@@ -19209,6 +19719,23 @@ public partial class MainWindow : Window
             return;
         }
 
+        // SOUND: the same click that toggles a film, answered here because for
+        // a track there is nothing else to click. A film covers the picture
+        // area with the media element and takes the press there; an audio file
+        // draws no frames, lays out at 0x0 and leaves the ALBUM ART showing - so
+        // the press lands on the still instead, where it would otherwise have
+        // begun a flick to the next file (2026-08-11).
+        //
+        // Ahead of the pan/flick branch, and it costs the flick on a track: the
+        // transport is what the picture area is for while something is loaded,
+        // and the strip is the way to the next file with a track playing.
+        if (_viewerVideoPath is { } sounding && IsViewerAudio(sounding))
+        {
+            ViewerMediaPlayPause_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
         if (!ViewerCanPan)
         {
             // Nothing to pan, so the same drag can mean the other obvious
@@ -19898,7 +20425,10 @@ public partial class MainWindow : Window
 
                 // A film's still frame - or a track's album art - gets the one
                 // affordance that turns it into a promise the panel can keep.
-                if (IsViewerPlayable(path))
+                // Unless it is ALREADY PLAYING: 이어서 재생 starts the file
+                // before this callback lands, and a play button drawn over a
+                // playing track is an offer the panel has already taken up.
+                if (IsViewerPlayable(path) && !IsViewerMediaLoaded(path))
                 {
                     ViewerPlayOverlay.Visibility = Visibility.Visible;
                 }
@@ -19917,7 +20447,9 @@ public partial class MainWindow : Window
             {
                 ViewerIconImage.Visibility = Visibility.Collapsed;
                 ViewerIconImage.Source = null;
-                ViewerPlayOverlay.Visibility = Visibility.Visible;
+                ViewerPlayOverlay.Visibility = IsViewerMediaLoaded(path)
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
                 SetViewerFileInfo(path, 0, 0, withMediaInfo: true);
                 return;
             }
@@ -20019,6 +20551,17 @@ public partial class MainWindow : Window
         string date = $"{modified:yyyy-MM-dd HH:mm}";
         string body = length >= 0 ? $"{FormatFileSize(length)}  ·  {date}" : date;
         string head = pixelWidth > 0 && pixelHeight > 0 ? $"{pixelWidth} × {pixelHeight}" : string.Empty;
+        // A FOLDER has no pixel size, and that slot is exactly where its own
+        // headline belongs: how many of the files in it this panel can show.
+        // Said in full rather than as a bare number - the tree beside it may be
+        // listing 500 rows, and "12" next to that would read as a wrong count
+        // rather than as a different question.
+        if (head.Length == 0 &&
+            _viewerFolderCount.Count > 0 &&
+            string.Equals(_viewerFolderCount.Path, path, StringComparison.OrdinalIgnoreCase))
+        {
+            head = string.Format(Strings.ViewerFolderItemCount, _viewerFolderCount.Count);
+        }
 
         // NoAudioNote is re-applied rather than assumed away. Now that the
         // stat is a hop, MediaOpened can land FIRST and append the note to a

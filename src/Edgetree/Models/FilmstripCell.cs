@@ -21,10 +21,10 @@ public class FilmstripCell : INotifyPropertyChanged
 {
     private ImageSource? _thumbnail;
 
-    public FilmstripCell(FileSystemItem item, bool isVideo)
+    public FilmstripCell(FileSystemItem item, bool isPlayable)
     {
         Item = item;
-        IsVideo = isVideo;
+        IsPlayable = isPlayable;
     }
 
     public FileSystemItem Item { get; }
@@ -33,9 +33,10 @@ public class FilmstripCell : INotifyPropertyChanged
 
     public string Name => Item.Name;
 
-    // Drives the little corner mark in the template. A strip of stills gives no
-    // other clue which of them will play - a film's thumbnail is just a frame.
-    public bool IsVideo { get; }
+    // Drives the little play mark in the template. A strip of stills gives no
+    // other clue which of them will play - a film's thumbnail is just a frame,
+    // and a track's is its album art, which says even less about what it is.
+    public bool IsPlayable { get; }
 
     // False until the container has asked once, whether or not the shell had
     // anything to give: a file with no thumbnail must not be re-asked on every

@@ -318,6 +318,25 @@ public static class Strings
     public static string ViewerPause = "일시정지";
     public static string ViewerStop = "정지";
     public static string ViewerMute = "음소거";
+    // The four states of the transport's leftmost switch, said plainly and in
+    // the words a player uses - these are the tooltip AND the menu, so a name
+    // that needed explaining would need it twice (2026-08-11).
+    public static string ViewerRepeatOff = "이어서 재생 안 함";
+    public static string ViewerRepeatAll = "폴더 반복";
+    public static string ViewerRepeatOne = "한 곡 반복";
+    public static string ViewerRepeatShuffle = "셔플 재생";
+    // Appended to whichever of the four is in force. The switch turns the thing
+    // on and off, and nothing about it said where the other three modes live -
+    // which was the first thing asked about it (2026-08-11).
+    public static string ViewerRepeatHint = "우클릭으로 변경";
+    // A selected folder's headline, in the caption slot a file's pixel size
+    // uses. Counts what the PANEL can show, which is not the same number the
+    // tree is listing beside it - so the sentence says which question it is
+    // answering.
+    public static string ViewerFolderItemCount = "볼 수 있는 파일 {0}개";
+    // The folder's own play button. "전체" is the load-bearing word: pressing it
+    // does not play one file, it puts the folder on and keeps it on.
+    public static string ViewerFolderPlayAll = "폴더 전체 재생";
     // Shown in the caption when Windows has no codec for the file - the panel
     // says what happened and what still works, rather than sitting blank.
     public static string ViewerPlaybackUnsupported = "이 형식은 재생할 수 없습니다 · Enter로 기본 프로그램에서 열기";
@@ -700,6 +719,13 @@ public static class Strings
         ViewerPause = "Pause";
         ViewerStop = "Stop";
         ViewerMute = "Mute";
+        ViewerRepeatOff = "Don't continue";
+        ViewerRepeatAll = "Repeat folder";
+        ViewerRepeatOne = "Repeat one";
+        ViewerRepeatShuffle = "Shuffle";
+        ViewerRepeatHint = "right-click to change";
+        ViewerFolderItemCount = "{0} files this panel can show";
+        ViewerFolderPlayAll = "Play this folder";
         ViewerPlaybackUnsupported = "This format can't be played here · Enter opens it in the default app";
         ViewerPlaybackInterrupted = "Playback stopped · press play to resume, Enter opens it in the default app";
         ViewerNoAudio = "No sound";
