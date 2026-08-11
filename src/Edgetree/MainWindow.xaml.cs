@@ -16041,18 +16041,55 @@ public partial class MainWindow : Window
         _memTimer.Start();
     }
 
+    // WHAT THE PICTURE ITSELF WEIGHS. The strip's share is now accounted for to
+    // the byte, and it does not explain the total: 2,402 thumbnails at 318MB
+    // inside a 1,199MB process leaves most of it somewhere else, and the only
+    // other thing here holding pixels is the full-size decode in the panel - a
+    // 3840x2160 photo is 33MB of BGRA on its own (2026-08-12). Counted so the
+    // next round starts from a number instead of a suspicion.
+    private double ViewerDecodedMegabytes()
+    {
+        double bytes = 0;
+        if (ViewerImage.Source is System.Windows.Media.Imaging.BitmapSource shown)
+        {
+            bytes += shown.PixelWidth * (double)shown.PixelHeight * 4;
+        }
+
+        return bytes / (1024 * 1024);
+    }
+
     [System.Diagnostics.Conditional("DEBUG")]
     private void LogMemorySample()
     {
         _selfProcess ??= System.Diagnostics.Process.GetCurrentProcess();
         _selfProcess.Refresh();
 
+        // WHAT THE PICTURES ACTUALLY MEASURE, not what they were asked for.
+        // The size requested and the size returned are two different claims,
+        // and the estimate here used to assume the first: it read "600 MB" for
+        // a strip whose thumbnails had just been cut to a seventh of that, so
+        // it could neither confirm the change nor show it had failed
+        // (2026-08-12). One real sample is enough - a strip holds one size.
         int held = 0;
+        double bytes = 0;
+        int pixW = 0, pixH = 0;
         foreach (var cell in _filmstripCells)
         {
-            if (cell.Thumbnail is not null)
+            if (cell.Thumbnail is not { } image)
             {
-                held++;
+                continue;
+            }
+
+            held++;
+            if (image is System.Windows.Media.Imaging.BitmapSource bmp)
+            {
+                if (pixW == 0)
+                {
+                    pixW = bmp.PixelWidth;
+                    pixH = bmp.PixelHeight;
+                }
+
+                bytes += bmp.PixelWidth * (double)bmp.PixelHeight * 4;
             }
         }
 
@@ -16067,7 +16104,8 @@ public partial class MainWindow : Window
                 $"  ws {_selfProcess.WorkingSet64 / (1024 * 1024),5} MB" +
                 $"  managed {GC.GetTotalMemory(false) / (1024 * 1024),5} MB" +
                 $"  cells {_filmstripCells.Count,5}  thumbs {held,5}" +
-                $" (={held / 4,5} MB)" +
+                $" ({pixW}x{pixH}, ask {FilmstripFetchSize}, ={bytes / (1024 * 1024),5:F0} MB)" +
+                $"  view {ViewerDecodedMegabytes(),4:F0} MB" +
                 $"  viewer {(_viewerOpen ? "on " : "off")}" +
                 $"  strip {(ViewerFilmstripHost.Visibility == Visibility.Visible ? "on " : "off")}" +
                 $"{Environment.NewLine}");
