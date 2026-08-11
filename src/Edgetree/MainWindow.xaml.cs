@@ -903,7 +903,19 @@ public partial class MainWindow : Window
         SetBrushColor("ShowMoreForeground", light ? _settings.LightShowMoreColorHex : _settings.ShowMoreColorHex);
         SetBrushColor("TreeGuideLineBrush", light ? _settings.LightGuideLineColorHex : _settings.GuideLineColorHex);
         SetBrushColor("TreeGuideLineActiveBrush", light ? _settings.LightGuideLineActiveColorHex : _settings.GuideLineActiveColorHex);
-        SetBrushColor("PanelDividerBrush", light ? _settings.LightPanelDividerColorHex : _settings.PanelDividerColorHex);
+        // 영역 구분선 표시, through the brush rather than through the lines. Every
+        // one of them - header, tree/viewer, favorites, footer, the search view's
+        // rule, the filmstrip, the scrollbar's gutter line - draws with this one
+        // key, so an alpha of 0 takes the set out in one write and nothing has to
+        // know it happened. Collapsing them instead would move the window by a
+        // pixel in several places, and a borderless look is the point rather than
+        // a slightly different layout.
+        //
+        // The stored colours are left alone, so switching it back on restores
+        // exactly what was there - including a colour picked in the other theme.
+        SetBrushColor(
+            "PanelDividerBrush",
+            WithDividerVisibility(light ? _settings.LightPanelDividerColorHex : _settings.PanelDividerColorHex));
         SetBrushColor("ViewerBackground", light ? _settings.LightViewerBackgroundColorHex : _settings.ViewerBackgroundColorHex);
         SetBrushColor("HeaderBackground", light ? _settings.LightHeaderBackgroundColorHex : _settings.HeaderBackgroundColorHex);
         SetBrushColor("AutoHideHandleBackground", light ? _settings.LightAutoHideHandleColorHex : _settings.AutoHideHandleColorHex);
@@ -1065,6 +1077,22 @@ public partial class MainWindow : Window
         {
             Resources["TreeRowSelectedActiveBackground"] = wanted;
         }
+    }
+
+    // The divider colour as it should actually be painted: the stored one, or
+    // the same colour at zero alpha while 영역 구분선 is switched off. Returned as
+    // a Color rather than applied here so it goes through the one SetBrushColor
+    // that knows about frozen brushes.
+    private Color WithDividerVisibility(string hex)
+    {
+        var color = ColorConverter.ConvertFromString(hex) is Color parsed
+            ? parsed
+            : Colors.Transparent;
+        if (!_settings.ShowPanelDividers)
+        {
+            color.A = 0;
+        }
+        return color;
     }
 
     private void SetBrushColor(string resourceKey, string hex)
@@ -6168,6 +6196,7 @@ public partial class MainWindow : Window
                 FindMenuItem(generalSettings, "showFolderIcons") is { } showFolderIcons &&
                 FindMenuItem(generalSettings, "showFileIcons") is { } showFileIcons &&
                 FindMenuItem(generalSettings, "hideTitleBarTitle") is { } hideTitleBarTitle &&
+                FindMenuItem(generalSettings, "showPanelDividers") is { } showPanelDividers &&
                 // showPathBar left the menu on 2026-08-11 and had to leave this
                 // chain in the same edit: an id that no longer exists fails the
                 // whole conjunction and takes every setting below it down
@@ -6185,6 +6214,7 @@ public partial class MainWindow : Window
                 showFolderIcons.IsChecked = _settings.ShowFolderIcons;
                 showFileIcons.IsChecked = _settings.ShowFileIcons;
                 hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
+                showPanelDividers.IsChecked = _settings.ShowPanelDividers;
                 autoCollapse.IsChecked = _settings.AutoCollapseFolders;
                 autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
                 autoHideUseHandle.IsChecked = _settings.AutoHideUseHandle;
@@ -7853,6 +7883,19 @@ public partial class MainWindow : Window
             ApplyFileIconVisibility();
             // See the folder toggle above.
             RefreshBookmarkPanelIfShowing();
+        }
+    }
+
+    private void ShowPanelDividersMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.ShowPanelDividers = menuItem.IsChecked;
+            // Through the whole colour pass rather than the one brush: it is the
+            // path that already knows which theme's hex to read, and it is cheap
+            // enough that having two ways to reach a brush would be the more
+            // expensive thing.
+            ApplyColorSettings();
         }
     }
 

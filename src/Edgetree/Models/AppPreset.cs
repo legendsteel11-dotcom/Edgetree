@@ -126,6 +126,11 @@ public class AppPreset
         nameof(AppSettings.GuideLineColorHex),
         nameof(AppSettings.GuideLineActiveColorHex),
         nameof(AppSettings.PanelDividerColorHex),
+        // In the COLOUR group, not the look one: it is applied by the same pass
+        // that repaints the palette (LookFields' apply path never calls
+        // ApplyColorSettings), so a preset that turned the lines off through any
+        // other group would store the answer and never draw it.
+        nameof(AppSettings.ShowPanelDividers),
         nameof(AppSettings.ViewerBackgroundColorHex),
         nameof(AppSettings.HeaderBackgroundColorHex),
         nameof(AppSettings.StoredAutoHideHandleColor),

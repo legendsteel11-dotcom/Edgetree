@@ -1574,6 +1574,14 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="hideTitleBarTitle"
                         Click="HideTitleBarTitleMenuItem_Click"/>
+                <!-- Beside the two icon toggles because it answers the same kind
+                     of question - what the window DRAWS - rather than what it
+                     does. The colour rows for the line stay in 색상 설정; this is
+                     whether there is a line to colour. -->
+                <MenuItem Header="{x:Static services:Strings.MenuShowPanelDividers}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="showPanelDividers"
+                        Click="ShowPanelDividersMenuItem_Click"/>
                 <!-- 경로 표시줄's toggle was here and is GONE (2026-08-11). The
                      strip stopped being a display of where you are the moment it
                      grew the history chevrons: turning it off took a way of

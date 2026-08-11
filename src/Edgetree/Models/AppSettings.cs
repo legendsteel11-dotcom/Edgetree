@@ -269,6 +269,17 @@ public class AppSettings
     // these. Same default so existing users see no change until they
     // customize it separately.
     public string PanelDividerColorHex { get; set; } = "#FF323438";
+    // Whether those lines are drawn at all. Off makes the brush transparent
+    // rather than collapsing anything: the lines are 1px elements that other
+    // things are laid out against, so hiding them by Visibility would shift
+    // the whole window by a pixel in several places, and a plain borderless
+    // look is the point rather than a slightly different layout.
+    //
+    // One flag for both themes. It is a taste about the app's SHAPE, not a
+    // colour, and someone who does not want lines does not want them in the
+    // dark theme only. The colour rows for both themes are kept and untouched,
+    // so turning it back on restores exactly what was there.
+    public bool ShowPanelDividers { get; set; } = true;
     // "뷰어 배경" - the image viewer panel's own backdrop, separate from the
     // tree background so a photo can sit on near-black while the tree stays
     // its own colour. Same default as the tree background, so nothing

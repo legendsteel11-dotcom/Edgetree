@@ -159,6 +159,10 @@ public static class Strings
     public static string MenuShowFolderIcons = "폴더 아이콘";
     public static string MenuShowFileIcons = "파일 아이콘";
     public static string MenuHideTitleBarTitle = "제목 표시줄 타이틀 제거";
+    // The SAME name the colour row uses (색상 설정's 영역 구분선), because they are
+    // the same thing seen twice - one decides whether there is a line, the other
+    // what colour it is. Two names for it would read as two features.
+    public static string MenuShowPanelDividers = "영역 구분선";
     // MenuShowPathBar removed 2026-08-11 along with the toggle it labelled -
     // the strip is always on now that it carries the history chevrons.
     // Named after the PANEL, not favorites: it now holds either list. Lives
@@ -704,6 +708,7 @@ public static class Strings
         MenuShowFolderIcons = "Show Folder Icons";
         MenuShowFileIcons = "Show File Icons";
         MenuHideTitleBarTitle = "Hide Title Bar Text";
+        MenuShowPanelDividers = "Panel Dividers";
         MenuFavoritesAtBottom = "Show at Bottom";
         MenuDockOnRight = "Pin to Right Edge";
         MenuAutoHideCloseOnLeave = "Close on Mouse Leave";
