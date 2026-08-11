@@ -16470,6 +16470,44 @@ public partial class MainWindow : Window
         _videoLogLines.Clear();
     }
 
+    // THE BAR BELONGS TO THE FILE ABOUT TO BE LOADED, and nothing put it back
+    // (2026-08-11). The readout is written by a 250ms tick reading Position, so
+    // between handing the element a new file and that file's first tick the bar
+    // and the clock still described the PREVIOUS track - and on a manual
+    // 이전 곡/다음 곡 the bar moving is the whole of the feedback that press has,
+    // so it read as the press not having worked.
+    //
+    // Maximum goes with it: the extent still measured the old file, so the thumb
+    // would otherwise sit at the old fraction of a duration that no longer
+    // applies. Both are filled in again at MediaOpened, which is the first
+    // moment either is knowable. The marks go too - they were drawn against the
+    // old extent and belong to the old film.
+    //
+    // BACK TO 1, NOT 0, and the difference is visible. The played part of this
+    // bar is the Track's DecreaseRepeatButton, and a Track sizes it by
+    // (Value - Minimum) / (Maximum - Minimum) - so Maximum 0 against Minimum 0
+    // is a division by zero and the whole width goes to it: the bar filled
+    // completely for the moment between one track and the next. 1 is what the
+    // XAML declares this slider as before anything is loaded, which is the same
+    // "empty" this wants.
+    //
+    // The seek latch is cleared for the same reason: a seek outstanding against
+    // the file that just left would hold the new one's bar still while it waited
+    // for a position that is never coming.
+    private void ResetViewerMediaReadout()
+    {
+        _viewerSeekTargetSeconds = null;
+        _viewerMediaSeeking = false;
+        ViewerMediaPosition.Maximum = 1;
+        SetViewerMediaSliderValue(0);
+        ViewerMediaMarks.Children.Clear();
+        // Written out rather than through ShowViewerMediaTime, which reads
+        // NaturalDuration - still the old file's until MediaOpened, so the
+        // clock would read 00:00:00 against a total belonging to the track that
+        // just ended.
+        ViewerMediaTime.Text = $"{FormatDuration(TimeSpan.Zero)} / {FormatDuration(TimeSpan.Zero)}";
+    }
+
     private void SetViewerMediaSliderValue(double seconds)
     {
         _viewerSliderSelfWrite = true;
@@ -16550,6 +16588,9 @@ public partial class MainWindow : Window
         VideoLogStart(path);
         StartViewerOpeningWatch();
         ViewerMedia.Volume = _viewerMediaMuted ? 0 : ViewerMediaVolume.Value;
+        // Before the source changes, so the bar is never seen holding the
+        // outgoing file's place against the incoming file's name.
+        ResetViewerMediaReadout();
         // See LoadViewerImage's note on Uri: a path is not a URL. MediaElement
         // takes nothing but a Uri, so this is the one place left that has to
         // build one - if a video with a '#' in its name ever fails to open,
@@ -17243,6 +17284,10 @@ public partial class MainWindow : Window
         VideoLogStart(path);
         StartViewerOpeningWatch();
         ViewerMedia.Volume = _viewerMediaMuted ? 0 : ViewerMediaVolume.Value;
+        // Same as the panel's own load path: the transport is on screen for this
+        // one too, and an advance nobody selected is exactly where a stale bar
+        // is hardest to explain.
+        ResetViewerMediaReadout();
         ViewerMedia.Source = new Uri(path);
         ViewerMedia.Visibility = Visibility.Visible;
         // From the top: sound keeps no place, and this is the app starting it.
