@@ -4579,10 +4579,21 @@
                  the two casualties of the viewer's column split - they sat at
                  the default column 0, which is the zero-width viewer column,
                  and vanished; 2026-08-08.) -->
+            <!-- ...and spanning the columns was not enough on its own
+                 (2026-08-11). The -2 below puts the line inside ROW 1, where the
+                 viewer panel lives, and ViewerPanel is declared further down
+                 this file - so over the viewer's column the panel's own
+                 background painted straight over it and the line stopped dead at
+                 the split. Declaration order cannot fix it here the way it did
+                 for the tree: the panel has to come after the thumb and the rest
+                 of the split. ZIndex 3 clears both the panel (0) and the split
+                 thumb (2). Full screen collapses this Border outright, so the
+                 raised line can never appear over a picture. -->
             <Border x:Name="HeaderUnderline"
                     Grid.Row="0"
                     Grid.ColumnSpan="3"
                     Height="1"
+                    Panel.ZIndex="3"
                     VerticalAlignment="Bottom"
                     Margin="0,0,0,-2"
                     Background="{DynamicResource PanelDividerBrush}"/>
