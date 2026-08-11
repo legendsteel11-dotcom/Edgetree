@@ -482,9 +482,22 @@ public static class Strings
     public static string ColorFileDefaultName = "edgetree-colors.json";
     public static string ColorImportFailedTitle = "색상 불러오기";
     public static string ColorImportFailedBody = "이 파일에는 색상이 없습니다.";
-    public static string ColorThemeDarkMode = "🌙 다크 모드";
-    public static string ColorThemeLightMode = "☀️ 라이트 모드";
+    // The moon and sun emoji that used to lead these are gone (2026-08-11):
+    // they were the only pictures in a window of text buttons, they came from
+    // the system's emoji font rather than from the app's own marks, and the
+    // words already say which is which.
+    public static string ColorThemeDarkMode = "다크 모드";
+    public static string ColorThemeLightMode = "라이트 모드";
     public static string ButtonRandomColors = "랜덤";
+    // Said as what it GIVES, so the pair reads as a choice rather than as one
+    // button and its louder twin: this one lands on combinations that go
+    // together, the other one on combinations that do not have to.
+    public static string ButtonRandomColorsTip = "자연스러운 조합";
+    // The second die, beside the first. "원색" says what makes it different in
+    // two characters - it starts from a primary hue - where "과감" or "강렬"
+    // would be describing a feeling and could mean anything.
+    public static string ButtonDaringColors = "원색";
+    public static string ButtonDaringColorsTip = "원색에서 출발하는 과감한 조합";
     // "되돌리기" over the more precise "랜덤 전으로", which read oddly
     // (2026-08-09); the button lives beside 랜덤, which carries the
     // context the label dropped.
@@ -836,9 +849,12 @@ public static class Strings
         ColorFileDefaultName = "edgetree-colors.json";
         ColorImportFailedTitle = "Import Colours";
         ColorImportFailedBody = "That file holds no colours.";
-        ColorThemeDarkMode = "🌙 Dark Mode";
-        ColorThemeLightMode = "☀️ Light Mode";
+        ColorThemeDarkMode = "Dark Mode";
+        ColorThemeLightMode = "Light Mode";
         ButtonRandomColors = "Random";
+        ButtonRandomColorsTip = "Combinations that go together";
+        ButtonDaringColors = "Bold";
+        ButtonDaringColorsTip = "Bolder combinations, starting from a primary hue";
         ButtonUndoRandom = "Undo";
         ColorThemeDarkLabel = "Dark Mode";
         ColorThemeLightLabel = "Light Mode";

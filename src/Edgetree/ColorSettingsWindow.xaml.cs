@@ -133,6 +133,8 @@ public partial class ColorSettingsWindow : Window
         LightModeButton.IsEnabled = !_settings.IsLightMode;
         DarkRandomButton.IsEnabled = !_settings.IsLightMode;
         LightRandomButton.IsEnabled = _settings.IsLightMode;
+        DarkDaringButton.IsEnabled = !_settings.IsLightMode;
+        LightDaringButton.IsEnabled = _settings.IsLightMode;
         RefreshLabelPreviews();
         UpdateResetButtonEnabled();
     }
@@ -539,6 +541,51 @@ public partial class ColorSettingsWindow : Window
 
     private void RandomLight_Click(object sender, RoutedEventArgs e) => ApplyRandomPalette(light: true);
 
+    private void DaringDark_Click(object sender, RoutedEventArgs e)
+        => ApplyRandomPalette(light: false, daring: true);
+
+    private void DaringLight_Click(object sender, RoutedEventArgs e)
+        => ApplyRandomPalette(light: true, daring: true);
+
+    // ----- 연타를 막는 짧은 잠금 ---------------------------------------------
+    //
+    // A roll rewrites every colour in the app and the whole tree is repainted
+    // for it, so a held or hammered button queues that work faster than it can
+    // be done - and the palettes in between are never seen anyway.
+    //
+    // The buttons go DEAD for a moment rather than the presses being dropped
+    // quietly: a button that ignores you looks broken, one that greys out has
+    // told you why. Re-enabled through RefreshSwatches, so which of them comes
+    // back is decided by the theme rule in one place rather than here.
+    private const int RollLockMs = 450;
+    private System.Windows.Threading.DispatcherTimer? _rollLockTimer;
+
+    private void LockRollButtons()
+    {
+        DarkRandomButton.IsEnabled = false;
+        LightRandomButton.IsEnabled = false;
+        DarkDaringButton.IsEnabled = false;
+        LightDaringButton.IsEnabled = false;
+
+        _rollLockTimer ??= CreateRollLockTimer();
+        _rollLockTimer.Stop();
+        _rollLockTimer.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateRollLockTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(RollLockMs),
+        };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            RefreshSwatches();
+        };
+        return timer;
+    }
+
     private void UndoRandom_Click(object sender, RoutedEventArgs e)
     {
         if (_preRandomSnapshot is null)
@@ -561,7 +608,7 @@ public partial class ColorSettingsWindow : Window
         _onChanged();
     }
 
-    private void ApplyRandomPalette(bool light)
+    private void ApplyRandomPalette(bool light, bool daring = false)
     {
         // The inactive theme's die is disabled (see RefreshSwatches), so this
         // guard is belt-and-braces: rolling a theme that isn't showing would
@@ -576,7 +623,9 @@ public partial class ColorSettingsWindow : Window
             p => p.Name, p => (string?)p.GetValue(_settings) ?? string.Empty);
         UndoRandomButton.IsEnabled = true;
 
-        var palette = GenerateRandomPalette(light, PaletteRandom);
+        LockRollButtons();
+
+        var palette = GenerateRandomPalette(light, PaletteRandom, daring);
         CurrentBackgroundColorHex = Hex(palette.Background);
         CurrentHeaderBackgroundColorHex = Hex(palette.Header);
         CurrentHistoryBackgroundColorHex = Hex(palette.History);
@@ -607,13 +656,35 @@ public partial class ColorSettingsWindow : Window
         Color Text, Color TextHover, Color Highlight, Color ShowMore,
         Color Handle);
 
-    private static RandomPalette GenerateRandomPalette(bool light, Random rng)
+    // The hues a "primary" reads as - red, yellow, green, cyan, blue, magenta.
+    // The bolder roll starts from one of these with a little play either side,
+    // where the ordinary roll starts anywhere on the wheel. That is most of
+    // what makes it look deliberate rather than merely saturated: a colour ten
+    // degrees off pure blue still reads as BLUE, where one at 205° reads as
+    // "some sort of teal".
+    private static readonly double[] PrimaryHues = { 0, 60, 120, 180, 240, 300 };
+
+    // `daring` is the second button (see ApplyRandomPalette). SAME RULES, and
+    // that is the point: every readability floor below is still walked, so the
+    // bolder roll cannot produce a palette the calm one would have refused. It
+    // moves three things - where the hue starts, how many hues there are, and
+    // how far the saturation ceilings go.
+    //
+    // A separate button rather than a change to the die that exists: the
+    // ordinary roll is worth keeping as it is, because the quiet differences it
+    // makes are exactly what shows up differently on someone else's monitor.
+    private static RandomPalette GenerateRandomPalette(bool light, Random rng, bool daring = false)
     {
         // 1~3 hues: base always; a rough complement (150~210° away) when two;
         // an analogous neighbour (25~45°) as the third. Everything else in a
         // roll is derived, never independently random.
-        double baseHue = rng.NextDouble() * 360;
-        int hueCount = 1 + rng.Next(3);
+        //
+        // The bolder roll always takes at least TWO, so there is a real second
+        // colour in the palette rather than one hue at several brightnesses.
+        double baseHue = daring
+            ? Wrap(PrimaryHues[rng.Next(PrimaryHues.Length)] + (rng.NextDouble() * 24 - 12))
+            : rng.NextDouble() * 360;
+        int hueCount = daring ? 2 + rng.Next(2) : 1 + rng.Next(3);
         double accentHue = hueCount >= 2
             ? Wrap(baseHue + (rng.Next(2) == 0 ? -1 : 1) * (150 + rng.NextDouble() * 60))
             : baseHue;
@@ -628,13 +699,21 @@ public partial class ColorSettingsWindow : Window
         // warm hue does, so uniformly-drawn blue rolls kept arriving invisible
         // (2026-08-09). The readability floors below are what make a bolder
         // ceiling safe to sell.
-        bool bold = rng.NextDouble() < 0.28;
+        bool bold = daring || rng.NextDouble() < 0.28;
         double surfaceSat = light
-            ? (bold ? 0.05 + rng.NextDouble() * 0.11 : 0.02 + rng.NextDouble() * 0.07)
-            : (bold ? 0.06 + rng.NextDouble() * 0.16 : 0.03 + rng.NextDouble() * 0.10);
-        double accentSat = bold
-            ? 0.34 + rng.NextDouble() * 0.26
-            : 0.16 + rng.NextDouble() * 0.22;
+            ? (daring ? 0.09 + rng.NextDouble() * 0.14
+                : bold ? 0.05 + rng.NextDouble() * 0.11 : 0.02 + rng.NextDouble() * 0.07)
+            : (daring ? 0.11 + rng.NextDouble() * 0.20
+                : bold ? 0.06 + rng.NextDouble() * 0.16 : 0.03 + rng.NextDouble() * 0.10);
+        double accentSat = daring
+            ? 0.56 + rng.NextDouble() * 0.32
+            : bold ? 0.34 + rng.NextDouble() * 0.26 : 0.16 + rng.NextDouble() * 0.22;
+
+        // The ceilings the derived colours are held under. They exist so a bold
+        // accent cannot be multiplied into a shout further down; the bolder
+        // roll wants the shout, so its ceiling is raised rather than removed.
+        double satCap = daring ? 0.94 : 0.72;
+        double hoverCap = daring ? 0.44 : bold ? 0.30 : 0.22;
 
         if (!light)
         {
@@ -645,20 +724,37 @@ public partial class ColorSettingsWindow : Window
             // relationships to each other and only the ground moves down.
             double bgVal = 0.05 + rng.NextDouble() * 0.06;
             var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
-            var hover = FromHsv(neighborHue, Math.Min(bold ? 0.30 : 0.22, surfaceSat + 0.06), bgVal + 0.08, 255);
+            var hover = FromHsv(neighborHue, Math.Min(hoverCap, surfaceSat + 0.06), bgVal + 0.08, 255);
             // A step up in both saturation and brightness, so the selection box
             // reads a little stronger than the surface. Capped so a bold roll's
             // already-high accent saturation can't be multiplied into a shout.
-            var selection = FromHsv(accentHue, Math.Min(0.72, accentSat * 1.18), bgVal + 0.17, 255);
+            var selection = FromHsv(accentHue, Math.Min(satCap, accentSat * 1.18), bgVal + 0.17, 255);
             // Text is checked against HOVER, the lightest surface a name
             // actually sits on in the dark theme - passing there passes
             // everywhere.
-            var text = EnsureContrast(baseHue, 0.05 + rng.NextDouble() * 0.05, 0.76, hover, 4.5, towardLight: true);
+            //
+            // For a DARING roll the surfaces below pull apart, so "the lightest
+            // surface" is no longer necessarily hover - the text is walked
+            // against whichever of the tree's own three it reads worst on.
+            var header = daring
+                ? FromHsv(neighborHue, Math.Min(satCap, surfaceSat + 0.18), bgVal + 0.06 + rng.NextDouble() * 0.16, 255)
+                : FromHsv(baseHue, surfaceSat, bgVal + 0.025, 255);
+            var history = daring
+                ? FromHsv(accentHue, Math.Min(satCap, surfaceSat + 0.12), bgVal + 0.03 + rng.NextDouble() * 0.12, 255)
+                : FromHsv(baseHue, surfaceSat, bgVal + 0.015, 255);
+            var text = EnsureContrast(baseHue, 0.05 + rng.NextDouble() * 0.05, 0.76,
+                Worst(hover, history), 4.5, towardLight: true);
             return new RandomPalette(
                 Background: background,
-                Header: FromHsv(baseHue, surfaceSat, bgVal + 0.025, 255),
-                History: FromHsv(baseHue, surfaceSat, bgVal + 0.015, 255),
-                Viewer: background,
+                Header: header,
+                History: history,
+                // THE VIEWER IS ALLOWED TO BE A DIFFERENT ROOM in a daring
+                // roll. It shows pictures, not names, so nothing has to stay
+                // readable on it - which makes it the one surface that can take
+                // a whole other colour without costing anything.
+                Viewer: daring
+                    ? FromHsv(accentHue, Math.Min(satCap, surfaceSat + 0.22), bgVal + rng.NextDouble() * 0.14, 255)
+                    : background,
                 Hover: hover,
                 Selection: selection,
                 Guide: FromHsv(baseHue, surfaceSat, bgVal + 0.10, 255),
@@ -674,26 +770,55 @@ public partial class ColorSettingsWindow : Window
         }
         else
         {
-            double bgVal = 0.95 + rng.NextDouble() * 0.04;
+            // NEARLY WHITE, about a third of the time (2026-08-11). The dark
+            // side got this treatment on 08-10 - its rolls were landing at the
+            // pale end of dark and reading as charcoal - and the light side was
+            // left with the matching problem at its own end: every light roll
+            // carried a visible tint, so none of them was simply a white
+            // sidebar with colour in it. The draw only empties the TINT; the
+            // hue is still there for everything derived below.
+            bool nearWhite = !daring && rng.NextDouble() < 0.34;
+            if (nearWhite)
+            {
+                surfaceSat *= 0.25;
+            }
+
+            double bgVal = nearWhite
+                ? 0.985 + rng.NextDouble() * 0.015
+                : 0.95 + rng.NextDouble() * 0.04;
             var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
-            var hover = FromHsv(neighborHue, Math.Min(bold ? 0.24 : 0.16, surfaceSat + 0.05), bgVal - 0.07, 255);
+            var hover = FromHsv(neighborHue,
+                Math.Min(daring ? 0.36 : bold ? 0.24 : 0.16, surfaceSat + 0.05), bgVal - 0.07, 255);
             // Same step up the dark branch takes - more saturation, and one
             // notch further from the background it sits on.
             var selection = FromHsv(accentHue,
-                bold ? 0.31 + rng.NextDouble() * 0.21 : 0.18 + rng.NextDouble() * 0.15, 0.855, 255);
-            var text = EnsureContrast(baseHue, 0.10 + rng.NextDouble() * 0.10, 0.27, hover, 4.5, towardLight: false);
+                daring ? 0.44 + rng.NextDouble() * 0.30
+                    : bold ? 0.31 + rng.NextDouble() * 0.21 : 0.18 + rng.NextDouble() * 0.15,
+                0.855, 255);
+            // Same as the dark branch: a daring roll pulls the surfaces apart,
+            // so the text is walked against the worst of the tree's own.
+            var header = daring
+                ? FromHsv(neighborHue, Math.Min(satCap, surfaceSat + 0.20), bgVal - 0.06 - rng.NextDouble() * 0.16, 255)
+                : FromHsv(baseHue, surfaceSat, bgVal - 0.035, 255);
+            var history = daring
+                ? FromHsv(accentHue, Math.Min(satCap, surfaceSat + 0.14), bgVal - 0.03 - rng.NextDouble() * 0.12, 255)
+                : FromHsv(baseHue, surfaceSat, bgVal - 0.02, 255);
+            var text = EnsureContrast(baseHue, 0.10 + rng.NextDouble() * 0.10, 0.27,
+                Worst(hover, history), 4.5, towardLight: false);
             return new RandomPalette(
                 Background: background,
-                Header: FromHsv(baseHue, surfaceSat, bgVal - 0.035, 255),
-                History: FromHsv(baseHue, surfaceSat, bgVal - 0.02, 255),
-                Viewer: background,
+                Header: header,
+                History: history,
+                Viewer: daring
+                    ? FromHsv(accentHue, Math.Min(satCap, surfaceSat + 0.24), bgVal - rng.NextDouble() * 0.16, 255)
+                    : background,
                 Hover: hover,
                 Selection: selection,
                 Guide: FromHsv(baseHue, surfaceSat + 0.02, bgVal - 0.13, 255),
                 GuideActive: FromHsv(accentHue, accentSat * 0.5, bgVal - 0.38, 255),
                 Text: text,
                 TextHover: Emphasize(text, towardLight: false),
-                Highlight: EnsureContrast(accentHue, Math.Min(0.62, accentSat + 0.18), 0.19, selection, 5.0, towardLight: false),
+                Highlight: EnsureContrast(accentHue, Math.Min(daring ? 0.88 : 0.62, accentSat + 0.18), 0.19, selection, 5.0, towardLight: false),
                 ShowMore: EnsureContrast(baseHue, 0.08, 0.45, background, 3.0, towardLight: false),
                 Handle: RollHandle(accentHue, accentSat, background, rng, towardLight: false));
         }
@@ -742,6 +867,14 @@ public partial class ColorSettingsWindow : Window
     // brightness runs out) until the WCAG-style contrast ratio clears the
     // target. Terminates: each step moves monotonically and both walks have
     // hard bounds.
+    // The surface a name will read WORST on, of the two handed in. Which one
+    // that is stopped being obvious once a daring roll let the tree's surfaces
+    // take separate hues and brightnesses: hover used to be the extreme by
+    // construction, and now the history strip can be. Mid-grey, so the answer
+    // is "whichever is nearer the middle", not "whichever is lighter".
+    private static Color Worst(Color a, Color b)
+        => Math.Abs(Luminance(a) - 0.18) < Math.Abs(Luminance(b) - 0.18) ? a : b;
+
     private static Color EnsureContrast(double hue, double sat, double val,
         Color against, double target, bool towardLight)
     {
@@ -1489,8 +1622,22 @@ public partial class ColorSettingsWindow : Window
         return (hue, max <= 0 ? 0 : delta / max, max);
     }
 
+    // CLAMPED AT THE DOOR (2026-08-11). Nothing that calls this today hands it
+    // a value outside 0~1 - the ranges were checked one by one - but there was
+    // no guard, and a cast from a double past 255 to a byte does NOT saturate
+    // in C#: it produces an unspecified value, so an over-bright colour would
+    // come out as a dark one rather than as white. That is a wrong colour with
+    // nothing to show it went wrong, and the round that lifts saturation
+    // ceilings for the bolder roll is exactly the change that could reach it.
+    //
+    // The hue is wrapped rather than clamped because it is an angle; a negative
+    // one would otherwise pick a channel branch AND a negative component.
     private static Color FromHsv(double hue, double sat, double val, byte alpha)
     {
+        hue = ((hue % 360) + 360) % 360;
+        sat = Math.Clamp(sat, 0, 1);
+        val = Math.Clamp(val, 0, 1);
+
         double c = val * sat;
         double x = c * (1 - Math.Abs(((hue / 60.0) % 2) - 1));
         double m = val - c;
@@ -1505,10 +1652,12 @@ public partial class ColorSettingsWindow : Window
             _ => (c, 0.0, x),
         };
 
-        return Color.FromArgb(
-            alpha,
-            (byte)Math.Round((r + m) * 255),
-            (byte)Math.Round((g + m) * 255),
-            (byte)Math.Round((b + m) * 255));
+        return Color.FromArgb(alpha, Channel(r + m), Channel(g + m), Channel(b + m));
+
+        // Belt as well as braces: the arithmetic above cannot leave 0~1 once
+        // the inputs are clamped, and it costs nothing to make sure the cast
+        // can never be the thing that decides a colour.
+        static byte Channel(double value)
+            => (byte)Math.Clamp(Math.Round(value * 255), 0, 255);
     }
 }
