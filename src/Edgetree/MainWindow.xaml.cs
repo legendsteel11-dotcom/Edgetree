@@ -21152,9 +21152,26 @@ public partial class MainWindow : Window
     {
         _filmstripDragStart = null;
         _filmstripDragCandidate = null;
-        if (_filmstripSelfSelect ||
-            ItemsControl.ContainerFromElement(ViewerFilmstrip, (DependencyObject)e.OriginalSource)
-                is not ListBoxItem { Content: FilmstripCell cell })
+
+        var container = ItemsControl.ContainerFromElement(
+            ViewerFilmstrip, (DependencyObject)e.OriginalSource) as ListBoxItem;
+
+        // WHICH BRANCH SWALLOWED IT. A press on a cell that leaves the viewer
+        // showing the same picture has four places it can die and they are not
+        // distinguishable from outside: the strip was moving its own selection,
+        // WPF handed us an element with no container behind it, the row is past
+        // the folder's cap and the reveal declined, or the selection was set and
+        // the panel did not follow. Reported 2026-08-12 and once before that,
+        // both times without a repro. click.log already carries the raw window
+        // messages, so this line lands on the same timeline as the press it
+        // belongs to.
+        LogClickLine(
+            $"strip press: self={(_filmstripSelfSelect ? "yes" : "-")} " +
+            $"container={(container is null ? "none" : "yes")} " +
+            $"cell={(container?.Content as FilmstripCell)?.Name ?? "-"} " +
+            $"captured={(Mouse.Captured?.GetType().Name ?? "-")}");
+
+        if (_filmstripSelfSelect || container is not { Content: FilmstripCell cell })
         {
             return;
         }
@@ -21182,10 +21199,22 @@ public partial class MainWindow : Window
         // A row past the folder's "더 보기" cap is one the counter and the strip
         // already promised, so the reveal happens rather than the click doing
         // nothing. Only the tree has a cap to cross; a result list has none.
-        if (target.Parent is { } parent && !parent.Children.Contains(target))
+        // Uncovered only as far as this row, not the whole folder - see
+        // ShowChildrenUpTo, and the 1.6s freeze that came of doing it the other
+        // way.
+        bool hidden = target.Parent is { } parent && !parent.Children.Contains(target);
+        if (hidden)
         {
-            parent.ShowAllChildren();
+            target.Parent!.ShowChildrenUpTo(target);
         }
+
+        // The other half of the strip-press instrument: whether the row this is
+        // being asked to select is actually in the tree by the time it is asked
+        // for. A row still missing after the reveal is a click that can only do
+        // nothing, whatever happens below.
+        LogClickLine(
+            $"strip move: target={target.Name} wasHidden={(hidden ? "yes" : "-")} " +
+            $"nowInTree={(target.Parent?.Children.Contains(target) != false ? "yes" : "NO")}");
 
         // Selects, scrolls to and focuses the tree row; selection-follow then
         // brings the picture, so there is no second path to the same file.

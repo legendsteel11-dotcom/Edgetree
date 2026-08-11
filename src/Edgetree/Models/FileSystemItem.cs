@@ -433,14 +433,18 @@ public class FileSystemItem : INotifyPropertyChanged
         Children.ReplaceAll(capped);
     }
 
-    // The full loaded listing with the reveal state ignored: the revealed
-    // rows plus whatever still waits in _overflow behind "더 보기" (which are
-    // the SAME instances Children gains when it is clicked - _overflow is
-    // never cleared by the reveal, so the two must not be concatenated
-    // blindly). The viewer's carousel counts pictures against this, because
-    // "35 / 447" is a claim about the FOLDER, and a total that grew when
-    // 더 보기 was clicked read as the counter being wrong (2026-08-09). The
-    // "더 보기" row itself is not a child and is skipped.
+    // The full loaded listing with the reveal state ignored: the rows on show
+    // plus whatever still waits behind "더 보기". The viewer's carousel counts
+    // pictures against this, because "35 / 447" is a claim about the FOLDER,
+    // and a total that grew when 더 보기 was clicked read as the counter being
+    // wrong (2026-08-09). The synthetic trailing row is not a child and is
+    // skipped.
+    //
+    // Concatenated plainly, now that _overflow means exactly "the rows not in
+    // Children" whichever way the folder was revealed (see ShowAllChildren).
+    // While the two could overlap this needed a guard on the reveal state, and
+    // a reveal that took rows off the front of the overflow rather than all of
+    // them would have slipped straight past that guard.
     public IEnumerable<FileSystemItem> AllLoadedChildren
     {
         get
@@ -452,12 +456,9 @@ public class FileSystemItem : INotifyPropertyChanged
                     yield return child;
                 }
             }
-            if (!_showingAll)
+            foreach (var child in _overflow)
             {
-                foreach (var child in _overflow)
-                {
-                    yield return child;
-                }
+                yield return child;
             }
         }
     }
@@ -485,7 +486,69 @@ public class FileSystemItem : INotifyPropertyChanged
         revealed.AddRange(_overflow);
         revealed.Add(CreateShowLess(this, _overflow.Count));
         Children.ReplaceAll(revealed);
+
+        // ONE RULE FOR THE OVERFLOW: it holds exactly the rows that are NOT in
+        // Children. It used to be left standing through a reveal - harmless
+        // while nothing read it in that state, but ShowChildrenUpTo takes its
+        // rows off the front, so the two reveals disagreed about what the list
+        // meant and anything recapping had to know which one it was looking at.
+        // Clearing here makes the two the same shape (2026-08-12).
+        _overflow.Clear();
         _showingAll = true;
+    }
+
+    // Uncovers only as far as ONE row instead of the whole overflow. Clicking a
+    // thumbnail past the cap used to reveal everything, and on a folder of
+    // 2,404 that put every remaining row into the tree in one go - measured as
+    // 1.6 seconds between a press and its own release, during which the app
+    // answered nothing and the click read as broken (2026-08-12, click.log).
+    // The click was never what was slow; what it asked for was.
+    //
+    // Everything UP TO the target comes with it. The rows in between are what
+    // the tree would have to walk to put the target on screen anyway, and a
+    // sorted listing with holes in it would be a worse thing to hand back than
+    // the cost of carrying them. So a click near the front of a large folder
+    // now costs almost nothing, which is where most of them land; one at the
+    // far end still pays, and there is no way around that while the rule is
+    // that what you clicked is a row in the tree.
+    public void ShowChildrenUpTo(FileSystemItem target)
+    {
+        if (_showingAll || _overflow.Count == 0)
+        {
+            return;
+        }
+
+        int index = _overflow.IndexOf(target);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var revealed = new List<FileSystemItem>(Children.Count + index + 1);
+        foreach (var child in Children)
+        {
+            if (!child.IsShowMore)
+            {
+                revealed.Add(child);
+            }
+        }
+
+        revealed.AddRange(_overflow.GetRange(0, index + 1));
+        _overflow.RemoveRange(0, index + 1);
+
+        if (_overflow.Count > 0)
+        {
+            revealed.Add(CreateShowMore(this, _overflow.Count));
+        }
+        else
+        {
+            // The last of it came across, so the folder is simply revealed now
+            // and gets the way back out that a full reveal gets.
+            _showingAll = true;
+            revealed.Add(CreateShowLess(this, revealed.Count - DisplayCap));
+        }
+
+        Children.ReplaceAll(revealed);
     }
 
     // Returns a fully-revealed folder to the capped state (first DisplayCap +
@@ -505,11 +568,6 @@ public class FileSystemItem : INotifyPropertyChanged
     // cannot disagree.
     public void RecollapseOverflow()
     {
-        if (!_showingAll)
-        {
-            return;
-        }
-
         // The listing itself: the trailing synthetic row is a control, not a
         // file, and must not be carried into the overflow.
         var real = new List<FileSystemItem>(Children.Count);
@@ -521,19 +579,34 @@ public class FileSystemItem : INotifyPropertyChanged
             }
         }
 
-        _overflow.Clear();
-        _showingAll = false;
-
-        // Shrunk back under the cap while revealed (deletions): there is
-        // nothing left to hide, so the folder returns to the plain state
-        // rather than growing a row that stands for nothing.
+        // Nothing is on show past the cap, so there is nothing revealed to take
+        // back and this is already the capped shape. LEAVING IT ALONE IS THE
+        // WHOLE POINT: an earlier version rebuilt Children here from the rows
+        // it could see, which on an ordinary capped folder threw away the "더
+        // 보기" row AND everything waiting behind it - and since a collapse now
+        // recaps, closing any large folder erased it (2026-08-12).
+        //
+        // The one case that does need settling is a folder that shrank under
+        // the cap while revealed: nothing is hidden any more, so a trailing row
+        // standing for nothing has to go.
         if (real.Count <= DisplayCap)
         {
-            Children.ReplaceAll(real);
+            if (_overflow.Count == 0 && (_showingAll || Children.Count != real.Count))
+            {
+                _showingAll = false;
+                Children.ReplaceAll(real);
+            }
             return;
         }
 
-        _overflow.AddRange(real.GetRange(DisplayCap, real.Count - DisplayCap));
+        // Everything past the cap goes back IN FRONT of whatever was already
+        // waiting: a partial reveal takes its rows off the front of the
+        // overflow, so this is where they belong when they return.
+        var back = real.GetRange(DisplayCap, real.Count - DisplayCap);
+        back.AddRange(_overflow);
+        _overflow.Clear();
+        _overflow.AddRange(back);
+        _showingAll = false;
 
         var capped = new List<FileSystemItem>(DisplayCap + 1);
         capped.AddRange(real.GetRange(0, DisplayCap));
@@ -561,7 +634,7 @@ public class FileSystemItem : INotifyPropertyChanged
             string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
         if (hidden is not null)
         {
-            ShowAllChildren();
+            ShowChildrenUpTo(hidden);
             return hidden;
         }
 
