@@ -67,7 +67,7 @@
              for both orientations). It is a FLOOR on the grab area, not a
              size: anything short of a folder with thousands of rows never
              reaches it. -->
-        <system:Double x:Key="ScrollThumbMinLength">44</system:Double>
+        <system:Double x:Key="ScrollThumbMinLength">120</system:Double>
         <GridLength x:Key="ScrollGutterWidth">13</GridLength>
         <SolidColorBrush x:Key="MenuForeground" Color="#FFCCCCCC"/>
         <SolidColorBrush x:Key="PanelDividerBrush" Color="#FF3A3A3A"/>
@@ -427,8 +427,16 @@
                         Content="{TemplateBinding Content}"
                         CanContentScroll="{TemplateBinding CanContentScroll}"
                         Margin="{TemplateBinding Padding}"/>
+                <!-- HELD OFF THE RIGHT EDGE. The panel can sit flush against the
+                     window's edge, where the resize grip lives, and a thumb
+                     driven into that last few pixels became a fight between two
+                     controls for the same place - with the wrong one usually
+                     winning (2026-08-12). The track loses a little length,
+                     which costs nothing next to a thumb that cannot be caught
+                     where the strip most often ends up. -->
                 <ScrollBar x:Name="PART_HorizontalScrollBar"
                         Grid.Row="1"
+                        Margin="0,0,10,0"
                         Style="{StaticResource MinimalScrollBarStyle}"
                         Opacity="1"
                         Orientation="Horizontal"
