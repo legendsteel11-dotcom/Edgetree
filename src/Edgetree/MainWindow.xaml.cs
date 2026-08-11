@@ -19925,8 +19925,6 @@ public partial class MainWindow : Window
         }
 
         _viewerFlickFired = true;
-        // Home before the next picture arrives, so it is never drawn offset.
-        ViewerZoomPan.X = 0;
         // Dragging left pulls the next picture in from the right, which is the
         // direction every photo app on a phone has taught. It is also what the
         // hand is literally doing - pushing this one out of the way.
@@ -19940,12 +19938,9 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Nothing to put back: the picture never moved. The reset that used to
+        // be here belonged to the follow-the-hand feedback and went with it.
         _viewerFlicking = false;
-        // Straight back, not eased back. An animation here would be the app
-        // moving the picture on its own, which is the one kind of motion this
-        // app does not do - and the snap reads as the control being released
-        // rather than as something being undone.
-        ViewerZoomPan.X = 0;
         ViewerImageHost.ReleaseMouseCapture();
     }
 
@@ -19997,8 +19992,15 @@ public partial class MainWindow : Window
     {
         // The flick shares the same hazard and the same answer: left set, a
         // bare mouse move with no button held would page the folder.
+        //
+        // THE PAN IS NOT TOUCHED HERE, and it used to be: this method reset
+        // ViewerZoomPan.X unconditionally, left over from the follow-the-hand
+        // feedback the flick had for part of a day. Releasing a pan releases
+        // the capture, so every pan of a zoomed picture ended by having its
+        // horizontal position thrown away - the picture snapped sideways on
+        // mouse-up while the vertical stayed, which is what read as the old
+        // grab-and-drag effect having moved onto the pan (2026-08-11).
         _viewerFlicking = false;
-        ViewerZoomPan.X = 0;
 
         if (!_viewerPanning)
         {
