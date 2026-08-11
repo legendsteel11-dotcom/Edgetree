@@ -15611,6 +15611,7 @@ public partial class MainWindow : Window
         UpdateViewerExpandButton();
         StopViewerGif();
         StopViewerVideo();
+        ReleaseFilmstripCells();
         ViewerPlayOverlay.Visibility = Visibility.Collapsed;
         ViewerImage.Source = null;
         ViewerIconImage.Source = null;
@@ -20604,6 +20605,23 @@ public partial class MainWindow : Window
         }
 
         _filmstripTrickleRange = (first, last);
+
+        // THE CEILING IS ENFORCED BY MOVEMENT, not only by the fetch loop. It
+        // lived in the trickle alone, and the trickle STOPS the moment there is
+        // nothing left to fetch within reach - a stopped trickle trims nothing.
+        // Wheeling along a large strip then only ever added: this sweep asks for
+        // what came into view and nothing anywhere let go, which is how a
+        // 2,400-item folder reached 1.3GB (2026-08-12). What is near the eye is
+        // decided by where the eye is, so the sweep is the right place to say it.
+        //
+        // The other branch above is the no-precache path and already releases
+        // its own way (ReleaseDistantFilmstripThumbnails, a much tighter
+        // window); this covers the case that setting deliberately does not.
+        if (_settings.ViewerPrecacheThumbnails)
+        {
+            TrimFilmstripThumbnails((first + last) / 2);
+        }
+
         if (remote || _settings.ViewerPrecacheThumbnails)
         {
             StartFilmstripTrickle();
@@ -21174,9 +21192,60 @@ public partial class MainWindow : Window
         _settings.ViewerFilmstrip = ViewerFilmstripChip.IsChecked == true;
         _settingsService.Save(_settings);
         // Rebuild rather than just show: the cells are only built while the
-        // strip is up, so the first switch-on has none yet.
-        _filmstripBuiltFor = default;
+        // strip is up, so the first switch-on has none yet. Switching OFF goes
+        // through the same call to hand the pictures back.
+        ReleaseFilmstripCells();
         UpdateViewerCarousel();
+    }
+
+    // ----- 스트립을 놓을 때는 사진도 함께 놓는다 --------------------------------
+    //
+    // THE CELLS ARE THE CACHE, so letting the strip go has to mean letting its
+    // pictures go too - and until 2026-08-12 neither closing the panel nor
+    // switching the strip off touched them. Every thumbnail stayed alive for
+    // the rest of the run, for a strip nobody could see.
+    //
+    // It hid because the GC DOES NOT COUNT THIS MEMORY. WPF keeps bitmap pixels
+    // unmanaged, so a heap dump of a 930MB process reported a managed heap of
+    // 228MB and the stall instrument's collection counts stayed flat while the
+    // number climbed. At the retain ceiling the strip alone is a quarter of a
+    // gigabyte of 256px bitmaps.
+    //
+    // Dropping them costs a refill, not a re-read: every fetch consults this
+    // app's own thumbnail cache first, which answers from LOCAL disk however
+    // far away the file is - measured at 2,419 answers averaging 1ms.
+    // CLEARING THE COLLECTION IS NOT ENOUGH, and the first attempt at this only
+    // did that. A cell dropped from the list is still held by any queued
+    // request that was going to fill it, so its bitmap stayed alive with it -
+    // the strip read "thumbs 0" while the process sat at 1.3GB and never came
+    // down. The pixels are let go HERE, on the cells themselves, so it does not
+    // matter who else is still pointing at them; the queue is dropped as well
+    // so nothing refills what was just released.
+    private void ReleaseFilmstripCells()
+    {
+        Services.ShellThumbnailService.DropPending();
+
+        foreach (var cell in _filmstripCells)
+        {
+            cell.Thumbnail = null;
+            cell.Requested = false;
+        }
+
+        _filmstripCells.Clear();
+        _filmstripBuiltFor = default;
+        _filmstripTrickleRange = (0, 0);
+        _filmstripTrickleTimer?.Stop();
+
+        // AND ASK FOR THE COLLECTION, because closing the panel is the one
+        // moment nothing else will. Hundreds of megabytes just became
+        // unreachable, but the app is now idle - no allocation, so no
+        // collection, so the finalizers that free the unmanaged pixels never
+        // run. The number stays where it was for as long as the window sits
+        // there, which is exactly when someone looks at it.
+        //
+        // Background rather than blocking: nothing is waiting on the memory,
+        // and a blocking gen2 is a pause the window would wear for no one.
+        GC.Collect(2, GCCollectionMode.Forced, blocking: false);
     }
 
     // No wrap-around: a disabled chevron at either end says "you are at the

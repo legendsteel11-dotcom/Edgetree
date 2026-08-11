@@ -50,10 +50,41 @@ public class FilmstripCell : INotifyPropertyChanged
     // would let a speculative miss decide the cell is blank for good.
     public bool AskedAhead { get; set; }
 
+    // WHAT A THUMBNAIL WEIGHS, told to the collector. A 256x256 BGRA is a
+    // quarter of a megabyte, and none of it is on the managed heap - WPF keeps
+    // bitmap pixels unmanaged, so a thousand of them is 250MB the GC cannot
+    // see. Left at that it never treats them as a reason to collect: measured
+    // 2026-08-12, a process holding 1,316MB with a managed heap of 231MB sat
+    // there for a full minute, and dropped to 576MB the instant a collection
+    // was forced. Nothing was leaked - nothing had asked.
+    //
+    // Reported through this property and nowhere else, so the add and the
+    // remove cannot drift apart: every path that fills a cell or lets one go
+    // goes through here, and each one either replaces a value or clears it.
+    private const long ThumbnailBytes = 256 * 256 * 4;
+
     public ImageSource? Thumbnail
     {
         get => _thumbnail;
-        set => SetField(ref _thumbnail, value);
+        set
+        {
+            if (Equals(_thumbnail, value))
+            {
+                return;
+            }
+
+            if (_thumbnail is not null)
+            {
+                GC.RemoveMemoryPressure(ThumbnailBytes);
+            }
+
+            if (value is not null)
+            {
+                GC.AddMemoryPressure(ThumbnailBytes);
+            }
+
+            SetField(ref _thumbnail, value);
+        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

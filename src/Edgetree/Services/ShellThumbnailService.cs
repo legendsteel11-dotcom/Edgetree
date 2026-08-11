@@ -275,6 +275,36 @@ public static class ShellThumbnailService
         bool ReadDimensions, bool EmbeddedOnly, Action<ImageSource?, int, int> OnCompleted)> Pending = new();
     private static int _workers;
 
+    // Everything QUEUED BUT NOT STARTED, thrown away. This queue is
+    // speculative - a strip asking ahead for pictures the eye may never reach -
+    // and it outlived the thing that asked for it. Closing the viewer left over
+    // a thousand requests standing, and that cost twice: each request holds a
+    // callback, each callback holds the cell it was going to fill, and each
+    // cell holds a bitmap whose pixels are UNMANAGED, so emptying the strip
+    // freed nothing and a 1.3GB process stayed at 1.3GB; then the workers went
+    // on reading files and filling cells nobody could see, putting new bitmaps
+    // behind the same roots (2026-08-12, memory.log).
+    //
+    // Only the queue - a job already running finishes and answers into a
+    // callback that finds nothing to do, which is one wasted read at most.
+    // _inFlight is corrected by hand here because it is incremented on the
+    // PUSH, not on the start, and the instrument reading it would otherwise
+    // count these forever.
+    public static void DropPending()
+    {
+        lock (PendingGate)
+        {
+            int dropped = Pending.Count;
+            if (dropped == 0)
+            {
+                return;
+            }
+
+            Pending.Clear();
+            Interlocked.Add(ref _inFlight, -dropped);
+        }
+    }
+
     public static void GetPreview(string path, int pixelSize, bool thumbnailOnly,
         Action<ImageSource?, int, int> onCompleted, bool readDimensions = true,
         bool embeddedOnly = false)
