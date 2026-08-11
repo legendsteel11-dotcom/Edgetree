@@ -279,6 +279,11 @@ public static class Strings
     // FileSystemItem.DisplayCap items. {0} is the hidden count.
     public static string ShowMoreFormat = "… 더 보기 ({0}개)";
 
+    // The same trailing slot once the reveal has happened: the two states are
+    // exclusive, so one row serves both and the folder always ends in a way
+    // back out. {0} is the count that would be hidden again.
+    public static string ShowLessFormat = "… 접기 ({0}개)";
+
     // File search (Ctrl+F view - see MainWindow's search-view methods and
     // Services/FileSearchService)
     public static string ToolTipSearch = "검색 (Ctrl+F)";
@@ -772,6 +777,7 @@ public static class Strings
         ToolTipClose = "Exit";
         RootPathLabel = "This PC";
         ShowMoreFormat = "… Show {0} more";
+        ShowLessFormat = "… Show {0} less";
 
         ToolTipSearch = "Search (Ctrl+F)";
         ToolTipViewer = "Image Viewer";

@@ -5885,6 +5885,24 @@ public partial class MainWindow : Window
         if (e.OriginalSource is TreeViewItem { DataContext: FileSystemItem item })
         {
             LogTreeToggle(item, e.RoutedEvent == TreeViewItem.ExpandedEvent);
+
+            // CLOSING A FOLDER ENDS ITS REVEAL. "더 보기" was one-way: nothing
+            // but a favorites jump or a restart put a folder back behind the
+            // cap, so one click left the tree carrying thousands of realized
+            // rows for the rest of the session - and closing the folder, the
+            // obvious way to ask for that back, did nothing (2026-08-12).
+            //
+            // QUEUED, not done here. RecollapseOverflow removes rows, and
+            // removing the row holding the SELECTION re-enters the tree: that
+            // is the 2026-08-02 "Collection was modified" crash, raised from
+            // this same call under NavigateToPath. Letting the collapse finish
+            // first keeps the removal out of the tree's own event.
+            if (e.RoutedEvent == TreeViewItem.CollapsedEvent)
+            {
+                Dispatcher.BeginInvoke(
+                    () => RecapOverflowRecursive(item),
+                    System.Windows.Threading.DispatcherPriority.Background);
+            }
         }
 
         UpdateCollapseAllButtonState();
@@ -5912,6 +5930,12 @@ public partial class MainWindow : Window
         {
             CollapseRecursive(root);
         }
+
+        // The reveals go with them. Collapsing raises Collapsed for every
+        // REALIZED row, which recaps those on its own - but a folder revealed
+        // and then scrolled out of view has no container to raise anything, so
+        // a tidy-up that claims to collapse everything has to say it here too.
+        RecapAllOverflow();
 
         _collapseAllRestorePaths = null;
         CollapseAllFlip.ScaleY = CollapseAllUpright;
@@ -10637,7 +10661,23 @@ public partial class MainWindow : Window
         // also select this non-file placeholder row.
         if (treeViewItem.DataContext is FileSystemItem { IsShowMore: true } showMore)
         {
-            showMore.Parent?.ShowAllChildren();
+            if (showMore.IsShowLess)
+            {
+                // Queued for the same reason the collapse handler queues it:
+                // this drops thousands of rows, and dropping the one holding
+                // the selection re-enters the tree from inside a mouse event
+                // (the 2026-08-02 "Collection was modified" crash). Revealing
+                // only ADDS rows, so it has never needed the same care.
+                var folder = showMore.Parent;
+                Dispatcher.BeginInvoke(
+                    () => folder?.RecollapseOverflow(),
+                    System.Windows.Threading.DispatcherPriority.Background);
+            }
+            else
+            {
+                showMore.Parent?.ShowAllChildren();
+            }
+
             e.Handled = true;
             return;
         }

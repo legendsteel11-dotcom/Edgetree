@@ -53,7 +53,21 @@ public class FileSystemItem : INotifyPropertyChanged
     // of icon+name by the tree DataTemplate, and clicking it reveals the rest.
     public bool IsShowMore { get; }
     public int RemainingCount { get; }
-    public string ShowMoreLabel => string.Format(Strings.ShowMoreFormat, RemainingCount);
+
+    // THE SAME ROW AFTER THE REVEAL, pointing the other way. A folder showing
+    // everything has no "더 보기" row - that slot is simply empty - and until
+    // 2026-08-12 nothing put the folder back either: the reveal outlived every
+    // collapse and only a favorites jump or a restart undid it. The two states
+    // cannot both apply, so the slot carries whichever one is available.
+    //
+    // IsShowMore stays TRUE on this row so that every "not a real file" filter
+    // in the tree - navigation, recap, expanded-descendant, refresh matching -
+    // keeps excluding it without being taught about a second synthetic kind.
+    // What differs is the label and what a click does.
+    public bool IsShowLess { get; }
+
+    public string ShowMoreLabel => string.Format(
+        IsShowLess ? Strings.ShowLessFormat : Strings.ShowMoreFormat, RemainingCount);
 
     // Drive roots (FileSystemService.GetDriveRoots) are the only items ever
     // constructed with no parent - used to bold their row (C:, D:, ...).
@@ -309,9 +323,10 @@ public class FileSystemItem : INotifyPropertyChanged
 
     // The trailing "더 보기" row for an oversized folder; carries the count of
     // items still hidden in the parent's overflow so the row can label itself.
-    private FileSystemItem(FileSystemItem parent, int remainingCount)
+    private FileSystemItem(FileSystemItem parent, int remainingCount, bool showLess)
     {
         IsShowMore = true;
+        IsShowLess = showLess;
         RemainingCount = remainingCount;
         Parent = parent;
         Name = string.Empty;
@@ -319,7 +334,10 @@ public class FileSystemItem : INotifyPropertyChanged
     }
 
     public static FileSystemItem CreateShowMore(FileSystemItem parent, int remainingCount)
-        => new(parent, remainingCount);
+        => new(parent, remainingCount, showLess: false);
+
+    public static FileSystemItem CreateShowLess(FileSystemItem parent, int remainingCount)
+        => new(parent, remainingCount, showLess: true);
 
     // Lets MainWindow's whole-tree refresh (RefreshAllLoadedFolders) skip
     // folders that were never expanded - nothing loaded means nothing stale to
@@ -465,33 +483,62 @@ public class FileSystemItem : INotifyPropertyChanged
             }
         }
         revealed.AddRange(_overflow);
+        revealed.Add(CreateShowLess(this, _overflow.Count));
         Children.ReplaceAll(revealed);
         _showingAll = true;
     }
 
     // Returns a fully-revealed folder to the capped state (first DisplayCap +
     // a "더 보기" row) so navigating to another favorite never has to walk past
-    // a huge realized list (see MainWindow.NavigateToPath). Only removes the
-    // overflow rows it previously appended, leaving the first DisplayCap - and
-    // anything expanded within them - untouched.
+    // a huge realized list (see MainWindow.NavigateToPath). The first
+    // DisplayCap rows - and anything expanded within them - are carried over as
+    // the SAME instances, so no subtree state is lost.
+    //
+    // TAKEN FROM CHILDREN, NOT FROM _overflow, and that is the fix for a folder
+    // that could not be re-capped at all (2026-08-12). RefreshChildren clears
+    // _overflow and does not refill it while showing all - correctly, since
+    // every row is in Children then - so this used to see an empty overflow and
+    // return at its first line. Any refresh of a revealed folder therefore left
+    // it revealed for good: the collapse row did nothing, a jump's recap did
+    // nothing, and ShowAllChildren also declines while _showingAll, so nothing
+    // could put the two back in step. Deriving the split here means the two
+    // cannot disagree.
     public void RecollapseOverflow()
     {
-        if (!_showingAll || _overflow.Count == 0)
+        if (!_showingAll)
         {
             return;
         }
-        // The other half of the same cost: NavigateToPath re-caps every
-        // revealed folder before it walks, so a jump was paying one removal
-        // notification per hidden row on top of the reveal's own adds.
-        int keep = Math.Min(DisplayCap, Children.Count);
-        var capped = new List<FileSystemItem>(keep + 1);
-        for (int i = 0; i < keep; i++)
+
+        // The listing itself: the trailing synthetic row is a control, not a
+        // file, and must not be carried into the overflow.
+        var real = new List<FileSystemItem>(Children.Count);
+        foreach (var child in Children)
         {
-            capped.Add(Children[i]);
+            if (!child.IsShowMore && !child.IsPlaceholder)
+            {
+                real.Add(child);
+            }
         }
+
+        _overflow.Clear();
+        _showingAll = false;
+
+        // Shrunk back under the cap while revealed (deletions): there is
+        // nothing left to hide, so the folder returns to the plain state
+        // rather than growing a row that stands for nothing.
+        if (real.Count <= DisplayCap)
+        {
+            Children.ReplaceAll(real);
+            return;
+        }
+
+        _overflow.AddRange(real.GetRange(DisplayCap, real.Count - DisplayCap));
+
+        var capped = new List<FileSystemItem>(DisplayCap + 1);
+        capped.AddRange(real.GetRange(0, DisplayCap));
         capped.Add(CreateShowMore(this, _overflow.Count));
         Children.ReplaceAll(capped);
-        _showingAll = false;
     }
 
     // Finds a direct child by name for navigation, looking past the cap into
@@ -632,6 +679,13 @@ public class FileSystemItem : INotifyPropertyChanged
         if (_overflow.Count > 0)
         {
             Children.Add(CreateShowMore(this, _overflow.Count));
+        }
+        else if (_showingAll)
+        {
+            // The remove pass above dropped the old row with the rest of the
+            // synthetic ones, so a revealed folder that refreshes would lose its
+            // way back out and there would be no gesture left to restore it.
+            Children.Add(CreateShowLess(this, target.Count - DisplayCap));
         }
     }
 
