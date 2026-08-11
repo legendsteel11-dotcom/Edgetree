@@ -10230,8 +10230,29 @@ public partial class MainWindow : Window
             // not exist yet for a level that's mid-realization.
             if (attempt >= 5)
             {
+                // Never silently again. Five quiet passes and a return was a
+                // click that did nothing, with nothing anywhere saying why.
+                LogClickLine($"select gave up: {item.Name} (no container after {attempt} tries)");
                 return;
             }
+
+            // AND MAKE THE ROW EXIST, rather than only asking again. A
+            // virtualizing panel builds containers around what it is showing,
+            // so a row a long way down a revealed folder has none - and no
+            // amount of retrying conjures one, which is why clicking a
+            // thumbnail 30% into a 2,402-row folder moved nothing at all
+            // (2026-08-12). This is the same fault the drive roots had, in a
+            // place the huge root cache does not reach.
+            //
+            // It scrolls the tree, and that is the one thing this app does not
+            // do on its own - but the user asked for this row by clicking it,
+            // and the successful path below scrolls to it anyway.
+            int at = container.Items.IndexOf(item);
+            if (at >= 0 && FindDescendant<VirtualizingStackPanel>(container) is { } host)
+            {
+                host.BringIndexIntoViewPublic(at);
+            }
+
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
                 new Action(() => SelectVisibleItemStep(chain, index, container, attempt + 1)));
             return;
@@ -21270,6 +21291,22 @@ public partial class MainWindow : Window
 
         if (_filmstripSelfSelect || container is not { Content: FilmstripCell cell })
         {
+            // A PRESS THAT HIT NO CELL STOPS HERE. It used to be left to
+            // bubble, and something above took it: aiming at the scrollbar's
+            // thumb and missing moved the TREE to the parent folder, which is
+            // both surprising and expensive on a folder this size (reported
+            // 2026-08-12; click.log shows a run of "container=none" presses
+            // wherever it happened).
+            //
+            // Unless the scrollbar is what was pressed - this is a PREVIEW
+            // handler, so it runs before the bar sees the press at all, and
+            // handling it here would take dragging the bar away entirely.
+            if ((e.OriginalSource as DependencyObject)
+                    ?.FindAncestor<System.Windows.Controls.Primitives.ScrollBar>() is null)
+            {
+                e.Handled = true;
+            }
+
             return;
         }
 
