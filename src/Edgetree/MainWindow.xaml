@@ -6524,8 +6524,56 @@
                              controls - no playlist, no speed, no subtitles -
                              the panel previews a file, it does not become a
                              media player. -->
-                        <StackPanel x:Name="ViewerMediaBar"
-                                Visibility="Collapsed">
+                        <!-- A PLATE UNDER THE WHOLE TRANSPORT (2026-08-11), so
+                             the part of the panel that is about SOUND reads as
+                             one thing rather than as controls scattered under a
+                             caption. Faint, and the same ink the viewer's own
+                             hover uses - it is derived against whatever colour
+                             the panel's background happens to be, which a fixed
+                             tint would not survive.
+
+                             A Border rather than a background on the stack: it
+                             is the only one of the two that can round its
+                             corners and hold padding, and the padding is what
+                             keeps the plate off the caption above it.
+
+                             Still called ViewerMediaBar: everything that shows
+                             and hides the transport addresses it by that name,
+                             and a Border answers Visibility and Margin exactly
+                             as the StackPanel did. -->
+                        <Border x:Name="ViewerMediaBar"
+                                Visibility="Collapsed"
+                                Margin="0,8,0,0"
+                                SizeChanged="ViewerMediaBar_SizeChanged">
+                        <Grid>
+                            <!-- The plate is its OWN element behind the row,
+                                 not a background on the border around it,
+                                 because the only way to soften a brush that
+                                 comes from a resource is to fade the thing
+                                 painted with it - and fading the border would
+                                 take the controls down with it. Here the
+                                 opacity lands on the plate alone. -->
+                            <Border Background="{DynamicResource HoverBackground}"
+                                    CornerRadius="6"
+                                    Opacity="0.3"/>
+                        <StackPanel x:Name="ViewerMediaContent"
+                                Margin="6,5,6,3">
+                            <!-- WHICH TRACK IS PLAYING, and only while that is
+                                 not the file on screen. The caption above names
+                                 what the PANEL is showing, so once background
+                                 play lets the two come apart, the transport is
+                                 operating on a file nothing else on screen
+                                 names - and pausing "whatever this is" is not
+                                 something anyone should have to do. Hidden the
+                                 rest of the time, when the caption is already
+                                 the answer. -->
+                            <TextBlock x:Name="ViewerNowPlaying"
+                                    Visibility="Collapsed"
+                                    FontSize="{DynamicResource FooterChipFontSize}"
+                                    Foreground="{DynamicResource ForegroundText}"
+                                    TextAlignment="Center"
+                                    TextTrimming="CharacterEllipsis"
+                                    Margin="{DynamicResource ViewerCaptionRowGap}"/>
                             <!-- The marks ride WITH the bar rather than beside
                                  it: a tick is only meaningful against the
                                  position it points at. Underneath rather than
@@ -6551,7 +6599,15 @@
                                         VerticalAlignment="Bottom"
                                         IsHitTestVisible="False"/>
                             </Grid>
-                            <StackPanel Orientation="Horizontal"
+                            <!-- Named because it is MEASURED: as the panel
+                                 narrows this row is asked how much it wants,
+                                 and controls are taken out of it in order of
+                                 what can be done without - see
+                                 FitViewerMediaRow. Centred, so overflow used to
+                                 be clipped at BOTH ends and the first thing to
+                                 go was play/pause, in the middle. -->
+                            <StackPanel x:Name="ViewerMediaButtonRow"
+                                    Orientation="Horizontal"
                                     HorizontalAlignment="Center"
                                     Margin="{DynamicResource ViewerMediaButtonRowMargin}">
                                 <!-- Material Symbols "play_arrow" / "pause"
@@ -6585,6 +6641,31 @@
                                      mark padded to the full box beside marks
                                      fitted to their own ink would be the one
                                      that reads small. -->
+                                <!-- Keeps the sound going when the tree moves
+                                     somewhere else. Beside the repeat switch
+                                     because the two answer the same kind of
+                                     question - what happens to playback when
+                                     something else changes - and both are
+                                     switches rather than actions, so neither
+                                     draws the outlined box.
+
+                                     Material Symbols "keep", borrowed from the
+                                     header's own pin for now: it is the right
+                                     idea (this track stays put) but the same
+                                     mark already means "sidebar pinned open" a
+                                     few pixels away. A glyph of its own
+                                     replaces it. -->
+                                <ToggleButton x:Name="ViewerBackgroundChip"
+                                        Style="{StaticResource FooterFilterGlyphChipStyle}"
+                                        Click="ViewerBackgroundChip_Click"
+                                        ToolTip="{x:Static services:Strings.ViewerBackgroundPlay}">
+                                    <Path Data="m624-480 96 96v72H516v228l-36 36-36-36v-228H240v-72l96-96v-264h-48v-72h384v72h-48v264Zm-282 96h276l-66-66v-294H408v294l-66 66Zm138 0Z"
+                                            Stretch="Uniform"
+                                            Width="{DynamicResource ViewerChipIconSize}"
+                                            Height="{DynamicResource ViewerChipIconSize}"
+                                            Fill="{Binding Foreground,
+                                                RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                                </ToggleButton>
                                 <ToggleButton x:Name="ViewerRepeatChip"
                                         Style="{StaticResource FooterFilterGlyphChipStyle}"
                                         Click="ViewerRepeatChip_Click"
@@ -6644,7 +6725,8 @@
                                      as a filled square is an OUTLINED square
                                      here, and a hand-drawn one would have been
                                      the only solid shape in the row. -->
-                                <Button Style="{StaticResource FooterActionGlyphChipStyle}"
+                                <Button x:Name="ViewerMediaStop"
+                                        Style="{StaticResource FooterActionGlyphChipStyle}"
                                         Click="ViewerMediaStop_Click"
                                         ToolTip="{x:Static services:Strings.ViewerStop}">
                                     <Path Data="M336-624v288-288Zm-72 360v-432h432v432H264Zm72-72h288v-288H336v288Z"
@@ -6687,7 +6769,8 @@
                                      while the position bar was being dragged
                                      (2026-08-09). The twin carries the widest
                                      shape this readout can take. -->
-                                <Grid VerticalAlignment="Center"
+                                <Grid x:Name="ViewerMediaTimeBox"
+                                        VerticalAlignment="Center"
                                         Margin="{DynamicResource ViewerChipGroupMargin}">
                                     <!-- Now two digits of hours, since the
                                          readout stopped dropping them (see
@@ -6786,6 +6869,8 @@
                                 </Button>
                             </StackPanel>
                         </StackPanel>
+                        </Grid>
+                        </Border>
                     </StackPanel>
                     <!-- The panel's own close X used to sit here, top-right.
                          It was directly under the WINDOW's close X and drawn

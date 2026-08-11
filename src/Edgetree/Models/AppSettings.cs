@@ -115,6 +115,16 @@ public class AppSettings
     // file turned into.
     public string ViewerRepeat { get; set; } = "off";
 
+    // Sound carries on while the tree moves somewhere else - the panel normally
+    // drops what it is playing the moment another file is selected, which meant
+    // putting music on and then working in another folder was not possible
+    // without a second app (2026-08-11).
+    //
+    // Off by default, and NOT part of a preset: it is a thing you switch on for
+    // an hour, not part of what the app looks like. AUDIO ONLY; a film's picture
+    // is the point of it, so there is nothing to carry.
+    public bool ViewerBackgroundPlay { get; set; } = false;
+
     // Collapsed to a bare sliver at the screen edge that peeks open on
     // mouse-over - see MainWindow.xaml.cs's EnterAutoHide/ExitAutoHide.
     // Entered by a single click on the app icon while docked and expanded.

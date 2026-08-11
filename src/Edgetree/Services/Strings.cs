@@ -365,6 +365,10 @@ public static class Strings
     // on and off, and nothing about it said where the other three modes live -
     // which was the first thing asked about it (2026-08-11).
     public static string ViewerRepeatHint = "우클릭으로 변경";
+    // The switch that lets sound outlive the selection. Named for what it buys
+    // rather than for the mechanism: "백그라운드 재생" is what other apps call
+    // it, and it says the sound keeps going while you are doing something else.
+    public static string ViewerBackgroundPlay = "백그라운드 재생 · 다른 폴더로 가도 계속";
     // A selected folder's headline, in the caption slot a file's pixel size
     // uses. Counts what the PANEL can show, which is not the same number the
     // tree is listing beside it - so the sentence says which question it is
@@ -771,6 +775,7 @@ public static class Strings
         ViewerRepeatOne = "Repeat one";
         ViewerRepeatShuffle = "Shuffle";
         ViewerRepeatHint = "right-click to change";
+        ViewerBackgroundPlay = "Background play · keeps going in other folders";
         ViewerFolderItemCount = "{0} files this panel can show";
         ViewerFolderPlayAll = "Play this folder";
         ViewerPlaybackUnsupported = "This format can't be played here · Enter opens it in the default app";

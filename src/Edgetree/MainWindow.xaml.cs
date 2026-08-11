@@ -1337,7 +1337,10 @@ public partial class MainWindow : Window
             (e.Key == Key.Left || e.Key == Key.Right) &&
             Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
         {
-            if (_viewerVideoPath is not null)
+            // ViewerMediaIsSelection, not "something is loaded": music left
+            // running in another folder must not take the arrow keys away from
+            // the tree the hand is actually working in (2026-08-11).
+            if (ViewerMediaIsSelection)
             {
                 // 5 seconds, where the mouse's back/forward buttons take 10 -
                 // a keyboard tap is the fine adjustment and the thumb buttons
@@ -1378,9 +1381,13 @@ public partial class MainWindow : Window
         //
         // The position is kept either way (RememberResumePosition), so leaving
         // a paused film costs nothing at all: selecting it again carries on.
+        // Again ViewerMediaIsSelection: the guard exists so a mis-hit cannot
+        // throw away the place in the film IN FRONT OF YOU. Sound playing in
+        // another folder is not in front of you, and swallowing ↑↓ there would
+        // freeze the tree for as long as the music lasted.
         if (Keyboard.Modifiers == ModifierKeys.None &&
             _viewerOpen &&
-            _viewerVideoPath is not null &&
+            ViewerMediaIsSelection &&
             (e.Key == Key.Up || e.Key == Key.Down) &&
             Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
         {
@@ -15298,8 +15305,17 @@ public partial class MainWindow : Window
         // which is also where the previous video's file handle is released.
         // The same-path early return above is what lets a playing GIF (or
         // film) survive its own row being re-selected.
+        //
+        // UNLESS SOUND IS MEANT TO CARRY ON. That is the whole of background
+        // play on this side: the one line that used to drop the track when the
+        // selection moved. Everything else about it is making the panel say so
+        // (UpdateViewerNowPlaying) and keeping the keyboard out of it.
         StopViewerGif();
-        StopViewerVideo();
+        if (!ViewerBackgroundPlaying)
+        {
+            StopViewerVideo();
+        }
+
         ViewerPlayOverlay.Visibility = Visibility.Collapsed;
 
         ViewerFileName.Text = item.Name;
@@ -15324,6 +15340,12 @@ public partial class MainWindow : Window
         {
             ShowViewerIcon(path);
         }
+
+        // The transport survived the selection moving, so the panel has to say
+        // what it is still holding - and the media row has to stay up, which it
+        // does by simply not having been collapsed (that happens in
+        // StopViewerVideo, skipped above).
+        UpdateViewerNowPlaying();
 
         // The other half of 이어서 재생 (see ContinueViewerPlayback). The
         // advance is a selection change, and this is where the panel commits to
@@ -16193,6 +16215,66 @@ public partial class MainWindow : Window
     private bool IsViewerMediaLoaded(string path)
         => string.Equals(_viewerVideoPath, path, StringComparison.OrdinalIgnoreCase);
 
+    // ----- 백그라운드 재생 ---------------------------------------------------
+    //
+    // Sound outliving the selection, so music can be put on and then left
+    // playing while the tree goes somewhere else to work (2026-08-11). Until
+    // this, selecting any other file dropped what was playing - which meant a
+    // second app for the music, which is exactly the round trip this panel
+    // exists to remove.
+    //
+    // IT IS THE FIRST TIME THIS APP HAS TWO "CURRENTS". Everything here is
+    // about keeping that honest: the transport stays on screen and says which
+    // track it is holding, the keyboard goes back to the tree, and the one
+    // switch that turned it on is also the way to let the file go.
+    //
+    // The item, not just the path: when the selection has moved away, the next
+    // track has to be found in the PLAYING file's folder, and there is nothing
+    // else left on screen that knows what that folder was.
+    private FileSystemItem? _viewerPlayingItem;
+
+    // "The transport is holding the file the panel is showing." False exactly
+    // when sound has been left running somewhere else - and that is the
+    // question the keyboard has to ask before it decides whether ←→ seeks the
+    // music or belongs to the tree.
+    private bool ViewerMediaIsSelection
+        => _viewerVideoPath is { } playing
+           && string.Equals(playing, _pendingViewerPath, StringComparison.OrdinalIgnoreCase);
+
+    private bool ViewerBackgroundPlaying
+        => _settings.ViewerBackgroundPlay
+           && _viewerVideoPath is { } playing
+           && IsViewerAudio(playing);
+
+    private void ViewerBackgroundChip_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ViewerBackgroundPlay = ViewerBackgroundChip.IsChecked == true;
+        _settingsService.Save(_settings);
+
+        // SWITCHING IT OFF LETS GO OF THE FILE. While it is on, the track being
+        // played is held open, so the file cannot be renamed or deleted - and
+        // this switch is the way out of that, which is the whole reason it can
+        // be reached from anywhere the transport is (asked for that way).
+        if (!_settings.ViewerBackgroundPlay && !ViewerMediaIsSelection)
+        {
+            StopViewerVideo();
+            UpdateViewerNowPlaying();
+        }
+    }
+
+    // The line above the transport, and the visible half of "two currents":
+    // shown only while the transport is holding something the caption is not
+    // already naming.
+    private void UpdateViewerNowPlaying()
+    {
+        bool detached = _viewerVideoPath is not null && !ViewerMediaIsSelection;
+        ViewerNowPlaying.Visibility = detached ? Visibility.Visible : Visibility.Collapsed;
+        if (detached && _viewerVideoPath is { } path)
+        {
+            ViewerNowPlaying.Text = Path.GetFileName(path);
+        }
+    }
+
     // "The panel can show this" - pictures and films together. Films arrived in
     // this answer on 2026-08-10 with the filmstrip, and two places were still
     // asking the picture-only question afterwards: the row menu's thumbnail
@@ -16407,6 +16489,10 @@ public partial class MainWindow : Window
 
         StopViewerGif();
         _viewerVideoPath = path;
+        // Remembered because the selection is allowed to leave it behind - see
+        // background play, where the next track has to be found in THIS file's
+        // folder rather than in whatever the tree has moved on to.
+        _viewerPlayingItem = ViewerItem;
 
         // BOTH OF THESE ARM BEFORE THE SOURCE IS SET, and that is a correction
         // (2026-08-11). They used to be started at the end of this method, after
@@ -16460,6 +16546,10 @@ public partial class MainWindow : Window
         // put on it here rather than at startup - it has to be right every time
         // the strip appears, not once.
         UpdateViewerRepeatChip();
+        // And the row has to be thinned for the width it is appearing at: its
+        // SizeChanged does not fire for a panel that has not moved since the
+        // last file played.
+        FitViewerMediaRow();
         // Picked up here and applied in MediaOpened: Position means nothing
         // until the engine knows what it has opened.
         _pendingResumeSeconds = fromStart ? 0 : FindVideoMarks(path)?.Resume ?? 0;
@@ -16911,6 +17001,17 @@ public partial class MainWindow : Window
             return false;
         }
 
+        // PLAYING IN THE BACKGROUND MOVES NOTHING. The ordinary advance goes
+        // through the selection, which is the whole reason it needs no queue -
+        // but doing that while someone is working in another folder would drag
+        // the tree away from them at the end of every track. Detached, the
+        // element is simply handed the next file.
+        if (ViewerBackgroundPlaying && !ViewerMediaIsSelection)
+        {
+            PlayViewerAudioDetached(next);
+            return true;
+        }
+
         _viewerAutoPlayPath = next.FullPath;
         // The carousel's own move, so the reveal past 더 보기 and the search
         // list's separate path both come along without being written twice.
@@ -16920,13 +17021,15 @@ public partial class MainWindow : Window
 
     private FileSystemItem? NextViewerPlaybackItem(string current)
     {
-        if (ViewerItem is not { } shown)
+        // The file the TRANSPORT is on, which is only the selection while the
+        // two have not come apart.
+        if ((ViewerMediaIsSelection ? ViewerItem : _viewerPlayingItem) is not { } shown)
         {
             return null;
         }
 
         bool audio = IsViewerAudio(current);
-        var kin = GetViewerCarouselItems(shown)
+        var kin = ViewerPlaybackSiblings(shown)
             .Where(i => IsViewerPlayable(i.FullPath) && IsViewerAudio(i.FullPath) == audio)
             .ToList();
         // One file is not a folder to continue through. It falls back to
@@ -16965,6 +17068,123 @@ public partial class MainWindow : Window
         }
 
         return left.Count == 0 ? null : left[_viewerShuffle.Next(left.Count)];
+    }
+
+    // The set the advance walks. Normally the panel's own list, which is what
+    // lets the search results drive it - but a track left playing in another
+    // folder belongs to THAT folder, and the results list on screen has nothing
+    // to do with it.
+    private List<FileSystemItem> ViewerPlaybackSiblings(FileSystemItem anchor)
+        => ViewerMediaIsSelection
+            ? GetViewerCarouselItems(anchor)
+            : (anchor.Parent?.AllLoadedChildren ?? _roots).Where(IsViewerCarouselItem).ToList();
+
+    // Hands the element the next track without touching the selection. Only
+    // ever sound: it skips everything the panel would normally do for a file,
+    // because the panel is busy showing something else.
+    private void PlayViewerAudioDetached(FileSystemItem item)
+    {
+        string path = item.FullPath;
+        VideoLogFlush("switched");
+        _viewerMediaTimer?.Stop();
+        ViewerMedia.Stop();
+        ViewerMedia.Source = null;
+        _viewerMediaOpenedPath = null;
+
+        _viewerPlayingItem = item;
+        _viewerVideoPath = path;
+        // Off for sound, always - see ViewerPlayOverlay_Click, where leaving it
+        // on stopped audio dead with no event of any kind.
+        ViewerMedia.ScrubbingEnabled = false;
+        VideoLogStart(path);
+        StartViewerOpeningWatch();
+        ViewerMedia.Volume = _viewerMediaMuted ? 0 : ViewerMediaVolume.Value;
+        ViewerMedia.Source = new Uri(path);
+        ViewerMedia.Visibility = Visibility.Visible;
+        // From the top: sound keeps no place, and this is the app starting it.
+        _pendingResumeSeconds = 0;
+        ViewerMedia.Play();
+        SetViewerVideoPlaying(true);
+        UpdateViewerNowPlaying();
+    }
+
+    // ----- 좁아질 때 무엇이 남는가 ------------------------------------------
+    //
+    // The transport is a centred row, so a panel too narrow for it used to clip
+    // BOTH ends - and the middle of that row is play/pause, which is the one
+    // control nobody can do without. The narrowest panel showed stop, rewind
+    // and a clock, with play gone off the edge (2026-08-11).
+    //
+    // So the row is measured and thinned instead, in an order the user set:
+    // the way out first, then the clock, then the two transport buttons that
+    // duplicate what the seek bar already does, then the volume. WHAT SURVIVES
+    // AT ANY WIDTH: background play, shuffle, play/pause.
+    //
+    // Measured rather than stepped at fixed widths, because the row's own size
+    // moves with Ctrl +/- and with the strings in it.
+    private UIElement[] ViewerMediaRowDropOrder => new UIElement[]
+    {
+        ViewerMediaOpenExternal,
+        ViewerMediaTimeBox,
+        ViewerMediaStop,
+        ViewerMediaRewind,
+        ViewerMediaVolume,
+        ViewerMediaMute,
+    };
+
+    // The gap that holds the sound section off the caption above it. Here
+    // rather than only in the XAML because full screen writes this property and
+    // has to have something to put back.
+    private static readonly Thickness ViewerMediaBarMargin = new(0, 8, 0, 0);
+
+    private bool _fittingViewerMediaRow;
+
+    private void ViewerMediaBar_SizeChanged(object sender, SizeChangedEventArgs e)
+        => FitViewerMediaRow();
+
+    private void FitViewerMediaRow()
+    {
+        // Re-entrancy: taking a control out re-measures the row, and that lands
+        // back here through the layout pass.
+        if (_fittingViewerMediaRow || ViewerMediaBar.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        double available = ViewerMediaBar.ActualWidth - ViewerMediaContent.Margin.Left
+            - ViewerMediaContent.Margin.Right;
+        if (available <= 0)
+        {
+            return;
+        }
+
+        _fittingViewerMediaRow = true;
+        try
+        {
+            // Everything back first, or the row could only ever shrink: a panel
+            // being widened again has to get its controls back.
+            foreach (var element in ViewerMediaRowDropOrder)
+            {
+                element.Visibility = Visibility.Visible;
+            }
+
+            foreach (var element in ViewerMediaRowDropOrder)
+            {
+                // Qualified: System.Drawing is also in scope in this file.
+                ViewerMediaButtonRow.Measure(
+                    new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+                if (ViewerMediaButtonRow.DesiredSize.Width <= available)
+                {
+                    return;
+                }
+
+                element.Visibility = Visibility.Collapsed;
+            }
+        }
+        finally
+        {
+            _fittingViewerMediaRow = false;
+        }
     }
 
     private void ViewerRepeatChip_Click(object sender, RoutedEventArgs e)
@@ -17022,6 +17242,22 @@ public partial class MainWindow : Window
 
     private void UpdateViewerRepeatChip()
     {
+        // The switch beside it, put on at the same moment and for the same
+        // reason: the row is built once and shown many times.
+        //
+        // GONE FOR A FILM, and the SETTING IS LEFT ALONE. Background play does
+        // not apply to video - a picture nobody can see is not playing in any
+        // useful sense - so the switch has nothing to offer here and says so by
+        // not being there, the way the zoom row already leaves while a film is
+        // up. Clearing the setting instead would mean watching one video
+        // quietly changed what the next album does, which is a worse surprise
+        // than a control that comes and goes with what it applies to.
+        ViewerBackgroundChip.Visibility =
+            _viewerVideoPath is { } loaded && IsViewerVideo(loaded)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        ViewerBackgroundChip.IsChecked = _settings.ViewerBackgroundPlay;
+
         var mode = ViewerRepeat;
         ViewerRepeatChip.IsChecked = mode is not ViewerRepeatMode.Off;
         // The mark says WHICH of the three, so the switch does not need a
@@ -17931,7 +18167,11 @@ public partial class MainWindow : Window
         // that had been offering to start it was the thing that disappeared.
         // Paused IS the state that button belongs to; the transport's own
         // play/pause simply says it a second time, in a smaller place.
-        ViewerPlayOverlay.Visibility = !playing && _viewerVideoPath is not null
+        // ViewerMediaIsSelection, not "something is loaded": while sound is
+        // running in another folder the picture on screen belongs to a
+        // different file, and a play button drawn over it would offer to start
+        // THAT one while doing something else entirely.
+        ViewerPlayOverlay.Visibility = !playing && ViewerMediaIsSelection
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -18158,7 +18398,13 @@ public partial class MainWindow : Window
             // Once the source is gone the next play is a real open again, and
             // the slow-open line has to be allowed to appear for it.
             _viewerMediaOpenedPath = null;
+            _viewerPlayingItem = null;
         }
+
+        // Whatever the transport was holding is gone, so the line naming it is
+        // too - and this is also the path a closing panel takes, which is what
+        // makes "close the panel" a way to stop background sound.
+        UpdateViewerNowPlaying();
 
         _viewerVideoPlaying = false;
         _viewerVideoHasNoAudio = false;
@@ -20164,7 +20410,11 @@ public partial class MainWindow : Window
         // Ahead of the pan/flick branch, and it costs the flick on a track: the
         // transport is what the picture area is for while something is loaded,
         // and the strip is the way to the next file with a track playing.
-        if (_viewerVideoPath is { } sounding && IsViewerAudio(sounding))
+        // ViewerMediaIsSelection, or this click belongs to the wrong file: with
+        // sound running in another folder the thing under the pointer is a
+        // PICTURE, and clicking it was stopping music that has nothing to do
+        // with it (2026-08-11).
+        if (ViewerMediaIsSelection && _viewerVideoPath is { } sounding && IsViewerAudio(sounding))
         {
             ViewerMediaPlayPause_Click(this, new RoutedEventArgs());
             e.Handled = true;
@@ -20278,7 +20528,11 @@ public partial class MainWindow : Window
         ViewerCaptionPanel.VerticalAlignment = VerticalAlignment.Stretch;
         ViewerCaptionPanel.Background = null;
         ViewerCaptionPanel.Margin = new Thickness(10, 0, 10, 10);
-        ViewerMediaBar.Margin = new Thickness(0);
+        // Back to the panel's own gap, not to zero: the transport sits a little
+        // below the file's own facts so the sound section reads apart from the
+        // picture's description (2026-08-11). Zero here put it back against the
+        // caption for the rest of the session after one full screen.
+        ViewerMediaBar.Margin = ViewerMediaBarMargin;
         ViewerCaptionPanel.Visibility = _viewerFullscreen
             ? Visibility.Collapsed
             : Visibility.Visible;
