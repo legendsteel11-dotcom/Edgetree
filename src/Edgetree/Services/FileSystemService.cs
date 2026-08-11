@@ -451,7 +451,7 @@ public static class FileSystemService
             if (elapsed >= SlowReadMs)
             {
                 MarkRootUnreachable(path, hardFailure: false);
-                LogSlowRead(path, elapsed, failed: false);
+                LogSlowRead(path, elapsed, failed: false, "probe");
             }
         }
     }
@@ -470,7 +470,20 @@ public static class FileSystemService
     // the freeze becomes noticeable again.
     private const int NetworkReadTimeoutMs = 1_500;
 
-    public static List<FileSystemItem> LoadChildren(string path, FileSystemItem parent, out bool readFailed)
+    // Raised on a THREAD-POOL thread when a read that missed the deadline
+    // finishes cleanly anyway, carrying the folder it was for and what it
+    // found. The subscriber owns getting to the UI thread - this class has no
+    // dispatcher and should not grow one.
+    //
+    // An event rather than a longer timeout on purpose. The 1.5s is the ceiling
+    // on how long the WINDOW can freeze, and it was measured against a
+    // rebooting NAS holding a read for 21 seconds; raising it to cover big
+    // folders would give that freeze back. This way the ceiling stays where it
+    // is and a slow-but-alive folder simply arrives late, which is what every
+    // other slow thing in this app already does.
+    public static event Action<string, List<FileSystemItem>>? LateChildrenArrived;
+
+    public static List<FileSystemItem> LoadChildren(string path, FileSystemItem parent, out bool readFailed, string origin = "?")
     {
         // Known-unreachable: answer immediately rather than queue behind
         // another multi-second timeout. Reported as a failure, never as an
@@ -489,20 +502,29 @@ public static class FileSystemService
         // up more of the same.
         if (IsOnNetworkRoot(path))
         {
-            var read = Task.Run(() => ReadChildrenFromDisk(path, parent));
+            var read = Task.Run(() => ReadChildrenFromDisk(path, parent, origin));
             if (!read.Wait(NetworkReadTimeoutMs))
             {
                 MarkRootUnreachable(path, hardFailure: false);
-                LogSlowRead(path, NetworkReadTimeoutMs, failed: true);
+                LogSlowRead(path, NetworkReadTimeoutMs, failed: true, origin);
                 // The abandoned read still finishes. If it comes back clean,
                 // that is better evidence than the deadline was: the root is
                 // alive and merely slow, so the strike is taken back before it
                 // can join two others into a verdict.
+                //
+                // AND THE LISTING IS HANDED OVER (2026-08-12). Taking the strike
+                // back was all this used to do; the items it was holding were
+                // dropped on the floor. A folder that answers just past the
+                // deadline therefore came up blank EVERY time - the read is
+                // deterministic, so re-expanding it simply missed by the same
+                // margin again, and a NAS folder of 2400 files at 1.6s was
+                // permanently an empty row with nothing said about it.
                 _ = read.ContinueWith(finished =>
                 {
                     if (finished.Status == TaskStatus.RanToCompletion && !finished.Result.ReadFailed)
                     {
                         MarkRootReachable(path);
+                        LateChildrenArrived?.Invoke(path, finished.Result.Items);
                     }
                 }, TaskScheduler.Default);
                 readFailed = true;
@@ -521,12 +543,12 @@ public static class FileSystemService
             return read.Result.Items;
         }
 
-        var local = ReadChildrenFromDisk(path, parent);
+        var local = ReadChildrenFromDisk(path, parent, origin);
         readFailed = local.ReadFailed;
         return local.Items;
     }
 
-    private static (List<FileSystemItem> Items, bool ReadFailed) ReadChildrenFromDisk(string path, FileSystemItem parent)
+    private static (List<FileSystemItem> Items, bool ReadFailed) ReadChildrenFromDisk(string path, FileSystemItem parent, string origin)
     {
         bool readFailed;
         var startedTicks = Environment.TickCount64;
@@ -581,7 +603,7 @@ public static class FileSystemService
             {
                 MarkRootUnreachable(path, hardFailure: readFailed);
             }
-            LogSlowRead(path, elapsed, readFailed);
+            LogSlowRead(path, elapsed, readFailed, origin);
         }
 
         return (result, readFailed);
@@ -590,8 +612,13 @@ public static class FileSystemService
     // Debug builds only: which folder read blocked, for how long, and whether
     // it failed outright. "The app froze" is otherwise a report with nowhere
     // to start - this names the path and the cost.
+    // ORIGIN was added 2026-08-12 for a report the old line could not answer:
+    // the same NAS folder read every two seconds, each one blocking the UI for
+    // 1.5s. The path and the cost were both there; WHO KEPT ASKING was not, and
+    // "the first load retrying", "the watcher merging" and "the two feeding each
+    // other" all look identical without it.
     [System.Diagnostics.Conditional("DEBUG")]
-    private static void LogSlowRead(string path, long elapsedMs, bool failed)
+    private static void LogSlowRead(string path, long elapsedMs, bool failed, string origin)
     {
         if (elapsedMs < SlowReadMs && !failed)
         {
@@ -605,7 +632,7 @@ public static class FileSystemService
             Directory.CreateDirectory(dir);
             File.AppendAllText(
                 Path.Combine(dir, "slowread.log"),
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {elapsedMs,6}ms {(failed ? "FAILED " : "       ")}{path}{Environment.NewLine}");
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {elapsedMs,6}ms {(failed ? "FAILED " : "       ")}{origin,-8}{path}{Environment.NewLine}");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

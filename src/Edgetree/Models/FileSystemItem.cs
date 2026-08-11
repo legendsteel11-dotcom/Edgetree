@@ -357,7 +357,7 @@ public class FileSystemItem : INotifyPropertyChanged
         // refresh and the file never appear. Stamping first errs the other way:
         // worst case one redundant refresh of a folder that did catch the file.
         LastLoadedTicks = Environment.TickCount64;
-        var loaded = FileSystemService.LoadChildren(FullPath, this, out bool readFailed);
+        var loaded = FileSystemService.LoadChildren(FullPath, this, out bool readFailed, "expand");
 
         // A failed read (sleeping NAS, unplugged drive) is UNKNOWN contents,
         // not empty contents: keep the placeholder so the expander arrow
@@ -365,6 +365,26 @@ public class FileSystemItem : INotifyPropertyChanged
         // recording empty here is what left a network drive permanently
         // arrow-less for the session.
         if (readFailed)
+        {
+            return;
+        }
+
+        _childrenLoaded = true;
+        PendingExternalRefresh = false;
+        PopulateCapped(loaded);
+    }
+
+    // A NETWORK READ THAT MISSED ITS DEADLINE AND THEN FINISHED CLEANLY. The
+    // listing is real and already in hand - see LoadChildren, where the caller
+    // stops waiting at 1.5s but the read itself cannot be cancelled - so this
+    // is the same landing EnsureChildrenLoaded makes, arriving a moment later.
+    //
+    // Refused once something else has filled the folder: a retry that beat the
+    // deadline, or a refresh. The late answer is then the older of the two and
+    // has nothing to add.
+    public void AcceptLateChildren(List<FileSystemItem> loaded)
+    {
+        if (_childrenLoaded || !IsDirectory)
         {
             return;
         }
@@ -528,7 +548,7 @@ public class FileSystemItem : INotifyPropertyChanged
         // Same stamped-before-the-read rule as EnsureChildrenLoaded.
         LastLoadedTicks = Environment.TickCount64;
 
-        var fresh = FileSystemService.LoadChildren(FullPath, this, out bool readFailed);
+        var fresh = FileSystemService.LoadChildren(FullPath, this, out bool readFailed, "merge");
 
         // A refresh that couldn't actually read the folder keeps what's on
         // screen: stale rows beat wiping a NAS root (and every loaded subtree

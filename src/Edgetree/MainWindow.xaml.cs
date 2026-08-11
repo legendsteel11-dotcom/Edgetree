@@ -517,6 +517,7 @@ public partial class MainWindow : Window
             new System.Windows.Data.CollectionContainer { Collection = _bottomGapRows },
         };
         StartDriveWatchers();
+        FileSystemService.LateChildrenArrived += OnLateChildrenArrived;
 
         // Deferred one pass: the tree's own ScrollViewer only exists once the
         // template has been applied and laid out, and this must be attached
@@ -12015,6 +12016,32 @@ public partial class MainWindow : Window
         };
         _pendingExternalRefreshes[folderPath] = pending;
         timer.Start();
+    }
+
+    // A network folder whose read overran the 1.5s deadline and then came back
+    // clean. Raised on a thread-pool thread, so the first thing here is getting
+    // onto the one that owns the rows.
+    //
+    // The row is found the same careful way the watcher's refresh finds one -
+    // no ancestor is force-loaded to reach it, so a listing for a folder nobody
+    // has opened simply lands nowhere. It goes to the ITEM rather than through
+    // a re-read: the whole point is that this listing already exists and asking
+    // the NAS again would cost the same 1.6 seconds a second time.
+    //
+    // The viewer is told afterwards for the same reason the merge tells it: a
+    // folder that fills in late is a folder that changed under the panel.
+    private void OnLateChildrenArrived(string path, List<FileSystemItem> items)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (FindLoadedItemForPath(path) is not { } item)
+            {
+                return;
+            }
+
+            item.AcceptLateChildren(items);
+            NoteFolderChangedForViewer(item);
+        });
     }
 
     // Walks down from the matching drive root by name, same idea as
