@@ -517,6 +517,7 @@ public partial class MainWindow : Window
             new System.Windows.Data.CollectionContainer { Collection = _bottomGapRows },
         };
         StartDriveWatchers();
+        StartMemoryWatch();
         FileSystemService.LateChildrenArrived += OnLateChildrenArrived;
 
         // Deferred one pass: the tree's own ScrollViewer only exists once the
@@ -15962,6 +15963,80 @@ public partial class MainWindow : Window
 
     [System.Diagnostics.Conditional("DEBUG")]
     private void StopUiStallWatch() => _uiStallTimer?.Stop();
+
+    // ----- 메모리는 눈으로 판정할 수 없다 ---------------------------------------
+    //
+    // Watching Task Manager and deciding whether a release happened is reading
+    // noise: the GC is not prompt, WPF frees its unmanaged bitmap pixels only
+    // when the owning objects are collected, and Windows trims the working set
+    // lazily on top of both. A peak of 1.3GB was seen with no way to say when
+    // or whether it came back (2026-08-12).
+    //
+    // So the CURVE is written down instead, with the thing that is supposed to
+    // drive it beside it. THUMBS x 0.25MB is what the strip can account for -
+    // a 256x256 BGRA each - so private memory running far above that says
+    // something other than thumbnails is being held, which is the open question
+    // (full-size decodes surviving a strip scroll).
+    //
+    // Its own timer and its own file, running for the life of the process
+    // rather than the life of the panel: the question is what happens AFTER
+    // the viewer closes, and an instrument that stops when the panel does can
+    // never answer it.
+    private System.Windows.Threading.DispatcherTimer? _memTimer;
+    private System.Diagnostics.Process? _selfProcess;
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void StartMemoryWatch()
+    {
+        if (_memTimer is not null)
+        {
+            return;
+        }
+
+        _memTimer = new System.Windows.Threading.DispatcherTimer(
+            System.Windows.Threading.DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromSeconds(2),
+        };
+        _memTimer.Tick += (_, _) => LogMemorySample();
+        _memTimer.Start();
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogMemorySample()
+    {
+        _selfProcess ??= System.Diagnostics.Process.GetCurrentProcess();
+        _selfProcess.Refresh();
+
+        int held = 0;
+        foreach (var cell in _filmstripCells)
+        {
+            if (cell.Thumbnail is not null)
+            {
+                held++;
+            }
+        }
+
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "memory.log"),
+                $"{DateTime.Now:HH:mm:ss}  private {_selfProcess.PrivateMemorySize64 / (1024 * 1024),5} MB" +
+                $"  ws {_selfProcess.WorkingSet64 / (1024 * 1024),5} MB" +
+                $"  managed {GC.GetTotalMemory(false) / (1024 * 1024),5} MB" +
+                $"  cells {_filmstripCells.Count,5}  thumbs {held,5}" +
+                $" (={held / 4,5} MB)" +
+                $"  viewer {(_viewerOpen ? "on " : "off")}" +
+                $"  strip {(ViewerFilmstripHost.Visibility == Visibility.Visible ? "on " : "off")}" +
+                $"{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
 
     // A [Conditional] method cannot be turned into a delegate, so the lambda
     // does the wrapping instead - the hook itself is still Debug-only.
