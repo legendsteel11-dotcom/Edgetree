@@ -1244,6 +1244,24 @@ public partial class MainWindow : Window
             return;
         }
 
+        // NOTHING LOADED YET, and the selected file is one the panel can play:
+        // Space starts it, which is the same key doing the same thing one step
+        // earlier. Added with sound (2026-08-11) because auditioning a folder of
+        // short takes is ↓ Space ↓ Space, and reaching for the play button
+        // between every one of them is the whole gesture. It reads the same on a
+        // film - the button remains, this is just the key already meaning play.
+        if (Keyboard.Modifiers == ModifierKeys.None &&
+            _viewerOpen &&
+            e.Key == Key.Space &&
+            _viewerVideoPath is null &&
+            _pendingViewerPath is { } playable && IsViewerPlayable(playable) &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            ViewerPlayOverlay_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
         // F1 from anywhere, including out of a text box: it is the one key on a
         // keyboard that means the same thing in every program, and someone
         // reaching for it is by definition unsure where they are.
@@ -15683,8 +15701,32 @@ public partial class MainWindow : Window
         ".mpg", ".mpeg", ".m2ts", ".mts", ".ts", ".flv", ".3gp"
     };
 
+    // Sound, added 2026-08-11 for a reason worth writing down: the panel could
+    // answer "what is this" for a picture and for a film, and went silent on an
+    // audio file - which is the gap someone auditioning ASSET files falls into,
+    // a folder of short takes where the question is exactly "which one is this".
+    //
+    // Three formats and not a sweep of every container Windows knows: these are
+    // the ones asked for, and each extra one is a line here. Whether a given
+    // file actually plays is the same story as video - it depends on the codecs
+    // on the PC, and FLAC in particular is not guaranteed on the old pipeline.
+    private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp3", ".wav", ".flac"
+    };
+
     private static bool IsViewerVideo(string path)
         => VideoExtensions.Contains(Path.GetExtension(path));
+
+    private static bool IsViewerAudio(string path)
+        => AudioExtensions.Contains(Path.GetExtension(path));
+
+    // "The transport applies to this" - the two kinds the panel plays. Kept
+    // apart from IsViewerVideo rather than folded into it, because half the
+    // viewer asks the narrower question: the navigator, the film's zoom and the
+    // HDR correction are all about a PICTURE that moves, and sound has none.
+    private static bool IsViewerPlayable(string path)
+        => IsViewerVideo(path) || IsViewerAudio(path);
 
     // "The panel can show this" - pictures and films together. Films arrived in
     // this answer on 2026-08-10 with the filmstrip, and two places were still
@@ -15697,7 +15739,12 @@ public partial class MainWindow : Window
     // else had to change to make the thumbnail appear.
     private static bool HasViewerPreview(string path)
         => ThumbnailExtensions.Contains(Path.GetExtension(path))
-           || VideoExtensions.Contains(Path.GetExtension(path));
+           || VideoExtensions.Contains(Path.GetExtension(path))
+           // Sound too, and the shell already draws it: asked for a thumbnail,
+           // a tagged music file answers with its EMBEDDED ALBUM ART, so the
+           // picture side of this cost nothing at all. Files with no art fall
+           // through to the file-type icon like anything else.
+           || AudioExtensions.Contains(Path.GetExtension(path));
 
     // The file currently handed to MediaElement - null whenever nothing is
     // loaded, which is also the app's promise that the file is not held open.
@@ -15851,13 +15898,46 @@ public partial class MainWindow : Window
 
     private void ViewerPlayOverlay_Click(object sender, RoutedEventArgs e)
     {
-        if (_pendingViewerPath is not { } path || !IsViewerVideo(path))
+        if (_pendingViewerPath is not { } path || !IsViewerPlayable(path))
         {
             return;
         }
 
+        // SOUND KEEPS THE PICTURE IT ALREADY HAS: a film replaces its still
+        // frame with the moving one, a track has no frame, so the album art
+        // stays where it is.
+        //
+        // But the media element is still made VISIBLE for it, and that is not a
+        // detail - hidden, it never opened the file at all (2026-08-11: the
+        // caption sat on "여는 중" forever and MediaOpened never came). WPF does
+        // not run a collapsed MediaElement. Showing it costs nothing here
+        // because an audio file has no video frame to draw, so it paints
+        // nothing and the art behind it stays visible.
+        bool audio = IsViewerAudio(path);
+
         StopViewerGif();
         _viewerVideoPath = path;
+
+        // BOTH OF THESE ARM BEFORE THE SOURCE IS SET, and that is a correction
+        // (2026-08-11). They used to be started at the end of this method, after
+        // Play() - which works only if opening is asynchronous. When the engine
+        // opens synchronously on the Source assignment, MediaOpened had already
+        // come and gone: the log line it writes was dropped because the clock
+        // did not exist yet, and the opening watch was armed a moment AFTER the
+        // event that stops it, so the caption sat on "여는 중" for good.
+        // A watch that starts after the thing it watches for is the same
+        // mistake as a guard that fails for the reason it exists.
+        // OFF FOR SOUND, AND THIS WAS THE WHOLE BUG (2026-08-11). Scrubbing asks
+        // the element to render the frame at a new position while paused, which
+        // is meaningless without frames - and with it on, an audio file opened
+        // no event, raised no failure, and held Position at zero while playing
+        // through to its end on time. Turned off, MediaOpened arrives in 120ms
+        // and the position runs. Set before the log line below so the header
+        // records what this run actually used.
+        ViewerMedia.ScrubbingEnabled = !audio;
+
+        VideoLogStart(path);
+        StartViewerOpeningWatch();
         ViewerMedia.Volume = _viewerMediaMuted ? 0 : ViewerMediaVolume.Value;
         // See LoadViewerImage's note on Uri: a path is not a URL. MediaElement
         // takes nothing but a Uri, so this is the one place left that has to
@@ -15865,8 +15945,21 @@ public partial class MainWindow : Window
         // this line is why.
         ViewerMedia.Source = new Uri(path);
         ViewerMedia.Visibility = Visibility.Visible;
-        ViewerImage.Visibility = Visibility.Collapsed;
-        ViewerIconImage.Visibility = Visibility.Collapsed;
+        // THE ELEMENT IS SHOWN EITHER WAY, and for sound that costs nothing:
+        // with no frames to draw it lays out at 0x0 and paints nothing, so the
+        // album art behind it is simply left alone. Only a film replaces the
+        // still it was showing.
+        //
+        // Its SIZE was chased for three rounds and was never the problem - the
+        // working log reads `element size=0x0` (2026-08-11). What did matter is
+        // that the element be genuinely rendered: hiding it, first with
+        // Collapsed and then with Opacity 0, stopped the file opening at all
+        // both times.
+        if (!audio)
+        {
+            ViewerImage.Visibility = Visibility.Collapsed;
+            ViewerIconImage.Visibility = Visibility.Collapsed;
+        }
         ViewerPlayOverlay.Visibility = Visibility.Collapsed;
         ViewerNavigatorPlate.Visibility = Visibility.Collapsed;
         // The two strips describe the same picture in ways that cannot both
@@ -15880,8 +15973,9 @@ public partial class MainWindow : Window
         ApplyViewerHdrToneMap();
         ViewerMedia.Play();
         SetViewerVideoPlaying(true);
-        StartViewerOpeningWatch();
-        VideoLogStart(path);
+        VideoLog($"play() called  audio={audio}  " +
+            $"duration={(ViewerMedia.NaturalDuration.HasTimeSpan ? ViewerMedia.NaturalDuration.TimeSpan.ToString() : "-")}  " +
+            $"size={ViewerMedia.ActualWidth:F0}x{ViewerMedia.ActualHeight:F0}");
     }
 
     // ----- 여는 동안, 그리고 읽다 멈춘 동안 --------------------------------------
@@ -16022,7 +16116,14 @@ public partial class MainWindow : Window
 
     private void ApplyViewerHdrToneMap()
     {
-        if (!ViewerHdrOn)
+        // NEVER on sound. The switch is remembered globally, so a film tuned
+        // yesterday left the effect armed for every mp3 played after it - and a
+        // colour correction on a file with no picture is meaningless at best.
+        // An Effect also forces the element down a different rendering path,
+        // which is the last thing to hang on a media session that is already
+        // refusing to start (2026-08-11).
+        bool video = _viewerVideoPath is { } loaded && IsViewerVideo(loaded);
+        if (!ViewerHdrOn || !video)
         {
             ViewerMedia.Effect = null;
             _viewerHdrEffect = null;
@@ -16124,6 +16225,15 @@ public partial class MainWindow : Window
             $"opened  {ViewerMedia.NaturalVideoWidth}x{ViewerMedia.NaturalVideoHeight}  " +
             $"video={ViewerMedia.HasVideo}  audio={ViewerMedia.HasAudio}  " +
             $"duration={(ViewerMedia.NaturalDuration.HasTimeSpan ? ViewerMedia.NaturalDuration.TimeSpan.ToString() : "-")}");
+        // The ELEMENT's own state, added while chasing an audio file that
+        // opened and downloaded in full without its clock ever starting. Every
+        // guess so far has been about one of these five, so they are recorded
+        // rather than reasoned about.
+        VideoLog(
+            $"element size={ViewerMedia.ActualWidth:F0}x{ViewerMedia.ActualHeight:F0}  " +
+            $"vis={ViewerMedia.Visibility}  opacity={ViewerMedia.Opacity:F2}  " +
+            $"stretch={ViewerMedia.Stretch}  effect={(ViewerMedia.Effect is null ? "none" : "yes")}  " +
+            $"scrub={ViewerMedia.ScrubbingEnabled}  volume={ViewerMedia.Volume:F2}");
 
         ViewerMediaPosition.Maximum = ViewerMedia.NaturalDuration.HasTimeSpan
             ? ViewerMedia.NaturalDuration.TimeSpan.TotalSeconds
@@ -16211,6 +16321,13 @@ public partial class MainWindow : Window
         ViewerMedia.Position = TimeSpan.Zero;
         ViewerMedia.Pause();
         SetViewerVideoPlaying(false);
+        // The button comes back, because the state it belongs to has come back:
+        // sitting at the start, not playing. Without it a track that had run
+        // once left a black square with no way to ask again - the transport is
+        // there, but the panel's own answer to "play this" had vanished
+        // (2026-08-11, on a file with no album art, where the button IS the
+        // picture).
+        ViewerPlayOverlay.Visibility = Visibility.Visible;
         UpdateViewerMediaReadout();
         VideoLogFlush("ended");
     }
@@ -17215,10 +17332,13 @@ public partial class MainWindow : Window
         }
 
         entry.Resume = resume;
-        // Newest first, and dropped entirely once it holds nothing - the same
-        // housekeeping the mark button does, so the list has one set of rules.
+        // Newest first, and dropped entirely once it holds NOTHING - IsEmpty,
+        // not "no resume and no marks". The entry also carries the subtitle
+        // offset and this film's colour settings now, and the old test would
+        // have quietly thrown those away every time a film was closed at a
+        // position not worth resuming from.
         _settings.VideoMarks.Remove(entry);
-        if (entry.Resume > 0 || entry.Seconds.Count > 0)
+        if (!entry.IsEmpty)
         {
             _settings.VideoMarks.Insert(0, entry);
         }
@@ -17466,8 +17586,13 @@ public partial class MainWindow : Window
     // behind an unplayed film is a SHELL THUMBNAIL - a downsized stand-in, not
     // the film - so mapping it would be as misleading as mapping the wrong
     // frame during playback, just quieter about it.
+    //
+    // The loaded path is TESTED rather than assumed, because the same field
+    // holds an audio file now: a playing mp3 would otherwise have answered yes
+    // here and taken the navigator away while turning on the film's zoom row
+    // and the HDR correction, none of which mean anything without a picture.
     private bool IsViewerShowingVideo
-        => _viewerVideoPath is not null
+        => (_viewerVideoPath is { } loaded && IsViewerVideo(loaded))
            || (_pendingViewerPath is { } path && IsViewerVideo(path));
 
     // Below this the plate would be taking a serious bite out of the picture
@@ -17989,7 +18114,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        // The playback group, only for a film.
+        // TWO conditions now, not one. A track is played by the same transport
+        // as a film, so play/rewind/bookmarks apply to it - but the film's zoom,
+        // its subtitles and the HDR correction are all about a PICTURE, and an
+        // mp3 has none. The narrower question is asked separately below.
+        bool movingPicture = _viewerVideoPath is { } loadedPath && IsViewerVideo(loadedPath);
+        var pictureRows = movingPicture ? Visibility.Visible : Visibility.Collapsed;
         var playbackRows = showingVideo ? Visibility.Visible : Visibility.Collapsed;
         ViewerPlaybackSeparator.Visibility = playbackRows;
         // Closes the bookmark fence. It follows the GROUP rather than the mark
@@ -18000,10 +18130,10 @@ public partial class MainWindow : Window
         ViewerPlayPauseItem.Visibility = playbackRows;
         ViewerPlayPauseItem.Header = _viewerVideoPlaying ? Strings.ViewerPause : Strings.ViewerPlay;
         ViewerRewindItem.Visibility = playbackRows;
-        ViewerMediaZoomItem.Visibility = playbackRows;
+        ViewerMediaZoomItem.Visibility = pictureRows;
         ViewerMarkAddItem.Visibility = playbackRows;
         // Only when a subtitle file was actually found beside this film.
-        var subtitleRows = showingVideo && HasSubtitles ? Visibility.Visible : Visibility.Collapsed;
+        var subtitleRows = movingPicture && HasSubtitles ? Visibility.Visible : Visibility.Collapsed;
         ViewerSubtitleToggleItem.Visibility = subtitleRows;
         ViewerSubtitleToggleItem.IsChecked = _settings.ViewerSubtitles;
         ViewerSubtitleSizeItem.Visibility = subtitleRows;
@@ -18021,7 +18151,7 @@ public partial class MainWindow : Window
 
         // Only for a film: the correction undoes a PQ curve, and a picture that
         // never had one would come out worse than it went in.
-        ViewerHdrItem.Visibility = showingVideo ? Visibility.Visible : Visibility.Collapsed;
+        ViewerHdrItem.Visibility = pictureRows;
         ViewerHdrItem.IsChecked = ViewerHdrOn;
         UpdateViewerHdrReadout();
 
@@ -19766,12 +19896,29 @@ public partial class MainWindow : Window
                 // duration and true frame size.
                 SetViewerFileInfo(path, pixelWidth, pixelHeight, withMediaInfo: true);
 
-                // A video's still frame gets the one affordance that turns it
-                // into a promise the panel can keep.
-                if (IsViewerVideo(path))
+                // A film's still frame - or a track's album art - gets the one
+                // affordance that turns it into a promise the panel can keep.
+                if (IsViewerPlayable(path))
                 {
                     ViewerPlayOverlay.Visibility = Visibility.Visible;
                 }
+                return;
+            }
+
+            // A PLAYABLE FILE WITH NO PICTURE GETS THE BUTTON INSTEAD OF THE
+            // ICON, not both. A film always has a still to hang the button on;
+            // a .wav has neither art nor frames and landed on the file-type
+            // icon - which is declared after the button and is the same 64px
+            // square, so it covered it exactly (2026-08-11). Stacking them
+            // meant one hid the other whichever way round they went, and
+            // between the two the button is the one worth seeing: the caption
+            // under it already says the file's name.
+            if (IsViewerPlayable(path))
+            {
+                ViewerIconImage.Visibility = Visibility.Collapsed;
+                ViewerIconImage.Source = null;
+                ViewerPlayOverlay.Visibility = Visibility.Visible;
+                SetViewerFileInfo(path, 0, 0, withMediaInfo: true);
                 return;
             }
 
