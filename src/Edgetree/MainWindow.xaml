@@ -5877,7 +5877,15 @@
                                  Geometry Rects are render-only updates, so
                                  tracking the pan frame by frame costs the
                                  same as the box's own transform. -->
-                            <Path Fill="#59000000">
+                            <!-- 0x59 (35%) → 0x6E (43%), 2026-08-11, chosen by
+                                 eye against a 50% that read as too much. Purely
+                                 how it looks: the plate can afford a heavier dim
+                                 because nothing is lost with it. Whatever falls
+                                 outside the box is on screen full size behind
+                                 the navigator, and the filmstrip is showing the
+                                 neighbours underneath - so the dimmed part is
+                                 the only copy of nothing. -->
+                            <Path Fill="#6E000000">
                                 <Path.Data>
                                     <CombinedGeometry GeometryCombineMode="Exclude">
                                         <CombinedGeometry.Geometry1>
@@ -6083,10 +6091,22 @@
                             BorderBrush="{DynamicResource PanelDividerBrush}"
                             Visibility="Collapsed">
                       <Grid>
+                        <!-- LEFT PADDING 4 → 0 (2026-08-11), so the first frame
+                             starts on the same vertical line the picture above
+                             it does. The cells carry no left margin of their
+                             own, so this 4 was the whole of the offset.
+                             It lines up when the picture FILLS the panel's
+                             width, which is the ordinary case; a portrait one is
+                             letterboxed and starts further in, and so does the
+                             strip once it has been scrolled. Neither is worth
+                             chasing - the alignment is there to be noticed when
+                             it holds, not enforced when it cannot.
+                             The right stays at 4: nothing over there has an edge
+                             to agree with. -->
                         <ListBox x:Name="ViewerFilmstrip"
                                 Background="Transparent"
                                 BorderThickness="0"
-                                Padding="4,5,4,4"
+                                Padding="0,5,4,4"
                                 Focusable="False"
                                 ScrollViewer.CanContentScroll="True"
                                 ScrollViewer.HorizontalScrollBarVisibility="Hidden"
