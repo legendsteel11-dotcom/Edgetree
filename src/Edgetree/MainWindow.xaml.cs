@@ -15918,6 +15918,7 @@ public partial class MainWindow : Window
     // Sampled EVERY tick, not only on the late ones, or the delta would cover
     // whatever time has passed since the last stall rather than the stall.
     private int _uiStallGen0, _uiStallGen1, _uiStallGen2;
+    private int _uiStallRows;
 
     [System.Diagnostics.Conditional("DEBUG")]
     private void StartUiStallWatch()
@@ -15945,9 +15946,26 @@ public partial class MainWindow : Window
             int g2 = GC.CollectionCount(2);
             if (late >= 200)
             {
+                // HOW MANY TREE ROWS WPF IS HOLDING, and how many appeared
+                // across the stall. Everything the viewer does has now been
+                // cleared by measurement - arrow-keying 101 pictures cost 3
+                // stalls and 287ms at worst, with 566 thumbnail reads in flight
+                // - while scrolling the tree of a revealed 2,402-item folder
+                // cost 84 stalls and 72 seconds. Realising a row is the one
+                // thing that happens there and nowhere else, it allocates
+                // (gen0 in the teens across every long stall), and it touches
+                // no disk, which is the shape the log has been describing all
+                // along.
+                //
+                // Counted only when a stall is being written, never on the
+                // ordinary tick: this walks the container generator for the
+                // whole tree, which is far too expensive for a 50ms timer.
+                int rows = CountRealizedRows(ExplorerTree);
                 ViewerLoadLog(
                     $"  *** UI STALL {late,7:F0} ms ***  gc {g0 - _uiStallGen0}/{g1 - _uiStallGen1}/" +
-                    $"{g2 - _uiStallGen2}  heap {GC.GetTotalMemory(false) / (1024 * 1024),5} MB");
+                    $"{g2 - _uiStallGen2}  heap {GC.GetTotalMemory(false) / (1024 * 1024),5} MB" +
+                    $"  rows {rows,5} ({(rows - _uiStallRows >= 0 ? "+" : "")}{rows - _uiStallRows})");
+                _uiStallRows = rows;
             }
 
             _uiStallGen0 = g0;
