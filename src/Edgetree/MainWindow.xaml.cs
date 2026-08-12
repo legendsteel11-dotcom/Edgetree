@@ -4688,6 +4688,43 @@ public partial class MainWindow : Window
         }
     }
 
+    // Favorites were the last list in the app with no way to empty them -
+    // bookmarks and hidden folders have had one for a while, so clearing
+    // favorites meant one right-click per row. The asymmetry had a reason that
+    // expired: favorites were always on screen, so they needed no menu listing
+    // them, and the clear-all came in with that listing everywhere else.
+    private void ClearAllFavorites_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settings.Favorites.Count == 0)
+        {
+            return;
+        }
+
+        // Asked about, exactly as bookmarks are, and for the same reason: the
+        // per-row 제거 above it drops one entry the user is looking straight at,
+        // this throws away a list built over weeks with nothing to undo it. The
+        // count goes in the question because it is the part worth knowing
+        // before answering.
+        var result = MessageBox.Show(
+            this,
+            string.Format(Strings.FavoriteClearAllConfirmBody, _settings.Favorites.Count),
+            Strings.FavoriteClearAllConfirmTitle,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _settings.Favorites.Clear();
+        UpdateFavoritesPanelVisibility();
+        // Saved here even though adding and removing a single favorite do not:
+        // those leave something on screen to notice and put back, and this
+        // leaves an empty panel. Whatever closes the app next should not be
+        // able to decide whether the list came back.
+        _settingsService.Save(_settings);
+    }
+
     private void FavoriteListBoxItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is ListBoxItem item)

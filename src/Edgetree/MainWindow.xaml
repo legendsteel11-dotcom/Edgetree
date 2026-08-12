@@ -3595,6 +3595,15 @@
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
             <MenuItem Header="{x:Static services:Strings.MenuRemoveFavorite}"
                     Click="RemoveFavorite_Click"/>
+            <!-- 전체 해제 lives on the ROW menu, not on the panel's empty
+                 space, because the panel is only as tall as its rows: once
+                 there are enough favorites for clearing them all to be worth
+                 asking for, there is no empty space left to right-click. The
+                 separator is what keeps a one-row action and an all-rows one
+                 from sitting together like two of the same kind. -->
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuBookmarkClearAll}"
+                    Click="ClearAllFavorites_Click"/>
         </ContextMenu>
 
         <Style x:Key="FavoriteListBoxItemStyle"
@@ -3743,6 +3752,14 @@
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
             <MenuItem Header="{x:Static services:Strings.MenuBookmarkRemove}"
                     Click="RemoveBookmarkFromPanel_Click"/>
+            <!-- The favorites row's twin carries 전체 해제, so this one does
+                 too. Bookmarks already had the action by two other routes (the
+                 options menu and the tree's 북마크 submenu) - what they did not
+                 have is it HERE, in the panel the rows are actually in, which
+                 is where someone looking at the list reaches for it. -->
+            <Separator/>
+            <MenuItem Header="{x:Static services:Strings.MenuBookmarkClearAll}"
+                    Click="ClearAllBookmarks_Click"/>
         </ContextMenu>
 
         <!-- The favorites row's twin, for when the panel is showing bookmarks
