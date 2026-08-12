@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Reflection;
 using System.Text.Json.Serialization;
 
 namespace SidebarExplorer.App.Models;
@@ -641,8 +642,126 @@ public class AppSettings
         FavoritesPanelHeight = Sane(FavoritesPanelHeight, 100, min: 0);
         DockedHeightRatio = Sane(DockedHeightRatio, 1.0, min: 0, max: 1);
         DockedTopRatio = Sane(DockedTopRatio, 0.0, min: 0, max: 1);
+        NormalizeColors();
     }
 
     private static double Sane(double value, double fallback, double min, double max = double.MaxValue)
         => double.IsFinite(value) ? Math.Clamp(value, min, max) : fallback;
+
+    // ----- 손으로 고친 색 문자열 -----------------------------------------------
+    //
+    // THE ONE PLACE A TYPO COULD STOP THE APP STARTING. Thirty-four colour
+    // fields are stored as text, and every one of them ends up at
+    // ColorConverter.ConvertFromString on the way to a brush - which THROWS on
+    // anything it does not recognise. The call sites are written as
+    // `ConvertFromString(hex) is Color c`, and that pattern only guards null:
+    // the exception is raised before there is anything to test. Colours are
+    // applied while the window is being built, so the failure is a launch that
+    // does not happen - the one kind nobody can fix from inside the app.
+    //
+    // Measured rather than assumed (2026-08-13). Rejected: "zzz", "#GGGGGG",
+    // "#FF2E7D3" (a digit short), "" and a value with a zero-width space in it.
+    // Accepted: leading and trailing spaces, and the 3-digit form.
+    //
+    // TWO STEPS, in this order, because they answer different mistakes:
+    //   1. CLEAN, then re-test. A value that came through a chat window or a
+    //      web page can carry a zero-width space or a stray control character
+    //      that nobody can see in an editor either. Those are repaired, because
+    //      the colour the person wrote is right there and throwing it away over
+    //      an invisible character would be the surprise.
+    //   2. Only if it still will not parse, take THIS FIELD'S OWN DEFAULT from
+    //      a fresh AppSettings. Not black, not white: one bad line costs that
+    //      one colour and the palette around it is left alone.
+    //
+    // Found by name rather than listed, the same as the export path's own
+    // lookup - a 35th colour is covered without anyone remembering this code
+    // exists. It is a WIDER net than that one on purpose: export deliberately
+    // leaves out the two nullable handle colours (see their note above), and
+    // "not set" is a legitimate value here that must be left as null.
+    private static PropertyInfo[] ColorProperties { get; } =
+        typeof(AppSettings).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.PropertyType == typeof(string) && p.CanRead && p.CanWrite
+                && p.Name.Contains("Color", StringComparison.Ordinal))
+            .ToArray();
+
+    private void NormalizeColors()
+    {
+        AppSettings? defaults = null;
+        foreach (var property in ColorProperties)
+        {
+            // null means "nothing stored", which the two handle colours use to
+            // mean "follow the background". Only text can be malformed.
+            if (property.GetValue(this) is not string stored)
+            {
+                continue;
+            }
+
+            if (IsColor(stored))
+            {
+                continue;
+            }
+
+            string cleaned = CleanColorText(stored);
+            if (IsColor(cleaned))
+            {
+                property.SetValue(this, cleaned);
+                continue;
+            }
+
+            defaults ??= new AppSettings();
+            property.SetValue(this, property.GetValue(defaults));
+        }
+    }
+
+    private static bool IsColor(string text)
+    {
+        try
+        {
+            return System.Windows.Media.ColorConverter.ConvertFromString(text)
+                is System.Windows.Media.Color;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+        // ConvertFromString raises this for input it cannot even tokenize, and
+        // it is the same answer as a FormatException as far as this is
+        // concerned: not a colour.
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    // Whitespace the converter already forgives, so this is only about what an
+    // editor will not show: zero-width and directional marks, the BOM when it
+    // has been pasted into the middle of a value, and any control character.
+    //
+    // WRITTEN AS CODE POINTS, never as the characters themselves. A literal
+    // zero-width space in this file would be invisible in every editor that
+    // opens it, including to whoever comes to change this list.
+    private static bool IsInvisible(char c)
+        => char.IsControl(c)
+        || c is (char)0x200B    // zero-width space
+            or (char)0x200C     // zero-width non-joiner
+            or (char)0x200D     // zero-width joiner
+            or (char)0x200E     // left-to-right mark
+            or (char)0x200F     // right-to-left mark
+            or (char)0x2060     // word joiner
+            or (char)0xFEFF;    // BOM, when it has been pasted mid-value
+
+    private static string CleanColorText(string text)
+    {
+        var kept = new System.Text.StringBuilder(text.Length);
+        foreach (char c in text)
+        {
+            if (IsInvisible(c))
+            {
+                continue;
+            }
+            kept.Append(c);
+        }
+
+        return kept.ToString().Trim();
+    }
 }
