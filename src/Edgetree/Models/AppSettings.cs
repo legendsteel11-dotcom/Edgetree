@@ -595,4 +595,39 @@ public class AppSettings
     {
         AutoHideUseHandle = true,
     };
+
+    // ----- 값이 레이아웃에 닿기 전에 -------------------------------------------
+    //
+    // Run on everything that comes in from outside: the settings file, an
+    // imported settings file, and a preset. Each of those can carry a number
+    // this build never wrote - a file edited by hand, one brought from another
+    // machine, one left by a version that meant something else by the same
+    // field.
+    //
+    // It deliberately does NOT repeat the tunable ranges (6-20 for the
+    // scrollbar, 1-50 for the display cap, and so on). Those are clamped where
+    // they are used, and a second copy here would be a second source of truth
+    // that can drift from the first - which is a worse failure than the one it
+    // guards against, because it is silent.
+    //
+    // What it does enforce is the part WPF will throw over, and that no clamp
+    // at a use site can save: a value has to be a finite number, and a length
+    // has to be non-negative. Math.Clamp does not help there - Clamp(NaN, 0, 1)
+    // is NaN - so the finiteness test has to come first. new GridLength() on a
+    // negative or NaN double throws, and FavoritesPanelHeight is built into one
+    // on the way to the screen.
+    public void Normalize()
+    {
+        ExpandedWidth = Sane(ExpandedWidth, 240, min: 1);
+        ViewerWidth = Sane(ViewerWidth, 360, min: 1);
+        ViewerFilmstripCellHeight = Sane(ViewerFilmstripCellHeight, 64, min: 1);
+        AutoHideSliverWidth = Sane(AutoHideSliverWidth, 3, min: 1);
+        TreeFontSize = Sane(TreeFontSize, 12, min: 1);
+        FavoritesPanelHeight = Sane(FavoritesPanelHeight, 100, min: 0);
+        DockedHeightRatio = Sane(DockedHeightRatio, 1.0, min: 0, max: 1);
+        DockedTopRatio = Sane(DockedTopRatio, 0.0, min: 0, max: 1);
+    }
+
+    private static double Sane(double value, double fallback, double min, double max = double.MaxValue)
+        => double.IsFinite(value) ? Math.Clamp(value, min, max) : fallback;
 }

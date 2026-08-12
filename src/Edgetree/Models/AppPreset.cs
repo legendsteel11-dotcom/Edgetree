@@ -300,12 +300,25 @@ public class AppPreset
             {
                 property.SetValue(settings, value.Deserialize(property.PropertyType));
             }
-            catch (JsonException)
+            catch (Exception ex) when (
+                ex is JsonException or ArgumentException or NotSupportedException or InvalidCastException)
             {
                 // A value whose type has changed since it was saved. One field
                 // skipped is a preset that is slightly out of date; a throw
                 // here would be a preset that cannot be applied at all.
+                //
+                // JsonException alone was too narrow: a stored null for a field
+                // that is now a value type reaches SetValue as null and comes
+                // back as ArgumentException, and a type Deserialize has no
+                // converter for raises NotSupportedException. All three mean
+                // the same thing here - this one field cannot be carried over -
+                // and none of them is a reason to abandon the other forty.
             }
         }
+
+        // A preset is a file like any other: written by a build that may not be
+        // this one, and editable by anyone who finds it. The same pass the
+        // settings file gets on the way in - see AppSettings.Normalize.
+        settings.Normalize();
     }
 }

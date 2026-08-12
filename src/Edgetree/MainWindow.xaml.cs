@@ -4487,7 +4487,8 @@ public partial class MainWindow : Window
         if (hasFavorites)
         {
             bool measured = HasRealizedFavoriteRow;
-            FavoritesRowDef.Height = new GridLength(Math.Min(ComputeFavoritesContentHeight(), _settings.FavoritesPanelHeight));
+            FavoritesRowDef.Height =
+                SafeGridLength(Math.Min(ComputeFavoritesContentHeight(), _settings.FavoritesPanelHeight));
 
             // Sized off the estimate rather than a real row - startup, or the
             // very first favorite. The estimate runs short, so the panel came
@@ -4544,8 +4545,17 @@ public partial class MainWindow : Window
         }
 
         FavoritesRowDef.Height =
-            new GridLength(Math.Min(ComputeFavoritesContentHeight(), _settings.FavoritesPanelHeight));
+            SafeGridLength(Math.Min(ComputeFavoritesContentHeight(), _settings.FavoritesPanelHeight));
     }
+
+    // GridLength throws on a negative or non-finite length, and this row's
+    // height is the one built from a stored number: a settings file, an
+    // imported one, or a preset. AppSettings.Normalize keeps that number sane
+    // on the way in, and this keeps the ARITHMETIC around it sane too - the
+    // measured content height is the other half of the Math.Min above, and a
+    // safety device that shares a cause with the thing it guards is not one.
+    private static GridLength SafeGridLength(double length)
+        => new(double.IsFinite(length) && length > 0 ? length : 0);
 
     private void FavoritesSplitter_DragCompleted(object sender, DragCompletedEventArgs e)
     {

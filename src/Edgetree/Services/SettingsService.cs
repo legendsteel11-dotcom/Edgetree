@@ -38,6 +38,10 @@ public class SettingsService
                 var settings = JsonSerializer.Deserialize<AppSettings>(json);
                 if (settings is not null)
                 {
+                    // Everything that arrives from outside goes through this -
+                    // see AppSettings.Normalize for what it does and what it
+                    // deliberately leaves to the use sites.
+                    settings.Normalize();
                     return settings;
                 }
             }
