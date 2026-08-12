@@ -20951,7 +20951,17 @@ public partial class MainWindow : Window
         double thumbWidth =
             (bar.Template?.FindName("PART_Track", bar) as System.Windows.Controls.Primitives.Track)
                 ?.Thumb?.ActualWidth ?? 0;
+        // The mark is a BOX now, so it has two dimensions that no longer agree.
+        // Its height follows the bar, inset a pixel top and bottom so the bar's
+        // own edge still reads around it - the bar's thickness is a setting, and
+        // a fixed height would suit exactly one value of it.
         double dot = ViewerFilmstripMarker.Width;
+        double markHeight = Math.Max(4, bar.ActualHeight - 4);
+        if (Math.Abs(ViewerFilmstripMarker.Height - markHeight) > 0.5)
+        {
+            ViewerFilmstripMarker.Height = markHeight;
+        }
+
         double span = Math.Max(0, bar.ActualWidth - thumbWidth);
         double at = bar.Maximum <= 0 ? 0 : Math.Clamp(index / bar.Maximum, 0, 1);
 
@@ -21046,6 +21056,15 @@ public partial class MainWindow : Window
                 $"strip bar: thumb={thumbWidth:F0}px  bar={bar.ActualWidth:F0}px  " +
                 $"max={bar.Maximum:F0}  viewport={bar.ViewportSize:F0}  cells={_filmstripCells.Count}  " +
                 $"slot={Slot(thumbElement)}  " +
+                // WHY THE BAR IS 17 TALL WHEN THE SETTING SAYS 10 (2026-08-12).
+                // MinimalScrollBarStyle's Orientation trigger sets Height from
+                // the ScrollBarThickness resource, and 17 is what Windows uses
+                // for a horizontal scrollbar when nobody sets one - so either
+                // the resource is not resolving here and Height stays unset, or
+                // something is overriding the trigger. Height as a raw value
+                // separates them: NaN means nothing was ever applied.
+                $"barH={bar.Height:F0}/{bar.ActualHeight:F0}  " +
+                $"thickRes={(bar.TryFindResource("ScrollBarThickness") is double t ? t.ToString("F0") : "unresolved")}  " +
                 $"trackVp={stripTrack?.ViewportSize ?? double.NaN:F2}  " +
                 $"desired={thumbElement?.DesiredSize.Width ?? -1:F0}x{thumbElement?.DesiredSize.Height ?? -1:F0}  " +
                 $"tree thumb={treeThumb:F0}px  bar={treeBar:F0}px  slot={Slot(treeThumbElement)}");
@@ -21056,7 +21075,7 @@ public partial class MainWindow : Window
         Canvas.SetLeft(ViewerFilmstripMarker,
             origin.X + at * span + (thumbWidth - dot) / 2);
         Canvas.SetTop(ViewerFilmstripMarker,
-            origin.Y + (bar.ActualHeight - dot) / 2);
+            origin.Y + (bar.ActualHeight - markHeight) / 2);
         ViewerFilmstripMarker.Visibility = Visibility.Visible;
     }
 

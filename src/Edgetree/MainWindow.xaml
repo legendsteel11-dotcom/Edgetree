@@ -6471,10 +6471,26 @@
                              gesture. -->
                         <Canvas x:Name="ViewerFilmstripMarkerLayer"
                                 IsHitTestVisible="False">
-                            <Ellipse x:Name="ViewerFilmstripMarker"
-                                    Width="5"
-                                    Height="5"
-                                    Fill="{DynamicResource AccentForeground}"
+                            <!-- AN OUTLINED BOX, NOT AN ACCENT DOT (2026-08-12).
+                                 A filled accent dot already means "there is an
+                                 update" elsewhere in this app, and one mark
+                                 cannot carry two meanings. Drawn instead in the
+                                 scrollbar's own family - white, the thumb's
+                                 corner radius - and only a little brighter than
+                                 the thumb, because it sits ON the bar and is
+                                 read against it rather than against the panel.
+                                 Its height is set from the bar in
+                                 UpdateFilmstripPositionMarker; the bar's
+                                 thickness is a setting, so a fixed one here
+                                 would be right at exactly one value of it. -->
+                            <Rectangle x:Name="ViewerFilmstripMarker"
+                                    Width="7"
+                                    Height="7"
+                                    RadiusX="2"
+                                    RadiusY="2"
+                                    Stroke="#99FFFFFF"
+                                    StrokeThickness="1"
+                                    Fill="Transparent"
                                     Visibility="Collapsed"/>
                         </Canvas>
                         <Thumb x:Name="ViewerFilmstripThumb"
