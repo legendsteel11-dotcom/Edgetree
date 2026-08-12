@@ -5537,6 +5537,7 @@ public partial class MainWindow : Window
         double startOffset = scrollViewer.VerticalOffset;
         int steps = 0;
         int blind = 0;
+        int grows = 0;
         double lastTop = double.NaN;
 
         // Says what it MEASURED and what it did about it. Added because the
@@ -5632,10 +5633,47 @@ public partial class MainWindow : Window
 
             if (Math.Abs(scrollViewer.VerticalOffset - before) < 0.01)
             {
-                // The range is spent - the row is as close to the top as this
-                // tree can put it. The bottom-gap rows above are what usually
-                // makes the rest of the room; if they could not, stop here
-                // rather than loop against a wall.
+                // The range is spent: a step DOWN was asked for and refused,
+                // with the row still MEASURED short of the top. That is the
+                // panel stating there is no more room - so make the room, the
+                // same way PinRowToTop does, and keep going.
+                //
+                // PinRowToTop asks its shortfall question BEFORE auto-collapse
+                // has finished arriving, against a scroll range that is about
+                // to shrink - which is why the gap it computes can be zero for
+                // a jump that needed seven rows of it.
+                //
+                // SIZED FROM THE PIXELS, NOT THE MODEL. The first version here
+                // asked "row index minus ScrollableHeight", and the user found
+                // the gap never appearing: index 294 against scrollable 303
+                // said "room to spare" while the same instant measured top=324
+                // and a refused step (`click.log` 2026-08-13 00:49). The index
+                // and the panel's geometry disagreeing is the very fault this
+                // loop exists for, so the gap must come from what was MEASURED:
+                // the row is `top` pixels short, and a row of range is about
+                // one row's height of pixels.
+                //
+                // Two growths at most per settle. The legitimate need is once
+                // (plus once more if the tree shrinks mid-walk); a third ask
+                // means the refusal has some other cause, and growing the gap
+                // 64 times against it would trade a misplaced row for a
+                // screenful of blank ones.
+                if (top > 0 && grows < 2 && scrollViewer.ViewportHeight > 0)
+                {
+                    double rowHeight = scrollViewer.ActualHeight / scrollViewer.ViewportHeight;
+                    int need = rowHeight > 0 ? (int)Math.Ceiling(top / rowHeight) : 0;
+                    if (need > 0)
+                    {
+                        grows++;
+                        int grown = _bottomGapRows.Count + need;
+                        LogClickLine(
+                            $"settle: {name} out of room, gap {_bottomGapRows.Count} -> {grown} " +
+                            $"(top {top:F0}px, row {rowHeight:F0}px)");
+                        SetBottomGap(grown, scrollViewer);
+                        continue;
+                    }
+                }
+
                 Report("range-spent");
                 return;
             }
