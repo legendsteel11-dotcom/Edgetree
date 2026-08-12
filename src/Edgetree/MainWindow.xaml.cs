@@ -5154,6 +5154,42 @@ public partial class MainWindow : Window
 
         container.UpdateLayout();
         var item = chain[index];
+
+        // THE CONTAINER HANDED DOWN MAY NO LONGER BE THE PARENT'S. This walk
+        // spans dispatcher passes, and the tree recycles row containers
+        // (VirtualizationMode=Recycling, shipped in 2.0.0): one that scrolls out
+        // of view is handed to a different row, and the reference this step is
+        // holding then answers for something else entirely. It shows up as a
+        // parent with no children at all -
+        //
+        //   reveal gave up: 선별2023 (step 1 of 2, host=yes, itemIndex=-1 of 0,
+        //   parent=root)
+        //
+        // - a D: drive row whose DataContext and Items had both gone (measured
+        // 2026-08-12). Only on a jump far enough to recycle, which is why it was
+        // a CROSS-DRIVE fault, why the tree stayed where it was, and why
+        // clicking the same bookmark again worked: by then the view was already
+        // there and nothing had been recycled.
+        //
+        // Re-resolved from the top rather than repaired in place. The chain is a
+        // handful of rows, walking it again costs one pass, and it is the only
+        // answer that cannot itself be holding a stale reference.
+        if (index > 0 && container is TreeViewItem handedParent &&
+            !ReferenceEquals(handedParent.DataContext, chain[index - 1]))
+        {
+            if (attempt < 12)
+            {
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,
+                    new Action(() => RevealChainStep(
+                        chain, 0, ExplorerTree, token, attempt + 1, pinToTop, settled: false)));
+                return;
+            }
+
+            LogClickLine($"reveal gave up: {item.Name} (parent container recycled, step {index})");
+            EndFavoriteNavigation(token);
+            return;
+        }
+
         if (container.ItemContainerGenerator.ContainerFromItem(item) is not TreeViewItem treeViewItem)
         {
             // A container outside the virtualizing panel's viewport+cache won't
@@ -5166,16 +5202,35 @@ public partial class MainWindow : Window
             // selection in place - the "wrong file opens" bug). Harmless for the
             // levels that were already realizing on their own: it only runs when
             // the container is genuinely missing.
-            if (FindItemsHostPanel(container) is VirtualizingPanel hostPanel)
+            //
+            // AND it is only half a fallback, which is what 2026-08-12 caught:
+            // "reveal gave up: 선별2023 (no container after 8 tries, step 1 of 2)"
+            // - a bookmark on D: clicked while the tree sat on C:. Step 0, the
+            // drive root, was found; step 1, its child, never was.
+            //
+            // The asymmetry is the whole answer. In hierarchical virtualization
+            // the ROOT panel owns the scroll and every nested one only realizes
+            // what the shared viewport covers, so asking a nested panel to bring
+            // an index into view moves nothing: the parent row is off screen, its
+            // children have no viewport to be in, and the retries could only
+            // count down. Pin the PARENT to the top first and its children ARE
+            // the viewport - then the ask below is one the panel can answer. The
+            // pin at the end of the walk moves the view to its real destination
+            // anyway, so this costs no extra scroll.
+            if (container is TreeViewItem parentRow)
             {
-                int itemIndex = container.Items.IndexOf(item);
-                if (itemIndex >= 0)
-                {
-                    hostPanel.BringIndexIntoViewPublic(itemIndex);
-                }
+                PinRowToTop(parentRow);
+                container.UpdateLayout();
             }
 
-            if (attempt >= 8)
+            var hostPanel = FindItemsHostPanel(container);
+            int itemIndex = container.Items.IndexOf(item);
+            if (hostPanel is not null && itemIndex >= 0)
+            {
+                hostPanel.BringIndexIntoViewPublic(itemIndex);
+            }
+
+            if (attempt >= 12)
             {
                 // Given it a real chance - genuinely gone (renamed/deleted), not just slow.
                 //
@@ -5186,12 +5241,25 @@ public partial class MainWindow : Window
                 // to a log that had nothing to say either way: a favorite that
                 // quietly did nothing and a favorite that was never clicked
                 // wrote the same thing, which is no line at all.
+                // Says WHY now, not just that it happened. The first version of
+                // this line proved the walk was failing and could not say at
+                // which of the three places - no items host, the item not in the
+                // list at all, or a host that was asked and did not answer.
                 LogClickLine(
-                    $"reveal gave up: {item.Name} (no container after {attempt} tries, step {index} of {chain.Count})");
+                    $"reveal gave up: {item.Name} (no container after {attempt} tries, " +
+                    $"step {index} of {chain.Count}, host={(hostPanel is null ? "none" : "yes")}, " +
+                    $"itemIndex={itemIndex} of {container.Items.Count}, " +
+                    $"parent={((container as TreeViewItem)?.DataContext is FileSystemItem p ? p.Name : "root")})");
                 EndFavoriteNavigation(token);
                 return;
             }
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
+            // Loaded, not Background: the retry is waiting on a LAYOUT PASS to
+            // generate the container, and Loaded is the priority that runs right
+            // after one. Background sits below input, so the retries were being
+            // handed out while the tree was still realizing rows - eight of them
+            // burned through three and a half seconds and none landed after the
+            // pass they were waiting for.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,
                 new Action(() => RevealChainStep(chain, index, container, token, attempt + 1, pinToTop, settled: false)));
             return;
         }

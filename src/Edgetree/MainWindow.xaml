@@ -4637,6 +4637,19 @@
                  Also note: do NOT "fix" this by setting IsVirtualizing=False
                  here. That was tried; it silently un-virtualizes the ENTIRE
                  tree (the property inherits) and breaks scrolling app-wide. -->
+            <!-- PUT BACK TO Standard the same day (2026-08-12). The experiment
+                 went into 2.0.0 hours after it was written and cost a defect
+                 within the day: a bookmark on ANOTHER DRIVE stopped reaching
+                 the tree at all. The reveal walk holds a parent container
+                 across dispatcher passes, and recycling hands that container
+                 to a different row mid-walk - click.log caught it as
+                 "itemIndex=-1 of 0", a drive row with no DataContext and no
+                 children. RevealChainStep notices that now and re-walks from
+                 the top, so the walk no longer depends on the mode either way.
+                 The mode still goes back: it is an unmeasured change sitting
+                 under every scroll in the app, and a release is not where it
+                 gets its soak. Bring it in again with one, and with this
+                 failure in the list of things to watch for. -->
             <!-- EXPERIMENT 2026-08-10, NOT a decision: ScrollUnit below was
                  "Pixel". In pixel mode the panel has to guess the height of
                  every row it hasn't realized, from the average of the ones it
@@ -4661,7 +4674,7 @@
                     ContextMenu="{StaticResource ExplorerEmptySpaceContextMenu}"
                       ItemContainerStyle="{StaticResource ExplorerTreeViewItemStyle}"
                       VirtualizingPanel.IsVirtualizing="True"
-                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      VirtualizingPanel.VirtualizationMode="Standard"
                       VirtualizingPanel.ScrollUnit="Item"
                       VirtualizingPanel.CacheLengthUnit="Page"
                       VirtualizingPanel.CacheLength="1,1"
