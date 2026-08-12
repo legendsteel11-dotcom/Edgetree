@@ -143,8 +143,14 @@
                                  horizontal bar in the app found it (2026-08-12)
                                  - and a thumb sitting where nobody would aim is
                                  also why it read as unclickable. -->
-                            <Track x:Name="PART_Track"
+                            <!-- FlooredTrack, not Track: the thumb's minimum
+                                 length is enforced where the thumb's slot is
+                                 decided. A stock Track ignores the Thumb's
+                                 MinWidth/MinHeight entirely - see the class,
+                                 which carries the measurement. -->
+                            <local:FlooredTrack x:Name="PART_Track"
                                     IsDirectionReversed="True"
+                                    MinThumbLength="{DynamicResource ScrollThumbMinLength}"
                                    Orientation="{TemplateBinding Orientation}">
                                 <Track.Thumb>
                                     <Thumb x:Name="ScrollBarThumb"
@@ -160,7 +166,7 @@
                                             Opacity="0"
                                             Focusable="False"/>
                                 </Track.IncreaseRepeatButton>
-                            </Track>
+                            </local:FlooredTrack>
                         </Grid>
                         <!-- A floor on the grab area. Track sizes the thumb
                              purely as viewport ÷ content, with no minimum of
@@ -185,19 +191,19 @@
                              asked to go.
 
                              One resource for both, so this stays a single
-                             number to tune rather than two that can drift. -->
+                             number to tune rather than two that can drift.
+
+                             IT IS NOT SET ON THE THUMB ANY MORE (2026-08-12).
+                             MinWidth/MinHeight on the Thumb reached the
+                             element and never the Track, which arranges the
+                             thumb into a slot of its own reckoning and clips
+                             whatever overflows: a 96px thumb showed 8 pixels,
+                             and every raise from 28 to 400 moved nothing on
+                             screen. The floor now goes to FlooredTrack, which
+                             is the thing that decides the slot. -->
                         <ControlTemplate.Triggers>
                             <Trigger Property="Orientation"
-                                    Value="Vertical">
-                                <Setter TargetName="ScrollBarThumb"
-                                        Property="MinHeight"
-                                        Value="{DynamicResource ScrollThumbMinLength}"/>
-                            </Trigger>
-                            <Trigger Property="Orientation"
                                     Value="Horizontal">
-                                <Setter TargetName="ScrollBarThumb"
-                                        Property="MinWidth"
-                                        Value="{DynamicResource ScrollThumbMinLength}"/>
                                 <Setter TargetName="PART_Track"
                                         Property="IsDirectionReversed"
                                         Value="False"/>
