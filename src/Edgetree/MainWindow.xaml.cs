@@ -5133,6 +5133,16 @@ public partial class MainWindow : Window
             if (attempt >= 8)
             {
                 // Given it a real chance - genuinely gone (renamed/deleted), not just slow.
+                //
+                // Said out loud, the same rule SelectVisibleItemStep already
+                // follows. This walk is the one thing the tree's thousand-item
+                // cache existed for, and when that cache was removed
+                // (2026-08-12) the check for whether it still worked came down
+                // to a log that had nothing to say either way: a favorite that
+                // quietly did nothing and a favorite that was never clicked
+                // wrote the same thing, which is no line at all.
+                LogClickLine(
+                    $"reveal gave up: {item.Name} (no container after {attempt} tries, step {index} of {chain.Count})");
                 EndFavoriteNavigation(token);
                 return;
             }
@@ -20732,9 +20742,42 @@ public partial class MainWindow : Window
                         as System.Windows.Controls.Primitives.Track)?.Thumb?.ActualHeight ?? 0;
             }
 
+            // WHAT THE THUMB IS GIVEN, next to what it reports being.
+            //
+            // The two disagree, and until now only one of them was ever read.
+            // On 2026-08-12 the app reported thumb=96px on a 229px bar while a
+            // screen capture of that same moment measured the painted thumb at
+            // 7px wide and 15 tall - the height exactly as reported, the width
+            // nowhere near it. That is the whole reason five rounds of raising
+            // the floor changed nothing: the floor reaches ActualWidth and not
+            // the pixels.
+            //
+            // A Track sizes its thumb as viewport ÷ content and arranges it
+            // into a slot that size. MinWidth can only make the element's own
+            // render size bigger than the slot it was given, and WPF clips an
+            // element to its layout slot when it overflows one. If that is what
+            // is happening, the slot and the clip below both read about 7-10px
+            // while ActualWidth reads 96, and no floor can ever win. If instead
+            // the slot reads 96, the fault is somewhere after layout and this
+            // whole line of reasoning is wrong.
+            var thumbElement =
+                (bar.Template?.FindName("PART_Track", bar) as System.Windows.Controls.Primitives.Track)?.Thumb;
+            string slot = "-", clip = "-";
+            if (thumbElement is not null)
+            {
+                var layoutSlot = System.Windows.Controls.Primitives.LayoutInformation
+                    .GetLayoutSlot(thumbElement);
+                slot = $"{layoutSlot.Width:F0}x{layoutSlot.Height:F0}";
+                clip = System.Windows.Controls.Primitives.LayoutInformation
+                    .GetLayoutClip(thumbElement) is { } clipGeometry
+                        ? $"{clipGeometry.Bounds.Width:F0}x{clipGeometry.Bounds.Height:F0}"
+                        : "none";
+            }
+
             LogClickLine(
                 $"strip bar: thumb={thumbWidth:F0}px  bar={bar.ActualWidth:F0}px  " +
                 $"max={bar.Maximum:F0}  viewport={bar.ViewportSize:F0}  cells={_filmstripCells.Count}  " +
+                $"slot={slot}  clip={clip}  " +
                 $"tree thumb={treeThumb:F0}px  bar={treeBar:F0}px");
         }
 
