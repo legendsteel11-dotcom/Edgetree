@@ -10477,7 +10477,7 @@ public partial class MainWindow : Window
             keepExpanded.Add(ancestor);
         }
 
-        foreach (var root in _roots)
+        foreach (var root in _roots.ToList())
         {
             CollapseExcept(root, keepExpanded);
         }
@@ -10490,17 +10490,43 @@ public partial class MainWindow : Window
             item.IsExpanded = false;
         }
 
-        // Files never expand, so there's nothing under one worth recursing
-        // into - skipping them here (rather than recursing in and immediately
-        // finding an empty Children collection) matters for a folder holding
-        // a large number of files, where this loop would otherwise pay for a
-        // full method call per file on every single favorites navigation.
+        // THE RECURSION IS OUT OF THE ENUMERATION, and that is the whole point
+        // of the two loops (2026-08-13). Collapsing a folder can change the
+        // CHILDREN OF A FOLDER ABOVE IT - the overflow recap runs off
+        // IsExpanded - so recursing from inside a foreach over Children let a
+        // deep collapse modify the very list an outer frame was still walking:
+        //
+        //     InvalidOperationException: Collection was modified;
+        //     enumeration operation may not execute.
+        //     CollapseExcept <- CollapseOtherFolders <- ApplyAutoCollapse
+        //     <- TreeViewItem_Expanded <- RevealChainStep <- JumpToBookmark
+        //
+        // Ctrl+Alt+L onto a bookmark, in a tree with enough expanded for the
+        // recap to have work to do, was the whole recipe. It reached v2.0.2.
+        //
+        // ONLY THE FOLDERS ARE COPIED, never the files, which keeps the guard
+        // the original loop was written for: files never expand, so there is
+        // nothing under one worth recursing into, and a folder holding several
+        // thousand of them must not cost a list of several thousand entries on
+        // every navigation. The list is not allocated at all for a folder that
+        // holds no subfolders, which is most of them.
+        List<FileSystemItem>? folders = null;
         foreach (var child in item.Children)
         {
             if (!child.IsPlaceholder && child.IsDirectory)
             {
-                CollapseExcept(child, keepExpanded);
+                (folders ??= new List<FileSystemItem>()).Add(child);
             }
+        }
+
+        if (folders is null)
+        {
+            return;
+        }
+
+        foreach (var child in folders)
+        {
+            CollapseExcept(child, keepExpanded);
         }
     }
 
