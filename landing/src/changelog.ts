@@ -20,6 +20,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // One line, and the shortcut is not named. Naming it would tell everyone
+    // which gesture to be wary of, right above the download buttons, for a
+    // fault that is already gone in the build those buttons hand out.
+    version: 'v2.0.3',
+    ko: [
+      '버그 수정 — 특정 단축키 문제 해결',
+    ],
+    en: [
+      'Bug fix — resolved an issue with a particular keyboard shortcut',
+    ],
+  },
+  {
     // Back to three, which the two entries below both had reasons to exceed.
     // The panel's rename is not one of them: it matters to someone already
     // using the app and looking for it in the options menu, and that person is

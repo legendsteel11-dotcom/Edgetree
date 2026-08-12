@@ -1,4 +1,4 @@
-# Edgetree v2.0.2
+# Edgetree v2.0.3
 
 [English](README.md)
 
@@ -206,6 +206,10 @@ dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -o publi
 csproj만 올리면 됩니다.
 
 ## 변경 이력
+
+### v2.0.3 (2026-08-13)
+
+- 버그 수정 — 특정 단축키 문제 해결
 
 ### v2.0.2 (2026-08-12)
 
