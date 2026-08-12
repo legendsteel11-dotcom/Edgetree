@@ -238,7 +238,11 @@ public static class FileSystemService
 
             roots.Add(new FileSystemItem(displayName, drive.RootDirectory.FullName, isDirectory: true)
             {
-                IsOnNetworkDrive = isNetwork
+                IsOnNetworkDrive = isNetwork,
+                // Recorded, not asked for again later: this is the one moment the
+                // drive's type is already in hand, and the row's icon reads it
+                // (see FileSystemItem.Icon).
+                DriveKind = drive.DriveType
             });
         }
 

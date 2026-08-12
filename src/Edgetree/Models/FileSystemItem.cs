@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Media;
 using SidebarExplorer.App.Services;
@@ -29,8 +30,17 @@ public class FileSystemItem : INotifyPropertyChanged
     public ImageSource? Icon => IsShowMore || IsPlaceholder
         ? null
         : IsDirectory
-            ? ShellIconService.GetFolderIcon(Name, IsExpanded)
+            ? DriveKind is { } drive
+                ? ShellIconService.GetDriveIcon(drive, Name, IsExpanded)
+                : ShellIconService.GetFolderIcon(Name, IsExpanded)
             : ShellIconService.GetFileIcon(Name, FullPath, RefreshIcon);
+
+    // Set on drive roots by FileSystemService.GetDriveRoots and null everywhere
+    // else, which is what makes it the test above: a root the user chose for
+    // themselves (a folder pinned as the tree's top) is still a folder and keeps
+    // the folder glyph. Not inherited downward the way IsOnNetworkDrive is -
+    // this one is about the row being the drive itself.
+    public DriveType? DriveKind { get; set; }
 
     // Also called by MainWindow.ApplyIconStyle when the icon mode toggles, so
     // every realized row re-reads Icon under the new mode without a reload.

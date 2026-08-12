@@ -89,6 +89,56 @@ public static class ShellIconService
             ? GetGenericFolderIcon(isExpanded)
             : GetPackIcon(IconResolver.ResolveFolderIcon(folderName, isExpanded));
 
+    // A drive root is a drive, not a folder - Explorer has drawn it that way
+    // for as long as it has existed, and this app was giving every root the same
+    // folder glyph as the folders inside it.
+    //
+    // From the STOCK icon table rather than by asking the drive itself. Asking
+    // (SHGetFileInfo on the root, no USEFILEATTRIBUTES) is what would pick up a
+    // volume's custom icon, but it is also disk and NETWORK I/O on the one row
+    // this app already knows can hang for seconds at a time - and the roots are
+    // built on the UI thread. The stock table costs nothing and gets the four
+    // cases that actually distinguish a drive right: fixed, removable, network,
+    // optical.
+    //
+    // The bundled PNG set has no drive art, so 아이콘 방식: 기본 keeps the folder
+    // glyph it has always had rather than being handed a Windows icon in the
+    // middle of a hand-drawn set.
+    public static ImageSource? GetDriveIcon(DriveType driveType, string driveName, bool isExpanded)
+    {
+        if (!UseShellIcons)
+        {
+            return GetPackIcon(IconResolver.ResolveFolderIcon(driveName, isExpanded));
+        }
+
+        int stockId = driveType switch
+        {
+            DriveType.Removable => SIID_DRIVEREMOVE,
+            DriveType.Network => SIID_DRIVENET,
+            DriveType.CDRom => SIID_DRIVECD,
+            DriveType.Ram => SIID_DRIVERAM,
+            _ => SIID_DRIVEFIXED,
+        };
+
+        string key = "v:" + stockId;
+        if (GenericShellCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var icon = ExtractStockIcon(stockId);
+        if (icon is null)
+        {
+            // Same fallback discipline as the generic file icon: the folder
+            // glyph rather than a gap, and not cached, so a transient refusal
+            // can heal on the next read.
+            return GetGenericFolderIcon(isExpanded);
+        }
+
+        GenericShellCache[key] = icon;
+        return icon;
+    }
+
     // The favorites panel's rows all share one folder icon (favorites are
     // always folders); MainWindow stores this in a DynamicResource the
     // favorites DataTemplate binds, refreshed on every mode switch.
@@ -380,6 +430,41 @@ public static class ShellIconService
         }
     }
 
+    // Same handle discipline as ExtractShellIcon: the HICON is destroyed here,
+    // and only a frozen ImageSource leaves the method.
+    private static ImageSource? ExtractStockIcon(int stockId)
+    {
+        var info = new SHSTOCKICONINFO { cbSize = (uint)Marshal.SizeOf<SHSTOCKICONINFO>() };
+        try
+        {
+            if (SHGetStockIconInfo(stockId, SHGSI_ICON | SHGSI_LARGEICON, ref info) != 0 ||
+                info.hIcon == IntPtr.Zero)
+            {
+                return null;
+            }
+        }
+        catch (Exception e) when (e is ExternalException or ArgumentException)
+        {
+            return null;
+        }
+
+        try
+        {
+            var source = Imaging.CreateBitmapSourceFromHIcon(
+                info.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            source.Freeze();
+            return source;
+        }
+        catch (Exception e) when (e is ExternalException or ArgumentException)
+        {
+            return null;
+        }
+        finally
+        {
+            DestroyIcon(info.hIcon);
+        }
+    }
+
     private const uint SHGFI_ICON = 0x000000100;
     private const uint SHGFI_LARGEICON = 0x000000000;
     private const uint SHGFI_OPENICON = 0x000000002;
@@ -389,6 +474,14 @@ public static class ShellIconService
     private const uint ILD_TRANSPARENT = 0x1;
     private const uint FILE_ATTRIBUTE_NORMAL = 0x00000080;
     private const uint FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
+    private const uint SHGSI_ICON = 0x000000100;
+    private const uint SHGSI_LARGEICON = 0x000000000;
+    // SHSTOCKICONID, by position in the enum - the drive block only.
+    private const int SIID_DRIVEREMOVE = 7;
+    private const int SIID_DRIVEFIXED = 8;
+    private const int SIID_DRIVENET = 9;
+    private const int SIID_DRIVECD = 11;
+    private const int SIID_DRIVERAM = 12;
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct SHFILEINFO
@@ -421,9 +514,23 @@ public static class ShellIconService
         [PreserveSig] int GetIcon(int i, uint flags, out IntPtr picon);
     }
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct SHSTOCKICONINFO
+    {
+        public uint cbSize;
+        public IntPtr hIcon;
+        public int iSysImageIndex;
+        public int iIcon;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        public string szPath;
+    }
+
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes,
         ref SHFILEINFO psfi, uint cbFileInfo, uint uFlags);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHGetStockIconInfo(int siid, uint uFlags, ref SHSTOCKICONINFO psii);
 
     [DllImport("shell32.dll")]
     private static extern int SHGetImageList(int iImageList, ref Guid riid,
