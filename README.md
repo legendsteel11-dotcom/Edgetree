@@ -1,4 +1,4 @@
-# Edgetree v2.0.0
+# Edgetree v2.0.1
 
 [한국어 안내](README-ko.md)
 

@@ -20,6 +20,25 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // A pointer line first, the way v1.7.1 does it below. 2.0 is the release
+    // that says what the app now is, and a patch landing on top of it puts that
+    // list one arrow away - so this entry says where it went rather than
+    // standing in front of it.
+    version: 'v2.0.1',
+    ko: [
+      'v2.0.0에 이어진 다듬기입니다 — 2.0의 새 기능은 아래 v2.0.0 항목을 봐 주세요',
+      '트리에 표시되는 위치 관련 로직을 강화했습니다',
+      '드라이브 행에 드라이브 종류에 맞는 아이콘이 표시됩니다',
+      '라이트 테마에서 전체화면 재생 컨트롤이 또렷하게 보입니다',
+    ],
+    en: [
+      'Polish on top of v2.0.0 — what 2.0 added is in the v2.0.0 entry below',
+      'Stronger logic for where the tree lands and what it puts on screen',
+      'Drive rows carry the icon for what kind of drive they are',
+      'Full-screen playback controls read clearly in the light theme',
+    ],
+  },
+  {
     // EIGHT lines, past the three the note above asks for, and deliberately:
     // the author's call for this release. 2.0 is the version where the app
     // stopped being a tree, and the card carrying the same list as the release
