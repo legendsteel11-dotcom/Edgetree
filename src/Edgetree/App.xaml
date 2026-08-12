@@ -67,7 +67,10 @@
              for both orientations). It is a FLOOR on the grab area, not a
              size: anything short of a folder with thousands of rows never
              reaches it. -->
-        <system:Double x:Key="ScrollThumbMinLength">96</system:Double>
+        <!-- 96 until 2026-08-12, which was the first value ever to reach the
+             screen (the floor used to be set where a Track never read it - see
+             FlooredTrack). Judged too big once actually visible, and halved. -->
+        <system:Double x:Key="ScrollThumbMinLength">48</system:Double>
         <GridLength x:Key="ScrollGutterWidth">13</GridLength>
         <SolidColorBrush x:Key="MenuForeground" Color="#FFCCCCCC"/>
         <SolidColorBrush x:Key="PanelDividerBrush" Color="#FF3A3A3A"/>
