@@ -7033,13 +7033,42 @@
                                  something anyone should have to do. Hidden the
                                  rest of the time, when the caption is already
                                  the answer. -->
+                            <!-- AND IT IS THE WAY BACK TO THAT TRACK. The folder
+                                 button at the end of the transport already does
+                                 this, but it is second in the row's drop order,
+                                 so in a sidebar - which is narrow nearly all the
+                                 time - it is almost never on screen ("폴더버튼은
+                                 잘 인식이 안되네요", 2026-08-12). This line
+                                 cannot be dropped: it IS the file's name, so it
+                                 needs no icon to explain it, and it survives
+                                 every width.
+
+                                 Underline on hover rather than a colour: the ink
+                                 here is derived against whatever the panel's
+                                 background happens to be, and an underline reads
+                                 on any of them. -->
                             <TextBlock x:Name="ViewerNowPlaying"
                                     Visibility="Collapsed"
+                                    Background="Transparent"
+                                    Cursor="Hand"
                                     FontSize="{DynamicResource FooterChipFontSize}"
                                     Foreground="{DynamicResource ForegroundText}"
                                     TextAlignment="Center"
                                     TextTrimming="CharacterEllipsis"
-                                    Margin="{DynamicResource ViewerCaptionRowGap}"/>
+                                    Margin="{DynamicResource ViewerCaptionRowGap}"
+                                    ToolTip="{x:Static services:Strings.MenuRevealInTree}"
+                                    MouseLeftButtonUp="ViewerNowPlaying_Click">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="TextDecorations"
+                                                        Value="Underline"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                             <!-- The marks ride WITH the bar rather than beside
                                  it: a tick is only meaningful against the
                                  position it points at. Underneath rather than

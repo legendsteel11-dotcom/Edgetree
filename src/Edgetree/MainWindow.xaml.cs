@@ -18658,6 +18658,13 @@ public partial class MainWindow : Window
     // To the FILE rather than to its folder: the folder is where the file is,
     // and landing on the row itself is also what hands the panel back, so the
     // transport is attached to the selection again once the jump lands.
+    // The 지금 재생 중 line is the same action with no icon to explain it: the
+    // name IS the destination. It exists because the button below is second in
+    // the row's drop order and a sidebar is narrow nearly all the time, so in
+    // practice the button was rarely on screen (2026-08-12).
+    private void ViewerNowPlaying_Click(object sender, MouseButtonEventArgs e)
+        => ViewerMediaRevealInTree_Click(sender, e);
+
     private void ViewerMediaRevealInTree_Click(object sender, RoutedEventArgs e)
     {
         if (_viewerVideoPath is { } path)
