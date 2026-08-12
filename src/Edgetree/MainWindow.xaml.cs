@@ -23513,8 +23513,22 @@ public partial class MainWindow : Window
             // under it already says the file's name.
             if (IsViewerPlayable(path))
             {
+                // AND THE PICTURE THE LAST FILE LEFT BEHIND GOES WITH IT. This
+                // branch cleared the icon and not the image, so a track with no
+                // art kept showing the art of whichever track came before it -
+                // caption naming one file, picture showing another, for as long
+                // as the un-arted run lasted (reported 2026-08-12). The
+                // file-type branch below has always cleared both; this one was
+                // simply missing the pair.
+                //
+                // Nothing to zoom either, so the strip goes the same way it does
+                // there.
+                ViewerImage.Visibility = Visibility.Collapsed;
+                ViewerImage.Source = null;
+                _viewerShowingDecodedImage = false;
                 ViewerIconImage.Visibility = Visibility.Collapsed;
                 ViewerIconImage.Source = null;
+                ClearViewerZoom();
                 ViewerPlayOverlay.Visibility = IsViewerMediaLoaded(path)
                     ? Visibility.Collapsed
                     : Visibility.Visible;
