@@ -111,5 +111,11 @@ function step(by: number) {
 .notes li {
   font-size: 14px;
   line-height: 1.7;
+  /* So a line in changelog.ts can break itself where the sense breaks - the
+     v2.0.0 music entry carries an examples clause that reads as a second
+     thought rather than more of the first. Note that pre-line COLLAPSES
+     ordinary spaces, so the indent on such a line is written with non-breaking
+     spaces ( ) in the string itself. */
+  white-space: pre-line;
 }
 </style>

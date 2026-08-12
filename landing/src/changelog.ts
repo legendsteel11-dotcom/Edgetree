@@ -31,7 +31,11 @@ export const changelog: ChangelogEntry[] = [
       '경로 직접 입력 및 히스토리 기능(Ctrl+←, Ctrl+→) 추가',
       '이미지 뷰어(썸네일 바 및 내비게이션)',
       '영상 재생(HDR 보정 및 자막 지원)',
-      '음악 재생(앱 내에서 전역 플레이어로 설정하고 다른 작업으로 이동 가능 — 예: 이미지 뷰어 또는 파일 관리, 검색 등)',
+      // Breaks itself: the examples are a second thought, not more of the
+      // first, and on one line they pushed the entry to two rows anyway. The
+      // indent is non-breaking spaces because pre-line collapses ordinary ones
+      // (see UpdateNotes.vue).
+      '음악 재생(앱 내에서 전역 플레이어로 설정하고 다른 작업으로 이동 가능)\n   예: 이미지 뷰어 또는 파일 관리, 검색 등',
       '사용자가 정한 앱 형태 및 설정 등을 프리셋으로 저장하고 그대로 불러올 수 있는 기능(5개까지)',
       '더 다양해진 랜덤 색상 모드',
       '메모리 관리 및 성능 최적화, 버그 수정, 앱 속도 향상',
@@ -41,7 +45,7 @@ export const changelog: ChangelogEntry[] = [
       'Type a path directly, and step back and forward through where you have been (Ctrl+←, Ctrl+→)',
       'Image viewer (thumbnail bar and navigator)',
       'Video playback (HDR correction and subtitles)',
-      'Music playback — set it as the app\'s player and carry on elsewhere (viewing images, managing files, searching)',
+      'Music playback (set it as the app\'s player and carry on elsewhere)\n   e.g. viewing images, managing files, searching',
       'Keep the app\'s shape and settings as presets and bring them back exactly (up to five)',
       'More varied random colour modes',
       'Memory and performance work, bug fixes, a faster app',
