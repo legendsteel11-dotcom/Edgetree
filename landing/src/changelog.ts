@@ -20,6 +20,24 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // Back to three, which the two entries below both had reasons to exceed.
+    // The panel's rename is not one of them: it matters to someone already
+    // using the app and looking for it in the options menu, and that person is
+    // reading the release notes or the help, not a card on the way to a
+    // download button.
+    version: 'v2.0.2',
+    ko: [
+      '이미지·음악·영상을 더블클릭하면 앱 안에서 바로 열도록 설정할 수 있습니다',
+      '재생 중인 곡을 앨범아트 위에서 바로 알아볼 수 있고, 재생을 눌러도 화면이 움직이지 않습니다',
+      '즐겨찾기 전체 해제, 색상 설정 창 정리, 옵션 즉시 저장',
+    ],
+    en: [
+      'Images, music and video can open in the app itself on a double-click',
+      'The album art says which track is playing, and starting one no longer moves the panel',
+      'Clear all favorites, a tidier colour window, options saved as they are set',
+    ],
+  },
+  {
     // A pointer line first, the way v1.7.1 does it below. 2.0 is the release
     // that says what the app now is, and a patch landing on top of it puts that
     // list one arrow away - so this entry says where it went rather than

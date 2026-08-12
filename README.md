@@ -1,4 +1,4 @@
-# Edgetree v2.0.1
+# Edgetree v2.0.2
 
 [한국어 안내](README-ko.md)
 
@@ -170,6 +170,52 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v2.0.2 (2026-08-12)
+
+- **The image viewer is now the multimedia panel**: it shows pictures, plays
+  film and sound, and carries a track on with nothing on screen at all
+- **Double-click opens a file here**: turn it on in Options → Multimedia panel
+  and images, music and video open in the app's own panel instead of going to
+  Windows. Enter follows the same setting; everything else still opens in the
+  default program
+- **Which track is sounding, at a glance**: the mark on the album art is a
+  triangle before it starts and two bars while it is playing, so tracks that
+  share a cover tell themselves apart. While you are looking at a different
+  file, the playback area takes a backing of its own to say the sound belongs
+  somewhere else
+- **Pressing play no longer moves the panel**: album art used to change size as
+  a track started
+- **Clear all favorites**: on the right-click menu of a favorite. The bookmark
+  panel carries the same
+- **A tidier colour window**: the theme row went from six buttons to four, and
+  the theme in use is marked in the app's own blue
+- **Options are saved as they are set**: a setting changed in the options menu
+  is written the moment it is clicked
+
+### v2.0.1 (2026-08-12)
+
+- **Stronger logic for where the tree lands and what it puts on screen**
+- **Drive rows carry the icon for what kind of drive they are** — fixed,
+  removable, network and optical each read as themselves
+- **Full-screen playback controls read clearly in the light theme** — the seek
+  bar and the buttons were recoloured for the dark plate they sit on
+- **A long menu no longer moves under the pointer** — running down past the
+  bottom of a scrolling menu and back up could carry the rows with it
+
+### v2.0.0 (2026-08-12)
+
+- **Type a path directly**, and step back and forward through where you have
+  been (`Ctrl+←`, `Ctrl+→`)
+- **Image viewer** — a thumbnail bar and a navigator
+- **Video playback** — HDR correction and subtitles
+- **Music playback** — set it as the app's player and carry on elsewhere
+  (viewing images, managing files, searching)
+- **Presets** — keep the app's shape and settings and bring them back exactly
+  (up to five)
+- **More varied random colour modes**
+- **Memory and performance work**, bug fixes, a faster app
+- **`F1` help**
 
 ### v1.7.1 (2026-08-07)
 
