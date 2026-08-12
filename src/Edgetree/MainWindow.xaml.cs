@@ -16003,6 +16003,11 @@ public partial class MainWindow : Window
     private int _uiStallGen0, _uiStallGen1, _uiStallGen2;
     private int _uiStallRows;
 
+    // See LogTreeCacheConstraints. The answer does not change while the app
+    // runs, so a few samples are the whole evidence; the walk is as expensive
+    // as the row count and does not belong on every stall.
+    private int _cacheProbesLeft = 3;
+
     [System.Diagnostics.Conditional("DEBUG")]
     private void StartUiStallWatch()
     {
@@ -16048,6 +16053,17 @@ public partial class MainWindow : Window
                     $"  *** UI STALL {late,7:F0} ms ***  gc {g0 - _uiStallGen0}/{g1 - _uiStallGen1}/" +
                     $"{g2 - _uiStallGen2}  heap {GC.GetTotalMemory(false) / (1024 * 1024),5} MB" +
                     $"  rows {rows,5} ({(rows - _uiStallRows >= 0 ? "+" : "")}{rows - _uiStallRows})");
+
+                // Low on purpose: once the cache is a page either side the row
+                // count is supposed to STAY under a hundred, and a threshold
+                // set above it would silently stop reporting exactly when the
+                // reading matters most.
+                if (_cacheProbesLeft > 0 && rows > 50)
+                {
+                    _cacheProbesLeft--;
+                    LogTreeCacheConstraints();
+                }
+
                 _uiStallRows = rows;
             }
 
@@ -24013,6 +24029,95 @@ public partial class MainWindow : Window
             }
         }
         return count;
+    }
+
+    // WHOSE CACHE LENGTH THE FOLDER'S PANEL IS ACTUALLY OBEYING.
+    //
+    // ExplorerTree carries CacheLength="1000,1000" Item so the drive-root
+    // containers are never dropped (favorites navigation to another drive
+    // walks them), and ExplorerTreeViewItemStyle re-sets "Page 1,1" locally on
+    // every TreeViewItem so that cache is not supposed to reach a folder. The
+    // realized-row count says otherwise: it never falls below ~1,046 for a
+    // viewport of thirty, which is the root's 1000 plus a screenful.
+    //
+    // A local value does beat an inherited one, so the setter is not the
+    // question - the question is whether a nested panel reads the attached
+    // property at all. In hierarchical virtualization the PARENT panel hands
+    // each expanded container a HierarchicalVirtualizationConstraints, and
+    // that carries a cache length of the parent's choosing. If the handed
+    // value is 1000 Item while the local property reads 1 Page, the setter is
+    // being addressed to something nobody consults, and lowering it further
+    // would go on achieving nothing (five rounds of exactly that are already
+    // on file for another number).
+    //
+    // Both readings, side by side, from the folder holding the most realized
+    // children. Written a few times per session, not per stall.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogTreeCacheConstraints()
+    {
+        TreeViewItem? worst = null;
+        int worstCount = 0;
+
+        void Walk(ItemsControl host)
+        {
+            foreach (var entry in host.Items)
+            {
+                if (host.ItemContainerGenerator.ContainerFromItem(entry) is not TreeViewItem container)
+                {
+                    continue;
+                }
+
+                int direct = 0;
+                foreach (var child in container.Items)
+                {
+                    if (container.ItemContainerGenerator.ContainerFromItem(child) is not null)
+                    {
+                        direct++;
+                    }
+                }
+
+                if (direct > worstCount)
+                {
+                    worstCount = direct;
+                    worst = container;
+                }
+
+                Walk(container);
+            }
+        }
+
+        Walk(ExplorerTree);
+        if (worst is null)
+        {
+            return;
+        }
+
+        static string Describe(VirtualizationCacheLength length, VirtualizationCacheLengthUnit unit)
+            => $"{length.CacheBeforeViewport:F0},{length.CacheAfterViewport:F0} {unit}";
+
+        string local = Describe(
+            VirtualizingPanel.GetCacheLength(worst),
+            VirtualizingPanel.GetCacheLengthUnit(worst));
+        string root = Describe(
+            VirtualizingPanel.GetCacheLength(ExplorerTree),
+            VirtualizingPanel.GetCacheLengthUnit(ExplorerTree));
+
+        // TreeViewItem implements this explicitly, so the cast is the only way
+        // in. ItemsHost is null until the folder has been expanded once.
+        var hierarchical = (System.Windows.Controls.Primitives.IHierarchicalVirtualizationAndScrollInfo)worst;
+        var constraints = hierarchical.Constraints;
+        string handed = Describe(constraints.CacheLength, constraints.CacheLengthUnit);
+
+        string panel = hierarchical.ItemsHost is { } host
+            ? Describe(
+                VirtualizingPanel.GetCacheLength(host),
+                VirtualizingPanel.GetCacheLengthUnit(host)) + $" [{host.GetType().Name}]"
+            : "(no items host)";
+
+        ViewerLoadLog(
+            $"  cache  folder {worstCount,5} realized of {worst.Items.Count,5}" +
+            $"  local {local}  handed {handed}  panel {panel}  root {root}" +
+            $"  viewport {constraints.Viewport.Height:F0}");
     }
 
     [System.Diagnostics.Conditional("DEBUG")]

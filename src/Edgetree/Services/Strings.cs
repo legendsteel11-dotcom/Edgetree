@@ -617,7 +617,13 @@ public static class Strings
     {
         if (language != "en")
         {
-#if DEBUG
+#if INSTRUMENT
+            // A measuring build (-p:EdgetreeInstrument=true) is Release code with the
+            // DEBUG instruments compiled back in, so it would otherwise call
+            // itself DEBUG and its numbers would be filed under the wrong
+            // build. See the Instrument property in Edgetree.csproj.
+            RootPathLabel += " (계측)";
+#elif DEBUG
             // A quick, unmistakable way to tell a freshly-built Debug run
             // apart from any already-running instance the single-instance
             // mutex (see App.OnStartup) might otherwise silently defer to -
@@ -952,7 +958,9 @@ public static class Strings
         ResetSettingsConfirmTitle = "Reset Settings";
         ResetSettingsConfirmBody = "All settings and favorites will be reset to the app's default state. This cannot be undone.\n\nThe app will restart afterward to apply it. Continue?";
 
-#if DEBUG
+#if INSTRUMENT
+        RootPathLabel += " (INSTRUMENTED)";
+#elif DEBUG
         RootPathLabel += " (DEBUG)";
 #endif
     }

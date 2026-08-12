@@ -25,6 +25,26 @@
     <Product>Edgetree</Product>
   </PropertyGroup>
 
+  <!-- MEASURING BUILD: Release code generation with the instruments still in.
+       Every instrument in this app is [Conditional("DEBUG")] or #if DEBUG, so
+       a Release build carries none of them - which left every performance
+       figure on file measured in Debug, where the app's own code runs
+       unoptimised. A Debug number cannot say what a user gets.
+
+       Defining DEBUG here does not touch Optimize; it only puts the
+       instruments back. The root label reads "(계측)" instead of "(DEBUG)" so a
+       measuring build is never mistaken for either of the other two.
+
+         dotnet build -c Release -p:EdgetreeInstrument=true
+
+       Never pass this for a release asset. The property is NOT called
+       "Instrument": that name is already MSBuild's, and it reaches the
+       compiler as /instrument:true - "error CS8111: Invalid instrumentation
+       kind: true". -->
+  <PropertyGroup Condition="'$(EdgetreeInstrument)' == 'true'">
+    <DefineConstants>$(DefineConstants);DEBUG;INSTRUMENT</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <Resource Include="Resources\Icons\**\*.png" />
     <Resource Include="Resources\icon-map.json" />
