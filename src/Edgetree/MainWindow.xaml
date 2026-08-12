@@ -6331,8 +6331,18 @@
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Grid>
+                                    <!-- The hairline ring is what keeps the
+                                         disc A DISC on a white ground: the
+                                         plate is translucent white, which over
+                                         a no-art track in the light theme left
+                                         a bare triangle floating on nothing
+                                         (2026-08-13). Over a photograph the
+                                         ring is a pixel of edge the eye reads
+                                         as the button's rim. -->
                                     <Ellipse x:Name="Plate"
-                                            Fill="#B0FFFFFF"/>
+                                            Fill="#B0FFFFFF"
+                                            Stroke="#2E000000"
+                                            StrokeThickness="1"/>
                                     <Path x:Name="PlayMark"
                                             Data="M 24,18 L 44,32 L 24,46 Z"
                                             Fill="#C0000000"/>

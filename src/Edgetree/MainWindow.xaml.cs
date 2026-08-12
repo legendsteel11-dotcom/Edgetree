@@ -5632,41 +5632,10 @@ public partial class MainWindow : Window
 
             if (Math.Abs(scrollViewer.VerticalOffset - before) < 0.01)
             {
-                // The range is spent: a step DOWN was asked for and refused,
-                // with the row still short of the top. That is not a guess
-                // about the tree's size, it is the panel stating there is no
-                // more room - so make the room, the same way PinRowToTop does,
-                // and keep going.
-                //
-                // PinRowToTop asks its shortfall question BEFORE auto-collapse
-                // has finished arriving, against a scroll range that is about
-                // to shrink - `click.log` 2026-08-13, 선별2023: shortfall
-                // computed against scrollable=556, extent then collapsed
-                // 566 -> 228 -> 94, and the row ended pinned 198px down with
-                // gap=0rows because nothing re-asked. Here is where the truth
-                // is finally known, so here is where the gap is grown.
-                //
-                // The index is recounted from the model rather than reusing
-                // countedIndex, which describes the tree as it stood before
-                // those collapses. Bounded by the loop's own MaxSteps: every
-                // pass either moves the view or grows the gap by a whole row,
-                // and a pass that can do neither returns below.
-                if (top > 0 &&
-                    anchor.DataContext is FileSystemItem rowItem &&
-                    VisibleRowIndexOf(rowItem) is { } liveIndex)
-                {
-                    double shortfall = liveIndex - scrollViewer.ScrollableHeight;
-                    if (shortfall > 0.5)
-                    {
-                        int grown = _bottomGapRows.Count + (int)Math.Ceiling(shortfall);
-                        LogClickLine(
-                            $"settle: {name} out of room, gap {_bottomGapRows.Count} -> {grown} " +
-                            $"(index {liveIndex}, scrollable {scrollViewer.ScrollableHeight:F0})");
-                        SetBottomGap(grown, scrollViewer);
-                        continue;
-                    }
-                }
-
+                // The range is spent - the row is as close to the top as this
+                // tree can put it. The bottom-gap rows above are what usually
+                // makes the rest of the room; if they could not, stop here
+                // rather than loop against a wall.
                 Report("range-spent");
                 return;
             }
@@ -17899,6 +17868,10 @@ public partial class MainWindow : Window
         // Same reasoning for the footer's row: what it names and whether it is
         // there at all both follow from what the transport is holding.
         UpdateFooterNowPlaying();
+
+        // And for the parked state: whether the transport is standing empty or
+        // holding a file follows from exactly the same fact.
+        UpdateViewerParkedTransport();
     }
 
     // "The panel can show this" - pictures and films together. Films arrived in
@@ -19071,44 +19044,15 @@ public partial class MainWindow : Window
 
     private bool _fittingViewerMediaRow;
 
+    // TRANSPORT-SWAP JUMP NOTE (2026-08-12/13): the strip and the transport
+    // take turns in the same place and are not the same height, so the swap
+    // used to resize the album art above them. The first cure reserved the
+    // band by measurement; the standing cure is simpler - a selected track's
+    // transport is ALWAYS there (UpdateViewerParkedTransport), so for audio
+    // the swap never happens at all.
     private void ViewerMediaBar_SizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        // Kept for the band a track's album art reserves in its place - see
-        // ViewerTransportBandHeight. Recorded whenever the real thing is on
-        // screen, so the reserve follows a font change without being told.
-        //
-        // Only while the 재생 중 line is holding its place, which is to say only
-        // while the transport belongs to a TRACK. A film's transport is one line
-        // shorter, and recording that height would leave the next track's art
-        // reserving too little and jumping after all.
-        if (ViewerMediaBar.DesiredSize.Height > 0 &&
-            ViewerNowPlaying.Visibility != Visibility.Collapsed)
-        {
-            _viewerTransportBandHeight = ViewerMediaBar.DesiredSize.Height;
-        }
+        => FitViewerMediaRow();
 
-        FitViewerMediaRow();
-    }
-
-    // ----- 재생을 눌러도 그림이 움직이지 않게 --------------------------------
-    //
-    // The zoom strip and the transport TAKE TURNS in the same place, and they
-    // are not the same height - the transport is a plate with margins of its
-    // own. For a picture that hardly matters: the strip is up the whole time
-    // one is on screen. For a TRACK it is the whole difference, because
-    // pressing play swaps one for the other and the album art above resizes to
-    // whatever room is left (reported 2026-08-12).
-    //
-    // So a track's art holds the transport's band open before there is a
-    // transport. The strip is Hidden rather than Collapsed - measured, not
-    // drawn - and given the height the transport will take when it arrives.
-    // Nothing moves at the swap because nothing about the space changes.
-    //
-    // MEASURED, NOT DERIVED. The band is a plate, two nested margins and a row
-    // that thins with the panel; any arithmetic for it here would be a second
-    // copy of the XAML, free to drift from it. The transport reports its own
-    // size whenever it is up, and the one time nothing has ever been played it
-    // is asked directly.
     // The transport plate at rest and while it is holding a file the panel is
     // not showing. Both live here rather than in the XAML because only one of
     // them can be the markup's value and splitting the pair across two files is
@@ -19122,31 +19066,6 @@ public partial class MainWindow : Window
     // notice than one that is always there and merely changes strength.
     private const double ViewerMediaPlateOpacity = 0.0;
     private const double ViewerMediaPlateDetachedOpacity = 0.7;
-
-    private double _viewerTransportBandHeight;
-
-    private double ViewerTransportBandHeight()
-    {
-        if (_viewerTransportBandHeight > 0)
-        {
-            return _viewerTransportBandHeight;
-        }
-
-        // Hidden measures; Collapsed does not. Both are put back exactly as they
-        // were - this is a question, not a change. The 재생 중 line is asked to
-        // hold its place for the measurement too, because that is the shape the
-        // band takes for a track and a track is what is reserving it.
-        var wasBar = ViewerMediaBar.Visibility;
-        var wasLine = ViewerNowPlaying.Visibility;
-        ViewerMediaBar.Visibility = Visibility.Hidden;
-        ViewerNowPlaying.Visibility = Visibility.Hidden;
-        ViewerMediaBar.Measure(new System.Windows.Size(
-            double.PositiveInfinity, double.PositiveInfinity));
-        _viewerTransportBandHeight = ViewerMediaBar.DesiredSize.Height;
-        ViewerNowPlaying.Visibility = wasLine;
-        ViewerMediaBar.Visibility = wasBar;
-        return _viewerTransportBandHeight;
-    }
 
     private void FitViewerMediaRow()
     {
@@ -19411,6 +19330,11 @@ public partial class MainWindow : Window
     {
         if (_viewerVideoPath is null)
         {
+            // The PARKED transport (see UpdateViewerParkedTransport): nothing
+            // is loaded, so play means "start the file being shown" - the same
+            // ask as the disc on the art, through the same handler, which is
+            // where the file is finally opened.
+            ViewerPlayOverlay_Click(sender, e);
             return;
         }
 
@@ -20418,10 +20342,18 @@ public partial class MainWindow : Window
         // makes "close the panel" a way to stop background sound.
         UpdateViewerNowPlaying();
 
-        _viewerVideoPlaying = false;
+        // Through the setter, not the bare field: the setter is what flips the
+        // play/pause icons, and the transport now OUTLIVES a stop (parked, see
+        // UpdateViewerParkedTransport) - written as a field-set, the bar stood
+        // there still showing ⏸ after the music was gone (2026-08-13). While
+        // the bar always vanished with the file, nobody could see the
+        // difference.
+        SetViewerVideoPlaying(false);
         _viewerVideoHasNoAudio = false;
         ViewerMedia.Visibility = Visibility.Collapsed;
-        ViewerMediaBar.Visibility = Visibility.Collapsed;
+        // Parked or gone is the parked logic's own decision - audio keeps the
+        // bar standing, everything else takes it down.
+        UpdateViewerParkedTransport();
         // After _viewerVideoPath is cleared, so this empties the canvas rather
         // than redrawing the film that just left.
         DrawViewerMediaMarks();
@@ -20622,24 +20554,19 @@ public partial class MainWindow : Window
         // name, weight and date. 1:1 on one offers a crop of a picture nobody
         // chose to look at.
         //
-        // The row stays as a reserved band, because what replaces it when the
-        // track starts is the transport - see ViewerTransportBandHeight.
+        // The band it leaves behind is not empty: the transport stands in it,
+        // parked, whether or not anything is playing - see
+        // UpdateViewerParkedTransport.
         if (_pendingViewerPath is { } shown && IsViewerAudio(shown))
         {
-            double gap = Resources["ViewerCaptionChipRowGap"] is Thickness t ? t.Top : 0;
-            ViewerZoomBar.MinHeight = Math.Max(0, ViewerTransportBandHeight() - gap);
-            // THE TEST IS WHETHER THE TRANSPORT IS THERE, not whether it is
-            // holding this file. Asked the second way (2026-08-12), a track
-            // watched while ANOTHER one played held the band open underneath a
-            // transport that was already on screen - two bands where the point
-            // was to have exactly one, and the album art paid for it.
-            ViewerZoomBar.Visibility = _viewerVideoPath is not null
-                ? Visibility.Collapsed
-                : Visibility.Hidden;
+            ViewerZoomBar.Visibility = Visibility.Collapsed;
+            UpdateViewerParkedTransport();
             return;
         }
 
-        ViewerZoomBar.MinHeight = 0;
+        // A parked bar left over from a track must not survive onto a
+        // photograph's strip.
+        UpdateViewerParkedTransport();
 
         bool hasImage = _viewerPixelWidth > 0 && ViewerImage.Source is not null && !ViewerMediaIsSelection;
         ViewerZoomBar.Visibility = hasImage ? Visibility.Visible : Visibility.Collapsed;
@@ -21362,6 +21289,64 @@ public partial class MainWindow : Window
     private void ShowViewerFolderPlayBar(bool show)
         => ViewerFolderPlayBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
 
+    // ----- 정지해도 트랜스포트는 서 있다 -------------------------------------
+    //
+    // A selected track shows the TRANSPORT whether or not anything is playing.
+    // It used to exist only while a file was loaded - an internal fact (loaded
+    // = the file is held open) worn on the screen - so pressing stop made the
+    // whole control row vanish, which read as a fault ("재생 컨트롤 박스 영역
+    // 사라진 거", 2026-08-13), and the first replacement, two detached chips
+    // standing in the blank, read no better: the user's own question was why
+    // stop does not simply leave the transport with play lit and stop greyed,
+    // the way every player does it.
+    //
+    // PARKED HOLDS NO FILE. The app's promise - nothing open unless it is
+    // playing - is kept: play on a parked transport goes through the same path
+    // as the disc on the art, which opens the file at that moment. What parked
+    // cannot do is greyed rather than gone: stop (nothing to stop) and the
+    // position slider (no position without the engine). The track-step buttons
+    // answer for themselves through UpdateViewerTrackButtons, whose targets
+    // come up null with nothing playing.
+    //
+    // Audio only. A film's still already fills the panel and its transport
+    // arriving on load never bothered anyone - the confusion this solves is a
+    // track's, where stopping changed the panel's shape.
+    //
+    // Called from UpdateViewerNowPlaying, which already runs at every moment
+    // the transport arrives or leaves, and from the zoom bar's update, which
+    // runs at every selection change.
+    private void UpdateViewerParkedTransport()
+    {
+        bool loaded = _viewerVideoPath is not null;
+        ViewerMediaStop.IsEnabled = loaded;
+        ViewerMediaPosition.IsEnabled = loaded;
+
+        if (loaded)
+        {
+            // The load and stop paths own the bar while the engine holds a
+            // file; parked only fills the state they leave behind.
+            return;
+        }
+
+        bool parked = _viewerOpen
+            && _pendingViewerPath is { } shown
+            && IsViewerAudio(shown);
+        if (!parked)
+        {
+            ViewerMediaBar.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        ViewerMediaBar.Visibility = Visibility.Visible;
+        ViewerZoomBar.Visibility = Visibility.Collapsed;
+        // The engine is not holding anything, so the readout says so rather
+        // than holding the last file's numbers.
+        ResetViewerMediaReadout();
+        UpdateViewerRepeatChip();
+        UpdateViewerTrackButtons();
+        FitViewerMediaRow();
+    }
+
     // ----- 폴더를 재생한다는 것 ----------------------------------------------
     //
     // It is not a new mode and it builds nothing: pressing either button picks
@@ -21406,6 +21391,20 @@ public partial class MainWindow : Window
         if (mode is ViewerRepeatMode.Shuffle)
         {
             _viewerShuffleDone.Add(first.FullPath);
+        }
+
+        // ALREADY ON SCREEN MEANS PLAY IT, NOT QUEUE IT. The handoff below
+        // works by moving the selection and letting the preview's landing
+        // press play - and when the pick IS the file being shown, nothing
+        // moves, so nothing lands, so nothing plays; worse, the queued path
+        // then fires off the NEXT preview refresh, so some later, unrelated
+        // gesture starts the music (2026-08-13, met through a since-removed
+        // caller). The queue is for a selection in flight; a file already
+        // here is just played.
+        if (string.Equals(first.FullPath, _pendingViewerPath, StringComparison.OrdinalIgnoreCase))
+        {
+            ViewHere(first);
+            return;
         }
 
         // The same handoff the end of a track uses: queue the file, move the
@@ -23830,7 +23829,19 @@ public partial class MainWindow : Window
                 return;
             }
 
-            if (thumbnail is BitmapSource frame)
+            // A TRACK'S "ART" SMALLER THAN THE PLAY BUTTON IS NOT ART. The
+            // shell can answer the thumbnail ask for an artless mp3 with a
+            // tiny generic raster, and drawing that as the cover put a
+            // postage-stamp grey box under a 64px disc twice its size
+            // (2026-08-13, screenshot). The disc is the honest rendering for
+            // a track with nothing to show - the same branch a null answer
+            // takes below. 64 because that is the disc: art the button would
+            // completely cover was never going to be looked at.
+            bool tinyAudioArt = thumbnail is BitmapSource tiny
+                && IsViewerAudio(path)
+                && Math.Max(tiny.PixelWidth, tiny.PixelHeight) < 64;
+
+            if (thumbnail is BitmapSource frame && !tinyAudioArt)
             {
                 ViewerIconImage.Visibility = Visibility.Collapsed;
                 ViewerIconImage.Source = null;
