@@ -20,6 +20,24 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // Four lines, which the note above allows for a release that earns it: the
+    // viewer is what this version is, and the other three are each a different
+    // reason someone would want it.
+    version: 'v2.0.0',
+    ko: [
+      '이미지 뷰어가 사이드바 안에 들어왔습니다 — 사진·영상·음악을 그 자리에서',
+      '필름스트립으로 폴더를 훑고, 클릭 한 번으로 그 파일 자리에 섭니다',
+      '지나온 자리를 되짚는 트리 히스토리 (Ctrl+←, Ctrl+→)',
+      '자주 쓰는 배치를 프리셋 다섯 개로 저장해 두고 바꿔 씁니다',
+    ],
+    en: [
+      'An image viewer now lives inside the sidebar — photos, video and music in place',
+      'Skim a folder on the filmstrip, and one click puts you on that file',
+      'Step back through where you have been (Ctrl+←, Ctrl+→)',
+      'Keep five layouts as presets and switch between them',
+    ],
+  },
+  {
     version: 'v1.7.1',
     ko: [
       'v1.7.0에 이어진 안정성 수정입니다 — 새 기능은 아래 v1.7.0 항목을 봐 주세요',
