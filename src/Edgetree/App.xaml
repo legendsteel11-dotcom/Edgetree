@@ -77,19 +77,20 @@
         <!-- A thin, translucent scrollbar thumb (VS Code style) instead of the
              stock Windows scrollbar chrome. Implicit (no x:Key) so it applies to
              every ScrollBar in scope, including the TreeView's internal one. -->
-        <!-- THE ALPHA IS WHAT MAKES IT FINDABLE, and it was the whole of the
-             complaint that read as "the thumb is too small" (2026-08-12). It
-             measured 160px against a 1,050px bar while being described as a
-             fingernail: at 20% white on a dark strip there was nothing to see,
-             so what the eye caught was the few pixels the cursor happened to
-             brighten. Three rounds went into raising a number that was already
-             right.
-             Raised across the ladder, keeping its shape - hover brighter than
-             rest, dragging brighter still. -->
+        <!-- BACK TO 33/55/70 (2026-08-12, same day). These were raised to
+             66/99/CC on the theory that "too small to grab" was really "too
+             faint to see" - the app reported a 160px thumb while it was being
+             described as a fingernail, so the alpha was the only suspect left.
+             It was the wrong one: the thumb was being drawn 7px wide whatever
+             the app reported (see FlooredTrack). With the size fixed there is
+             nothing left for the brightness to compensate for, and at 66 the
+             bar reads as glaring.
+             The ladder keeps its shape - hover brighter than rest, dragging
+             brighter still. -->
         <Style x:Key="MinimalScrollBarThumb"
                 TargetType="Thumb">
             <Setter Property="Background"
-                    Value="#66FFFFFF"/>
+                    Value="#33FFFFFF"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
@@ -102,13 +103,13 @@
                                     Value="True">
                                 <Setter TargetName="ThumbBorder"
                                         Property="Background"
-                                        Value="#99FFFFFF"/>
+                                        Value="#55FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsDragging"
                                     Value="True">
                                 <Setter TargetName="ThumbBorder"
                                         Property="Background"
-                                        Value="#CCFFFFFF"/>
+                                        Value="#70FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
