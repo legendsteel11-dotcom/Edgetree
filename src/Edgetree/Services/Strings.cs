@@ -124,7 +124,18 @@ public static class Strings
     public static string BookmarkShortcutPrev = "이전 북마크";
     public static string MenuNewFolder = "새 폴더";
     public static string MenuRefresh = "새로고침";
-    public static string MenuOpen = "열기";
+    // THE OPEN GROUP NAMES ITS DESTINATIONS. 열기 on its own said nothing about
+    // where, which only became a question once the app grew a viewer of its own
+    // - so the two that hand the file OUT say so, and the one that keeps it here
+    // says nothing at all. That asymmetry is the point: the unmarked form is
+    // "in here". 기본 프로그램에서 열기 is not new wording either - it is what the
+    // viewer's own menu has always called this exact action (see
+    // ViewerOpenExternally, which shares its handler).
+    public static string MenuOpen = "기본 프로그램에서 열기";
+    // One item whose word follows the file: a picture is looked at, a track or a
+    // film is played.
+    public static string MenuViewHere = "보기";
+    public static string MenuPlayHere = "재생";
     public static string MenuOpenWith = "연결 프로그램";
     public static string MenuCut = "잘라내기";
     public static string MenuCopy = "복사";
@@ -705,7 +716,9 @@ public static class Strings
         MenuCollapseAllExpanded = "Collapse All Expanded Folders";
         CollapseAllConfirmTitle = "Collapse All Expanded Folders";
         CollapseAllConfirmBody = "Collapse every folder that is currently expanded?";
-        MenuOpen = "Open";
+        MenuOpen = "Open in default app";
+        MenuViewHere = "View";
+        MenuPlayHere = "Play";
         MenuOpenWith = "Open With";
         MenuCut = "Cut";
         MenuCopy = "Copy";

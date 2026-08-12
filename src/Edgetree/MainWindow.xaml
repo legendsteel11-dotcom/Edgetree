@@ -1197,6 +1197,19 @@
                         Click="FolderSortFollowGlobalMenuItem_Click"/>
             </MenuItem>
             <Separator/>
+            <!-- THE WAY IN. The app grew a viewer and there was no way to ask
+                 for it from the place the file is: Enter hands the file to
+                 whatever Windows uses, which is right and stays, but it was the
+                 only answer this menu had. "다른 플레이어로 재생하면 그 플레이어가
+                 실행되잖아요" - so this always puts the panel on screen, never
+                 starts something behind it.
+
+                 Header and visibility are set in ExplorerItemContextMenu_Opened:
+                 the word follows the file (보기 for a picture, 재생 for a track or
+                 a film) and the row is absent entirely for anything the panel
+                 cannot show. -->
+            <MenuItem Tag="viewHere"
+                    Click="ViewHere_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpen}"
                     InputGestureText="Enter"
                     Click="OpenItem_Click"/>

@@ -11913,6 +11913,46 @@ public partial class MainWindow : Window
             var renameItem = FindTaggedMenuElement<MenuItem>(menu, "rename");
             var copyPathItem = FindTaggedMenuElement<MenuItem>(menu, "copyPath");
             var openWithCodeItem = FindTaggedMenuElement<MenuItem>(menu, "openWithCode");
+            var viewHereItem = FindTaggedMenuElement<MenuItem>(menu, "viewHere");
+
+            // THE PANEL'S OWN ROW. Absent - not greyed - for anything the panel
+            // cannot show: a folder, a text file, an archive. A disabled row here
+            // would be a permanent reminder of what this menu is not for, on
+            // every row in the tree.
+            //
+            // The word follows the file, which is why the header is set from
+            // here rather than bound in the XAML: a picture is looked at, a
+            // track or a film is played, and one row saying both is one row less
+            // in a menu that is already long.
+            if (viewHereItem is not null)
+            {
+                bool canShow = ExplorerTree.SelectedItem is FileSystemItem { IsDirectory: false } row
+                               && HasViewerPreview(row.FullPath);
+                viewHereItem.Visibility = canShow ? Visibility.Visible : Visibility.Collapsed;
+                if (canShow && ExplorerTree.SelectedItem is FileSystemItem selectedRow)
+                {
+                    bool playable = IsViewerPlayable(selectedRow.FullPath);
+                    viewHereItem.Header = playable ? Strings.MenuPlayHere : Strings.MenuViewHere;
+
+                    // GREYED once the panel is already open, but only for 보기.
+                    // Right-clicking a row selects it and selection is what the
+                    // panel follows, so with the panel up the picture is on
+                    // screen before the menu has finished opening - the row
+                    // would be offering to do what has just been done.
+                    //
+                    // 재생 is not the same and stays live: playback NEVER starts
+                    // on selection (arrow-keying a folder would set several films
+                    // going), so with the panel open a track is showing its art
+                    // and still not playing. That is a real thing left to ask
+                    // for.
+                    //
+                    // Greyed rather than gone, unlike the whole-row test above:
+                    // absent means this menu can never do it, greyed means it is
+                    // already done. Two different facts deserve two different
+                    // looks.
+                    viewHereItem.IsEnabled = playable || !_viewerOpen;
+                }
+            }
 
             if (thumbnailItem is null || thumbnailSeparator is null || multiInfoItem is null ||
                 multiInfoSeparator is null || addFavoriteItem is null || newFolderItem is null ||
@@ -17838,6 +17878,48 @@ public partial class MainWindow : Window
         finally
         {
             _viewerSliderSelfWrite = false;
+        }
+    }
+
+    // 보기 / 재생 on a tree row: hand this file to the app's own panel.
+    //
+    // IT ALWAYS PUTS THE PANEL ON SCREEN. "다른 플레이어로 재생하면 그 플레이어가
+    // 실행되잖아요" - handing a file to our viewer has to do the same thing every
+    // other player does, so there is no background start from this route.
+    //
+    // Collapsed to the sliver, the panel declines to open at all. Rather than
+    // refuse the menu item - which would make it a liar on the one row it was
+    // asked from - the pin comes off first and the play follows. That is the
+    // pin button's own path, and reaching this menu means the window is peeked
+    // open anyway: a sliver has no tree to right-click.
+    private void ViewHere_Click(object sender, RoutedEventArgs e)
+    {
+        if (ExplorerTree.SelectedItem is not FileSystemItem { IsDirectory: false } item ||
+            !HasViewerPreview(item.FullPath))
+        {
+            return;
+        }
+
+        if (_settings.IsAutoHidden)
+        {
+            ExitAutoHide();
+        }
+
+        OpenViewer();
+
+        // Selection changes reach the panel through a short debounce, and this
+        // is an explicit ask that must not wait for it - the play below reads
+        // _pendingViewerPath, which the preview is what sets. Harmless when the
+        // panel has just opened and already ran it: it re-reads the same row.
+        UpdateViewerPreview();
+
+        // Playback NEVER starts on selection - arrow-keying down a folder would
+        // set several films going at once - so it has to be asked for, and the
+        // menu item just was. Through the play button's own handler rather than
+        // a second copy of it: resume-vs-open-from-scratch is decided there.
+        if (IsViewerPlayable(item.FullPath))
+        {
+            ViewerPlayOverlay_Click(this, new RoutedEventArgs());
         }
     }
 
