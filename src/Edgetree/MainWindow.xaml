@@ -4595,16 +4595,25 @@
                  ANY level, root included. That fallback did not exist when the
                  cache was added. IF FAVORITES NAVIGATION TO ANOTHER DRIVE EVER
                  BREAKS AGAIN, look there first - not here. -->
-            <!-- VirtualizationMode is Standard, not Recycling. Recycling reuses
-                 row containers as they scroll out of view, and a reused
-                 container whose visual fails to refresh renders as a blank gap
-                 - one candidate for the reported "rows disappear from the
-                 middle of the tree until I click something". This is a
-                 SEPARATE setting from CacheLength below. It was left alone
-                 while that cache kept a thousand containers alive and made the
-                 saving irrelevant; now that the cache is back to one page,
-                 Recycling is worth measuring again - against the blank-row
-                 symptom above, which is why it was refused.
+            <!-- EXPERIMENT 2026-08-12, NOT a decision: VirtualizationMode was
+                 Standard. Recycling reuses row containers as they scroll out of
+                 view instead of discarding them, and a reused container whose
+                 visual fails to refresh renders as a blank gap - one candidate
+                 for the reported "rows disappear from the middle of the tree
+                 until I click something", which is why it had never been tried.
+
+                 It is tried now because two separate measurements point at the
+                 same cost, and it is the only setting that addresses both.
+                 Making a row container is what the window stops for (+500 rows
+                 = 900-1900ms, releasing 1000 = 300ms), and dragging the scroll
+                 thumb over a heavily expanded tree swings the realized count
+                 between 191 and 2,935 - thousands of containers built and
+                 thrown away per trip, which a forced collect showed to be
+                 532MB of garbage in one minute of dragging. Recycling takes
+                 containers from a pool rather than building them, so both the
+                 pause and the debris come off the same lever.
+
+                 IF BLANK ROWS APPEAR, this is the first thing to put back.
 
                  Also note: do NOT "fix" this by setting IsVirtualizing=False
                  here. That was tried; it silently un-virtualizes the ENTIRE
@@ -4633,7 +4642,7 @@
                     ContextMenu="{StaticResource ExplorerEmptySpaceContextMenu}"
                       ItemContainerStyle="{StaticResource ExplorerTreeViewItemStyle}"
                       VirtualizingPanel.IsVirtualizing="True"
-                      VirtualizingPanel.VirtualizationMode="Standard"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
                       VirtualizingPanel.ScrollUnit="Item"
                       VirtualizingPanel.CacheLengthUnit="Page"
                       VirtualizingPanel.CacheLength="1,1"
