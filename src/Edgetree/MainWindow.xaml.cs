@@ -5347,6 +5347,10 @@ public partial class MainWindow : Window
         // same machinery (reported 2026-08-02).
         // Skipping straight to the deferred pin there is the pre-existing
         // behaviour, and it was never the flashing case.
+        LogClickLine(
+            $"reveal done: {(selected.DataContext as FileSystemItem)?.Name ?? "-"} " +
+            $"settled={settled} pinToTop={pinToTop}");
+
         if (settled)
         {
             ExplorerTree.UpdateLayout();
@@ -5358,13 +5362,33 @@ public partial class MainWindow : Window
         // moves the row out from under it. Re-running the same routine settles
         // that; it scrolls only if the target has actually moved, so in the
         // ordinary case this pass does nothing at all and nothing is redrawn.
-        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
+        //
+        // Loaded rather than Background, for the reason the walk's own retries
+        // moved (2026-08-12): what this pass is waiting for is a LAYOUT, and
+        // Background sits below input, so on a big tree the correction was being
+        // handed out while rows were still being built. With 폴더 자동 접기 OFF
+        // the tree stays fully expanded - extents of tens of thousands of rows -
+        // and that is precisely when the first pin's row count is stale by the
+        // time it lands.
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
         {
             if (token != _navigationToken)
             {
                 return;
             }
             PinRowToTop(selected);
+
+            // And once more when everything else has stopped. Free when the pin
+            // above already landed - the routine scrolls only if the row has
+            // actually moved - and the only thing that catches a collapse or a
+            // child load that settles a pass later than the layout did.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
+            {
+                if (token == _navigationToken)
+                {
+                    PinRowToTop(selected);
+                }
+            }));
         }));
     }
 
@@ -5394,11 +5418,43 @@ public partial class MainWindow : Window
     // instead, and the model always answers.
     private void PinRowToTop(TreeViewItem anchor, ScrollViewer scrollViewer)
     {
-        if (anchor.DataContext is not FileSystemItem item ||
-            VisibleRowIndexOf(item) is not { } index)
+        if (anchor.DataContext is not FileSystemItem item)
         {
             return;
         }
+
+        // The two numbers below have to describe the SAME tree: a row index
+        // counted from the model, and a scroll range read from the panel.
+        // RecapAllOverflow runs at the top of every navigation and can drop
+        // thousands of rows out of the model in one call, and until a layout
+        // pass lands the panel still reports the range it had before. Pinning
+        // across that window is what put a cross-drive bookmark down in the
+        // middle of C: - measured 2026-08-12, "index=362 offset=3026
+        // extent=3167" for a tree the model had already cut to about 400. It
+        // only showed with 폴더 자동 접기 OFF because that is what leaves enough
+        // expanded for the recap to matter.
+        scrollViewer.UpdateLayout();
+
+        if (VisibleRowIndexOf(item) is not { } index)
+        {
+            // The one silent failure this routine had. Counting rows asks the
+            // model, and the model can only answer for a row the walk actually
+            // reached - so a null here says the pin was asked for something the
+            // tree does not consider visible, which is a different fault from
+            // scrolling to the wrong place and used to look identical.
+            LogClickLine($"pin skipped: no visible row index for {item.Name}");
+            return;
+        }
+
+        // Every pin, so a navigation that lands in the wrong place can be read
+        // back as a sequence: what each pass counted, and what the tree was at
+        // the time. The suspicion this was added for (2026-08-12) is a count
+        // taken before a collapse or a child load lands, which shows up here as
+        // two passes reporting DIFFERENT indexes for the same row.
+        LogClickLine(
+            $"pin: {item.Name} index={index} offset={scrollViewer.VerticalOffset:F0} " +
+            $"scrollable={scrollViewer.ScrollableHeight:F0} extent={scrollViewer.ExtentHeight:F0} " +
+            $"viewport={scrollViewer.ViewportHeight:F0} gap={_bottomGapRows.Count}rows");
 
         // Within the last screenful there is nothing below the row to scroll up
         // into, so the room is made rather than the pin given up - see the
@@ -5414,6 +5470,124 @@ public partial class MainWindow : Window
         {
             scrollViewer.ScrollToVerticalOffset(target);
         }
+
+        SettleRowAtTop(anchor, scrollViewer, index, item.Name);
+    }
+
+    // The scroll above is arithmetic; this LOOKS. Every version of this routine
+    // has been a calculation that was right about a tree which had already
+    // changed underneath it - the row number counted from the model, the range
+    // read from the panel, the recap that empties one before the other hears
+    // about it - and each time the symptom was a jump landing a fixed distance
+    // from where it meant to (2026-08-12: favorites arriving six rows down,
+    // every time, in accordion mode).
+    //
+    // A line step is the one thing that needs no agreement between those
+    // numbers: it moves the view by exactly one row whatever either of them
+    // claims. So measure where the row actually is and step until its top edge
+    // is the viewport's. Costs nothing when the arithmetic was right, which is
+    // the ordinary case - the first measurement returns and nothing is redrawn.
+    private void SettleRowAtTop(
+        TreeViewItem anchor, ScrollViewer scrollViewer, int countedIndex, string name)
+    {
+        double startOffset = scrollViewer.VerticalOffset;
+        int steps = 0;
+        int blind = 0;
+        double lastTop = double.NaN;
+
+        // Says what it MEASURED and what it did about it. Added because the
+        // first version of this loop was a silent actor: the landing changed
+        // and there was no way to tell whether the loop had corrected it,
+        // overshot it, or never run at all (2026-08-12).
+        void Report(string outcome) => LogClickLine(
+            $"settle: {name} {outcome} steps={steps} blind={blind} " +
+            $"top={(double.IsNaN(lastTop) ? "-" : lastTop.ToString("F0"))} " +
+            $"offset {startOffset:F0} -> {scrollViewer.VerticalOffset:F0} counted={countedIndex}");
+
+        // A screenful and a bit. The scroll above has already landed near the
+        // target, so this is a correction, not a search - and a bound means a
+        // row that can never reach the top (the tree's last screenful, before
+        // the 아래 여백 rows are added) costs a handful of steps rather than
+        // spinning.
+        const int MaxSteps = 64;
+
+        for (int step = 0; step < MaxSteps; step++)
+        {
+            scrollViewer.UpdateLayout();
+
+            if (!anchor.IsDescendantOf(scrollViewer))
+            {
+                // Off screen, so there is nothing to measure - and that is not
+                // an edge case here, it is the very fault this loop is for. An
+                // overshoot leaves the row ABOVE the viewport, and a row above
+                // the viewport is virtualized away: the first version of this
+                // returned at exactly the moment it was needed, and the row
+                // stayed hidden two rows up (2026-08-12).
+                //
+                // The counted index is not trusted to LAND on - that is the
+                // whole premise - but it is trustworthy for the DIRECTION,
+                // since what it gets wrong is a row or two, never a side.
+                double from = scrollViewer.VerticalOffset;
+                if (countedIndex <= from)
+                {
+                    scrollViewer.LineUp();
+                }
+                else
+                {
+                    scrollViewer.LineDown();
+                }
+
+                blind++;
+                if (Math.Abs(scrollViewer.VerticalOffset - from) < 0.01)
+                {
+                    Report("stuck-offscreen");
+                    return;
+                }
+                continue;
+            }
+
+            double top;
+            try
+            {
+                top = anchor.TransformToAncestor(scrollViewer)
+                    .Transform(new System.Windows.Point(0, 0)).Y;
+            }
+            catch (InvalidOperationException)
+            {
+                Report("unmeasurable");
+                return;
+            }
+
+            lastTop = top;
+            if (Math.Abs(top) <= 0.5)
+            {
+                Report(steps == 0 && blind == 0 ? "already-there" : "settled");
+                return;
+            }
+
+            double before = scrollViewer.VerticalOffset;
+            if (top > 0)
+            {
+                scrollViewer.LineDown();
+            }
+            else
+            {
+                scrollViewer.LineUp();
+            }
+            steps++;
+
+            if (Math.Abs(scrollViewer.VerticalOffset - before) < 0.01)
+            {
+                // The range is spent - the row is as close to the top as this
+                // tree can put it. The bottom-gap rows above are what usually
+                // makes the rest of the room; if they could not, stop here
+                // rather than loop against a wall.
+                Report("range-spent");
+                return;
+            }
+        }
+
+        Report("gave-up");
     }
 
     // The row one below the current selection, in the order the tree is drawn -
