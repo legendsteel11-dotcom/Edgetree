@@ -302,15 +302,20 @@ public static class Strings
     // File search (Ctrl+F view - see MainWindow's search-view methods and
     // Services/FileSearchService)
     public static string ToolTipSearch = "검색 (Ctrl+F)";
-    public static string ToolTipViewer = "이미지 뷰어";
+    // 이미지 뷰어 until 2026-08-12. The panel plays film and sound as well as
+    // showing pictures, and it goes on playing with nothing on screen - so
+    // "뷰어" was naming half of it. Not 미디어 패널 either: 미디어 is already the
+    // footer chip that filters to sound and film ONLY, with 이미지 its own chip
+    // beside it, so that word is taken and taken narrowly.
+    public static string ToolTipViewer = "멀티미디어 패널";
     // Viewer zoom strip - two chips wide, so both stay short in every language.
     public static string ViewerZoomFit = "맞춤";
     public static string ViewerZoomActual = "1:1";
     public static string ViewerNavigator = "내비게이터";
-    public static string ViewerClose = "뷰어 닫기";
+    public static string ViewerClose = "멀티미디어 패널 닫기";
     // The footer's now-playing row, which only exists while the viewer is shut
     // and 배경 재생 is holding a track.
-    public static string FooterNowPlayingOpen = "뷰어에서 열기";
+    public static string FooterNowPlayingOpen = "멀티미디어 패널에서 열기";
     // Explorer's own wording for the same action, so it reads as the familiar
     // thing rather than a new feature.
     public static string MenuSetWallpaper = "바탕 화면 배경으로 설정";
@@ -329,13 +334,17 @@ public static class Strings
     // label admitting it needs a translation. The English keeps its own name
     // rather than being translated back.
     public static string ViewerFilmstrip = "썸네일 바";
-    public static string MenuImageViewer = "이미지 뷰어";
+    public static string MenuImageViewer = "멀티미디어 패널";
     // 캐싱 rather than 미리 불러오기, reversing the earlier choice to name it for
     // what it does instead of for the machinery: 캐싱 is the word Korean users
     // read fastest here, and "미리 불러오기" describes the act without naming the
     // thing that is left behind - which is what the row below cleans up. The two
     // rows now share a noun, so the pair reads as one subject.
     public static string MenuPrecacheThumbnails = "이미지 썸네일 캐싱";
+    // Names the three kinds on purpose. "미디어" is already this app's word for
+    // the footer chip that means sound and film only, and this covers pictures
+    // too - so the label lists them rather than borrowing a word that is taken.
+    public static string MenuOpenMediaInViewer = "이미지·음악·영상 더블클릭으로 열기";
     // The size rides in the row itself, because the only reason to press it is
     // that the number has grown - and a row that has to be pressed to find out
     // is a row that gets pressed for no reason.
@@ -513,7 +522,7 @@ public static class Strings
     public static string ColorLabelGuideLineActive = "들여쓰기 안내선 강조";
     public static string ColorLabelHeader = "제목 표시줄 배경";
     public static string ColorLabelPanelDivider = "영역 구분선";
-    public static string ColorLabelViewerBackground = "뷰어 배경";
+    public static string ColorLabelViewerBackground = "멀티미디어 패널 배경";
     // Names both shapes the hidden sidebar can take, because one colour covers
     // both and the option menu already calls them 손잡이 and 막대
     // (MenuAutoHideUseHandle / MenuAutoHideSliverWidth).
@@ -809,20 +818,21 @@ public static class Strings
         ShowLessFormat = "… Show {0} less";
 
         ToolTipSearch = "Search (Ctrl+F)";
-        ToolTipViewer = "Image Viewer";
+        ToolTipViewer = "Multimedia Panel";
         ViewerZoomFit = "Fit";
         ViewerZoomActual = "1:1";
         ViewerNavigator = "Navigator";
-        ViewerClose = "Close viewer";
-        FooterNowPlayingOpen = "Open in the viewer";
+        ViewerClose = "Close the multimedia panel";
+        FooterNowPlayingOpen = "Open in the multimedia panel";
         MenuSetWallpaper = "Set as desktop background";
         TreeHistoryBack = "Back  (Ctrl+←)";
         TreeHistoryForward = "Forward  (Ctrl+→)";
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
         ViewerFilmstrip = "Thumbnail bar";
-        MenuImageViewer = "Image viewer";
+        MenuImageViewer = "Multimedia panel";
         MenuPrecacheThumbnails = "Preload image thumbnails";
+        MenuOpenMediaInViewer = "Open images, music and video on double-click";
         MenuClearThumbnailCache = "Clean up thumbnail files";
         MenuClearThumbnailCacheSized = "Clean up thumbnail files ({0})";
         ViewerPrecaching = "Preloading {0}";
@@ -905,7 +915,7 @@ public static class Strings
         ColorLabelGuideLineActive = "Guide Line Highlight";
         ColorLabelHeader = "Title Bar Background";
         ColorLabelPanelDivider = "Panel Divider";
-        ColorLabelViewerBackground = "Viewer Background";
+        ColorLabelViewerBackground = "Multimedia Panel Background";
         ColorLabelAutoHideHandle = "Auto-Hide Handle/Bar";
         ButtonDefaults = "Defaults";
         ButtonClose = "Close";

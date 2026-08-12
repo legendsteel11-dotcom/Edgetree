@@ -1654,6 +1654,21 @@
                  them. -->
             <MenuItem Header="{x:Static services:Strings.MenuImageViewer}"
                     AutomationProperties.AutomationId="imageViewer">
+                <!-- Which of the two "open" actions a double-click means. In
+                     this group rather than among the behaviour toggles above
+                     because the answer it changes is where the file GOES, and
+                     the destination is this panel - someone wondering whether
+                     the app can be made to open its own files looks for the
+                     viewer, not for a list of tree behaviours.
+
+                     The row menu's 기본 프로그램에서 열기 is untouched by it and
+                     has to be: a row that names where it sends the file cannot
+                     start sending it somewhere else. -->
+                <MenuItem Header="{x:Static services:Strings.MenuOpenMediaInViewer}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="openMediaInViewer"
+                        Click="OpenMediaInViewerMenuItem_Click"/>
+                <Separator/>
                 <MenuItem Header="{x:Static services:Strings.MenuPrecacheThumbnails}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="precacheThumbnails"

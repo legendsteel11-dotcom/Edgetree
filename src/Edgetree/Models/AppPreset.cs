@@ -213,7 +213,8 @@ public class AppPreset
     //     - about the machine and the install, not about this window.
     //
     //   ViewerHdr*, ViewerSubtitle*, ViewerRepeat, ViewerPrecacheThumbnails,
-    //   HelpWindow*, MaxItemsPerFolder, AutoCollapseFolders, SearchSortMode
+    //   OpenMediaInViewer, HelpWindow*, MaxItemsPerFolder, AutoCollapseFolders,
+    //   SearchSortMode
     //     - preferences about how a job is done, which nobody expects to change
     //       when they move the window to the other edge.
 

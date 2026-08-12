@@ -204,10 +204,10 @@ public static class HelpContent
                     // if-clause in it.
                     R("결과 클릭", "트리의 해당 항목으로 이동",
                       "Click a result", "Go to it in the tree"),
-                    R("결과 클릭 · ↑ ↓ (이미지 뷰어 열림)", "검색 결과 간 이동",
-                      "Click a result · ↑ ↓", "(with the image viewer open) Move through the results"),
-                    R("결과 더블클릭 (이미지 뷰어 열림)", "트리의 해당 항목으로 이동",
-                      "Double-click a result", "(with the image viewer open) Go to it in the tree"),
+                    R("결과 클릭 · ↑ ↓ (멀티미디어 패널 열림)", "검색 결과 간 이동",
+                      "Click a result · ↑ ↓", "(with the multimedia panel open) Move through the results"),
+                    R("결과 더블클릭 (멀티미디어 패널 열림)", "트리의 해당 항목으로 이동",
+                      "Double-click a result", "(with the multimedia panel open) Go to it in the tree"),
                     R("결과 표시 수", "기본 1,000개 · 목록 끝 더 보기로 1,000개씩 추가",
                       "How many results show", "1,000 at a time - \"Show more\" at the end adds another 1,000"),
                     // The dot is the half a label cannot say: the button names
@@ -221,8 +221,11 @@ public static class HelpContent
         new Section(
             // "이미지 뷰어" until 2026-08-11, when the panel stopped being one:
             // it plays film and sound now, and two of the four groups under
-            // this heading are about things that are not images.
-            T("멀티미디어", "Multimedia"),
+            // this heading are about things that are not images. This heading
+            // went first and the rest of the app followed on 2026-08-12 - the
+            // panel is called 멀티미디어 패널 everywhere now, so the heading names
+            // it outright rather than naming the subject it covers.
+            T("멀티미디어 패널", "Multimedia Panel"),
             new[]
             {
                 new Group(T("이미지", "Images"), new[]
@@ -330,8 +333,8 @@ public static class HelpContent
                       "The ▤ button beside the counter", "The folder's images as a row - or the results, while searching"),
                     R("칸을 밖으로 드래그", "다른 앱으로 드롭", "Drag a cell out", "Drop it into another app"),
                     R("바 위쪽 가장자리 드래그", "칸 크기 조절", "Drag the bar's top edge", "Cell size"),
-                    R("옵션 → 이미지 뷰어", "이미지 썸네일 캐싱 · 캐싱 파일 정리",
-                      "Options → Image viewer", "Preload thumbnails · clean the cache up"),
+                    R("옵션 → 멀티미디어 패널", "이미지 썸네일 캐싱 · 캐싱 파일 정리",
+                      "Options → Multimedia panel", "Preload thumbnails · clean the cache up"),
                 }),
             }),
 

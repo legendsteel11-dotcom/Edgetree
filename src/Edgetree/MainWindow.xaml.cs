@@ -6538,6 +6538,11 @@ public partial class MainWindow : Window
                     FilmstripFetchSteps[0], FilmstripFetchSteps[^1]);
             }
 
+            if (FindMenuItem(imageViewer, "openMediaInViewer") is { } openMediaInViewer)
+            {
+                openMediaInViewer.IsChecked = _settings.OpenMediaInViewer;
+            }
+
             if (FindMenuItem(imageViewer, "precacheThumbnails") is { } precacheThumbnails &&
                 FindMenuItem(imageViewer, "clearThumbnailCache") is { } clearThumbnailCache)
             {
@@ -6553,7 +6558,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                LogClickLine("options menu: an 이미지 뷰어 row is missing");
+                LogClickLine("options menu: a 멀티미디어 패널 row is missing");
             }
 
             // Nothing expanded means nothing to collapse - grey it out rather
@@ -8381,6 +8386,17 @@ public partial class MainWindow : Window
         Services.ThumbnailCacheService.Clear();
         // The cells hold their own copies, so what is on screen stays; only the
         // disk side is gone.
+    }
+
+    private void OpenMediaInViewerMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem)
+        {
+            return;
+        }
+
+        _settings.OpenMediaInViewer = menuItem.IsChecked;
+        _settingsService.Save(_settings);
     }
 
     private void PrecacheThumbnailsMenuItem_Click(object sender, RoutedEventArgs e)
@@ -10491,7 +10507,14 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 break;
             case Key.Enter:
-                OpenItem_Click(sender, e);
+                // Enter and a double-click mean one thing, so they take one
+                // answer - splitting them would give a single intent two.
+                if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsShowMore: false, IsDirectory: false } enterItem ||
+                    !OpenByGestureInViewer(enterItem))
+                {
+                    OpenItem_Click(sender, e);
+                }
+
                 e.Handled = true;
                 break;
             case Key.C when Keyboard.Modifiers == ModifierKeys.Control:
@@ -10820,6 +10843,12 @@ public partial class MainWindow : Window
         }
 
         if (IsUnreachableNetworkItem(item))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (OpenByGestureInViewer(item))
         {
             e.Handled = true;
             return;
@@ -17940,8 +17969,45 @@ public partial class MainWindow : Window
     // open anyway: a sliver has no tree to right-click.
     private void ViewHere_Click(object sender, RoutedEventArgs e)
     {
-        if (ExplorerTree.SelectedItem is not FileSystemItem { IsDirectory: false } item ||
-            !HasViewerPreview(item.FullPath))
+        if (ExplorerTree.SelectedItem is FileSystemItem { IsDirectory: false } item)
+        {
+            ViewHere(item);
+        }
+    }
+
+    // ----- 더블클릭·Enter 를 어디로 보낼 것인가 -------------------------------
+    //
+    // False means "not mine" and the caller carries on to the default program,
+    // which is what both gestures have always done and what they still do
+    // unless someone has asked otherwise (AppSettings.OpenMediaInViewer).
+    //
+    // MEDIA ONLY. HasViewerPreview is the same predicate the row menu's
+    // 보기 / 재생 uses to decide whether to appear at all, so a file the panel
+    // cannot show goes to Windows however the setting is set - there is no
+    // state in which a .txt lands in an image viewer.
+    //
+    // The row menu's 기본 프로그램에서 열기 does not come through here on
+    // purpose. It NAMES its destination, and a row that says where it sends a
+    // file cannot start sending it elsewhere.
+    private bool OpenByGestureInViewer(FileSystemItem item)
+    {
+        if (!_settings.OpenMediaInViewer || !HasViewerPreview(item.FullPath))
+        {
+            return false;
+        }
+
+        ViewHere(item);
+        return true;
+    }
+
+    // Split out from the menu handler above so a GESTURE can ask for the same
+    // thing without going through the selection. Both callers have the row
+    // selected by the time they get here - a double-click selects on the way
+    // down, and Enter has nothing else to act on - which matters because the
+    // preview this opens follows the SELECTION, not the argument.
+    private void ViewHere(FileSystemItem item)
+    {
+        if (!HasViewerPreview(item.FullPath))
         {
             return;
         }
@@ -21226,7 +21292,7 @@ public partial class MainWindow : Window
     // would have drawn the same strip (2026-08-12).
     private static readonly int[] FilmstripFetchSteps = { 32, 48, 64, 96, 128, 160, 192, 224, 256 };
 
-    // The user's ceiling on all of it (옵션 메뉴 → 이미지 뷰어 → 썸네일 최대 크기).
+    // The user's ceiling on all of it (옵션 메뉴 → 멀티미디어 패널 → 썸네일 최대 크기).
     // Past this the strip is drawn LARGER from the same picture rather than
     // fetched bigger, which is the whole point: a taller strip stops costing
     // memory once the number that multiplies by the folder's size is pinned.

@@ -75,6 +75,21 @@ public class AppSettings
     // glancing at a folder, which is exactly the shape a setting is for.
     public bool ViewerPrecacheThumbnails { get; set; } = false;
 
+    // Whether a double-click (and Enter, which means the same thing) on a
+    // picture, a track or a film hands it to this app's own panel instead of to
+    // whatever Windows opens it with.
+    //
+    // MEDIA ONLY, and that is not a simplification - "our panel" has no meaning
+    // for a .txt or a .psd, so everything else goes to the default program
+    // whatever this says. The menu label names the three kinds for that reason.
+    //
+    // Off by default. Handing a file to Windows is what a double-click has
+    // always done here and what it does everywhere else in the OS, so the app
+    // does not quietly change it on anyone; someone who wants the panel says so
+    // once. Worth most with the panel CLOSED - with it already open, a single
+    // click has previewed the file there anyway.
+    public bool OpenMediaInViewer { get; set; } = false;
+
     // The help window's size, because it is the one dialog here that can be
     // resized and therefore the one someone can have an opinion about. 0 means
     // "never sized by hand" - the window works out its own first size then, and
@@ -290,7 +305,7 @@ public class AppSettings
     // dark theme only. The colour rows for both themes are kept and untouched,
     // so turning it back on restores exactly what was there.
     public bool ShowPanelDividers { get; set; } = true;
-    // "뷰어 배경" - the image viewer panel's own backdrop, separate from the
+    // "멀티미디어 패널 배경" - the panel's own backdrop, separate from the
     // tree background so a photo can sit on near-black while the tree stays
     // its own colour. Same default as the tree background, so nothing
     // changes until it's customized.
