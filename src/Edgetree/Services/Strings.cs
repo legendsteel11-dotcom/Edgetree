@@ -295,6 +295,9 @@ public static class Strings
     public static string ViewerZoomActual = "1:1";
     public static string ViewerNavigator = "내비게이터";
     public static string ViewerClose = "뷰어 닫기";
+    // The footer's now-playing row, which only exists while the viewer is shut
+    // and 배경 재생 is holding a track.
+    public static string FooterNowPlayingOpen = "뷰어에서 열기";
     // Explorer's own wording for the same action, so it reads as the familiar
     // thing rather than a new feature.
     public static string MenuSetWallpaper = "바탕 화면 배경으로 설정";
@@ -794,6 +797,7 @@ public static class Strings
         ViewerZoomActual = "1:1";
         ViewerNavigator = "Navigator";
         ViewerClose = "Close viewer";
+        FooterNowPlayingOpen = "Open in the viewer";
         MenuSetWallpaper = "Set as desktop background";
         TreeHistoryBack = "Back  (Ctrl+←)";
         TreeHistoryForward = "Forward  (Ctrl+→)";

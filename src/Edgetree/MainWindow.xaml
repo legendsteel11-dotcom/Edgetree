@@ -4909,6 +4909,116 @@
                             Orientation="Horizontal"
                             Margin="8,1,4,6">
                     </WrapPanel>
+                    <!-- WHAT IS STILL PLAYING WITH THE PANEL SHUT.
+                         배경 재생 keeps a track going when the tree moves
+                         elsewhere, and closing the viewer is the same kind of
+                         move - so the sound carries on. That leaves a state with
+                         no transport on screen: nothing says what is playing,
+                         nothing stops it, and the track is held open so it
+                         cannot be renamed or deleted either. This row is the
+                         answer to all three.
+
+                         Only while the viewer is SHUT. Open, the transport says
+                         and does the same things a few pixels up, and two of
+                         them would be two places to look.
+
+                         A plain row rather than something that slides or
+                         toggles: hiding it behind a gesture costs more than the
+                         line it saves (the user's call). It costs no height at
+                         all when there is nothing to say - a Collapsed
+                         StackPanel child takes none, which is how the path bar
+                         above comes and goes - so the footer only grows while a
+                         track is held, which is a state the user switched on. -->
+                    <Grid x:Name="FooterNowPlayingRow"
+                            Margin="8,0,4,6"
+                            Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <!-- Material Symbols "music_note". The row only ever
+                             shows for audio (see ViewerBackgroundPlaying), so
+                             the mark can be literal. -->
+                        <Path Grid.Column="0"
+                                Data="M400-120q-66 0-113-47t-47-113q0-66 47-113t113-47q23 0 42.5 5.5T480-418v-422h240v160H560v400q0 66-47 113t-113 47Z"
+                                Stretch="Uniform"
+                                Width="{DynamicResource ViewerChipIconSize}"
+                                Height="{DynamicResource ViewerChipIconSize}"
+                                Fill="{DynamicResource ForegroundText}"
+                                Opacity="0.65"
+                                VerticalAlignment="Center"
+                                Margin="0,0,5,0"/>
+                        <!-- The name is the way BACK: clicking it opens the
+                             viewer on the track it names, which is the same
+                             direction the tree row menu's 보기 goes. One rule,
+                             two places. -->
+                        <!-- Deliberately NOT one of the footer's chip buttons.
+                             Those templates draw Content THROUGH a TextBlock, so
+                             a TextBlock put in one renders as nothing at all -
+                             which is what happened here first, and is the same
+                             trap the ...GlyphChipStyle variants exist for. A
+                             chip's outlined box would be wrong besides: the row
+                             has one button in it, and this is a label that
+                             happens to be clickable.
+
+                             Background=Transparent so it hit-tests across its
+                             whole width rather than only where the glyphs are. -->
+                        <!-- The hover is the chips' own - their fill, their
+                             corner, and the same step from 0.65 to full ink -
+                             because this sits in their row and has to answer to
+                             the pointer the way they do. Without it the name
+                             read as dead text and nobody would learn it could be
+                             pressed (2026-08-12).
+
+                             The Border carries the press rather than the
+                             TextBlock: it fills the column, so the target is the
+                             whole strip between the mark and the stop button,
+                             not just the glyphs. -->
+                        <Border x:Name="FooterNowPlayingHit"
+                                Grid.Column="1"
+                                Background="Transparent"
+                                CornerRadius="3"
+                                Padding="4,2"
+                                Margin="0,0,4,0"
+                                Cursor="Hand"
+                                MouseLeftButtonUp="FooterNowPlaying_Click">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Opacity" Value="0.65"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background"
+                                                    Value="{DynamicResource TreeRowHoverBackground}"/>
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock x:Name="FooterNowPlayingText"
+                                    Foreground="{DynamicResource ForegroundText}"
+                                    FontSize="{DynamicResource FooterChipFontSize}"
+                                    TextTrimming="CharacterEllipsis"
+                                    VerticalAlignment="Center"/>
+                        </Border>
+                        <!-- STOP, not pause. Half of what this row is for is
+                             that the switch which releases the file lives in the
+                             transport, and the transport is gone - so the button
+                             here has to be the one that lets go, or the lock
+                             stays with no way out of it. -->
+                        <Button x:Name="FooterNowPlayingStop"
+                                Grid.Column="2"
+                                Style="{StaticResource FooterActionGlyphChipStyle}"
+                                Click="FooterNowPlayingStop_Click"
+                                ToolTip="{x:Static services:Strings.ViewerStop}">
+                            <Path Data="M336-624v288-288Zm-72 360v-432h432v432H264Zm72-72h288v-288H336v288Z"
+                                    Stretch="Uniform"
+                                    Width="{DynamicResource ViewerChipIconSize}"
+                                    Height="{DynamicResource ViewerChipIconSize}"
+                                    Fill="{Binding Foreground,
+                                        RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        </Button>
+                    </Grid>
                 </StackPanel>
             </Border>
 

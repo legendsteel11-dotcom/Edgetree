@@ -15980,6 +15980,8 @@ public partial class MainWindow : Window
         }
 
         UpdateViewerPreview();
+        // The transport is back, so the footer's stand-in goes.
+        UpdateFooterNowPlaying();
     }
 
     private void CloseViewer()
@@ -16019,7 +16021,18 @@ public partial class MainWindow : Window
         ViewerCollapseButton.Visibility = Visibility.Collapsed;
         UpdateViewerExpandButton();
         StopViewerGif();
-        StopViewerVideo();
+        // Closing the panel used to stop the sound with it, which read as odd
+        // for the one mode built to survive the panel's attention moving
+        // (2026-08-12). 배경 재생 already says what should happen when the tree
+        // goes elsewhere, and shutting the viewer is the same kind of move -
+        // this path just never asked. The predicate is the one the selection
+        // handlers already use, so all three routes agree.
+        //
+        // A film always stops: there is nothing to keep without the picture.
+        if (!ViewerBackgroundPlaying)
+        {
+            StopViewerVideo();
+        }
         ReleaseFilmstripCells();
         ViewerPlayOverlay.Visibility = Visibility.Collapsed;
         ViewerImage.Source = null;
@@ -16039,6 +16052,59 @@ public partial class MainWindow : Window
             _settings.ViewerOpen = false;
             _settingsService.Save(_settings);
         }
+
+        UpdateFooterNowPlaying();
+    }
+
+    // ----- 푸터의 재생 중 줄 --------------------------------------------------
+    //
+    // Shown only while the viewer is SHUT and 배경 재생 is holding a track. Open,
+    // the transport says and does the same things a few pixels up.
+    //
+    // Called from every place that can change either half of that: the two
+    // methods that open and close the panel, the background-play switch, and
+    // UpdateViewerNowPlaying, which already runs whenever what is playing
+    // changes. One predicate, so the row cannot disagree with the transport.
+    private void UpdateFooterNowPlaying()
+    {
+        bool show = !_viewerOpen && ViewerBackgroundPlaying && _viewerVideoPath is not null;
+        FooterNowPlayingRow.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+
+        if (show)
+        {
+            string name = System.IO.Path.GetFileName(_viewerVideoPath!);
+            FooterNowPlayingText.Text = name;
+            // The name is trimmed to the width the footer has, so the whole one
+            // has to be reachable some other way.
+            FooterNowPlayingText.ToolTip = $"{name}\n{Strings.FooterNowPlayingOpen}";
+        }
+    }
+
+    // The way back: open the panel on the track this row names. Same direction
+    // the tree row's own 보기 goes, so there is one rule rather than two.
+    private void FooterNowPlaying_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_viewerVideoPath is not { } playing)
+        {
+            return;
+        }
+
+        OpenViewer();
+        // After the panel exists, or there is nothing for the reveal to land in.
+        // Through NavigateToPath like every other deliberate jump: the tree
+        // moving is what hands the panel its selection.
+        NavigateToPath(playing, source: "nowplaying-footer");
+    }
+
+    // Stop rather than pause, and deliberately: half of what this row is for is
+    // that 배경 재생 holds the file open and the switch that releases it lives in
+    // the transport, which is not on screen. A pause here would leave the lock
+    // with no way out of it.
+    private void FooterNowPlayingStop_Click(object sender, RoutedEventArgs e)
+    {
+        StopViewerVideo();
+        UpdateViewerNowPlaying();
+        UpdateFooterNowPlaying();
     }
 
     // Selection changes debounce through a short timer: arrow-keying down a
@@ -17536,6 +17602,8 @@ public partial class MainWindow : Window
             StopViewerVideo();
             UpdateViewerNowPlaying();
         }
+
+        UpdateFooterNowPlaying();
     }
 
     // The line above the transport, and the visible half of "two currents":
@@ -17556,6 +17624,10 @@ public partial class MainWindow : Window
         // Hung here because this is already called at every moment the two can
         // come apart or back together.
         UpdateViewerTrackButtons();
+
+        // Same reasoning for the footer's row: what it names and whether it is
+        // there at all both follow from what the transport is holding.
+        UpdateFooterNowPlaying();
     }
 
     // "The panel can show this" - pictures and films together. Films arrived in
