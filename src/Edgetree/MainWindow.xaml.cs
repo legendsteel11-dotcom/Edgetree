@@ -5620,12 +5620,53 @@ public partial class MainWindow : Window
             }
             steps++;
 
+            // THE STEP HAS TO LAND BEFORE IT IS JUDGED. A line step only
+            // reaches VerticalOffset on the next layout pass, so reading it
+            // straight back can return the old value and read as "refused" -
+            // which ended this loop one step in, with the row 468px down and
+            // 173 rows of range still below it (`click.log` 2026-08-13,
+            // "range-spent steps=1 top=468 offset 104 -> 104" against
+            // scrollable=277). The loop-top UpdateLayout serves the NEXT
+            // measurement; the refusal test needs its own.
+            scrollViewer.UpdateLayout();
+
             if (Math.Abs(scrollViewer.VerticalOffset - before) < 0.01)
             {
-                // The range is spent - the row is as close to the top as this
-                // tree can put it. The bottom-gap rows above are what usually
-                // makes the rest of the room; if they could not, stop here
-                // rather than loop against a wall.
+                // The range is spent: a step DOWN was asked for and refused,
+                // with the row still short of the top. That is not a guess
+                // about the tree's size, it is the panel stating there is no
+                // more room - so make the room, the same way PinRowToTop does,
+                // and keep going.
+                //
+                // PinRowToTop asks its shortfall question BEFORE auto-collapse
+                // has finished arriving, against a scroll range that is about
+                // to shrink - `click.log` 2026-08-13, 선별2023: shortfall
+                // computed against scrollable=556, extent then collapsed
+                // 566 -> 228 -> 94, and the row ended pinned 198px down with
+                // gap=0rows because nothing re-asked. Here is where the truth
+                // is finally known, so here is where the gap is grown.
+                //
+                // The index is recounted from the model rather than reusing
+                // countedIndex, which describes the tree as it stood before
+                // those collapses. Bounded by the loop's own MaxSteps: every
+                // pass either moves the view or grows the gap by a whole row,
+                // and a pass that can do neither returns below.
+                if (top > 0 &&
+                    anchor.DataContext is FileSystemItem rowItem &&
+                    VisibleRowIndexOf(rowItem) is { } liveIndex)
+                {
+                    double shortfall = liveIndex - scrollViewer.ScrollableHeight;
+                    if (shortfall > 0.5)
+                    {
+                        int grown = _bottomGapRows.Count + (int)Math.Ceiling(shortfall);
+                        LogClickLine(
+                            $"settle: {name} out of room, gap {_bottomGapRows.Count} -> {grown} " +
+                            $"(index {liveIndex}, scrollable {scrollViewer.ScrollableHeight:F0})");
+                        SetBottomGap(grown, scrollViewer);
+                        continue;
+                    }
+                }
+
                 Report("range-spent");
                 return;
             }
