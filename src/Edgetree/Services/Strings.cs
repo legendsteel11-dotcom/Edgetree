@@ -113,6 +113,24 @@ public static class Strings
     public static string MenuHiddenFolderList = "숨긴 폴더";
     public static string MenuHiddenFolderListEmpty = "숨긴 폴더 없음";
     public static string MenuUnhideFolder = "숨김 해제";
+
+    // 네트워크 위치. Named for the PLACE rather than for "드라이브": the whole
+    // point is that it does not need a drive letter, so calling it one would
+    // describe the thing it exists to avoid.
+    public static string MenuNetworkLocations = "네트워크 위치";
+    public static string MenuNetworkLocationAdd = "위치 추가…";
+    public static string MenuNetworkLocationsEmpty = "추가된 위치 없음";
+    public static string MenuNetworkLocationRemove = "목록에서 제거";
+    public static string NetworkLocationPromptTitle = "네트워크 위치 추가";
+    // Says the shape of the answer, because that is the one thing someone
+    // typing here can get wrong. The mapped case is named too - it is the
+    // question this box will otherwise be asked.
+    public static string NetworkLocationPromptHint =
+        "\\\\서버\\공유 형식이나 폴더 경로를 입력합니다. 드라이브 문자로 연결한 것은 이미 목록에 있습니다.";
+    public static string NetworkLocationUnreachableTitle = "연결할 수 없음";
+    public static string NetworkLocationUnreachableBody =
+        "{0}\n\n응답이 없습니다. 그래도 목록에 추가할까요?";
+    public static string NetworkLocationDuplicateTitle = "이미 있는 위치";
     // The button on every row of the bookmark / hidden-folder lists. One word
     // for both because the row it sits on already says what is being released.
     public static string MenuListRowRemove = "해제";
@@ -717,6 +735,17 @@ public static class Strings
         MenuHiddenFolderList = "Hidden Folders";
         MenuHiddenFolderListEmpty = "No hidden folders";
         MenuUnhideFolder = "Unhide";
+        MenuNetworkLocations = "Network Locations";
+        MenuNetworkLocationAdd = "Add Location…";
+        MenuNetworkLocationsEmpty = "No locations added";
+        MenuNetworkLocationRemove = "Remove from list";
+        NetworkLocationPromptTitle = "Add Network Location";
+        NetworkLocationPromptHint =
+            "Enter it as \\\\server\\share, or a folder path. Anything mapped to a drive letter is already in the list.";
+        NetworkLocationUnreachableTitle = "Cannot connect";
+        NetworkLocationUnreachableBody =
+            "{0}\n\nThere was no response. Add it to the list anyway?";
+        NetworkLocationDuplicateTitle = "Already in the list";
         MenuListRowRemove = "Remove";
         HiddenClearAllConfirmTitle = "Unhide All Folders";
         HiddenClearAllConfirmBody = "Show all {0} hidden folders again?";

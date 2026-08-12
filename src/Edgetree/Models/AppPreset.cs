@@ -201,7 +201,8 @@ public class AppPreset
     //
     //   Favorites, BookmarkPaths, VideoMarks, HiddenFolderPaths,
     //   FolderSortOverrides, FileFilterCustomExtensions,
-    //   FileFilterExcludeExtensions, SearchHistory, LastSearchFolder
+    //   FileFilterExcludeExtensions, SearchHistory, LastSearchFolder,
+    //   NetworkLocations
     //     - DATA. The user made these, one at a time, and no change of shape
     //       should be able to take them away.
     //

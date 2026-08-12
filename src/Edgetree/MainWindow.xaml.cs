@@ -437,6 +437,12 @@ public partial class MainWindow : Window
             FileSystemService.HiddenPaths.Add(FileSystemService.NormalizeHiddenPath(path));
         }
 
+        FileSystemService.UserRoots.Clear();
+        foreach (var path in _settings.NetworkLocations)
+        {
+            FileSystemService.UserRoots.Add(path);
+        }
+
         FileSystemService.SortOverrides.Clear();
         foreach (var entry in _settings.FolderSortOverrides)
         {
@@ -13959,6 +13965,188 @@ public partial class MainWindow : Window
         submenu.Items.Add(new Separator());
         submenu.Items.Add(BuildListClearAllButton(
             Strings.MenuBookmarkClearAll, () => ClearAllHiddenFolders_Click(this, new RoutedEventArgs())));
+    }
+
+    // ----- 네트워크 위치 -------------------------------------------------------
+    //
+    // Built on open, into whichever of the two menus asked, exactly like the
+    // hidden-folder list beside it. 위치 추가 leads rather than closing the
+    // list: on a fresh install the list is empty, and the one row in it should
+    // be the one that does something.
+    private void NetworkLocationSubmenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem submenu)
+        {
+            AppendNetworkLocationListTo(submenu);
+        }
+    }
+
+    private void AppendNetworkLocationListTo(MenuItem submenu)
+    {
+        submenu.Items.Clear();
+
+        var add = FollowMenuFont(new MenuItem { Header = Strings.MenuNetworkLocationAdd });
+        add.Click += AddNetworkLocation_Click;
+        submenu.Items.Add(add);
+
+        submenu.Items.Add(new Separator());
+
+        // The same trap the hidden-folder list documents: a MenuItem whose
+        // Items reach zero reports HasItems=false, WPF stops opening it, and
+        // SubmenuOpened never fires again to refill it. 위치 추가 above is
+        // always there, so this list can never empty the submenu - the row
+        // below is for the reading, not for the mechanism.
+        if (_settings.NetworkLocations.Count == 0)
+        {
+            submenu.Items.Add(FollowMenuFont(new MenuItem
+            {
+                Header = Strings.MenuNetworkLocationsEmpty,
+                IsEnabled = false,
+            }));
+            return;
+        }
+
+        foreach (string path in _settings.NetworkLocations.ToList())
+        {
+            submenu.Items.Add(BuildNetworkLocationRow(path));
+        }
+    }
+
+    private MenuItem BuildNetworkLocationRow(string path)
+    {
+        var row = FollowMenuFont(new MenuItem
+        {
+            ToolTip = path,
+            // Nothing on the row itself: the place is already IN the tree, so a
+            // click here would be offering to go somewhere the user can simply
+            // scroll to. Only the button does anything.
+            StaysOpenOnClick = true,
+        });
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var name = new TextBlock
+        {
+            Text = path,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+        };
+        name.SetResourceReference(TextBlock.ForegroundProperty, "FolderNameForeground");
+        Grid.SetColumn(name, 0);
+        grid.Children.Add(name);
+
+        var remove = new Button
+        {
+            Content = Strings.MenuListRowRemove,
+            Style = (Style)FindResource("MenuRowActionButtonStyle"),
+            ToolTip = Strings.MenuNetworkLocationRemove,
+            Margin = new Thickness(14, 0, 0, 0),
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+        };
+        remove.Click += (_, args) =>
+        {
+            args.Handled = true;
+            RemoveNetworkLocation(path);
+
+            // From whichever menu this row belongs to - the list is built into
+            // two of them, and naming one would quietly do nothing in the other
+            // (the lesson the bookmark list paid for on 2026-07-31).
+            if (ItemsControl.ItemsControlFromItemContainer(row) is MenuItem host)
+            {
+                AppendNetworkLocationListTo(host);
+            }
+        };
+        Grid.SetColumn(remove, 1);
+        grid.Children.Add(remove);
+
+        row.Header = grid;
+        return row;
+    }
+
+    private void RemoveNetworkLocation(string path)
+    {
+        if (_settings.NetworkLocations.RemoveAll(
+                p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)) == 0)
+        {
+            return;
+        }
+
+        _settingsService.Save(_settings);
+        FileSystemService.UserRoots.RemoveAll(
+            p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+        ReloadRoots();
+    }
+
+    // ONE BOX, and the existence check behind it runs on a WORKER. A sleeping
+    // NAS takes tens of seconds to answer Directory.Exists, and asking inline
+    // is precisely how v1.3.2's 21~59s freezes happened - the same reason the
+    // path bar already resolves the way it does.
+    //
+    // A LOCATION THAT DOES NOT ANSWER IS STILL OFFERED, because "not answering"
+    // and "not real" are the same sentence from here: the NAS may simply be
+    // asleep, which is the ordinary state of the machine this was asked for.
+    // Refusing it would mean the location can only be added while it happens to
+    // be awake. So the user is told and decides.
+    private async void AddNetworkLocation_Click(object sender, RoutedEventArgs e)
+    {
+        var prompt = new PresetNameWindow(
+            string.Empty,
+            string.Empty,
+            Strings.NetworkLocationPromptTitle,
+            Strings.NetworkLocationPromptHint)
+        {
+            Owner = this,
+        };
+
+        if (prompt.ShowDialog() != true || prompt.Result is not { } typed)
+        {
+            return;
+        }
+
+        string path = typed.Trim().Trim('"').TrimEnd('\\', '/');
+        if (path.Length == 0)
+        {
+            return;
+        }
+
+        if (_settings.NetworkLocations.Any(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)) ||
+            FileSystemService.GetDriveRoots().Any(
+                r => string.Equals(r.FullPath.TrimEnd('\\'), path, StringComparison.OrdinalIgnoreCase)))
+        {
+            MessageBox.Show(this, path, Strings.NetworkLocationDuplicateTitle,
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        bool reachable = await Task.Run(() =>
+        {
+            try
+            {
+                return Directory.Exists(path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        });
+
+        if (!reachable &&
+            MessageBox.Show(
+                this,
+                string.Format(Strings.NetworkLocationUnreachableBody, path),
+                Strings.NetworkLocationUnreachableTitle,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _settings.NetworkLocations.Add(path);
+        _settingsService.Save(_settings);
+        FileSystemService.UserRoots.Add(path);
+        ReloadRoots();
     }
 
     private void ClearAllHiddenFolders_Click(object sender, RoutedEventArgs e)

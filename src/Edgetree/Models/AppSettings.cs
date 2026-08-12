@@ -114,6 +114,27 @@ public class AppSettings
     // that touches the disk.
     public List<VideoMarkEntry> VideoMarks { get; set; } = new();
 
+    // Network places added by hand, shown as roots under the drive letters.
+    //
+    // WHY THIS EXISTS: the tree's roots come from DriveInfo.GetDrives(), which
+    // answers with drive LETTERS and nothing else. A share that Windows has
+    // mapped to a letter has always worked here - that is what a NAS on Y:
+    // is - but a UNC path used as a UNC path (\\NAS\공유) could not be reached
+    // at all, not even by typing it into the path bar: NavigateToPath walks
+    // down from a root, and there was no root it began with. WebDAV is the same
+    // story - mapped to a letter it has always worked, unmapped it could not be
+    // reached.
+    //
+    // A LIST OF STRINGS, in the order they were added, because that is what
+    // the tree shows. Kept out of presets deliberately (see AppPreset): a
+    // place the user typed in is data, not a shape.
+    //
+    // Nothing here is load-bearing. A location that stops answering is drawn
+    // the same way a sleeping mapped drive is - the row stays so it can be
+    // clicked again - and one that is gone for good is removed from the menu
+    // it was added from.
+    public List<string> NetworkLocations { get; set; } = new();
+
     // Subtitles that sit beside the film as a .smi/.srt (see SubtitleService for
     // why that is the only kind there can be). ON by default, unlike the
     // navigator and the filmstrip: those add something to a panel that was

@@ -186,6 +186,47 @@ public static class FileSystemService
     // persisted - it dies with the paste, with Esc, or with the next copy.
     public static readonly HashSet<string> CutPaths = new(StringComparer.OrdinalIgnoreCase);
 
+    // Mirror of AppSettings.NetworkLocations, kept in step by MainWindow the
+    // same way the two sets above are. A LIST, not a set: these are rows in a
+    // tree and the order they were added in is the order they appear.
+    //
+    // NOT to be confused with the NetworkRoots set further down - that one is
+    // the backoff bookkeeping for roots that have stopped answering, and it
+    // takes these as members too.
+    public static readonly List<string> UserRoots = new();
+
+    // A bare share - "\\NAS\보관", server and share and nothing more. That is
+    // the one added location that is a place in its own right rather than a
+    // folder inside one, which is why it alone is drawn and named like a drive.
+    private static bool IsShareRoot(string path)
+    {
+        string trimmed = path.TrimEnd('\\', '/');
+        return trimmed.StartsWith(@"\\", StringComparison.Ordinal)
+            // Server and share and nothing after them. "\\NAS" on its own is
+            // one segment and is not a place that can be opened.
+            && trimmed[2..].Split('\\', '/', StringSplitOptions.RemoveEmptyEntries).Length == 2;
+    }
+
+    // A share reads as "보관 (\\NAS)", which is what Explorer calls it.
+    //
+    // EVERYTHING ELSE KEEPS ITS WHOLE PATH, and that is worth a sentence,
+    // because the first version shortened those too. A folder added from a
+    // mapped drive came out as "작업 (Y:)" - character for character the shape
+    // the drive rows use for their volume label, so it sat among them reading
+    // as another drive (seen 2026-08-13). The full path is a little longer and
+    // says exactly what the row is.
+    private static string UserRootDisplayName(string path)
+    {
+        string trimmed = path.TrimEnd('\\', '/');
+        if (!IsShareRoot(trimmed))
+        {
+            return trimmed;
+        }
+
+        int lastSeparator = trimmed.LastIndexOfAny(new[] { '\\', '/' });
+        return $"{trimmed[(lastSeparator + 1)..]} ({trimmed[..lastSeparator]})";
+    }
+
     public static List<FileSystemItem> GetDriveRoots()
     {
         var roots = new List<FileSystemItem>();
@@ -243,6 +284,53 @@ public static class FileSystemService
                 // drive's type is already in hand, and the row's icon reads it
                 // (see FileSystemItem.Icon).
                 DriveKind = drive.DriveType
+            });
+        }
+
+        // AFTER the letters, never among them: the drives are what Windows
+        // says is on this machine and their order is its answer, while these
+        // are the user's own additions in the order they added them.
+        //
+        // EXISTENCE IS NOT ASKED HERE. This runs on the UI thread from every
+        // ReloadRoots, and a sleeping NAS answers Directory.Exists in tens of
+        // seconds - which is the shape of the 21~59s freezes v1.3.2 had. The
+        // row is built either way and behaves exactly like a mapped network
+        // drive whose server is away: it stays, and clicking it tries again.
+        foreach (string path in UserRoots)
+        {
+            if (IsHiddenByUser(path))
+            {
+                continue;
+            }
+
+            // A UNC path is remote by its own shape; a lettered one inherits
+            // from the drive it sits on, which the loop above has just read -
+            // so this costs no second look at the disk and nothing at all over
+            // the network.
+            bool onNetwork = path.StartsWith(@"\\", StringComparison.Ordinal)
+                || roots.Any(r => r.DriveKind == DriveType.Network
+                    && path.StartsWith(r.FullPath, StringComparison.OrdinalIgnoreCase));
+
+            if (onNetwork)
+            {
+                // Same bookkeeping the mapped drives get: it is what lets a
+                // later read tell "the network went away" from "this folder is
+                // slow" without asking anything.
+                lock (UnreachableRootsUntil)
+                {
+                    NetworkRoots.Add(path);
+                }
+            }
+
+            roots.Add(new FileSystemItem(UserRootDisplayName(path), path, isDirectory: true)
+            {
+                IsOnNetworkDrive = onNetwork,
+                // Only a bare share is a drive-like place. A FOLDER someone put
+                // at the top of the tree is still a folder and keeps the folder
+                // glyph - the rule FileSystemItem.DriveKind states for exactly
+                // this case, which the first version of this loop broke by
+                // stamping every added root as a network drive.
+                DriveKind = IsShareRoot(path) ? DriveType.Network : null,
             });
         }
 
@@ -352,16 +440,46 @@ public static class FileSystemService
     // Cheap when the mapping is disconnected, and it can still block when the
     // server is up but wedged - which is exactly the case the backoff mark
     // above covers, so the two together handle both shapes of "not there".
+    //
+    // DRIVEINFO UNDERSTANDS DRIVE LETTERS AND NOTHING ELSE. Handed anything
+    // else it throws ArgumentException ("Object must be a root directory..."),
+    // which the catch below read as "not ready" - so every root added by hand
+    // was drawn greyed-out and inert from the moment it appeared, however well
+    // it was answering. Both shapes an added root can take hit this: a share
+    // (\\server\share) and a folder on a mapped drive (Y:\작업). Found on the
+    // day the feature landed, 2026-08-13, and settled by asking DriveInfo
+    // directly rather than by reasoning about what it would do.
+    //
+    // Directory.Exists is the same question for those, at a known cost: unlike
+    // a disconnected MAPPING, which answers instantly, this one can sit in the
+    // SMB timeout. That is affordable here and nowhere else - this method is
+    // the one place allowed to ask the network anything, it is only ever
+    // reached from the background poll, and a read that overruns is what the
+    // backoff exists to catch.
     private static bool IsNetworkRootReady(string root)
     {
         try
         {
-            return new DriveInfo(root).IsReady;
+            return IsDriveLetterRoot(root) ? new DriveInfo(root).IsReady : Directory.Exists(root);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
             return false;
         }
+    }
+
+    // "Y:" or "Y:\" - the whole of a lettered drive, which is the only thing
+    // DriveInfo will answer for. "Y:\강의" is not one, and neither is any UNC
+    // path however short.
+    private static bool IsDriveLetterRoot(string path)
+    {
+        if (path.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string trimmed = path.TrimEnd('\\', '/');
+        return trimmed.Length == 2 && trimmed[1] == ':' && char.IsLetter(trimmed[0]);
     }
 
     // How many times in a row a root has run past the deadline without ever

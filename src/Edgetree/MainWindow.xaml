@@ -994,6 +994,13 @@
                     SubmenuOpened="HiddenFolderSubmenu_Opened">
                 <MenuItem Header=""/>
             </MenuItem>
+            <!-- Beside 숨긴 폴더 rather than among the options: both are lists
+                 of places the user decided about, one taken out of the tree and
+                 one put into it. Built by the same handler in either menu. -->
+            <MenuItem Header="{x:Static services:Strings.MenuNetworkLocations}"
+                    SubmenuOpened="NetworkLocationSubmenu_Opened">
+                <MenuItem Header=""/>
+            </MenuItem>
             <MenuItem Header="{x:Static services:Strings.MenuFileFilter}"
                     SubmenuOpened="FileFilterSubmenu_Opened">
                 <MenuItem Header=""/>
@@ -1767,6 +1774,15 @@
             <MenuItem Header="{x:Static services:Strings.MenuHiddenFolderList}"
                     AutomationProperties.AutomationId="hiddenFolderList"
                     SubmenuOpened="HiddenFolderSubmenu_Opened">
+                <MenuItem Header=""/>
+            </MenuItem>
+            <!-- Places added by hand, for the shares Windows has not been given
+                 a drive letter for. The list and the way to add to it are one
+                 item because they are one feature - the same argument that put
+                 이 폴더 숨기기 next to 숨긴 폴더. -->
+            <MenuItem Header="{x:Static services:Strings.MenuNetworkLocations}"
+                    AutomationProperties.AutomationId="networkLocations"
+                    SubmenuOpened="NetworkLocationSubmenu_Opened">
                 <MenuItem Header=""/>
             </MenuItem>
             <!-- Which file kinds the tree lists. "전체" sits apart above the
