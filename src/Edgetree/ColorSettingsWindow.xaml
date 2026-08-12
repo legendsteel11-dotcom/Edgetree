@@ -255,13 +255,29 @@
             <Grid Grid.Row="1"
                     Margin="16,12,16,0">
                 <!-- Per zone: the theme switch, its die, and the bolder die.
-                     The 12 in the middle is the gap between the two zones. -->
+                     The middle column is the gap between the two zones.
+
+                     THE TWO SWITCHES ARE Auto, AND THAT IS THE WHOLE POINT.
+                     They were `*`, which does not mean "share the room" when
+                     there is not enough of it - a star column takes what is left
+                     and CLIPS whatever does not fit, while the dice beside them,
+                     being Auto, always take their full width first. So the row
+                     always cut the same thing: the only button in it carrying a
+                     word (2026-08-12, "Dark Mo…" at the small font sizes).
+
+                     Small font is exactly when it bites, because the window's
+                     width scales with the font (ColorDialogWidth = 390 × scale)
+                     while the padding inside it does not - the fixed 16/12/10/4
+                     pixels are the same at every size, so they eat a bigger
+                     share of a narrower window and the star columns are what
+                     pays. The gap became `*` for the same reason: it is the one
+                     thing in the row that CAN give its pixels back. -->
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="12"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*" MinWidth="12"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>

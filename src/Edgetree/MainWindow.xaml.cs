@@ -9939,7 +9939,16 @@ public partial class MainWindow : Window
         // gained the two theme zones with dice and its bottom row a fourth
         // button - 랜덤 전으로 was clipping at 330 (2026-08-09; the
         // widening was the suggested fix). The other dialogs stay at 330.
-        appResources["ColorDialogWidth"] = Math.Round(390.0 * scale);
+        //
+        // IT SCALES UP BUT NEVER DOWN (2026-08-12). The window's width follows
+        // the font; the padding inside it does not - the 16/12/10/9/4 pixels of
+        // margin, gap and button padding are the same at every size. So shrinking
+        // the window hands those fixed pixels a bigger share of a smaller row,
+        // and at the smallest steps (scale 0.75, i.e. 292px) the theme row ran
+        // about eighty pixels over and the last die fell off the right edge.
+        // Growing is safe - the text is what grew - so only the floor is wrong,
+        // and 390 is the width already proven at the default font.
+        appResources["ColorDialogWidth"] = Math.Round(Math.Max(390.0 * scale, 390.0));
         // Help is two columns of text, so it needs the width the other dialogs
         // do not - at 390 the gesture column would wrap every phrase in it. But
         // not so much that the window comes out square: 620 against a 640-tall
