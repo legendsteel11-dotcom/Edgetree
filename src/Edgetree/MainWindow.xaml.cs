@@ -21071,7 +21071,8 @@ public partial class MainWindow : Window
                 // something is overriding the trigger. Height as a raw value
                 // separates them: NaN means nothing was ever applied.
                 $"barH={bar.Height:F0}/{bar.ActualHeight:F0}  " +
-                $"fit={_filmstripFitWidth:F0}/{(Resources["FilmstripCellWidth"] as double? ?? -1):F0}  " +
+                $"fit={_filmstripFitWidth:F0}/{(Resources["FilmstripCellWidth"] as double? ?? -1):F0}" +
+                $"/{(FindDescendant<ScrollViewer>(ViewerFilmstrip) is { } fitScroller && FindDescendant<ScrollContentPresenter>(fitScroller) is { } fitPresenter ? fitPresenter.ActualWidth : -1):F0}  " +
                 $"thickRes={(bar.TryFindResource("ScrollBarThickness") is double t ? t.ToString("F0") : "unresolved")}  " +
                 $"trackVp={stripTrack?.ViewportSize ?? double.NaN:F2}  " +
                 $"desired={thumbElement?.DesiredSize.Width ?? -1:F0}x{thumbElement?.DesiredSize.Height ?? -1:F0}  " +
@@ -21704,9 +21705,15 @@ public partial class MainWindow : Window
     // tree, so the click handler can tell that from a hand.
     private bool _filmstripSelfSelect;
 
-    // What one cell costs the strip beyond its own width: the Frame border, two
-    // pixels on each side. The strip advances by this, not by the cell.
-    private const double FilmstripCellBorder = 4;
+    // What one cell costs the strip beyond its own width, and the strip
+    // advances by the sum rather than by the cell: the Frame's border, two
+    // pixels on each side, plus the container's own right margin. Both live in
+    // the filmstrip's ItemContainerStyle - CHANGE THEM TOGETHER. Counting only
+    // the border made every fit one frame too optimistic, which showed up as
+    // exactly the empty frame-width the fit was meant to remove (2026-08-12).
+    private const double FilmstripCellBorder = 2 * 2;
+    private const double FilmstripCellGap = 3;
+    private const double FilmstripCellAdvance = FilmstripCellBorder + FilmstripCellGap;
 
     // The fitted width is a share of the strip's width, so it has to be redone
     // whenever that changes - the panel divider, the window, a dock. Only the
@@ -21750,9 +21757,29 @@ public partial class MainWindow : Window
     private double FitFilmstripCellWidth(double natural)
     {
         double strip = _filmstripFitWidth > 0 ? _filmstripFitWidth : ViewerFilmstrip.ActualWidth;
-        double available = strip
-            - ViewerFilmstrip.Padding.Left - ViewerFilmstrip.Padding.Right;
-        double advance = natural + FilmstripCellBorder;
+
+        // THE AREA THE CELLS ARE ACTUALLY ARRANGED INTO, not the control's width
+        // less its padding. Deriving it cost a whole frame: the strip measured
+        // 959 and the arithmetic said six cells of 159 fit in 955, while WPF
+        // laid out five - the presenter is about ten pixels narrower than that
+        // sum, and when the remainder is tight those few pixels drop a whole
+        // frame and leave its width standing empty. The difference between the
+        // control and its presenter is chrome and does not change with width,
+        // so it is measured from the current layout and carried onto the new
+        // width - which keeps this right during a resize, when the presenter
+        // itself still holds the old number.
+        double chrome = ViewerFilmstrip.Padding.Left + ViewerFilmstrip.Padding.Right;
+        if (FindDescendant<ScrollViewer>(ViewerFilmstrip) is { } scrollViewer &&
+            FindDescendant<ScrollContentPresenter>(scrollViewer) is { ActualWidth: > 0 } presenter &&
+            ViewerFilmstrip.ActualWidth > presenter.ActualWidth)
+        {
+            chrome = ViewerFilmstrip.ActualWidth - presenter.ActualWidth;
+        }
+
+        // A pixel of slack. Layout rounds, and a fit that lands exactly on the
+        // edge is the one that loses a frame.
+        double available = strip - chrome - 1;
+        double advance = natural + FilmstripCellAdvance;
         if (natural <= 0 || available <= 0 || advance <= 0)
         {
             return natural;
@@ -21765,7 +21792,7 @@ public partial class MainWindow : Window
             return natural;
         }
 
-        return Math.Max(natural, Math.Floor(available / fits) - FilmstripCellBorder);
+        return Math.Max(natural, Math.Floor(available / fits) - FilmstripCellAdvance);
     }
 
     // Width follows height, and both are written as resources because the cell
