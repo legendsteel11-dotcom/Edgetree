@@ -20919,6 +20919,13 @@ public partial class MainWindow : Window
 
     private void UpdateFilmstripPositionMarker()
     {
+        // A net under the fit. SizeChanged is the ordinary way the cell width is
+        // brought up to date, but a strip that was hidden while the panel moved
+        // comes back sized for a width that has gone - and this runs whenever
+        // the selection or the folder moves. It returns immediately when
+        // nothing has actually changed.
+        ApplyFilmstripCellSize();
+
         int index = ViewerFilmstrip.SelectedIndex;
         var scroller = FindDescendant<ScrollViewer>(ViewerFilmstrip);
         var bar = scroller?.Template?.FindName("PART_HorizontalScrollBar", scroller)
@@ -21064,6 +21071,7 @@ public partial class MainWindow : Window
                 // something is overriding the trigger. Height as a raw value
                 // separates them: NaN means nothing was ever applied.
                 $"barH={bar.Height:F0}/{bar.ActualHeight:F0}  " +
+                $"fit={_filmstripFitWidth:F0}/{(Resources["FilmstripCellWidth"] as double? ?? -1):F0}  " +
                 $"thickRes={(bar.TryFindResource("ScrollBarThickness") is double t ? t.ToString("F0") : "unresolved")}  " +
                 $"trackVp={stripTrack?.ViewportSize ?? double.NaN:F2}  " +
                 $"desired={thumbElement?.DesiredSize.Width ?? -1:F0}x{thumbElement?.DesiredSize.Height ?? -1:F0}  " +
@@ -21704,12 +21712,17 @@ public partial class MainWindow : Window
     // whenever that changes - the panel divider, the window, a dock. Only the
     // width matters here; ApplyFilmstripCellSize returns without touching
     // anything when neither dimension has actually moved.
+    // The width to fit against, taken from the event rather than read back off
+    // the control. Measured 2026-08-12: frames stayed at the pitch computed for
+    // a 645px strip while the strip was 940px, leaving four fifths of a frame
+    // empty on the right - the fit had been done once and never redone, and
+    // reading ActualWidth gave no way to tell a missed pass from a stale one.
+    private double _filmstripFitWidth;
+
     private void ViewerFilmstrip_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (e.WidthChanged)
-        {
-            ApplyFilmstripCellSize();
-        }
+        _filmstripFitWidth = e.NewSize.Width;
+        ApplyFilmstripCellSize();
     }
 
     // ----- 오른쪽에 남던 자투리 -------------------------------------------------
@@ -21736,7 +21749,8 @@ public partial class MainWindow : Window
     // a tenth by shrinking, which is a different trade than the one chosen.
     private double FitFilmstripCellWidth(double natural)
     {
-        double available = ViewerFilmstrip.ActualWidth
+        double strip = _filmstripFitWidth > 0 ? _filmstripFitWidth : ViewerFilmstrip.ActualWidth;
+        double available = strip
             - ViewerFilmstrip.Padding.Left - ViewerFilmstrip.Padding.Right;
         double advance = natural + FilmstripCellBorder;
         if (natural <= 0 || available <= 0 || advance <= 0)
