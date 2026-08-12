@@ -918,6 +918,15 @@ public partial class MainWindow : Window
         SetBrushColor(
             "PanelDividerBrush",
             WithDividerVisibility(light ? _settings.LightPanelDividerColorHex : _settings.PanelDividerColorHex));
+        // The scroll thumb, three states deep. White on the dark theme was
+        // white on white in the light one - invisible, reported 2026-08-12.
+        // The same three steps on black rather than a tie to the divider or
+        // guide-line colours, which are the user's to set: the ladder then
+        // reads the same on both themes however else the app has been
+        // recoloured, and it stays a shade weaker than the ink around it.
+        SetBrushColor("ScrollThumbBrush", light ? "#33000000" : "#33FFFFFF");
+        SetBrushColor("ScrollThumbHoverBrush", light ? "#55000000" : "#55FFFFFF");
+        SetBrushColor("ScrollThumbDragBrush", light ? "#70000000" : "#70FFFFFF");
         SetBrushColor("ViewerBackground", light ? _settings.LightViewerBackgroundColorHex : _settings.ViewerBackgroundColorHex);
         SetBrushColor("HeaderBackground", light ? _settings.LightHeaderBackgroundColorHex : _settings.HeaderBackgroundColorHex);
         SetBrushColor("AutoHideHandleBackground", light ? _settings.LightAutoHideHandleColorHex : _settings.AutoHideHandleColorHex);

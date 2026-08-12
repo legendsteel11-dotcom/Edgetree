@@ -181,6 +181,16 @@
              for why that used to be the case). -->
         <SolidColorBrush x:Key="PanelDividerBrush"
                 Color="#FF323438"/>
+        <!-- The scroll thumb's three states. Declared here as well as in
+             App.xaml so ApplyColorSettings can RECOLOUR them in place rather
+             than replace the entry - see SetBrushColor for why that difference
+             is worth a duplicate declaration. -->
+        <SolidColorBrush x:Key="ScrollThumbBrush"
+                Color="#33FFFFFF"/>
+        <SolidColorBrush x:Key="ScrollThumbHoverBrush"
+                Color="#55FFFFFF"/>
+        <SolidColorBrush x:Key="ScrollThumbDragBrush"
+                Color="#70FFFFFF"/>
         <!-- The image viewer panel's backdrop (AppSettings.
              ViewerBackgroundColorHex) - its own colour row in 색상 설정, so a
              photo can sit on near-black while the tree keeps its colour. -->
@@ -6476,11 +6486,13 @@
                                  A filled accent dot already means "there is an
                                  update" elsewhere in this app, and one mark
                                  cannot carry two meanings. Drawn instead in the
-                                 scrollbar's own family - white, and square
-                                 rather than rounded so it does not read as a
-                                 second thumb - and only a shade brighter than
-                                 the thumb, because it sits ON the bar and is
-                                 read against it rather than against the panel.
+                                 scrollbar's own family - square rather than
+                                 rounded so it does not read as a second thumb,
+                                 and in the thumb's HOVER ink, which is one
+                                 step up its own ladder. Taking the step rather
+                                 than a colour of its own means it follows the
+                                 theme with the bar it sits on, instead of
+                                 being a white mark on a white bar.
                                  Its height is set from the bar in
                                  UpdateFilmstripPositionMarker; the bar's
                                  thickness is a setting, so a fixed one here
@@ -6488,7 +6500,7 @@
                             <Rectangle x:Name="ViewerFilmstripMarker"
                                     Width="7"
                                     Height="7"
-                                    Stroke="#55FFFFFF"
+                                    Stroke="{DynamicResource ScrollThumbHoverBrush}"
                                     StrokeThickness="1"
                                     Fill="Transparent"
                                     Visibility="Collapsed"/>

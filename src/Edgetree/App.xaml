@@ -85,12 +85,24 @@
              the app reported (see FlooredTrack). With the size fixed there is
              nothing left for the brightness to compensate for, and at 66 the
              bar reads as glaring.
-             The ladder keeps its shape - hover brighter than rest, dragging
-             brighter still. -->
+             The ladder keeps its shape - hover stronger than rest, dragging
+             stronger still.
+
+             THE INK IS A THEME BRUSH NOW (2026-08-12). It was white at every
+             step, which on the light theme is a white thumb on a near-white
+             bar - invisible, as reported. The light theme mirrors the same
+             three steps onto black instead of tying itself to the divider or
+             guide-line colours, which the user can set: the ladder then reads
+             the same on both themes whatever else has been recoloured. These
+             App-level values are the dark ones and the fallback for any window
+             that resolves before ApplyColorSettings has run. -->
+        <SolidColorBrush x:Key="ScrollThumbBrush" Color="#33FFFFFF"/>
+        <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#55FFFFFF"/>
+        <SolidColorBrush x:Key="ScrollThumbDragBrush" Color="#70FFFFFF"/>
         <Style x:Key="MinimalScrollBarThumb"
                 TargetType="Thumb">
             <Setter Property="Background"
-                    Value="#33FFFFFF"/>
+                    Value="{DynamicResource ScrollThumbBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
@@ -103,13 +115,13 @@
                                     Value="True">
                                 <Setter TargetName="ThumbBorder"
                                         Property="Background"
-                                        Value="#55FFFFFF"/>
+                                        Value="{DynamicResource ScrollThumbHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsDragging"
                                     Value="True">
                                 <Setter TargetName="ThumbBorder"
                                         Property="Background"
-                                        Value="#70FFFFFF"/>
+                                        Value="{DynamicResource ScrollThumbDragBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
