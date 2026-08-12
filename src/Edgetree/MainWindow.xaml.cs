@@ -11562,6 +11562,12 @@ public partial class MainWindow : Window
         }
 
         var data = new DataObject(DataFormats.FileDrop, dragPaths);
+        // Marks this drag as OURS, which is what lets Shift mean 이동 when it
+        // lands back in this tree (see TreeViewItem_Drop). Carried on the data
+        // object rather than in a field: a flag would have to be cleared on
+        // every way a drag can end, and the one time it was not, a file dragged
+        // in from Explorer would be moved instead of copied.
+        data.SetData(InternalDragFormat, true);
 
         // Source is the TreeView, NOT the TreeViewItem this started on. The
         // item is a virtualized, recycled container, and a background refresh
@@ -11596,6 +11602,35 @@ public partial class MainWindow : Window
             SetDropTarget(null);
         }
     }
+
+    // ----- Shift+드래그 = 이동 -------------------------------------------------
+    //
+    // Explorer MOVES on a same-drive drag. So dragging a row onto a folder here
+    // and finding the original still sitting where it was reads as a missing
+    // feature rather than as a safe default - even though 잘라내기+붙여넣기 has
+    // been here all along, in the row menu and on Ctrl+X/Ctrl+V.
+    //
+    // BEHIND SHIFT, NOT AS THE DEFAULT, and the reason is this app's own
+    // history. A click with a few pixels of travel already read as a drop once
+    // (see the micro-drag note in TreeViewItem_Drop). As a copy that mistake
+    // leaves a duplicate somebody notices; as a move it takes the file out of
+    // the folder being looked at, silently, and there is no undo anywhere in
+    // this app. A hand that slips four pixels is not also holding Shift, so
+    // gating on it makes every move deliberate. Nobody's existing gesture
+    // changes either - what was a copy yesterday is still a copy.
+    //
+    // THE DRAG OUT TO OTHER APPS IS UNTOUCHED, deliberately: DoDragDrop still
+    // offers Copy alone. Offering Move there is what made Explorer silently
+    // move on a same-drive drop, which is the surprise the note above the drag
+    // source records. The cost of keeping it that way is that the CURSOR still
+    // shows the copy badge while Shift is held - the effect the drop reports
+    // has to stay Copy for the outward case to stay safe - so the move is read
+    // from the key directly rather than from what the drag negotiated.
+    private const string InternalDragFormat = "Edgetree.InternalDrag";
+
+    private static bool IsMoveDrop(DragEventArgs e)
+        => (e.KeyStates & DragDropKeyStates.ShiftKey) != 0
+            && e.Data.GetDataPresent(InternalDragFormat);
 
     // Which folder a drop on this row lands in: the row itself when it's a
     // folder, otherwise the folder the file sits in. The file fallback is the
@@ -11711,10 +11746,36 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!FileOperationService.TryImportDroppedPaths(importablePaths, item.FullPath, ConfirmOverwrite, out var error))
+        string? error;
+        if (IsMoveDrop(e))
+        {
+            if (!FileOperationService.TryMoveDroppedPaths(
+                    importablePaths, item.FullPath, out var emptied, out error))
+            {
+                return;
+            }
+
+            // A move empties the folders the rows came FROM, and those may be
+            // open on screen - the destination refresh below would otherwise
+            // leave every moved row still sitting where it used to be. Exactly
+            // what 붙여넣기 does after a cut (see Paste_Click), including the
+            // search view, which holds rows of its own that now name nothing.
+            DropMovedSearchEntries(importablePaths);
+            foreach (string folder in emptied)
+            {
+                if (FindLoadedItemForPath(folder) is { ChildrenLoaded: true } source &&
+                    !ReferenceEquals(source, item))
+                {
+                    RefreshFolderPreservingState(source);
+                }
+            }
+        }
+        else if (!FileOperationService.TryImportDroppedPaths(
+                     importablePaths, item.FullPath, ConfirmOverwrite, out error))
         {
             return;
         }
+
         if (error is not null)
         {
             MessageBox.Show(this, error, Strings.ImportFailedTitle, MessageBoxButton.OK, MessageBoxImage.Warning);

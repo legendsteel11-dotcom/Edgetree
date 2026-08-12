@@ -341,6 +341,51 @@ public static class FileOperationService
         return true;
     }
 
+    // Shift+드래그. The MOVE half of the drop above, and deliberately NOT a
+    // second idea of what moving means: it goes through MoveEntry, the same
+    // call 잘라내기+붙여넣기 has always used. So a name that already exists
+    // numbers up to " (2)" rather than asking, a folder dropped into its own
+    // subtree is refused before anything is written, and a move across volumes
+    // copies in full BEFORE the source is removed.
+    //
+    // Only ever reached for a drag that started inside this app (see
+    // MainWindow's InternalDragFormat). A file dragged in from Explorer still
+    // copies whatever keys are held - taking someone's file out of a folder
+    // this app does not own is not a sidebar's business, and Explorer's own
+    // idea of who deletes the source in a cross-application move is not
+    // something to be guessing at.
+    //
+    // The source FOLDERS come back because a move empties them, and the tree
+    // may well have them open: refreshing only the destination would leave the
+    // rows that just left still sitting there.
+    public static bool TryMoveDroppedPaths(IReadOnlyList<string> sourcePaths, string destinationFolder,
+        out IReadOnlyList<string> emptiedFolders, out string? error)
+    {
+        error = null;
+        var folders = new List<string>();
+        foreach (string sourcePath in sourcePaths)
+        {
+            try
+            {
+                string? parent = Path.GetDirectoryName(sourcePath.TrimEnd(Path.DirectorySeparatorChar));
+                MoveEntry(sourcePath, destinationFolder);
+                if (parent is not null && !folders.Contains(parent, StringComparer.OrdinalIgnoreCase))
+                {
+                    folders.Add(parent);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // One item's failure is not the other five's - same rule the
+                // copy path beside this one follows.
+                error = ex.Message;
+            }
+        }
+
+        emptiedFolders = folders;
+        return true;
+    }
+
     // Pasting into a folder that already has an item with the same name
     // appends " (2)", " (3)", ... instead of overwriting. Shared with
     // ArchiveService so a second 압축 of the same row numbers up the same way
