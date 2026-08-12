@@ -927,6 +927,13 @@ public partial class MainWindow : Window
         SetBrushColor("ScrollThumbBrush", light ? "#33000000" : "#33FFFFFF");
         SetBrushColor("ScrollThumbHoverBrush", light ? "#55000000" : "#55FFFFFF");
         SetBrushColor("ScrollThumbDragBrush", light ? "#70000000" : "#70FFFFFF");
+        // The unlit chip's hover ink, one rung past the resting one. The chips
+        // rest at 0.65 of ForegroundText and hover already took that to full -
+        // a step small enough to miss in a strip of eight (2026-08-12), so the
+        // colour moves too. Toward the extreme on each theme rather than toward
+        // an accent: an accent would say "selected", which is the neighbouring
+        // state and the one thing this must not be confused with.
+        SetBrushColor("FooterChipHoverForeground", light ? "#FF16181C" : "#FFF2F4F8");
         SetBrushColor("ViewerBackground", light ? _settings.LightViewerBackgroundColorHex : _settings.ViewerBackgroundColorHex);
         SetBrushColor("HeaderBackground", light ? _settings.LightHeaderBackgroundColorHex : _settings.HeaderBackgroundColorHex);
         SetBrushColor("AutoHideHandleBackground", light ? _settings.LightAutoHideHandleColorHex : _settings.AutoHideHandleColorHex);

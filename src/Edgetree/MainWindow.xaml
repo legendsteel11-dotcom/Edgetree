@@ -191,6 +191,17 @@
                 Color="#55FFFFFF"/>
         <SolidColorBrush x:Key="ScrollThumbDragBrush"
                 Color="#70FFFFFF"/>
+        <!-- What an UNLIT chip's text becomes under the pointer. The chips rest
+             at 0.65 of ForegroundText and hover already took that to full, which
+             is a step the eye can miss in a strip of eight (2026-08-12) - so
+             hover changes the COLOUR as well, one rung past the resting ink
+             rather than a different hue. A lit chip never sees this: its own
+             trigger runs later and keeps the white it carries on its fill.
+             Theme-fixed and recoloured in ApplyColorSettings, like the scroll
+             thumb above and for the same reason - a pointer state has to read
+             the same however the palette has been set. -->
+        <SolidColorBrush x:Key="FooterChipHoverForeground"
+                Color="#FFF2F4F8"/>
         <!-- The image viewer panel's backdrop (AppSettings.
              ViewerBackgroundColorHex) - its own colour row in 색상 설정, so a
              photo can sit on near-black while the tree keeps its colour. -->
@@ -2672,6 +2683,13 @@
                                         Value="{DynamicResource TreeRowHoverBackground}"/>
                                 <Setter Property="Opacity"
                                         Value="1"/>
+                                <!-- Full ink was not enough of a step to notice
+                                     in a strip of eight (2026-08-12), so the
+                                     colour moves as well. The lit chip below
+                                     never sees this - its trigger runs later and
+                                     keeps its own white. -->
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource FooterChipHoverForeground}"/>
                             </Trigger>
                             <!-- Grey, not the tree's selection colour and not an
                                  accent: the lit chip has to stand out from the
@@ -2737,6 +2755,8 @@
                                         Value="{DynamicResource TreeRowHoverBackground}"/>
                                 <Setter Property="Opacity"
                                         Value="1"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource FooterChipHoverForeground}"/>
                             </Trigger>
                             <Trigger Property="IsChecked"
                                     Value="True">
@@ -2876,6 +2896,8 @@
                                         Value="{DynamicResource TreeRowHoverBackground}"/>
                                 <Setter Property="Opacity"
                                         Value="1"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource FooterChipHoverForeground}"/>
                             </Trigger>
                             <!-- A step that can't be taken (already at fit, or
                                  at 800%) stays visible and stops answering -
@@ -2929,6 +2951,8 @@
                                         Value="{DynamicResource TreeRowHoverBackground}"/>
                                 <Setter Property="Opacity"
                                         Value="1"/>
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource FooterChipHoverForeground}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled"
                                     Value="False">
