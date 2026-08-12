@@ -11,11 +11,13 @@ using Keyboard = System.Windows.Input.Keyboard;
 using TextBox = System.Windows.Controls.TextBox;
 using Key = System.Windows.Input.Key;
 using Color = System.Windows.Media.Color;
+using Cursors = System.Windows.Input.Cursors;
 using ColorConverter = System.Windows.Media.ColorConverter;
 // WinForms is referenced for the tray icon and Recycle Bin, and brings its own
 // Point/Brush - the picker below is the first code in this file to use either.
 using Point = System.Windows.Point;
 using Brush = System.Windows.Media.Brush;
+using Button = System.Windows.Controls.Button;
 
 namespace SidebarExplorer.App;
 
@@ -139,17 +141,16 @@ public partial class ColorSettingsWindow : Window
             RefreshHexBox(box);
         }
 
-        // The active mode's own button is disabled - nothing to switch to,
-        // and the 0.4-opacity disabled look doubles as the "you are here"
-        // marker without inventing a checked style. The dice go the other
-        // way (2026-08-09): only the theme being looked at can
-        // be rolled, so each zone has exactly one live button.
-        DarkModeButton.IsEnabled = _settings.IsLightMode;
-        LightModeButton.IsEnabled = !_settings.IsLightMode;
-        DarkRandomButton.IsEnabled = !_settings.IsLightMode;
-        LightRandomButton.IsEnabled = _settings.IsLightMode;
-        DarkDaringButton.IsEnabled = !_settings.IsLightMode;
-        LightDaringButton.IsEnabled = _settings.IsLightMode;
+        RefreshThemeToggles();
+
+        // The dice are simply live. They used to come in pairs, one per theme
+        // zone, and the inactive theme's pair was disabled - which meant two
+        // buttons in this row could never be pressed. With one pair there is
+        // nothing to gate: it rolls the theme being looked at, which is the
+        // only theme there has ever been to roll. They go dead for a moment
+        // after a roll, and that is LockRollButtons, not this.
+        RandomButton.IsEnabled = true;
+        DaringButton.IsEnabled = true;
         RefreshLabelPreviews();
         UpdateResetButtonEnabled();
     }
@@ -348,6 +349,69 @@ public partial class ColorSettingsWindow : Window
         _settings.IsLightMode = light;
         RefreshSwatches();
         _onChanged();
+        // Again, and deliberately - the stamp is painted from AccentForeground,
+        // which is a PER-THEME chrome brush that _onChanged is what swaps. The
+        // call inside RefreshSwatches above still holds the outgoing theme's
+        // blue, so without this the button that just lit up would wear the
+        // colour of the theme it came from.
+        RefreshThemeToggles();
+    }
+
+    // ----- 어느 쪽이 켜져 있는가 ---------------------------------------------
+    //
+    // 다크 모드 / 라이트 모드 are two ordinary buttons, and the one that is ON
+    // is stamped with the app's own blue - AccentForeground, the same brush the
+    // 앱 정보 and 도움말 windows use for their links. Reusing it means the app
+    // has one accent rather than one more invented here.
+    //
+    // Two earlier answers were tried and dropped the day this was built
+    // (2026-08-12): DISABLING the active button, where "you are here" was said
+    // by the 0.4 opacity and read as "unavailable" instead; and INVERTING its
+    // colours, which read as neither one thing nor the other.
+    //
+    // 선택 색 was the other candidate and is not used. It carries the right
+    // meaning - it is literally the colour this app marks a chosen thing with -
+    // but the user owns it, and its dark default #FF323438 is a near-black that
+    // would vanish into the button it is meant to fill. A roll can take it
+    // anywhere. The stamp has to be legible whatever the palette is doing.
+    private void RefreshThemeToggles()
+    {
+        PaintThemeToggle(DarkModeButton, on: !_settings.IsLightMode);
+        PaintThemeToggle(LightModeButton, on: _settings.IsLightMode);
+    }
+
+    // The ink over the blue is CHOSEN rather than fixed, because the accent is
+    // not the same blue in both themes: dark's #FF4FA8FF is light enough to
+    // want dark letters and light's #FF0969DA deep enough to want white ones.
+    // ContrastRatio already lives in this file for the random palettes, so the
+    // pick costs one line and follows the accent if it is ever retuned.
+    private static readonly Color ThemeToggleDarkInk = Color.FromRgb(0x1E, 0x1E, 0x1E);
+
+    private void PaintThemeToggle(Button button, bool on)
+    {
+        // The ON button takes no mouse. It is already that theme so there is
+        // nothing to press, and hover would paint its own fill over the fill
+        // that is doing the talking. IsHitTestVisible does both without the
+        // disabled look, which is the thing being got rid of here.
+        button.IsHitTestVisible = !on;
+        button.Cursor = on ? Cursors.Arrow : Cursors.Hand;
+
+        if (!on)
+        {
+            button.ClearValue(BackgroundProperty);
+            button.ClearValue(BorderBrushProperty);
+            button.ClearValue(ForegroundProperty);
+            return;
+        }
+
+        var accent = ((SolidColorBrush)FindResource("AccentForeground")).Color;
+        var fill = new SolidColorBrush(accent);
+        button.Background = fill;
+        button.BorderBrush = fill;
+        button.Foreground = new SolidColorBrush(
+            ContrastRatio(Colors.White, accent) >= ContrastRatio(ThemeToggleDarkInk, accent)
+                ? Colors.White
+                : ThemeToggleDarkInk);
     }
 
     // True only if every one of the current theme's 16 colors already
@@ -552,15 +616,15 @@ public partial class ColorSettingsWindow : Window
     // is covered without anyone remembering this exists.
     private Dictionary<string, string>? _preRandomSnapshot;
 
-    private void RandomDark_Click(object sender, RoutedEventArgs e) => ApplyRandomPalette(light: false);
+    // Both dice roll the theme being LOOKED AT. That was already the rule when
+    // there was a pair per theme - the inactive theme's pair was disabled - so
+    // collapsing them to one pair changed which buttons exist, not what a roll
+    // does.
+    private void Random_Click(object sender, RoutedEventArgs e)
+        => ApplyRandomPalette(light: _settings.IsLightMode);
 
-    private void RandomLight_Click(object sender, RoutedEventArgs e) => ApplyRandomPalette(light: true);
-
-    private void DaringDark_Click(object sender, RoutedEventArgs e)
-        => ApplyRandomPalette(light: false, daring: true);
-
-    private void DaringLight_Click(object sender, RoutedEventArgs e)
-        => ApplyRandomPalette(light: true, daring: true);
+    private void Daring_Click(object sender, RoutedEventArgs e)
+        => ApplyRandomPalette(light: _settings.IsLightMode, daring: true);
 
     // ----- 연타를 막는 짧은 잠금 ---------------------------------------------
     //
@@ -577,10 +641,8 @@ public partial class ColorSettingsWindow : Window
 
     private void LockRollButtons()
     {
-        DarkRandomButton.IsEnabled = false;
-        LightRandomButton.IsEnabled = false;
-        DarkDaringButton.IsEnabled = false;
-        LightDaringButton.IsEnabled = false;
+        RandomButton.IsEnabled = false;
+        DaringButton.IsEnabled = false;
 
         _rollLockTimer ??= CreateRollLockTimer();
         _rollLockTimer.Stop();

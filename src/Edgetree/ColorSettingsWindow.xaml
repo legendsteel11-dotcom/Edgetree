@@ -191,6 +191,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
     </Window.Resources>
 
     <Border x:Name="RootBorder"
@@ -243,106 +244,88 @@
                 </Button>
             </Grid>
 
-            <!-- The top splits into a dark zone and a light zone (the user's
-                 own design, 2026-08-09), replacing the single toggle that
-                 named the mode it would switch TO. Each zone names its own
-                 mode - the active one is disabled, which is also what marks
-                 it as "you are here" - and carries its own 랜덤 die at its
-                 right. The die rolls only the theme being LOOKED AT (the
-                 decided): the inactive zone's die is disabled with it,
-                 so each zone always has exactly one live button - switch
-                 there, or roll here. -->
+            <!-- Two buttons for the theme, one filled to say which is on, and
+                 one pair of dice.
+
+                 Why not a single toggle, which is the smaller control: a lone
+                 button that named the mode it would switch TO was ambiguous
+                 (2026-08-09) - "am I in dark, or does this make it dark?".
+                 Two buttons each naming their own mode answer that, and the
+                 fill answers which one you are in.
+
+                 What this replaced was two ZONES, each with its own pair of
+                 dice, of which one pair was ALWAYS disabled - an artefact of
+                 there being two zones rather than anything the user could act
+                 on. One pair remains and rolls whatever theme is being looked
+                 at, which was already the rule. Six buttons became four and
+                 none of them is permanently dead. -->
             <Grid Grid.Row="1"
                     Margin="16,12,16,0">
-                <!-- Per zone: the theme switch, its die, and the bolder die.
-                     The middle column is the gap between the two zones.
+                <!-- The two theme buttons, the gap, and the two dice.
 
-                     THE TWO SWITCHES ARE Auto, AND THAT IS THE WHOLE POINT.
-                     They were `*`, which does not mean "share the room" when
-                     there is not enough of it - a star column takes what is left
-                     and CLIPS whatever does not fit, while the dice beside them,
-                     being Auto, always take their full width first. So the row
-                     always cut the same thing: the only button in it carrying a
-                     word (2026-08-12, "Dark Mo…" at the small font sizes).
-
-                     Small font is exactly when it bites, because the window's
-                     width scales with the font (ColorDialogWidth = 390 × scale)
-                     while the padding inside it does not - the fixed 16/12/10/4
-                     pixels are the same at every size, so they eat a bigger
-                     share of a narrower window and the star columns are what
-                     pays. The gap became `*` for the same reason: it is the one
-                     thing in the row that CAN give its pixels back. -->
+                     EVERY BUTTON IS Auto AND THE GAP IS THE `*`. A star column
+                     does not mean "share the room" when there is not enough of
+                     it - it takes what is left and CLIPS whatever does not fit,
+                     while an Auto neighbour takes its full width first. So when
+                     the switches were `*` the row always cut the same thing: the
+                     only buttons in it carrying words (2026-08-12, "Dark Mo…" at
+                     the small font sizes). The gap is the one thing here that
+                     can give its pixels back, so the gap is what gives. -->
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*" MinWidth="12"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
+                <!-- Two ordinary buttons of this window's one button style,
+                     and the ON one is stamped in the app's blue - painted in
+                     RefreshThemeToggles, which is also where the reasoning is.
+                     A joined segmented control was tried here first and did not
+                     read as a control anyone recognised, so the two went back
+                     to looking like the buttons they are.
+
+                     They carry their own Padding because the style sets none
+                     and these two are the only buttons in the window that
+                     never did: they used to sit in `*` columns, which stretched
+                     them wide enough that the missing padding never showed. -->
                 <Button x:Name="DarkModeButton"
                         Content="{x:Static services:Strings.ColorThemeDarkMode}"
                         Style="{StaticResource DialogButtonStyle}"
+                        Padding="10,0"
                         Click="DarkMode_Click"/>
-                <Button x:Name="DarkRandomButton"
+                <Button x:Name="LightModeButton"
                         Grid.Column="1"
+                        Content="{x:Static services:Strings.ColorThemeLightMode}"
+                        Style="{StaticResource DialogButtonStyle}"
+                        Padding="10,0"
+                        Margin="6,0,0,0"
+                        Click="LightMode_Click"/>
+                <Button x:Name="RandomButton"
+                        Grid.Column="3"
                         Content="{x:Static services:Strings.ButtonRandomColors}"
                         Style="{StaticResource DialogButtonStyle}"
                         Padding="10,0"
-                        Margin="4,0,0,0"
                         ToolTip="{x:Static services:Strings.ButtonRandomColorsTip}"
-                        Click="RandomDark_Click"/>
+                        Click="Random_Click"/>
                 <!-- The bolder roll, beside the ordinary one rather than
                      replacing it: the quiet die is worth keeping because its
                      small differences are exactly what shows up differently on
                      someone else's monitor, which is the point of rolling at
                      all. This one starts from a primary hue and lifts the
-                     saturation ceilings - same readability floors.
-
-                     A short WORD, not a drawn mark: every other button in this
-                     window is text, and a hand-drawn shape here would be the
-                     only one of its kind. A Material glyph replaces it the
-                     moment there is one to use. -->
-                <Button x:Name="DarkDaringButton"
-                        Grid.Column="2"
+                     saturation ceilings - same readability floors. -->
+                <Button x:Name="DaringButton"
+                        Grid.Column="4"
                         Style="{StaticResource DialogButtonStyle}"
                         Padding="9,0"
                         Margin="4,0,0,0"
                         ToolTip="{x:Static services:Strings.ButtonDaringColorsTip}"
-                        Click="DaringDark_Click">
+                        Click="Daring_Click">
                     <!-- Material Symbols "palette" (2026-08-11). The one mark
                          in this window, and it earns that: the button beside it
                          is a word for the ordinary die, and this one is the
                          odd, deliberate thing - which is what a picture says
                          faster than "원색" did. -->
-                    <Path Data="M480-96q-79 0-149-30t-122.5-82.5Q156-261 126-331T96-480q0-80 30.5-149.5t84-122Q264-804 335.5-834T488-864q78 0 146.5 27T754-763q51 47 80.5 110T864-518q0 96-67 163t-163 67h-68q-8 0-14 5t-6 13q0 15 15 25t15 53q0 37-27 66.5T480-96Zm0-384Zm-173.5 18.5Q324-479 324-504t-17.5-42.5Q289-564 264-564t-42.5 17.5Q204-529 204-504t17.5 42.5Q239-444 264-444t42.5-17.5Zm120-144Q444-623 444-648t-17.5-42.5Q409-708 384-708t-42.5 17.5Q324-673 324-648t17.5 42.5Q359-588 384-588t42.5-17.5Zm192 0Q636-623 636-648t-17.5-42.5Q601-708 576-708t-42.5 17.5Q516-673 516-648t17.5 42.5Q551-588 576-588t42.5-17.5Zm120 144Q756-479 756-504t-17.5-42.5Q721-564 696-564t-42.5 17.5Q636-529 636-504t17.5 42.5Q671-444 696-444t42.5-17.5ZM480-168q11 0 17.5-8.5T504-192q0-16-15-28t-15-50q0-38 26.5-64t64.5-26h69q66 0 112-46t46-112q0-115-88.5-194.5T488-792q-134 0-227 91t-93 221q0 130 91 221t221 91Z"
-                            Stretch="Uniform"
-                            Width="{DynamicResource DialogFontSize}"
-                            Height="{DynamicResource DialogFontSize}"
-                            Fill="{Binding Foreground,
-                                RelativeSource={RelativeSource AncestorType=Button}}"/>
-                </Button>
-                <Button x:Name="LightModeButton"
-                        Grid.Column="4"
-                        Content="{x:Static services:Strings.ColorThemeLightMode}"
-                        Style="{StaticResource DialogButtonStyle}"
-                        Click="LightMode_Click"/>
-                <Button x:Name="LightRandomButton"
-                        Grid.Column="5"
-                        Content="{x:Static services:Strings.ButtonRandomColors}"
-                        Style="{StaticResource DialogButtonStyle}"
-                        Padding="10,0"
-                        Margin="4,0,0,0"
-                        ToolTip="{x:Static services:Strings.ButtonRandomColorsTip}"
-                        Click="RandomLight_Click"/>
-                <Button x:Name="LightDaringButton"
-                        Grid.Column="6"
-                        Style="{StaticResource DialogButtonStyle}"
-                        Padding="9,0"
-                        Margin="4,0,0,0"
-                        ToolTip="{x:Static services:Strings.ButtonDaringColorsTip}"
-                        Click="DaringLight_Click">
                     <Path Data="M480-96q-79 0-149-30t-122.5-82.5Q156-261 126-331T96-480q0-80 30.5-149.5t84-122Q264-804 335.5-834T488-864q78 0 146.5 27T754-763q51 47 80.5 110T864-518q0 96-67 163t-163 67h-68q-8 0-14 5t-6 13q0 15 15 25t15 53q0 37-27 66.5T480-96Zm0-384Zm-173.5 18.5Q324-479 324-504t-17.5-42.5Q289-564 264-564t-42.5 17.5Q204-529 204-504t17.5 42.5Q239-444 264-444t42.5-17.5Zm120-144Q444-623 444-648t-17.5-42.5Q409-708 384-708t-42.5 17.5Q324-673 324-648t17.5 42.5Q359-588 384-588t42.5-17.5Zm192 0Q636-623 636-648t-17.5-42.5Q601-708 576-708t-42.5 17.5Q516-673 516-648t17.5 42.5Q551-588 576-588t42.5-17.5Zm120 144Q756-479 756-504t-17.5-42.5Q721-564 696-564t-42.5 17.5Q636-529 636-504t17.5 42.5Q671-444 696-444t42.5-17.5ZM480-168q11 0 17.5-8.5T504-192q0-16-15-28t-15-50q0-38 26.5-64t64.5-26h69q66 0 112-46t46-112q0-115-88.5-194.5T488-792q-134 0-227 91t-93 221q0 130 91 221t221 91Z"
                             Stretch="Uniform"
                             Width="{DynamicResource DialogFontSize}"
