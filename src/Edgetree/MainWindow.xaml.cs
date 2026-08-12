@@ -18472,10 +18472,19 @@ public partial class MainWindow : Window
     // transport said "playing" and the clock said 0:00. On a cold share that is
     // seconds, and it is indistinguishable from a file that will never open.
     //
-    // NOTHING IS ABORTED. A slow open is still an open, and a guard that gave
-    // up on it would be killing the case it was built for - the same rule the
-    // drive-offline watch already follows ("one slow read is not a dead
-    // drive"). The long wait gets a longer sentence, not a cancellation.
+    // A SLOW OPEN IS STILL AN OPEN, and for the first half-minute nothing is
+    // aborted - the same rule the drive-offline watch follows ("one slow read
+    // is not a dead drive"). The long wait gets a longer sentence, not a
+    // cancellation.
+    //
+    // PAST THAT IT DOES GIVE UP (2026-08-13). This used to wait forever on the
+    // argument above, and forever is the wrong end of it:
+    // a share that has not answered in thirty seconds is not slow, and the
+    // panel sitting on "여는 중…" indefinitely holds the file open, keeps the
+    // transport claiming to play, and leaves no way back but pressing stop on
+    // something that never started. Other players settle this the same way -
+    // wait at the front, then hand the screen back with a message. The way to
+    // retry is the play button, which is where it already was.
     private System.Windows.Threading.DispatcherTimer? _viewerOpeningTimer;
     private long _viewerOpeningStartedAt;
     private bool _viewerMediaOpening;
@@ -18486,6 +18495,12 @@ public partial class MainWindow : Window
     // Past this it is worth saying that the wait is not normal, without
     // claiming anything has failed.
     private const int ViewerOpeningSlowMs = 5000;
+    // And past THIS the wait itself is the failure. Deliberately far out: a
+    // sleeping NAS drive can take fifteen seconds just to spin up and answer,
+    // and giving up on one of those would be exactly the mistake the comment
+    // above warns against. Thirty seconds is past anything that was going to
+    // work, and still short enough that nobody is left staring at it.
+    private const int ViewerOpeningGiveUpMs = 30000;
 
     private void StartViewerOpeningWatch()
     {
@@ -18533,9 +18548,31 @@ public partial class MainWindow : Window
 
         double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - _viewerOpeningStartedAt)
             * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        if (ms >= ViewerOpeningGiveUpMs)
+        {
+            GiveUpViewerOpening();
+            return;
+        }
+
         SetViewerPlaybackStatus(ms >= ViewerOpeningSlowMs
             ? Strings.ViewerMediaOpeningSlow
             : Strings.ViewerMediaOpening);
+    }
+
+    // Hands the screen back: the source is released (which also releases the
+    // lock the file was held under), the element goes away and the still the
+    // panel was already showing comes back, so the panel looks the way it did
+    // before play was pressed.
+    private void GiveUpViewerOpening()
+    {
+        // Same device MediaFailed uses, so the block says why it ended rather
+        // than closing with the word a user pressing stop produces.
+        _videoLogEndReason = $"GAVE UP opening after {ViewerOpeningGiveUpMs / 1000}s";
+        StopViewerVideo();
+        // AFTER the stop, not before: StopViewerVideo clears the status line on
+        // its way through StopViewerOpeningWatch, so a message set first would
+        // be wiped by the very call meant to leave it standing.
+        SetViewerPlaybackStatus(Strings.ViewerMediaOpenGaveUp);
     }
 
     private void StopViewerOpeningWatch()

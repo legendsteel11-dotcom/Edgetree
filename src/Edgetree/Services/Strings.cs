@@ -403,6 +403,10 @@ public static class Strings
     // Nothing has failed and nothing is being cancelled; the wait is just
     // longer than a wait usually is, and saying so beats a still picture.
     public static string ViewerMediaOpeningSlow = "여는 중… 조금 오래 걸리고 있습니다";
+    // The wait ended without an open. Says what happened and leaves it there -
+    // the play button is right beside the line, so telling the reader to press
+    // it would be naming a control they are already looking at.
+    public static string ViewerMediaOpenGaveUp = "응답이 없어 재생을 취소했습니다";
     // Playing, but the picture has stopped moving - the file is not arriving
     // fast enough to decode. Named for the cause rather than for the symptom.
     public static string ViewerMediaStalled = "파일을 기다리는 중…";
@@ -854,6 +858,7 @@ public static class Strings
         ViewerHdrContrast = "  Contrast";
         ViewerMediaOpening = "Opening…";
         ViewerMediaOpeningSlow = "Opening… this is taking a while";
+        ViewerMediaOpenGaveUp = "No response — playback cancelled";
         ViewerMediaStalled = "Waiting for the file…";
         ViewerPlay = "Play";
         ViewerPause = "Pause";
