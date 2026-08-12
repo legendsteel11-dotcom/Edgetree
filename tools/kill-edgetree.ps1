@@ -1,11 +1,15 @@
 # Ends the running debug app so a build can replace its exe.
 #
-# Asks it to CLOSE first and only kills what refuses to go. That distinction
-# matters more than it looks: most settings are written to disk on the way out
-# (see MainWindow's own note - only colours, language and bookmarks save
-# immediately), so a forced kill silently rolls back whatever the user changed
-# since launch. It happened on 2026-07-23 with colours and again on 2026-07-28
-# with option-menu settings, both times because a build killed the app mid-day.
+# Asks it to CLOSE first and only kills what refuses to go.
+#
+# That distinction used to be the difference between keeping and losing a day's
+# settings: everything from the options menu was held in memory and written only
+# on the way out, so a forced kill rolled it all back. It happened on 2026-07-23
+# with colours and again on 2026-07-28 with option-menu settings, both times
+# because a build killed the app mid-day. Since 2026-08-12 every options-menu
+# toggle writes as it is clicked, so what a forced kill can still cost is the
+# window's own geometry and the expanded/selected state - which MainWindow_Closing
+# is the only thing that writes. Worth keeping the polite close for that alone.
 #
 # It also stamps exit.log either way, so a build's ending is never mistaken for
 # the app disappearing on its own - which is the whole point of that log.

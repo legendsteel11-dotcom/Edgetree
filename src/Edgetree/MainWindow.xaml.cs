@@ -7539,6 +7539,7 @@ public partial class MainWindow : Window
         // Kept in step for older builds reading this file - see AppSettings.
         _settings.SortByDate = parsed == FileSortField.Date;
         FileSystemService.SortField = parsed;
+        _settingsService.Save(_settings);
         RefreshAllLoadedFolders();
     }
 
@@ -7551,6 +7552,7 @@ public partial class MainWindow : Window
 
         _settings.SortDescending = direction == "desc";
         FileSystemService.SortDescending = _settings.SortDescending;
+        _settingsService.Save(_settings);
         RefreshAllLoadedFolders();
     }
 
@@ -8083,9 +8085,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Flushes to disk on close with the rest of the settings, same as the
-        // other toggles - no explicit save here.
         _settings.UseShellIcons = useShellIcons;
+        _settingsService.Save(_settings);
         ShellIconService.UseShellIcons = useShellIcons;
         ApplyIconStyle();
     }
@@ -8286,6 +8287,7 @@ public partial class MainWindow : Window
         if (sender is MenuItem menuItem)
         {
             _settings.AutoCollapseFolders = menuItem.IsChecked;
+            _settingsService.Save(_settings);
         }
     }
 
@@ -8300,6 +8302,7 @@ public partial class MainWindow : Window
             // can never be reached by the mouse again. ApplyTopmostState owns
             // that rule (and the writing-through problem) for every caller.
             ApplyTopmostState("always-on-top toggle");
+            _settingsService.Save(_settings);
         }
     }
 
@@ -8309,6 +8312,7 @@ public partial class MainWindow : Window
         {
             _settings.StartWithWindows = menuItem.IsChecked;
             SetStartWithWindows(menuItem.IsChecked);
+            _settingsService.Save(_settings);
         }
     }
 
@@ -8321,6 +8325,8 @@ public partial class MainWindow : Window
             {
                 app.IsTrayIconVisible = menuItem.IsChecked;
             }
+
+            _settingsService.Save(_settings);
         }
     }
 
@@ -8329,6 +8335,7 @@ public partial class MainWindow : Window
         if (sender is MenuItem menuItem)
         {
             _settings.ShowFolderIcons = menuItem.IsChecked;
+            _settingsService.Save(_settings);
             ApplyFolderIconVisibility();
             // The tree follows this through a resource; the bookmark panel does
             // not - its rows read the two toggles when they are BUILT and store
@@ -8345,6 +8352,7 @@ public partial class MainWindow : Window
         if (sender is MenuItem menuItem)
         {
             _settings.ShowFileIcons = menuItem.IsChecked;
+            _settingsService.Save(_settings);
             ApplyFileIconVisibility();
             // See the folder toggle above.
             RefreshBookmarkPanelIfShowing();
@@ -8356,6 +8364,7 @@ public partial class MainWindow : Window
         if (sender is MenuItem menuItem)
         {
             _settings.ShowPanelDividers = menuItem.IsChecked;
+            _settingsService.Save(_settings);
             // Through the whole colour pass rather than the one brush: it is the
             // path that already knows which theme's hex to read, and it is cheap
             // enough that having two ways to reach a brush would be the more
@@ -8369,6 +8378,7 @@ public partial class MainWindow : Window
         if (sender is MenuItem menuItem)
         {
             _settings.HideTitleBarTitle = menuItem.IsChecked;
+            _settingsService.Save(_settings);
             ApplyTitleTextVisibility();
         }
     }
@@ -8407,6 +8417,7 @@ public partial class MainWindow : Window
         }
 
         _settings.ViewerPrecacheThumbnails = menuItem.IsChecked;
+        _settingsService.Save(_settings);
         // Switching it ON starts on the folder already open rather than waiting
         // for the next one; switching it OFF stops the walk but keeps whatever
         // has already been fetched, since throwing that away would only mean
@@ -9003,6 +9014,7 @@ public partial class MainWindow : Window
         if (sender is MenuItem menuItem)
         {
             _settings.FavoritesAtBottom = menuItem.IsChecked;
+            _settingsService.Save(_settings);
             ApplyFavoritesPosition();
         }
     }
@@ -9447,6 +9459,7 @@ public partial class MainWindow : Window
         if (sender is MenuItem menuItem)
         {
             _settings.DockOnRight = menuItem.IsChecked;
+            _settingsService.Save(_settings);
             UpdateResizeThumbVisibility();
             UpdatePinButtonVisibility();
             if (_isDocked)
@@ -9496,6 +9509,7 @@ public partial class MainWindow : Window
         if (sender is MenuItem menuItem)
         {
             _settings.AutoHideCloseOnMouseLeave = menuItem.IsChecked;
+            _settingsService.Save(_settings);
 
             // Both directions have to be handled while the sidebar is already
             // revealed. Switching away from click-outside mode should stop the
