@@ -26,13 +26,13 @@ export const changelog: ChangelogEntry[] = [
     version: 'v2.0.0',
     ko: [
       '이미지 뷰어가 사이드바 안에 들어왔습니다 — 사진·영상·음악을 그 자리에서',
-      '필름스트립으로 폴더를 훑고, 클릭 한 번으로 그 파일 자리에 섭니다',
+      '썸네일 바로 폴더를 훑고, 클릭 한 번으로 그 파일 자리에 섭니다',
       '지나온 자리를 되짚는 트리 히스토리 (Ctrl+←, Ctrl+→)',
       '자주 쓰는 배치를 프리셋 다섯 개로 저장해 두고 바꿔 씁니다',
     ],
     en: [
       'An image viewer now lives inside the sidebar — photos, video and music in place',
-      'Skim a folder on the filmstrip, and one click puts you on that file',
+      'Skim a folder on the thumbnail bar, and one click puts you on that file',
       'Step back through where you have been (Ctrl+←, Ctrl+→)',
       'Keep five layouts as presets and switch between them',
     ],
