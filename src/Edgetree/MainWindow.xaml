@@ -2177,18 +2177,16 @@
 
         <Style x:Key="ExplorerTreeViewItemStyle"
                 TargetType="TreeViewItem">
-            <!-- Blocks the root TreeView's deliberately huge CacheLength (see
-                 ExplorerTree) from inheriting down here. That cache exists only
-                 to keep the handful of drive-root containers always realized;
-                 a folder can hold up to DisplayCap children - many more once
-                 "더 보기" is used - and has never had the realization problem
-                 the root had, so it keeps WPF's normal one-page-either-side
-                 caching. A local value beats an inherited one, which is what
-                 makes this work. -->
-            <Setter Property="VirtualizingPanel.CacheLengthUnit"
-                    Value="Page"/>
-            <Setter Property="VirtualizingPanel.CacheLength"
-                    Value="1,1"/>
+            <!-- CacheLength/CacheLengthUnit setters used to sit here, to keep
+                 the root TreeView's huge cache from inheriting down to a
+                 folder. They were removed 2026-08-12 because they never did
+                 that: a local value does beat an inherited one, but a nested
+                 virtualizing panel takes its cache length from the
+                 HierarchicalVirtualizationConstraints its PARENT panel hands
+                 it, not from the property. Measured - the local property read
+                 "1,1 Page" while the folder held 1,057 realized rows to the
+                 handed "1000,1000 Item". Putting them back would only restore
+                 the appearance of a limit; see ExplorerTree's comment. -->
             <Setter Property="IsExpanded"
                     Value="{Binding IsExpanded, Mode=TwoWay}"/>
             <!-- Vertical padding scales with the TreeView's FontSize AND the
@@ -4563,38 +4561,50 @@
                  few coarse steps and scroll offsets were meaningless as
                  pixels. Pixel makes the extent the actual rendered height.
 
-                 CacheLength="1000,1000" with CacheLengthUnit="Item" is what
-                 fixes favorites navigation to a DIFFERENT drive. Temporary
-                 diagnostic logging finally pinned it down: the walk was
-                 failing at its very first step, on the drive root itself -
-                 e.g. "step[0] 'E:' containerFound=False" repeated until it
-                 gave up - while every deeper step succeeded on its first try.
-                 With C: expanded to ~2165px and the viewport only ~432px tall
-                 scrolled to ~595px, the E: row sits ~2165px down, far outside
-                 the default cache (one viewport-page either side), so its
-                 container was never realized and ContainerFromItem returned
-                 null forever. That is the real reason this only reproduced in
-                 floating mode (short viewport -> small cache) and got better
-                 as the per-folder display cap shrank (shorter C: -> E: closer)
-                 - a hard structural miss, not the timing flake several earlier
-                 rounds of retry-tuning assumed. There are only ever a handful
-                 of drive roots, so caching "all of them" costs nothing.
+                 CacheLength WAS "1000,1000" with CacheLengthUnit="Item", to
+                 fix favorites navigation to a DIFFERENT drive: the walk failed
+                 at its very first step, on the drive root itself - "step[0]
+                 'E:' containerFound=False" until it gave up - because with C:
+                 expanded taller than the viewport the E: row sits far outside
+                 the default one-page cache, so ContainerFromItem returned null
+                 for ever. Caching every drive root made it moot, and there are
+                 only ever a handful of those, so it read as free.
 
-                 Both are deliberately blocked from inheriting down to
-                 individual folders - see ExplorerTreeViewItemStyle, which
-                 re-sets CacheLength locally. Folders keep normal caching:
-                 they were never the problem (the log proves it), and letting
-                 a "reveal everything" cache reach a folder someone expanded
-                 via "더 보기" would realize hundreds of rows for no reason. -->
+                 IT WAS NOT FREE, AND IT REACHED FOLDERS. The value inherits,
+                 and a nested panel does not read the attached property at all:
+                 the parent panel hands each expanded container a
+                 HierarchicalVirtualizationConstraints, and the cache length in
+                 there is the parent's. Measured 2026-08-12 with both readings
+                 side by side on a 2,405-item folder:
+
+                   folder 1057 realized of 2405
+                   local 1,1 Page   panel 1,1 Page
+                   handed 1000,1000 Item   root 1000,1000 Item
+
+                 So ExplorerTreeViewItemStyle's local re-set applied perfectly
+                 and changed nothing, and a folder held 1,000 rows either side
+                 of a 30-row viewport - which is the UI stall: realising +1000
+                 rows costs 900-1900ms, and scrolling a big folder ran to 5.4
+                 SECONDS in one step. Lowering the local number could never
+                 have helped; the root's value is the only one anybody reads.
+
+                 The drive-root miss is now fixed where it happens instead:
+                 both walks call BringIndexIntoViewPublic on the items host
+                 when a container is missing (RevealChainStep,
+                 SelectVisibleItemStep), which realises the row on demand at
+                 ANY level, root included. That fallback did not exist when the
+                 cache was added. IF FAVORITES NAVIGATION TO ANOTHER DRIVE EVER
+                 BREAKS AGAIN, look there first - not here. -->
             <!-- VirtualizationMode is Standard, not Recycling. Recycling reuses
                  row containers as they scroll out of view, and a reused
                  container whose visual fails to refresh renders as a blank gap
                  - one candidate for the reported "rows disappear from the
-                 middle of the tree until I click something". The saving it
-                 offers is small here regardless, since CacheLength already
-                 keeps a thousand containers alive. This is a SEPARATE setting
-                 from CacheLength below; that one fixes favorites navigation and
-                 must stay as it is.
+                 middle of the tree until I click something". This is a
+                 SEPARATE setting from CacheLength below. It was left alone
+                 while that cache kept a thousand containers alive and made the
+                 saving irrelevant; now that the cache is back to one page,
+                 Recycling is worth measuring again - against the blank-row
+                 symptom above, which is why it was refused.
 
                  Also note: do NOT "fix" this by setting IsVirtualizing=False
                  here. That was tried; it silently un-virtualizes the ENTIRE
@@ -4625,8 +4635,8 @@
                       VirtualizingPanel.IsVirtualizing="True"
                       VirtualizingPanel.VirtualizationMode="Standard"
                       VirtualizingPanel.ScrollUnit="Item"
-                      VirtualizingPanel.CacheLengthUnit="Item"
-                      VirtualizingPanel.CacheLength="1000,1000"
+                      VirtualizingPanel.CacheLengthUnit="Page"
+                      VirtualizingPanel.CacheLength="1,1"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                       MouseDoubleClick="ExplorerTree_MouseDoubleClick"
                       PreviewMouseLeftButtonDown="ExplorerTree_PreviewMouseLeftButtonDown"
