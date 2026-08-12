@@ -6318,13 +6318,28 @@
                              when it is darker than everything around it, and
                              this one is lighter. Hover just makes the plate more
                              solid; nothing moves or grows. -->
+                        <!-- TWO MARKS, ONE SHOWING. The disc says which of the
+                             two states the file under it is in, and Tag is what
+                             picks (UpdateViewerPlayOverlay). Two shapes toggled
+                             rather than one Data swapped: the same arrangement
+                             the transport's own play/pause uses, and it keeps
+                             both geometries where they can be compared.
+
+                             The pause bars share the triangle's box - 18 to 46
+                             tall, centred on 32 - so the mark does not appear to
+                             jump or resize as the state changes under it. -->
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Grid>
                                     <Ellipse x:Name="Plate"
                                             Fill="#B0FFFFFF"/>
-                                    <Path Data="M 24,18 L 44,32 L 24,46 Z"
+                                    <Path x:Name="PlayMark"
+                                            Data="M 24,18 L 44,32 L 24,46 Z"
                                             Fill="#C0000000"/>
+                                    <Path x:Name="PauseMark"
+                                            Data="M24,18 H30 V46 H24 Z M34,18 H40 V46 H34 Z"
+                                            Fill="#C0000000"
+                                            Visibility="Collapsed"/>
                                 </Grid>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver"
@@ -6332,6 +6347,15 @@
                                         <Setter TargetName="Plate"
                                                 Property="Fill"
                                                 Value="#D8FFFFFF"/>
+                                    </Trigger>
+                                    <Trigger Property="Tag"
+                                            Value="pause">
+                                        <Setter TargetName="PlayMark"
+                                                Property="Visibility"
+                                                Value="Collapsed"/>
+                                        <Setter TargetName="PauseMark"
+                                                Property="Visibility"
+                                                Value="Visible"/>
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
@@ -7051,7 +7075,13 @@
                                  painted with it - and fading the border would
                                  take the controls down with it. Here the
                                  opacity lands on the plate alone. -->
-                            <Border Background="{DynamicResource HoverBackground}"
+                            <!-- The opacity is set from code as well: it goes up
+                                 while the transport is holding a file the panel
+                                 is not showing, so the band reads as belonging
+                                 to something else. See UpdateViewerNowPlaying.
+                                 The value here is the resting one. -->
+                            <Border x:Name="ViewerMediaPlate"
+                                    Background="{DynamicResource HoverBackground}"
                                     CornerRadius="6"
                                     Opacity="0.3"/>
                         <StackPanel x:Name="ViewerMediaContent"

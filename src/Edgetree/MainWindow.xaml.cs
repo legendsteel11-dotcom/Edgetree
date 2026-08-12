@@ -17686,6 +17686,54 @@ public partial class MainWindow : Window
     private bool IsViewerMediaLoaded(string path)
         => string.Equals(_viewerVideoPath, path, StringComparison.OrdinalIgnoreCase);
 
+    // ----- 그림 위의 재생 버튼 -----------------------------------------------
+    //
+    // THE FILE ON SCREEN DECIDES IT, NOT THE TRANSPORT. The disc belongs to the
+    // picture under it and says which of two states that particular file is in:
+    // a triangle for one nobody is playing, two bars for the one that is.
+    //
+    // THIS REVERSES THE RULE IT REPLACED (2026-08-12). Background play used to
+    // hide the button, reasoning that a play mark over a picture that is not
+    // the one being heard would offer to start the wrong thing. The user's
+    // reading is the better one: the picture is what THEY chose, so the offer
+    // belongs to it, and without the mark nothing on the picture says it is not
+    // the thing making the sound. Before it is started, a track is an album art
+    // image; this is what tells the two apart.
+    //
+    // AND THE PAUSE MARK IS WHY IT CANNOT JUST BE "SHOWN OR HIDDEN". Two tracks
+    // off one album are the SAME still image whether they are sounding or not,
+    // so an absent button says nothing there - it reads as the state the other
+    // eleven tracks are in. The mark has to name the state, not merely exist.
+    //
+    // A FILM IS EXEMPT AND SHOWS NOTHING WHILE IT PLAYS. It is moving, so it is
+    // already saying it, and a disc parked over playing footage is in the way of
+    // the one thing the panel is there to show. The confusion this fixes cannot
+    // happen to a film.
+    //
+    // The playable guard is new too: the old rule never showed the button while
+    // the panel and the transport had come apart, and now that it does, the
+    // picture on screen may be a photograph.
+    private void UpdateViewerPlayOverlay()
+    {
+        if (_pendingViewerPath is not { } shown || !IsViewerPlayable(shown))
+        {
+            ViewerPlayOverlay.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        bool playingThis = _viewerVideoPlaying && ViewerMediaIsSelection;
+        if (playingThis && !IsViewerAudio(shown))
+        {
+            ViewerPlayOverlay.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // Read by the template's own trigger - see the two marks there.
+        ViewerPlayOverlay.Tag = playingThis ? "pause" : "play";
+        ViewerPlayOverlay.ToolTip = playingThis ? Strings.ViewerPause : Strings.ViewerPlay;
+        ViewerPlayOverlay.Visibility = Visibility.Visible;
+    }
+
     // ----- 백그라운드 재생 ---------------------------------------------------
     //
     // Sound outliving the selection, so music can be put on and then left
@@ -17741,11 +17789,38 @@ public partial class MainWindow : Window
     private void UpdateViewerNowPlaying()
     {
         bool detached = _viewerVideoPath is not null && !ViewerMediaIsSelection;
-        ViewerNowPlaying.Visibility = detached ? Visibility.Visible : Visibility.Collapsed;
+        // HIDDEN, NOT COLLAPSED, WHILE A TRACK IS ON SCREEN. One line of text
+        // is a large fraction of a sidebar's picture area: album art came out
+        // visibly bigger the moment this line went away, so pressing play on the
+        // track you were looking at while another one played made the cover jump
+        // (reported with two screenshots, 2026-08-12). The line keeps its place
+        // whether or not it has anything to say, and the whole band - reserved
+        // strip, transport, this line - is then one height in every state a
+        // track can be in.
+        //
+        // A FILM GETS THE COLLAPSE, because a film can never be in the state
+        // this line exists for: background play is sound only, so the transport
+        // and the picture cannot come apart. Reserving it there would be a line
+        // of the picture given up for something that cannot happen.
+        ViewerNowPlaying.Visibility = detached
+            ? Visibility.Visible
+            : _pendingViewerPath is { } shown && IsViewerAudio(shown)
+                ? Visibility.Hidden
+                : Visibility.Collapsed;
         if (detached && _viewerVideoPath is { } path)
         {
             ViewerNowPlaying.Text = Path.GetFileName(path);
         }
+
+        // AND THE PLATE UNDER IT LIFTS. Once the band stops belonging to the
+        // picture above it, the name alone was carrying that on its own, and a
+        // line of text is easy to read past. The plate is already a wash of the
+        // panel's own hover ink, so strengthening it says "this part is about
+        // something else" without introducing a colour - and it comes back down
+        // by itself the moment the two are the same file again.
+        ViewerMediaPlate.Opacity = detached
+            ? ViewerMediaPlateDetachedOpacity
+            : ViewerMediaPlateOpacity;
 
         // Attaching and detaching CHANGES THE LIST the track buttons walk -
         // ViewerPlaybackSiblings answers with the panel's list or the playing
@@ -18930,7 +19005,81 @@ public partial class MainWindow : Window
     private bool _fittingViewerMediaRow;
 
     private void ViewerMediaBar_SizeChanged(object sender, SizeChangedEventArgs e)
-        => FitViewerMediaRow();
+    {
+        // Kept for the band a track's album art reserves in its place - see
+        // ViewerTransportBandHeight. Recorded whenever the real thing is on
+        // screen, so the reserve follows a font change without being told.
+        //
+        // Only while the 재생 중 line is holding its place, which is to say only
+        // while the transport belongs to a TRACK. A film's transport is one line
+        // shorter, and recording that height would leave the next track's art
+        // reserving too little and jumping after all.
+        if (ViewerMediaBar.DesiredSize.Height > 0 &&
+            ViewerNowPlaying.Visibility != Visibility.Collapsed)
+        {
+            _viewerTransportBandHeight = ViewerMediaBar.DesiredSize.Height;
+        }
+
+        FitViewerMediaRow();
+    }
+
+    // ----- 재생을 눌러도 그림이 움직이지 않게 --------------------------------
+    //
+    // The zoom strip and the transport TAKE TURNS in the same place, and they
+    // are not the same height - the transport is a plate with margins of its
+    // own. For a picture that hardly matters: the strip is up the whole time
+    // one is on screen. For a TRACK it is the whole difference, because
+    // pressing play swaps one for the other and the album art above resizes to
+    // whatever room is left (reported 2026-08-12).
+    //
+    // So a track's art holds the transport's band open before there is a
+    // transport. The strip is Hidden rather than Collapsed - measured, not
+    // drawn - and given the height the transport will take when it arrives.
+    // Nothing moves at the swap because nothing about the space changes.
+    //
+    // MEASURED, NOT DERIVED. The band is a plate, two nested margins and a row
+    // that thins with the panel; any arithmetic for it here would be a second
+    // copy of the XAML, free to drift from it. The transport reports its own
+    // size whenever it is up, and the one time nothing has ever been played it
+    // is asked directly.
+    // The transport plate at rest and while it is holding a file the panel is
+    // not showing. Both live here rather than in the XAML because only one of
+    // them can be the markup's value and splitting the pair across two files is
+    // how one of them gets tuned and the other does not.
+    //
+    // AT REST THERE IS NO PLATE AT ALL (2026-08-12). It was a constant wash
+    // under the transport, put there so the part of the panel about sound would
+    // read as one thing; gone, it becomes a SIGNAL instead - the plate appearing
+    // is what says the transport has stopped belonging to the picture above it.
+    // A difference that is only ever there when it means something is easier to
+    // notice than one that is always there and merely changes strength.
+    private const double ViewerMediaPlateOpacity = 0.0;
+    private const double ViewerMediaPlateDetachedOpacity = 0.7;
+
+    private double _viewerTransportBandHeight;
+
+    private double ViewerTransportBandHeight()
+    {
+        if (_viewerTransportBandHeight > 0)
+        {
+            return _viewerTransportBandHeight;
+        }
+
+        // Hidden measures; Collapsed does not. Both are put back exactly as they
+        // were - this is a question, not a change. The 재생 중 line is asked to
+        // hold its place for the measurement too, because that is the shape the
+        // band takes for a track and a track is what is reserving it.
+        var wasBar = ViewerMediaBar.Visibility;
+        var wasLine = ViewerNowPlaying.Visibility;
+        ViewerMediaBar.Visibility = Visibility.Hidden;
+        ViewerNowPlaying.Visibility = Visibility.Hidden;
+        ViewerMediaBar.Measure(new System.Windows.Size(
+            double.PositiveInfinity, double.PositiveInfinity));
+        _viewerTransportBandHeight = ViewerMediaBar.DesiredSize.Height;
+        ViewerNowPlaying.Visibility = wasLine;
+        ViewerMediaBar.Visibility = wasBar;
+        return _viewerTransportBandHeight;
+    }
 
     private void FitViewerMediaRow()
     {
@@ -19110,7 +19259,7 @@ public partial class MainWindow : Window
         // there, but the panel's own answer to "play this" had vanished
         // (2026-08-11, on a file with no album art, where the button IS the
         // picture).
-        ViewerPlayOverlay.Visibility = Visibility.Visible;
+        UpdateViewerPlayOverlay();
         UpdateViewerMediaReadout();
         VideoLogFlush("ended");
     }
@@ -19969,13 +20118,7 @@ public partial class MainWindow : Window
         // that had been offering to start it was the thing that disappeared.
         // Paused IS the state that button belongs to; the transport's own
         // play/pause simply says it a second time, in a smaller place.
-        // ViewerMediaIsSelection, not "something is loaded": while sound is
-        // running in another folder the picture on screen belongs to a
-        // different file, and a play button drawn over it would offer to start
-        // THAT one while doing something else entirely.
-        ViewerPlayOverlay.Visibility = !playing && ViewerMediaIsSelection
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        UpdateViewerPlayOverlay();
 
         // The readout ticks only while something is moving - four times a
         // second, two property reads and a string. Nothing runs while paused,
@@ -20404,6 +20547,33 @@ public partial class MainWindow : Window
         // chips into the carousel row above instead would put eight controls on
         // a row that has no thinning device of its own - FitViewerMediaRow
         // belongs to the transport - so a narrow panel would simply clip them.
+        // A TRACK NEVER GETS THIS STRIP, and album art is why the question came
+        // up at all (2026-08-12). Every control on it - 맞춤, 1:1, the zoom
+        // stepper, the navigator - is for examining a picture the user opened.
+        // A cover is not that: it came out of the file with the song, its pixel
+        // size is nowhere on screen, and the caption above it is naming an mp3's
+        // name, weight and date. 1:1 on one offers a crop of a picture nobody
+        // chose to look at.
+        //
+        // The row stays as a reserved band, because what replaces it when the
+        // track starts is the transport - see ViewerTransportBandHeight.
+        if (_pendingViewerPath is { } shown && IsViewerAudio(shown))
+        {
+            double gap = Resources["ViewerCaptionChipRowGap"] is Thickness t ? t.Top : 0;
+            ViewerZoomBar.MinHeight = Math.Max(0, ViewerTransportBandHeight() - gap);
+            // THE TEST IS WHETHER THE TRANSPORT IS THERE, not whether it is
+            // holding this file. Asked the second way (2026-08-12), a track
+            // watched while ANOTHER one played held the band open underneath a
+            // transport that was already on screen - two bands where the point
+            // was to have exactly one, and the album art paid for it.
+            ViewerZoomBar.Visibility = _viewerVideoPath is not null
+                ? Visibility.Collapsed
+                : Visibility.Hidden;
+            return;
+        }
+
+        ViewerZoomBar.MinHeight = 0;
+
         bool hasImage = _viewerPixelWidth > 0 && ViewerImage.Source is not null && !ViewerMediaIsSelection;
         ViewerZoomBar.Visibility = hasImage ? Visibility.Visible : Visibility.Collapsed;
         if (!hasImage)
@@ -23629,10 +23799,7 @@ public partial class MainWindow : Window
                 // Unless it is ALREADY PLAYING: 이어서 재생 starts the file
                 // before this callback lands, and a play button drawn over a
                 // playing track is an offer the panel has already taken up.
-                if (IsViewerPlayable(path) && !IsViewerMediaLoaded(path))
-                {
-                    ViewerPlayOverlay.Visibility = Visibility.Visible;
-                }
+                UpdateViewerPlayOverlay();
                 return;
             }
 
@@ -23662,9 +23829,7 @@ public partial class MainWindow : Window
                 ViewerIconImage.Visibility = Visibility.Collapsed;
                 ViewerIconImage.Source = null;
                 ClearViewerZoom();
-                ViewerPlayOverlay.Visibility = IsViewerMediaLoaded(path)
-                    ? Visibility.Collapsed
-                    : Visibility.Visible;
+                UpdateViewerPlayOverlay();
                 SetViewerFileInfo(path, 0, 0, withMediaInfo: true);
                 return;
             }
