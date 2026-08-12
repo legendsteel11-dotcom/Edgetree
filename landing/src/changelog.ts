@@ -20,21 +20,21 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    // Four lines, which the note above allows for a release that earns it: the
-    // viewer is what this version is, and the other three are each a different
-    // reason someone would want it.
+    // Four lines, which the note above allows for a release that earns it. The
+    // release notes carry seven items; these are the same seven folded into a
+    // glance, with the two smallest sharing the third line.
     version: 'v2.0.0',
     ko: [
       '이미지 뷰어가 사이드바 안에 들어왔습니다 — 사진·영상·음악을 그 자리에서',
-      '썸네일 바로 폴더를 훑고, 클릭 한 번으로 그 파일 자리에 섭니다',
-      '지나온 자리를 되짚는 트리 히스토리 (Ctrl+←, Ctrl+→)',
-      '자주 쓰는 배치를 프리셋 다섯 개로 저장해 두고 바꿔 씁니다',
+      '썸네일 바로 폴더를 훑고, 음악은 틀어 둔 채 다른 작업을 이어갑니다',
+      '경로 직접 입력 · 히스토리(Ctrl+←, Ctrl+→) · 프리셋 5개 · 랜덤 색상 · F1 도움말',
+      '메모리 관리 및 성능 최적화, 앱 속도 향상',
     ],
     en: [
       'An image viewer now lives inside the sidebar — photos, video and music in place',
-      'Skim a folder on the thumbnail bar, and one click puts you on that file',
-      'Step back through where you have been (Ctrl+←, Ctrl+→)',
-      'Keep five layouts as presets and switch between them',
+      'Skim a folder on the thumbnail bar, and leave music playing while you work',
+      'Type a path directly · history (Ctrl+←, Ctrl+→) · five presets · random colours · F1 help',
+      'Memory and performance work, and a faster app',
     ],
   },
   {
