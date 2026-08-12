@@ -16181,6 +16181,13 @@ public partial class MainWindow : Window
             }
         }
 
+        // HOW MANY TREE ROWS ARE BEING HELD, on the same line as the memory.
+        // Reported 2026-08-12: dragging the tree's scroll thumb up and down
+        // over a heavily expanded tree grows the process every trip, and the
+        // curve alone cannot say whether that is rows. Cheap enough here - this
+        // runs every two seconds, not on a 50ms timer like the stall watch.
+        int rows = CountRealizedRows(ExplorerTree);
+
         try
         {
             string dir = Path.Combine(
@@ -16194,8 +16201,237 @@ public partial class MainWindow : Window
                 $"  cells {_filmstripCells.Count,5}  thumbs {held,5}" +
                 $" ({pixW}x{pixH}, ask {FilmstripFetchSize}, ={bytes / (1024 * 1024),5:F0} MB)" +
                 $"  view {ViewerDecodedMegabytes(),4:F0} MB" +
+                $"  rows {rows,5}" +
                 $"  viewer {(_viewerOpen ? "on " : "off")}" +
                 $"  strip {(ViewerFilmstripHost.Visibility == Visibility.Visible ? "on " : "off")}" +
+                $"{Environment.NewLine}");
+
+            LogMemoryCollectProbe(dir, rows);
+            CheckTreeRowsAreContiguous(dir);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    // ----- 빈 행: 원인을 막지 말고 규칙을 확인한다 -------------------------------
+    //
+    // The report (2026-07-21, and unchanged since): after the app has been left
+    // running a long time, part of the tree - usually near the TOP - shows an
+    // empty band of IRREGULAR height, and clicking brings the rows back. It has
+    // never been reproduced on demand, so two guesses were fired at it at once
+    // in 56dd15d: Recycling was turned off, and a forced redraw was added on
+    // resume/display-change. Neither could be credited afterwards, and the
+    // first of them was reversed on 2026-08-12 for reasons of its own.
+    //
+    // A band of irregular height is not the shape a reused container makes -
+    // that would be one row tall. It is the shape a wrong POSITION makes, and
+    // the tree scrolled by pixels until 2026-08-10, where the panel had to
+    // guess the height of every unrealized row (measured: the same folders
+    // reported 9,081px and 36,072px moments apart).
+    //
+    // Rather than keep naming suspects, this checks the rule that has to hold
+    // whatever the cause: THE ROWS ON SCREEN TILE THE VIEWPORT. Each row's own
+    // border should begin where the one above it ended. Whatever breaks that -
+    // a stale container, a bad height estimate, a redraw that never came, or a
+    // path nobody has thought of - is written down with the context needed to
+    // tell those apart, at the moment it happens rather than hours later.
+    //
+    // Only while the tree is standing still: the check costs a walk of every
+    // realized row, and mid-scroll a row genuinely can be between positions.
+    private double _lastTreeScrollOffset = double.NaN;
+    private bool _treeGapCheckAnnounced;
+    private int _treeGapsSeen;
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void CheckTreeRowsAreContiguous(string dir)
+    {
+        if (FindTreeScrollViewer() is not { } scrollViewer || scrollViewer.ViewportHeight <= 0)
+        {
+            return;
+        }
+
+        // Moved since the last look - not settled, so not judged.
+        double offset = scrollViewer.VerticalOffset;
+        bool still = !double.IsNaN(_lastTreeScrollOffset) &&
+            Math.Abs(offset - _lastTreeScrollOffset) < 0.5;
+        _lastTreeScrollOffset = offset;
+        if (!still)
+        {
+            return;
+        }
+
+        var onScreen = new List<(double Top, double Height, string Name)>();
+        var blank = new List<string>();
+
+        void Walk(ItemsControl host)
+        {
+            foreach (var entry in host.Items)
+            {
+                if (host.ItemContainerGenerator.ContainerFromItem(entry) is not TreeViewItem container)
+                {
+                    continue;
+                }
+
+                if (container.IsVisible &&
+                    container.Template?.FindName("RowBorder", container) is FrameworkElement row &&
+                    row.IsVisible && row.ActualHeight > 0)
+                {
+                    try
+                    {
+                        double top = row.TransformToAncestor(scrollViewer)
+                            .Transform(default(System.Windows.Point)).Y;
+                        if (top + row.ActualHeight > 0 && top < scrollViewer.ActualHeight)
+                        {
+                            string name = (entry as Models.FileSystemItem)?.Name ?? "?";
+                            onScreen.Add((top, row.ActualHeight, name));
+
+                            // THE SECOND WAY THE BAND COULD BE EMPTY: the row
+                            // holds its place and draws nothing. The screenshots
+                            // show the indent guides still running through the
+                            // empty band, so whatever is missing is inside the
+                            // row rather than the row itself.
+                            if (container.Template.FindName("PART_Header", container)
+                                    is FrameworkElement header &&
+                                (!header.IsVisible || header.ActualWidth <= 0 || header.ActualHeight <= 0) &&
+                                name.Length > 0)
+                            {
+                                blank.Add(name);
+                            }
+                        }
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // Not in the same visual tree any more - nothing to judge.
+                    }
+                }
+
+                Walk(container);
+            }
+        }
+
+        Walk(ExplorerTree);
+        if (onScreen.Count < 2)
+        {
+            return;
+        }
+
+        // A line the first time it runs, so silence afterwards means "checked
+        // and found nothing" rather than "never ran" - the distinction a
+        // marker instrument had to learn the hard way earlier today.
+        if (!_treeGapCheckAnnounced)
+        {
+            _treeGapCheckAnnounced = true;
+            AppendRedrawLine(dir, $"row gap check running (rows on screen {onScreen.Count})");
+        }
+
+        if (blank.Count > 0)
+        {
+            _treeGapsSeen++;
+            AppendRedrawLine(dir,
+                $"*** BLANK ROWS {blank.Count,4} *** of {onScreen.Count} on screen" +
+                $"  first '{blank[0]}'  last '{blank[^1]}'" +
+                $"  mode {VirtualizingPanel.GetVirtualizationMode(ExplorerTree)}" +
+                $"  uptime {(DateTime.Now - System.Diagnostics.Process.GetCurrentProcess().StartTime).TotalMinutes,5:F0} min" +
+                $"  seen {_treeGapsSeen}");
+        }
+
+        onScreen.Sort((a, b) => a.Top.CompareTo(b.Top));
+
+        // Half a row of slack: rows carry padding, and a band worth reporting
+        // is one somebody can see.
+        double slack = onScreen[0].Height / 2;
+        for (int i = 1; i < onScreen.Count; i++)
+        {
+            double gap = onScreen[i].Top - (onScreen[i - 1].Top + onScreen[i - 1].Height);
+            if (gap <= slack)
+            {
+                continue;
+            }
+
+            _treeGapsSeen++;
+            var self = System.Diagnostics.Process.GetCurrentProcess();
+            AppendRedrawLine(dir,
+                $"*** ROW GAP {gap,6:F0} px *** after '{onScreen[i - 1].Name}' before '{onScreen[i].Name}'" +
+                $"  at y {onScreen[i - 1].Top + onScreen[i - 1].Height:F0} of {scrollViewer.ActualHeight:F0}" +
+                $"  rowsOnScreen {onScreen.Count}  offset {offset:F0}/{scrollViewer.ExtentHeight:F0}" +
+                $"  mode {VirtualizingPanel.GetVirtualizationMode(ExplorerTree)}" +
+                $"  unit {VirtualizingPanel.GetScrollUnit(ExplorerTree)}" +
+                $"  uptime {(DateTime.Now - self.StartTime).TotalMinutes,5:F0} min" +
+                $"  seen {_treeGapsSeen}");
+            break;
+        }
+    }
+
+    private static void AppendRedrawLine(string dir, string line)
+    {
+        try
+        {
+            File.AppendAllText(
+                Path.Combine(dir, "redraw.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {line}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private int _memoryProbeCountdown = MemoryProbeEvery;
+
+    // Every two minutes, and only while the process is actually large.
+    private const int MemoryProbeEvery = 60;
+
+    // ----- 안 내려온 것인가, 못 내려오는 것인가 ----------------------------------
+    //
+    // A flat curve while the app sits idle says nothing at all: the collector
+    // has no reason to run, so held memory and abandoned memory read the same.
+    // That ambiguity is what cost a whole round in August - 1.3GB was treated
+    // as a leak until a forced collection handed most of it straight back.
+    //
+    // So the question is asked instead of watched. A full blocking compacting
+    // collect, then the same numbers again: what SURVIVES it is reachable, and
+    // reachable memory that keeps growing with nothing but scrolling is the
+    // only shape worth chasing. What the collect releases was never a leak, no
+    // matter how alarming the peak looked.
+    //
+    // This pauses the app for as long as the collect takes, which is why it is
+    // in the measuring build only and asks at most once every two minutes.
+    // Rows ride along on both sides: containers released by the collect are
+    // rows the tree had already let go of and simply had not been swept.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogMemoryCollectProbe(string dir, int rowsBefore)
+    {
+        if (--_memoryProbeCountdown > 0)
+        {
+            return;
+        }
+
+        _memoryProbeCountdown = MemoryProbeEvery;
+        if (_selfProcess is null || _selfProcess.PrivateMemorySize64 < 400L * 1024 * 1024)
+        {
+            return;
+        }
+
+        long managedBefore = GC.GetTotalMemory(false);
+        long privateBefore = _selfProcess.PrivateMemorySize64;
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+        watch.Stop();
+
+        _selfProcess.Refresh();
+        int rowsAfter = CountRealizedRows(ExplorerTree);
+
+        try
+        {
+            File.AppendAllText(
+                Path.Combine(dir, "memory.log"),
+                $"{DateTime.Now:HH:mm:ss}  *** COLLECT {watch.ElapsedMilliseconds,4} ms ***" +
+                $"  managed {managedBefore / (1024 * 1024),5} -> {GC.GetTotalMemory(false) / (1024 * 1024),5} MB" +
+                $"  private {privateBefore / (1024 * 1024),5} -> {_selfProcess.PrivateMemorySize64 / (1024 * 1024),5} MB" +
+                $"  rows {rowsBefore,5} -> {rowsAfter,5}" +
                 $"{Environment.NewLine}");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
