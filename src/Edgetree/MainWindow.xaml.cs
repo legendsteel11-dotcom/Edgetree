@@ -5540,14 +5540,26 @@ public partial class MainWindow : Window
         int grows = 0;
         double lastTop = double.NaN;
 
+        // Holds the gap's own reclaim watch off while this walks - see
+        // TreeScrollViewer_ScrollChanged. Cleared on every exit below.
+        _settlingRowAtTop = true;
+
         // Says what it MEASURED and what it did about it. Added because the
         // first version of this loop was a silent actor: the landing changed
         // and there was no way to tell whether the loop had corrected it,
         // overshot it, or never run at all (2026-08-12).
-        void Report(string outcome) => LogClickLine(
-            $"settle: {name} {outcome} steps={steps} blind={blind} " +
-            $"top={(double.IsNaN(lastTop) ? "-" : lastTop.ToString("F0"))} " +
-            $"offset {startOffset:F0} -> {scrollViewer.VerticalOffset:F0} counted={countedIndex}");
+        // EVERY exit of this loop goes through here, which is what makes it the
+        // one place that has to hand the gap's watch back. The growth path does
+        // NOT report - it continues walking - and that is exactly the case the
+        // watch has to stay off for.
+        void Report(string outcome)
+        {
+            _settlingRowAtTop = false;
+            LogClickLine(
+                $"settle: {name} {outcome} steps={steps} blind={blind} " +
+                $"top={(double.IsNaN(lastTop) ? "-" : lastTop.ToString("F0"))} " +
+                $"offset {startOffset:F0} -> {scrollViewer.VerticalOffset:F0} counted={countedIndex}");
+        }
 
         // A screenful and a bit. The scroll above has already landed near the
         // target, so this is a correction, not a search - and a bound means a
@@ -5893,6 +5905,11 @@ public partial class MainWindow : Window
     // for why). One row of range each, drawing nothing.
     private readonly System.Collections.ObjectModel.ObservableCollection<FileSystemItem> _bottomGapRows = new();
 
+    // True for the length of one SettleRowAtTop walk. The gap's reclaim watch
+    // reads it and stands down: the rows it is watching were added mid-walk,
+    // for a row the walk has not stepped into yet.
+    private bool _settlingRowAtTop;
+
     private void SetBottomGap(int rows, ScrollViewer scrollViewer)
     {
         rows = Math.Max(0, rows);
@@ -5945,6 +5962,19 @@ public partial class MainWindow : Window
         if (_bottomGapRows.Count == 0)
         {
             scrollViewer.ScrollChanged -= TreeScrollViewer_ScrollChanged;
+            return;
+        }
+
+        // NOT WHILE THE JUMP THAT ASKED FOR IT IS STILL WALKING. Adding the
+        // rows changes the extent, which raises this event before the settle
+        // loop has taken a single step into the room it just made - and by the
+        // test below the gap is not on screen yet, so it was taken straight
+        // back. The loop then measured the same shortfall, asked again, and was
+        // undone again: `click.log` 2026-08-13 shows "gap 0 -> 14" three times
+        // in 60ms, each from a count still at zero, ending range-spent with the
+        // row 252px down. Cleared by the settle loop when it finishes.
+        if (_settlingRowAtTop)
+        {
             return;
         }
 
