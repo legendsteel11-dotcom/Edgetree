@@ -6431,6 +6431,27 @@ public partial class MainWindow : Window
     // fall out of row heights at non-integer font scales; without it the
     // bottom chevron can survive a scroll all the way down by a rounding
     // error, which reads as the menu lying about having more.
+    // A menu tall enough to scroll used to move UNDER THE HAND. Running the
+    // pointer down a long menu and back up made it jump about (reported
+    // 2026-08-12), and the cause is not the ▾ mark at the bottom - that one is
+    // IsHitTestVisible="False" and can catch nothing. It is that a MenuItem
+    // takes focus on mouse-over, focus asks to be brought into view, and a row
+    // only half on screen is granted it: the list slides, a different row lands
+    // under the cursor, and that one asks too.
+    //
+    // Refused for the MOUSE only. The keyboard still needs it - walking to a row
+    // that is off screen with ↓ has to bring it on - and the pointer never does:
+    // whatever it is over is by definition already where the hand put it. Same
+    // rule as everywhere else in this app, that the view moves when the user
+    // moves it.
+    private void MenuItemsHost_RequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
+    {
+        if (InputManager.Current.MostRecentInputDevice is MouseDevice)
+        {
+            e.Handled = true;
+        }
+    }
+
     private void MenuScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
         if (sender is not ScrollViewer viewer)

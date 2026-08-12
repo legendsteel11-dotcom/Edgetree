@@ -530,7 +530,15 @@
                                  makes it scroll rather than grow - a ScrollViewer
                                  given unbounded height never scrolls at all. -->
                             <ScrollViewer Style="{DynamicResource MenuScrollViewerStyle}">
-                                <StackPanel IsItemsHost="True"/>
+                                <!-- The handler is on the items host rather than
+                                     on the ScrollViewer because the event is
+                                     bubbling and the SCROLL is what has to be
+                                     got in front of: by the time it reaches the
+                                     ScrollViewer its content presenter has
+                                     already acted on it. See
+                                     MenuItemsHost_RequestBringIntoView. -->
+                                <StackPanel IsItemsHost="True"
+                                        RequestBringIntoView="MenuItemsHost_RequestBringIntoView"/>
                             </ScrollViewer>
                         </Border>
                     </ControlTemplate>
@@ -743,7 +751,8 @@
                                          are built as inline rows inside a
                                          SUBMENU. -->
                                     <ScrollViewer Style="{DynamicResource MenuScrollViewerStyle}">
-                                        <StackPanel IsItemsHost="True"/>
+                                        <StackPanel IsItemsHost="True"
+                                                RequestBringIntoView="MenuItemsHost_RequestBringIntoView"/>
                                     </ScrollViewer>
                                 </Border>
                             </Popup>
