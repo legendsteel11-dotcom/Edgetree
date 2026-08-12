@@ -20760,25 +20760,59 @@ public partial class MainWindow : Window
             // while ActualWidth reads 96, and no floor can ever win. If instead
             // the slot reads 96, the fault is somewhere after layout and this
             // whole line of reasoning is wrong.
-            var thumbElement =
-                (bar.Template?.FindName("PART_Track", bar) as System.Windows.Controls.Primitives.Track)?.Thumb;
-            string slot = "-", clip = "-";
-            if (thumbElement is not null)
+            //
+            // ANSWERED 2026-08-12: slot=8x17, clip=8x17, thumb=96px. The floor
+            // makes the element wide and the Track hands it eight pixels.
+            //
+            // Three more readings decide what to do about it, and each one
+            // rules out a different fix:
+            //  · trackVp - a Track with ViewportSize NaN sizes its thumb from
+            //    the thumb's own DesiredSize (slider behaviour) instead of
+            //    viewport ÷ content. This template never binds ViewportSize, so
+            //    if it still reads a number, something is pushing one in, and
+            //    "just leave it NaN" is not available.
+            //  · desired - what the thumb asks for. The floor is supposed to
+            //    reach this even if it reaches nothing else.
+            //  · the tree's own slot and clip, on the same line. The tree's
+            //    thumb hits the same floor on a long folder, and whether the
+            //    vertical case is clipped too decides whether this is one fix
+            //    or two. Not something two people can settle by looking.
+            var stripTrack =
+                bar.Template?.FindName("PART_Track", bar) as System.Windows.Controls.Primitives.Track;
+            var thumbElement = stripTrack?.Thumb;
+
+            static string Slot(FrameworkElement? element)
             {
-                var layoutSlot = System.Windows.Controls.Primitives.LayoutInformation
-                    .GetLayoutSlot(thumbElement);
-                slot = $"{layoutSlot.Width:F0}x{layoutSlot.Height:F0}";
-                clip = System.Windows.Controls.Primitives.LayoutInformation
-                    .GetLayoutClip(thumbElement) is { } clipGeometry
-                        ? $"{clipGeometry.Bounds.Width:F0}x{clipGeometry.Bounds.Height:F0}"
+                if (element is null)
+                {
+                    return "-";
+                }
+
+                var rect = System.Windows.Controls.Primitives.LayoutInformation.GetLayoutSlot(element);
+                string clipped = System.Windows.Controls.Primitives.LayoutInformation
+                    .GetLayoutClip(element) is { } geometry
+                        ? $"{geometry.Bounds.Width:F0}x{geometry.Bounds.Height:F0}"
                         : "none";
+                return $"{rect.Width:F0}x{rect.Height:F0} clip {clipped}";
+            }
+
+            FrameworkElement? treeThumbElement = null;
+            if (FindTreeScrollViewer() is { } treeScrollViewer &&
+                treeScrollViewer.Template?.FindName("PART_VerticalScrollBar", treeScrollViewer)
+                    is System.Windows.Controls.Primitives.ScrollBar treeScrollBar)
+            {
+                treeThumbElement =
+                    (treeScrollBar.Template?.FindName("PART_Track", treeScrollBar)
+                        as System.Windows.Controls.Primitives.Track)?.Thumb;
             }
 
             LogClickLine(
                 $"strip bar: thumb={thumbWidth:F0}px  bar={bar.ActualWidth:F0}px  " +
                 $"max={bar.Maximum:F0}  viewport={bar.ViewportSize:F0}  cells={_filmstripCells.Count}  " +
-                $"slot={slot}  clip={clip}  " +
-                $"tree thumb={treeThumb:F0}px  bar={treeBar:F0}px");
+                $"slot={Slot(thumbElement)}  " +
+                $"trackVp={stripTrack?.ViewportSize ?? double.NaN:F2}  " +
+                $"desired={thumbElement?.DesiredSize.Width ?? -1:F0}x{thumbElement?.DesiredSize.Height ?? -1:F0}  " +
+                $"tree thumb={treeThumb:F0}px  bar={treeBar:F0}px  slot={Slot(treeThumbElement)}");
         }
 
         var origin = bar.TransformToVisual(ViewerFilmstripMarkerLayer)
