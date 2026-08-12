@@ -20,21 +20,32 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    // Four lines, which the note above allows for a release that earns it. The
-    // release notes carry seven items; these are the same seven folded into a
-    // glance, with the two smallest sharing the third line.
+    // EIGHT lines, past the three the note above asks for, and deliberately:
+    // the author's call for this release. 2.0 is the version where the app
+    // stopped being a tree, and the card carrying the same list as the release
+    // notes was judged worth more here than the glance the shape usually aims
+    // for. Read that as an exception earned by the release, not as the rule
+    // moving - the next version starts from three again.
     version: 'v2.0.0',
     ko: [
-      '이미지 뷰어가 사이드바 안에 들어왔습니다 — 사진·영상·음악을 그 자리에서',
-      '썸네일 바로 폴더를 훑고, 음악은 틀어 둔 채 다른 작업을 이어갑니다',
-      '경로 직접 입력 · 히스토리(Ctrl+←, Ctrl+→) · 프리셋 5개 · 랜덤 색상 · F1 도움말',
-      '메모리 관리 및 성능 최적화, 앱 속도 향상',
+      '경로 직접 입력 및 히스토리 기능(Ctrl+←, Ctrl+→) 추가',
+      '이미지 뷰어(썸네일 바 및 내비게이션)',
+      '영상 재생(HDR 보정 및 자막 지원)',
+      '음악 재생(앱 내에서 전역 플레이어로 설정하고 다른 작업으로 이동 가능 — 예: 이미지 뷰어 또는 파일 관리, 검색 등)',
+      '사용자가 정한 앱 형태 및 설정 등을 프리셋으로 저장하고 그대로 불러올 수 있는 기능(5개까지)',
+      '더 다양해진 랜덤 색상 모드',
+      '메모리 관리 및 성능 최적화, 버그 수정, 앱 속도 향상',
+      'F1 도움말',
     ],
     en: [
-      'An image viewer now lives inside the sidebar — photos, video and music in place',
-      'Skim a folder on the thumbnail bar, and leave music playing while you work',
-      'Type a path directly · history (Ctrl+←, Ctrl+→) · five presets · random colours · F1 help',
-      'Memory and performance work, and a faster app',
+      'Type a path directly, and step back and forward through where you have been (Ctrl+←, Ctrl+→)',
+      'Image viewer (thumbnail bar and navigator)',
+      'Video playback (HDR correction and subtitles)',
+      'Music playback — set it as the app\'s player and carry on elsewhere (viewing images, managing files, searching)',
+      'Keep the app\'s shape and settings as presets and bring them back exactly (up to five)',
+      'More varied random colour modes',
+      'Memory and performance work, bug fixes, a faster app',
+      'F1 help',
     ],
   },
   {
