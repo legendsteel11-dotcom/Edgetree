@@ -392,7 +392,15 @@ public partial class App : Application
             // and toward-white on dark. Split from ForegroundText so headers/
             // footers sharing that brush stay as they were.
             SetChromeBrush("MenuForeground", "#FF353535");
-            SetChromeBrush("MenuDisabledForeground", "#FF5F5F5F");
+            // Was #5F5F5F, which is 42 levels off the menu's own text and STILL
+            // a dark ink on a near-white menu - so a disabled row read as an
+            // ordinary one and the only tells were the cursor and the missing
+            // hover (2026-08-12). The dark theme's pair is 68 levels apart AND
+            // moves toward its background; this one moved toward black, which is
+            // the wrong direction on white. It now goes toward the ground, the
+            // same way its opposite does, and lands at roughly the contrast the
+            // dark pair has.
+            SetChromeBrush("MenuDisabledForeground", "#FF9EA2A8");
             SetChromeBrush("HighlightForeground", "#FF000000");
             SetChromeBrush("HoverBackground", "#FFE8E8E8");
             // A step past HoverBackground, because a menu's background is the
