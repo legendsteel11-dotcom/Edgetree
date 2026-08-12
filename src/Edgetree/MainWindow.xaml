@@ -4470,7 +4470,16 @@
                         ToolTip="{x:Static services:Strings.ToolTipOptions}"
                         ContextMenu="{StaticResource OptionsMenu}"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Grid>
+                    <!-- Sized to the BUTTON, not to the glyph: this grid is the
+                         update dot's coordinate system, and as content it would
+                         otherwise shrink to the glyph box - which is why the
+                         dot used to hang on negative margins, tuned once
+                         (v1.2.1) and clipped at other header sizes since the
+                         glyph grows and shrinks under it (2026-08-13, the dot
+                         half out of the button's top). Full-size, the dot sits
+                         in the button's own corner at every step. -->
+                    <Grid Width="{DynamicResource HeaderButtonSize}"
+                            Height="{DynamicResource HeaderButtonSize}">
                         <!-- Material Symbols "more_horiz" (
                              2026-08-10). The same three dots the hand-built
                              version drew, which is exactly why it is worth
@@ -4487,18 +4496,19 @@
                         <!-- Update-available indicator: lit by
                              CheckForUpdateOnceAsync when GitHub's latest
                              release is newer than this build. Display only -
-                             clicking stays the normal options menu. -->
-                        <!-- Nudged further up-right than its first placement
-                             (-2,-3): the 15% glyph grow widened the "..." and
-                             the dot read as overlapping its last dot
-                             (reported on the live v1.2.1 update test). -->
+                             clicking stays the normal options menu.
+
+                             The button's own top-right corner, in positive
+                             pixels. The "..." ink is a band across the glyph's
+                             middle, so the corner above its last dot is clear
+                             at every header step. -->
                         <Ellipse x:Name="UpdateAvailableDot"
                                 Width="5"
                                 Height="5"
                                 Fill="{DynamicResource AccentForeground}"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Top"
-                                Margin="0,-7,-5,0"
+                                Margin="0,3,3,0"
                                 Visibility="Collapsed"/>
                     </Grid>
                 </Button>
