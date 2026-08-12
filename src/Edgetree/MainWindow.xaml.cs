@@ -20658,13 +20658,24 @@ public partial class MainWindow : Window
     private void UpdateFilmstripPositionMarker()
     {
         int index = ViewerFilmstrip.SelectedIndex;
-        if (ViewerFilmstripHost.Visibility != Visibility.Visible ||
-            index < 0 ||
-            FindDescendant<ScrollViewer>(ViewerFilmstrip) is not { } scroller ||
-            scroller.Template?.FindName("PART_HorizontalScrollBar", scroller)
-                is not System.Windows.Controls.Primitives.ScrollBar bar ||
-            bar.Visibility != Visibility.Visible || bar.ActualWidth <= 0)
+        var scroller = FindDescendant<ScrollViewer>(ViewerFilmstrip);
+        var bar = scroller?.Template?.FindName("PART_HorizontalScrollBar", scroller)
+            as System.Windows.Controls.Primitives.ScrollBar;
+
+        // SAID OUT LOUD EVERY TIME, including the refusals. Written only on a
+        // change, this line went quiet exactly when it was being asked a
+        // question - and a missing line reads the same whether nothing changed
+        // or nothing ran (2026-08-12). Which of the tests below turned it back
+        // is the whole answer.
+        if (index < 0 || scroller is null || bar is null ||
+            bar.Visibility != Visibility.Visible || bar.ActualWidth <= 0 ||
+            ViewerFilmstripHost.Visibility != Visibility.Visible)
         {
+            LogClickLine(
+                $"strip bar: NONE  index={index}  scroller={(scroller is null ? "-" : "yes")}  " +
+                $"bar={(bar is null ? "-" : bar.Visibility.ToString())}  " +
+                $"barWidth={bar?.ActualWidth ?? -1:F0}  " +
+                $"host={ViewerFilmstripHost.Visibility}");
             ViewerFilmstripMarker.Visibility = Visibility.Collapsed;
             return;
         }
@@ -20688,7 +20699,6 @@ public partial class MainWindow : Window
         // floor meant to keep it catchable is set on the Thumb, and whether a
         // Track actually honours it for a horizontal bar is the open question
         // behind "it is still too small to grab" (2026-08-12).
-        if (Math.Abs(thumbWidth - _lastFilmstripThumbWidth) > 0.5)
         {
             _lastFilmstripThumbWidth = thumbWidth;
             // The TREE's thumb rides along, because the same floor is supposed
@@ -21474,11 +21484,41 @@ public partial class MainWindow : Window
         // both times without a repro. click.log already carries the raw window
         // messages, so this line lands on the same timeline as the press it
         // belongs to.
+        // WHAT WAS ACTUALLY UNDER THE POINTER, named by the app rather than
+        // guessed from a screenshot. A control described as a fingernail-sized
+        // square kept measuring 160px wide, which means the thing being
+        // measured and the thing being aimed at are not the same object - and
+        // three rounds of raising a number that was already right came of not
+        // asking (2026-08-12). The chain of types says which control owns that
+        // spot in one click.
+        var chain = new System.Text.StringBuilder();
+        for (DependencyObject? node = e.OriginalSource as DependencyObject;
+             node is not null && chain.Length < 200;
+             node = System.Windows.Media.VisualTreeHelper.GetParent(node))
+        {
+            chain.Append(node.GetType().Name);
+            if (node is FrameworkElement { Name.Length: > 0 } named)
+            {
+                chain.Append('(').Append(named.Name).Append(')');
+            }
+
+            // Sized on the way past, because the object being aimed at reports
+            // one width and the object being measured elsewhere reports another
+            // - and only the one under the pointer settles it.
+            if (node is FrameworkElement sized)
+            {
+                chain.Append('[').Append($"{sized.ActualWidth:F0}x{sized.ActualHeight:F0}")
+                     .Append(' ').Append($"min{sized.MinWidth:F0}").Append(']');
+            }
+
+            chain.Append(" < ");
+        }
+
         LogClickLine(
             $"strip press: self={(_filmstripSelfSelect ? "yes" : "-")} " +
             $"container={(container is null ? "none" : "yes")} " +
             $"cell={(container?.Content as FilmstripCell)?.Name ?? "-"} " +
-            $"captured={(Mouse.Captured?.GetType().Name ?? "-")}");
+            $"captured={(Mouse.Captured?.GetType().Name ?? "-")}  hit: {chain}");
 
         if (_filmstripSelfSelect || container is not { Content: FilmstripCell cell })
         {
