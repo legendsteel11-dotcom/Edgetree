@@ -18011,11 +18011,23 @@ public partial class MainWindow : Window
     private TimeSpan _videoLogStartPosition;
     private int _videoPlayCount;
 
+    // The gap the 08-13 round ran into: everything above records the CLOCK, and
+    // the report was that the clock and the subtitles ran on while the picture
+    // stood still. Nothing here could tell those apart, so a block that had all
+    // the answers in it still needed the user to say which one it was.
+    // See VideoLogPicture for what closes it.
+    private uint _videoLogPictureHash;
+    private int _videoLogPictureStill;
+    private int _videoLogPictureSkip;
+
     [System.Diagnostics.Conditional("DEBUG")]
     private void VideoLogStart(string? path)
     {
         _videoLogLines.Clear();
         _videoPlayCount++;
+        _videoLogPictureHash = 0;
+        _videoLogPictureStill = 0;
+        _videoLogPictureSkip = 0;
         _videoLogStartPosition = ViewerMedia.Position;
         _videoLogClock = System.Diagnostics.Stopwatch.StartNew();
         _videoLogLines.Add(
@@ -18059,6 +18071,95 @@ public partial class MainWindow : Window
         _videoLogLines.Add(
             $"{wall,8:F2}s  pos {played,8:F2}s  drift {played - wall,7:F2}s  " +
             $"buffering {ViewerMedia.BufferingProgress:P0}  download {ViewerMedia.DownloadProgress:P0}");
+        VideoLogPicture();
+    }
+
+    // Did the PICTURE change? The clock lines above cannot answer it, and on
+    // 2026-08-13 that was the whole question: sound, subtitles and Position all
+    // ran on while the frame stood still, and the log looked like a clean run.
+    //
+    // The picture is sampled by drawing the element through a VisualBrush into a
+    // 32x32 target and hashing the pixels. Two things about that are deliberate:
+    //
+    //   ONE SAMPLE PER SECOND, not per tick. A frozen picture lasts seconds, and
+    //   the intermediate this forces is the size of the video - four times a
+    //   second is a cost that would land on the very thing being measured.
+    //
+    //   THE READOUT SAYS WHAT IT SAW, not just whether it changed. If
+    //   RenderTargetBitmap cannot see media content at all - which would be a
+    //   property of the capture, not of playback - every sample comes back
+    //   identical and the instrument would report a frozen picture on a film
+    //   that is playing perfectly. `avg` and `spread` are how that is told
+    //   apart: a real frame is not one flat colour, so avg=#000000 spread=0
+    //   held across a whole block means the CAPTURE is blind and the `still`
+    //   count beside it means nothing.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void VideoLogPicture()
+    {
+        if (++_videoLogPictureSkip < 4)
+        {
+            return;
+        }
+        _videoLogPictureSkip = 0;
+
+        if (ViewerMedia.ActualWidth < 1 || ViewerMedia.ActualHeight < 1)
+        {
+            return;
+        }
+
+        byte[] pixels;
+        try
+        {
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                dc.DrawRectangle(
+                    new VisualBrush(ViewerMedia), null, new Rect(0, 0, 32, 32));
+            }
+            var target = new RenderTargetBitmap(32, 32, 96, 96, PixelFormats.Pbgra32);
+            target.Render(visual);
+            pixels = new byte[32 * 32 * 4];
+            target.CopyPixels(pixels, 32 * 4, 0);
+        }
+        catch (Exception ex)
+        {
+            // Never let the recorder take down the playback it is watching.
+            _videoLogLines.Add($"picture  CAPTURE FAILED  {ex.GetType().Name}");
+            return;
+        }
+
+        uint hash = 2166136261;
+        long sumB = 0, sumG = 0, sumR = 0;
+        byte lo = 255, hi = 0;
+        for (int i = 0; i < pixels.Length; i += 4)
+        {
+            sumB += pixels[i];
+            sumG += pixels[i + 1];
+            sumR += pixels[i + 2];
+            // Spread over the green channel alone is enough to say "this is a
+            // picture rather than one flat colour", and costs no second pass.
+            if (pixels[i + 1] < lo) lo = pixels[i + 1];
+            if (pixels[i + 1] > hi) hi = pixels[i + 1];
+            for (int b = 0; b < 4; b++)
+            {
+                hash = (hash ^ pixels[i + b]) * 16777619;
+            }
+        }
+
+        const int count = 32 * 32;
+        if (hash == _videoLogPictureHash)
+        {
+            _videoLogPictureStill++;
+        }
+        else
+        {
+            _videoLogPictureStill = 0;
+            _videoLogPictureHash = hash;
+        }
+
+        _videoLogLines.Add(
+            $"picture  hash={hash:X8}  still={_videoLogPictureStill,3}  " +
+            $"avg=#{sumR / count:X2}{sumG / count:X2}{sumB / count:X2}  spread={hi - lo,3}");
     }
 
     // Set by the failure handler so the flush that follows says how the run
@@ -18638,7 +18739,13 @@ public partial class MainWindow : Window
             $"element size={ViewerMedia.ActualWidth:F0}x{ViewerMedia.ActualHeight:F0}  " +
             $"vis={ViewerMedia.Visibility}  opacity={ViewerMedia.Opacity:F2}  " +
             $"stretch={ViewerMedia.Stretch}  effect={(ViewerMedia.Effect is null ? "none" : "yes")}  " +
-            $"scrub={ViewerMedia.ScrubbingEnabled}  volume={ViewerMedia.Volume:F2}");
+            $"scrub={ViewerMedia.ScrubbingEnabled}  volume={ViewerMedia.Volume:F2}  " +
+            // Which rendering the whole app is getting. Tier 0 is software, and
+            // an Effect on tier 0 is composited on the CPU - the one state where
+            // a colour correction could plausibly stop a picture that the clock
+            // beside it says is still playing. Recorded rather than assumed,
+            // because nothing in this log could say either way (2026-08-13).
+            $"tier={RenderCapability.Tier >> 16}");
 
         ViewerMediaPosition.Maximum = ViewerMedia.NaturalDuration.HasTimeSpan
             ? ViewerMedia.NaturalDuration.TimeSpan.TotalSeconds
