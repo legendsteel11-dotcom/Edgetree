@@ -21696,6 +21696,64 @@ public partial class MainWindow : Window
     // tree, so the click handler can tell that from a hand.
     private bool _filmstripSelfSelect;
 
+    // What one cell costs the strip beyond its own width: the Frame border, two
+    // pixels on each side. The strip advances by this, not by the cell.
+    private const double FilmstripCellBorder = 4;
+
+    // The fitted width is a share of the strip's width, so it has to be redone
+    // whenever that changes - the panel divider, the window, a dock. Only the
+    // width matters here; ApplyFilmstripCellSize returns without touching
+    // anything when neither dimension has actually moved.
+    private void ViewerFilmstrip_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.WidthChanged)
+        {
+            ApplyFilmstripCellSize();
+        }
+    }
+
+    // ----- 오른쪽에 남던 자투리 -------------------------------------------------
+    //
+    // The strip scrolls a CELL at a time (CanContentScroll), so the viewport
+    // holds a whole number of frames and whatever the division leaves over sat
+    // as dead space against the right edge - 467px of strip over 133px frames
+    // is three frames and 80 pixels of nothing.
+    //
+    // While the strip scrolled by pixels this could not be answered: a partial
+    // frame simply hung off the edge and the remainder was never a fixed
+    // quantity. Cell scrolling turns it into a division, so the frames take the
+    // remainder instead: as many as fit, each widened to share what is left.
+    //
+    // ONLY THE WIDTH. Height is what the grip sets, and deriving it from the
+    // panel's width would mean dragging the panel divider resized the strip -
+    // so a fitted frame is no longer 4:3. The picture inside is Uniform, so it
+    // keeps its own shape and gains a little air at the sides; a 16:9 photo
+    // actually sits better in the wider box than in the 4:3 one.
+    //
+    // Widen, never shrink. The cost is at the far end of the range: a panel
+    // just short of fitting one more frame widens the frames it does have by up
+    // to a third. Rounding to the NEAREST count instead would cap that at about
+    // a tenth by shrinking, which is a different trade than the one chosen.
+    private double FitFilmstripCellWidth(double natural)
+    {
+        double available = ViewerFilmstrip.ActualWidth
+            - ViewerFilmstrip.Padding.Left - ViewerFilmstrip.Padding.Right;
+        double advance = natural + FilmstripCellBorder;
+        if (natural <= 0 || available <= 0 || advance <= 0)
+        {
+            return natural;
+        }
+
+        int fits = (int)Math.Floor(available / advance);
+        if (fits < 1)
+        {
+            // Narrower than a single frame - there is no remainder to share.
+            return natural;
+        }
+
+        return Math.Max(natural, Math.Floor(available / fits) - FilmstripCellBorder);
+    }
+
     // Width follows height, and both are written as resources because the cell
     // template is inside a DataTemplate - there is no element to reach for.
     // Only on a real change: assigning an unchanged value still invalidates
@@ -21704,8 +21762,13 @@ public partial class MainWindow : Window
     private void ApplyFilmstripCellSize()
     {
         double height = Math.Round(FilmstripCellHeight);
-        double width = Math.Round(height * FilmstripAspect);
-        if (Resources["FilmstripCellHeight"] is double current && Math.Abs(current - height) < 0.5)
+        double width = FitFilmstripCellWidth(Math.Round(height * FilmstripAspect));
+
+        bool sameHeight = Resources["FilmstripCellHeight"] is double currentHeight &&
+            Math.Abs(currentHeight - height) < 0.5;
+        bool sameWidth = Resources["FilmstripCellWidth"] is double currentWidth &&
+            Math.Abs(currentWidth - width) < 0.5;
+        if (sameHeight && sameWidth)
         {
             return;
         }
