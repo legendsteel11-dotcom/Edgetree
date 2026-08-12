@@ -18165,6 +18165,15 @@ public partial class MainWindow : Window
         ApplyViewerHdrToneMap();
         ViewerMedia.Play();
         SetViewerVideoPlaying(true);
+        // The transport has just taken a NEW file, so the line above it - the
+        // one that names what is playing when the caption is naming something
+        // else - is out of date by definition. It was never refreshed here, so
+        // a track started from the panel while another was playing in the
+        // background left that other track's name sitting under the new one's
+        // caption (reported 2026-08-12). This path always plays the SELECTION,
+        // so the line's own rule hides it every time; what it needed was to be
+        // asked.
+        UpdateViewerNowPlaying();
         VideoLog($"play() called  audio={audio}  " +
             $"duration={(ViewerMedia.NaturalDuration.HasTimeSpan ? ViewerMedia.NaturalDuration.TimeSpan.ToString() : "-")}  " +
             $"size={ViewerMedia.ActualWidth:F0}x{ViewerMedia.ActualHeight:F0}");
