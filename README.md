@@ -1,4 +1,4 @@
-# Edgetree v2.0.3
+# Edgetree v2.0.4
 
 [한국어 안내](README-ko.md)
 
@@ -170,6 +170,11 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v2.0.4 (2026-08-13)
+
+- Tree positioning refinements
+- The music player's controls tidied up
 
 ### v2.0.3 (2026-08-13)
 

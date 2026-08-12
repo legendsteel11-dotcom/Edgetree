@@ -1,4 +1,4 @@
-# Edgetree v2.0.3
+# Edgetree v2.0.4
 
 [English](README.md)
 
@@ -206,6 +206,11 @@ dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -o publi
 csproj만 올리면 됩니다.
 
 ## 변경 이력
+
+### v2.0.4 (2026-08-13)
+
+- 트리 위치 표시 보완
+- 음악 재생 플레이어 기능 정렬
 
 ### v2.0.3 (2026-08-13)
 

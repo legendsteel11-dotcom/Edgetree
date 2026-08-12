@@ -20,6 +20,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: 'v2.0.4',
+    ko: [
+      '트리 위치 표시 보완',
+      '음악 재생 플레이어 기능 정렬',
+    ],
+    en: [
+      'Tree positioning refinements',
+      "The music player's controls tidied up",
+    ],
+  },
+  {
     // One line, and the shortcut is not named. Naming it would tell everyone
     // which gesture to be wary of, right above the download buttons, for a
     // fault that is already gone in the build those buttons hand out.
