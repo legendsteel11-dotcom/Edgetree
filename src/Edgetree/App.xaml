@@ -219,17 +219,30 @@
             <!-- The "thickness" dimension is Width for a vertical scrollbar but
                  Height for a horizontal one; a single fixed Width made the
                  horizontal scrollbar's own Track (now orientation-aware) collapse
-                 into a sliver instead of spanning the bottom edge. -->
+                 into a sliver instead of spanning the bottom edge.
+
+                 THE MINIMUMS HAVE TO GO WITH THEM (2026-08-12). Setting Width or
+                 Height alone did nothing measurable: the bar reported Height 10
+                 and an ActualHeight of 17, which is Windows' own horizontal
+                 scrollbar height. An explicit style does not replace a control's
+                 theme style, it overrides it property by property, and the theme
+                 style sets MinWidth/MinHeight from the system metrics - so the
+                 thickness asked for was being coerced straight back up to the
+                 system's. Both bars sat at 17 whatever the 6-20 setting said. -->
             <Style.Triggers>
                 <Trigger Property="Orientation"
                         Value="Vertical">
                     <Setter Property="Width"
                             Value="{DynamicResource ScrollBarThickness}"/>
+                    <Setter Property="MinWidth"
+                            Value="0"/>
                 </Trigger>
                 <Trigger Property="Orientation"
                         Value="Horizontal">
                     <Setter Property="Height"
                             Value="{DynamicResource ScrollBarThickness}"/>
+                    <Setter Property="MinHeight"
+                            Value="0"/>
                 </Trigger>
             </Style.Triggers>
             <!-- Revealing this used to be driven from the bar's own
