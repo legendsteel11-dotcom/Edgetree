@@ -66,6 +66,14 @@ const dict = {
       title: '주요기능',
       items: [
         {
+          title: '이미지 뷰어',
+          desc: '폴더에 포함된 이미지 전체를 빠르게 넘기며 볼 수 있습니다. 확대/축소/전체화면 및 내비게이터 기능, 썸네일 실시간 크기조정이 가능하고 바로 끌어 작업할 수 있습니다. 바탕화면 지정도 가능합니다.',
+        },
+        {
+          title: '음악 · 영상 재생',
+          desc: '주요 음원을 재생합니다. 백그라운드 재생기능으로 다른 일반 작업과 병행이 가능하고 대부분의 영상을 HDR 보정 및 자막과 함께 감상할 수 있습니다.',
+        },
+        {
           title: '도킹/자동 접기',
           desc: '화면의 좌/우에 고정시키거나 자동 접기 토글로 마우스를 움직여 펴거나 감출 수 있습니다. 숨을 때 손잡이와 전체 막대 중에서 선택할 수 있고, 고정된 상태의 높이와 위치도 원하는 대로 조정됩니다.',
         },
@@ -218,6 +226,14 @@ const dict = {
     screenshots: {
       title: 'Key Features',
       items: [
+        {
+          title: 'Image viewer',
+          desc: 'Flip quickly through every image a folder holds. Zoom, full screen and a navigator, thumbnails you resize as you go, and drag one straight out to work with. It can set your desktop background too.',
+        },
+        {
+          title: 'Music and video',
+          desc: 'Plays the common audio formats. Background playback keeps the sound going while you carry on with something else, and most video plays with HDR correction and subtitles.',
+        },
         {
           title: 'Docking',
           desc: 'Anchors to the left or right edge of your screen, always ready — switch sides anytime from the options menu. Hiding leaves either a short handle or a bar down the whole edge, and you can set how tall the docked sidebar is and where it sits.',

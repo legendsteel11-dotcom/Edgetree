@@ -2,7 +2,16 @@
 import { t } from '../i18n'
 
 // Index-matched to t.screenshots.items - insert into both or neither.
+//
+// NINE now, and the first two are 2.0's: this section carried seven cards and
+// not one of them showed the viewer, the video, the music or the presets - the
+// whole reason the version exists. They lead, and the grid is three columns, so
+// nine fills three even rows.
+// The seven that follow keep the pairing they already had - only the two new
+// ones are prepended, so nothing below can drift onto the wrong caption.
 const images = [
+  'et-09.png',
+  'et-08.png',
   'et-01.png',
   'et-07.png',
   'et-02.png',
