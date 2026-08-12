@@ -3528,7 +3528,17 @@ public partial class MainWindow : Window
         CollapseAllButton.Visibility = visibility;
         OptionsButton.Visibility = visibility;
         CloseButton.Visibility = visibility;
-        FavoritesList.Visibility = visibility;
+        // THE SIDE PANEL IS TWO LISTS SHARING ONE ROW, and which of them is on
+        // screen is a MODE question - so it cannot be assigned here the way the
+        // single controls above are. Assigning FavoritesList directly (which is
+        // what this line used to do) turned the favorites list back on every
+        // time the sidebar expanded, whatever the mode, while the bookmark list
+        // it was covering stayed visible underneath. The panel looked like
+        // bookmarks and the click landed on favorites, and switching the mode
+        // away and back "fixed" it because that is the path that collapses the
+        // other list again. Reported 2026-08-12: a bookmark row navigated to
+        // whatever the favorites list holds at that position.
+        SetSidePanelVisibility(visibility);
         FavoritesSplitter.Visibility = visibility;
         VersionFooterBorder.Visibility = visibility;
 
@@ -4422,13 +4432,29 @@ public partial class MainWindow : Window
                 ? _bookmarkPanelRows.Count
                 : _settings.Favorites.Count;
 
+    // Which of the two lists is on screen, in ONE place. Both callers need the
+    // same answer and neither may set only one of them: a list left visible
+    // under the other still takes the clicks meant for it.
+    private void SetSidePanelVisibility(Visibility visibility)
+    {
+        if (visibility != Visibility.Visible)
+        {
+            FavoritesList.Visibility = Visibility.Collapsed;
+            BookmarkPanelList.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        bool bookmarks = IsBookmarkPanelMode;
+        bool hidden = IsPanelHiddenMode;
+        FavoritesList.Visibility = !bookmarks && !hidden ? Visibility.Visible : Visibility.Collapsed;
+        BookmarkPanelList.Visibility = bookmarks && !hidden ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     private void ApplySidePanelMode()
     {
         bool bookmarks = IsBookmarkPanelMode;
-        bool hidden = IsPanelHiddenMode;
 
-        FavoritesList.Visibility = !bookmarks && !hidden ? Visibility.Visible : Visibility.Collapsed;
-        BookmarkPanelList.Visibility = bookmarks && !hidden ? Visibility.Visible : Visibility.Collapsed;
+        SetSidePanelVisibility(Visibility.Visible);
 
         // Built only while it is the one on screen: the rows carry an icon each,
         // and resolving those asks the disk about every bookmarked path - work
