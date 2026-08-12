@@ -22367,6 +22367,26 @@ public partial class MainWindow : Window
     private const double FullScreenTransportBandHeight = 140;
     private bool _fullScreenTransportShown;
 
+    // What the plate reads as, for the purpose of picking an ink. Not the plate's
+    // own #B4000000, which is translucent: a bright frame showing through lifts
+    // the true ground to roughly this, and that is the worst case the ink has to
+    // clear. Either way the answer is the light one, which is the point of
+    // deriving it against a fixed dark value rather than against the film.
+    private static readonly Color FullScreenPlateInkGround = Color.FromRgb(0x14, 0x14, 0x14);
+
+    // Every key the two calls in ShowFullScreenTransport put into the caption
+    // panel's own dictionary. Removed rather than re-derived on the way out, so
+    // the panel goes back to resolving them from the viewer's scope - keep this
+    // list in step with ApplyEdgeInkOverrides.
+    private static readonly string[] FullScreenPlateInkKeys =
+    {
+        "ForegroundText",
+        "FileNameForeground",
+        "TreeRowHoverBackground",
+        "HoverBackground",
+        "TreeGuideLineBrush",
+    };
+
     private void ViewerPanel_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         if (!_viewerFullscreen || _viewerVideoPath is null)
@@ -22402,6 +22422,28 @@ public partial class MainWindow : Window
         // the panel's backdrop, and a seek bar drawn straight onto a bright
         // frame cannot be read at all.
         ViewerCaptionPanel.Background = new SolidColorBrush(Color.FromArgb(0xB4, 0, 0, 0));
+        // And with the plate comes a GROUND the transport's inks were never
+        // derived against. Those inks follow the panel's own background (see
+        // UpdateDerivedEdgeInks), which in the light theme is white - so the
+        // buttons landed dark grey on a near-black plate and only the lit chip,
+        // carrying its own white on blue, could be read at all (2026-08-12).
+        //
+        // The plate stays black on BOTH themes on purpose: what shows through
+        // it is the film, not the app, which is the same argument the navigator
+        // plate settles the other way round. So the fix is the ink, not the
+        // plate - re-derived here against what the controls actually sit on, and
+        // scoped to the caption panel so every one of these keys goes on meaning
+        // what it meant in the docked panel.
+        ApplyEdgeInkOverrides(ViewerCaptionPanel.Resources, FullScreenPlateInkGround);
+        // The seek bar's unplayed track is the one part that does not come from
+        // that method: it draws with the TREE's guide-line colour, which in the
+        // light theme is a near-white opaque line. On the plate that was a bright
+        // rule across the bottom of the screen with an invisible thumb riding it
+        // - the loudest thing in a row whose controls could not be seen. A wash
+        // of the plate's own ink instead, a step under the played part, so the
+        // bar reads as one set with the buttons.
+        SetLocalBrush(ViewerCaptionPanel.Resources, "TreeGuideLineBrush",
+            Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF));
         // The PLATE runs to the edges of the screen; the CONTROLS keep their
         // room inside it. Two cuts got here: edge to edge with 2px underneath
         // read as cut off, and insetting the whole plate fixed that but left a
@@ -22438,6 +22480,11 @@ public partial class MainWindow : Window
         Grid.SetRow(ViewerCaptionPanel, 2);
         ViewerCaptionPanel.VerticalAlignment = VerticalAlignment.Stretch;
         ViewerCaptionPanel.Background = null;
+        // The plate's ink goes with the plate.
+        foreach (string key in FullScreenPlateInkKeys)
+        {
+            ViewerCaptionPanel.Resources.Remove(key);
+        }
         ViewerCaptionPanel.Margin = new Thickness(10, 0, 10, 10);
         // Back to the panel's own gap, not to zero: the transport sits a little
         // below the file's own facts so the sound section reads apart from the
