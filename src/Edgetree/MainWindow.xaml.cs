@@ -11025,6 +11025,11 @@ public partial class MainWindow : Window
     // actually starts in between (see TreeViewItem_PreviewMouseMove).
     private FileSystemItem? _deferredMultiClearItem;
 
+    // The folder expand/collapse a press queued, for the same reason and
+    // cancelled by the same drag: a press on a folder used to toggle it on the
+    // spot, which is what made a folder impossible to pick up.
+    private FileSystemItem? _deferredExpandItem;
+
     private void ClearMultiSelection()
     {
         foreach (var item in _multiSelection)
@@ -11156,6 +11161,19 @@ public partial class MainWindow : Window
             !ReferenceEquals((e.OriginalSource as DependencyObject)?.FindAncestor<TreeViewItem>(), treeViewItem))
         {
             return;
+        }
+
+        // The folder toggle the press put off (see the note where it is armed).
+        // Before the early return below, because that one is about the
+        // multi-selection collapse and this has to happen on every ordinary
+        // click on a folder - which is most of them.
+        if (_deferredExpandItem is { } toDeferredExpand)
+        {
+            _deferredExpandItem = null;
+            if (ReferenceEquals(treeViewItem.DataContext, toDeferredExpand))
+            {
+                toDeferredExpand.IsExpanded = !toDeferredExpand.IsExpanded;
+            }
         }
 
         if (_deferredMultiClearItem is not { } deferred)
@@ -11458,11 +11476,22 @@ public partial class MainWindow : Window
         bool clickedInIndent = RowContentLeftEdge(treeViewItem) is { } contentLeft
             && e.GetPosition(treeViewItem).X < contentLeft;
 
+        // THE TOGGLE WAITS FOR THE RELEASE (2026-08-13). It used to happen right
+        // here, on the press, which is why a folder could not be dragged at all:
+        // the gesture would have opened or closed the very row being picked up.
+        // Deferring it is the same device the multi-selection collapse above
+        // already uses for the same reason - if a drag comes of the press, the
+        // toggle is dropped; if the press turns out to be an ordinary click, the
+        // release performs it a few milliseconds later.
+        //
+        // Selection is NOT deferred with it. Selecting on the press is what
+        // makes a drag carry the row it started on, and it was never the half
+        // that conflicted.
         if (!clickedOnExpander && !clickedInIndent && e.ClickCount == 1 &&
             treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsDirectory: true, IsEditing: false } item)
         {
             treeViewItem.IsSelected = true;
-            item.IsExpanded = !item.IsExpanded;
+            _deferredExpandItem = item;
         }
 
         // Explorer-style "slow double-click" rename. Files only: a click on a
@@ -11485,12 +11514,14 @@ public partial class MainWindow : Window
             SchedulePendingRename(file);
         }
 
-        // Drag-out candidate: files only (see TreeViewItem_PreviewMouseMove) -
-        // folders already toggle expand/collapse above on this same click, so
-        // dragging one out isn't as clean a gesture and isn't what was asked
-        // for. Recorded on every qualifying mouse-down regardless of whether
-        // the previous press ever turned into an actual drag.
-        _itemDragStart = treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsDirectory: false, IsEditing: false }
+        // Drag-out candidate (see TreeViewItem_PreviewMouseMove). FOLDERS COUNT
+        // NOW: the reason they did not was that a press on one toggled it open
+        // or shut, which the deferral above removes. A multi-selection has
+        // always been able to carry folders, so nothing below this had to
+        // learn anything new - it was only the single-row press that opted out.
+        // Recorded on every qualifying mouse-down regardless of whether the
+        // previous press ever turned into an actual drag.
+        _itemDragStart = treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsShowMore: false, IsEditing: false }
             ? e.GetPosition(ExplorerTree)
             : null;
         _itemDragCandidate = _itemDragStart is null ? null : treeViewItem.DataContext as FileSystemItem;
@@ -11538,8 +11569,10 @@ public partial class MainWindow : Window
 
         // The press that started this drag will never be a plain click now, so
         // the deferred set-collapse it may have queued must not run on the
-        // (much later) mouse-up.
+        // (much later) mouse-up. Same for the folder toggle: picking a folder
+        // up must not also open or shut it.
         _deferredMultiClearItem = null;
+        _deferredExpandItem = null;
 
         // Dragging the file out, not renaming it in place.
         CancelPendingRename();
