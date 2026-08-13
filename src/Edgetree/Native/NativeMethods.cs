@@ -190,6 +190,121 @@ internal static class NativeMethods
     public static bool TrySetDesktopWallpaper(string path)
         => SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, path, SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
 
+    // ----- 모니터별 바탕화면 -------------------------------------------------
+    //
+    // SPI_SETDESKWALLPAPER above has no way to name a monitor - it sets the
+    // desktop, all of it. Windows 8 added IDesktopWallpaper, which does, and
+    // that is the whole of what this block is for: setting the picture on the
+    // ONE display the sidebar is currently sitting on (2026-08-14 request).
+    //
+    // The monitors are addressed by DEVICE PATH strings, which say nothing
+    // about position - so the mapping from "the screen this window is on" to
+    // "the string Windows wants" has to go through GetMonitorRECT and compare
+    // rectangles. That is why the caller passes a rect rather than an index:
+    // Screen.AllScreens' ordering and this interface's ordering are two
+    // separate enumerations, and nothing promises they agree.
+    //
+    // The rects here are PHYSICAL pixels, the same units
+    // System.Windows.Forms.Screen.Bounds reports, so a per-monitor DPI setup
+    // needs no conversion - and must not be given one.
+    [ComImport]
+    [Guid("B92B56A9-8B55-4E14-9A89-0199BBB6F93B")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IDesktopWallpaper
+    {
+        // Only the four that are used, in declaration order - a COM interface
+        // is a vtable, so every method BEFORE the ones wanted has to be
+        // declared even when it is never called, and the ones after can simply
+        // be left off. Getting this order wrong calls a different method
+        // entirely, which is why the unused three carry their real signatures
+        // rather than a placeholder.
+        void SetWallpaper([MarshalAs(UnmanagedType.LPWStr)] string? monitorId,
+            [MarshalAs(UnmanagedType.LPWStr)] string wallpaper);
+        void GetWallpaper([MarshalAs(UnmanagedType.LPWStr)] string? monitorId,
+            [MarshalAs(UnmanagedType.LPWStr)] out string wallpaper);
+        void GetMonitorDevicePathAt(uint monitorIndex,
+            [MarshalAs(UnmanagedType.LPWStr)] out string monitorId);
+        void GetMonitorDevicePathCount(out uint count);
+        void GetMonitorRECT([MarshalAs(UnmanagedType.LPWStr)] string monitorId, out Rect displayRect);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [ComImport]
+    [Guid("C2CF3110-460E-4fc1-B9D0-8A1C0C9CC4BD")]
+    private class DesktopWallpaperClass
+    {
+    }
+
+    // The picture on ONE monitor, named by the physical-pixel bounds of the
+    // screen it occupies. False means the caller should fall back to the
+    // all-monitors call above rather than leave the click doing nothing:
+    // the interface is missing on Windows 7, the device paths can be stale
+    // right after a display change, and a wallpaper set to a "slideshow" or
+    // "span" arrangement can refuse a per-monitor assignment outright.
+    public static bool TrySetDesktopWallpaperOnMonitor(string path, int left, int top, int right, int bottom)
+    {
+        IDesktopWallpaper? wallpaper = null;
+        try
+        {
+            // Called from a Task.Run pool thread, which is MTA - and a shell
+            // COM object created there can come back as a PROXY that marshals
+            // its calls onto this app's STA thread, i.e. onto the UI thread
+            // (the trap ShellThumbnailService documents, where it cost 1.5s
+            // freezes on a cold NAS). Left as is deliberately: the expensive
+            // half of setting a wallpaper is the re-encode, which happens
+            // before this and stays on the pool thread, and what is left here
+            // is four short calls. If the sidebar is ever seen to hitch at the
+            // moment a wallpaper is set, this is the first place to look, and
+            // the fix is to make the call from an STA thread of our own.
+            wallpaper = (IDesktopWallpaper)new DesktopWallpaperClass();
+            wallpaper.GetMonitorDevicePathCount(out uint count);
+
+            for (uint i = 0; i < count; i++)
+            {
+                wallpaper.GetMonitorDevicePathAt(i, out string monitorId);
+                if (string.IsNullOrEmpty(monitorId))
+                {
+                    // A path that is registered but not currently attached -
+                    // Windows keeps these so a monitor coming back gets its
+                    // own picture again. GetMonitorRECT throws on them.
+                    continue;
+                }
+
+                wallpaper.GetMonitorRECT(monitorId, out Rect rect);
+                if (rect.Left == left && rect.Top == top &&
+                    rect.Right == right && rect.Bottom == bottom)
+                {
+                    wallpaper.SetWallpaper(monitorId, path);
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is COMException or InvalidCastException
+                                       or NotSupportedException or PlatformNotSupportedException)
+        {
+            return false;
+        }
+        finally
+        {
+            if (wallpaper is not null)
+            {
+                Marshal.ReleaseComObject(wallpaper);
+            }
+        }
+
+        // Enumerated cleanly and no monitor matched - a display arrangement
+        // that changed between the window being measured and this running.
+        return false;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint RegisterWindowMessage(string lpString);
 

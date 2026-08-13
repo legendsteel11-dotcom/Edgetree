@@ -104,9 +104,16 @@ public static class ShellFileService
     // re-encoded as a PNG under %AppData%\Edgetree and Windows pointed at the
     // copy. The original, never the panel's bitmap: the viewer decodes at
     // panel width, and a wallpaper made from that would be soft on purpose.
-    public static bool TrySetDesktopWallpaper(string path)
+    // monitorBounds: the physical-pixel rectangle of the display to set, or
+    // null for every display at once. Non-null goes through IDesktopWallpaper
+    // (Windows 8+) and falls back to the all-monitors call if that refuses -
+    // an old Windows, a slideshow/span arrangement, or a display layout that
+    // changed underneath. Better the picture lands everywhere than the menu
+    // item does nothing.
+    public static bool TrySetDesktopWallpaper(
+        string path, (int Left, int Top, int Right, int Bottom)? monitorBounds = null)
     {
-        if (NativeMethods.TrySetDesktopWallpaper(path))
+        if (TryHandToWindows(path, monitorBounds))
         {
             return true;
         }
@@ -121,19 +128,46 @@ public static class ShellFileService
             string dir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
             Directory.CreateDirectory(dir);
-            string copy = Path.Combine(dir, "wallpaper.png");
+
+            // ONE FILE PER MONITOR. The re-encoded copy used to be a single
+            // "wallpaper.png", which was right while every monitor showed the
+            // same picture and became a trap the moment they could differ:
+            // Windows holds the PATH, not the pixels, so setting a webp on the
+            // second screen would rewrite the file the first screen was still
+            // pointing at and both would change (2026-08-14, caught while
+            // building per-monitor support rather than after shipping it).
+            // Keyed by the rectangle because that is what identifies the
+            // target here; the device path would be tidier and is not in hand
+            // at this level.
+            string name = monitorBounds is { } b
+                ? $"wallpaper-{b.Left}_{b.Top}_{b.Right}_{b.Bottom}.png"
+                : "wallpaper.png";
+            string copy = Path.Combine(dir, name);
             using (var stream = File.Create(copy))
             {
                 encoder.Save(stream);
             }
 
-            return NativeMethods.TrySetDesktopWallpaper(copy);
+            return TryHandToWindows(copy, monitorBounds);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException
                                        or FileFormatException or ArgumentException or UriFormatException)
         {
             return false;
         }
+    }
+
+    private static bool TryHandToWindows(
+        string path, (int Left, int Top, int Right, int Bottom)? monitorBounds)
+    {
+        if (monitorBounds is { } bounds &&
+            NativeMethods.TrySetDesktopWallpaperOnMonitor(
+                path, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom))
+        {
+            return true;
+        }
+
+        return NativeMethods.TrySetDesktopWallpaper(path);
     }
 
     public static void OpenTerminal(string folderPath)

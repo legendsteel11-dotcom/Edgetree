@@ -22567,10 +22567,32 @@ public partial class MainWindow : Window
             return;
         }
 
+        // THE MONITOR THE SIDEBAR IS ON, not the whole desktop (2026-08-14
+        // request). Someone with two displays sets a picture while looking at
+        // one of them, and "바탕화면으로 지정" reasonably means that one -
+        // walk the sidebar to the other screen, pick a different picture, and
+        // the two stand side by side. Windows 8's IDesktopWallpaper is what
+        // makes this possible; ShellFileService falls back to the
+        // all-monitors call when it cannot (see there).
+        //
+        // Measured HERE and passed as a value, not read inside the task: this
+        // window can be dragged to another display while the re-encode runs,
+        // and the screen the user was looking at when they clicked is the one
+        // they meant. Bounds, not the work area - IDesktopWallpaper reports
+        // full monitor rectangles, and comparing those against a taskbar-less
+        // rectangle would match nothing on the monitor that has the taskbar.
+        var hwnd = new WindowInteropHelper(this).Handle;
+        var screen = hwnd != IntPtr.Zero
+            ? System.Windows.Forms.Screen.FromHandle(hwnd)
+            : System.Windows.Forms.Screen.PrimaryScreen;
+        (int, int, int, int)? bounds = screen is null
+            ? null
+            : (screen.Bounds.Left, screen.Bounds.Top, screen.Bounds.Right, screen.Bounds.Bottom);
+
         // Off the UI thread: the fallback inside re-encodes the full-size
         // original. Nothing to report either way - the desktop itself is the
         // feedback, and the quiet default is this app's standing rule.
-        Task.Run(() => ShellFileService.TrySetDesktopWallpaper(path));
+        Task.Run(() => ShellFileService.TrySetDesktopWallpaper(path, bounds));
     }
 
     // The carousel row's world: the folder's image rows in the tree's current
