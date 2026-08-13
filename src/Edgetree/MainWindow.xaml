@@ -739,9 +739,14 @@
                                  and position a submenu popup - the previous template omitted it
                                  entirely, so a MenuItem with children (Role=SubmenuHeader) had
                                  no way to ever show that submenu; clicking it just did nothing. -->
+                            <!-- Side and offset are decided when the menu opens
+                                 (MainWindow.ApplySubmenuSide) rather than left
+                                 to WPF's own flip, which moves the popup to the
+                                 other side without mirroring the offset - see
+                                 that method for what that cost. -->
                             <Popup x:Name="PART_Popup"
-                                    Placement="Right"
-                                    HorizontalOffset="-12"
+                                    Placement="{DynamicResource SubmenuPlacement}"
+                                    HorizontalOffset="{DynamicResource SubmenuHorizontalOffset}"
                                     VerticalOffset="-10"
                                     AllowsTransparency="True"
                                     Focusable="False"

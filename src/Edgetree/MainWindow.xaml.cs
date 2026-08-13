@@ -3221,8 +3221,47 @@ public partial class MainWindow : Window
         }
     }
 
+    // ----- 하위 메뉴가 어느 쪽으로 열리는가 -------------------------------------
+    //
+    // Reported 2026-08-13 by someone docked on the RIGHT: the submenus opened
+    // to the left, as they must, and could not be reached - moving the cursor
+    // towards one closed it.
+    //
+    // The template asks for Placement=Right with HorizontalOffset=-12, and that
+    // -12 is not decoration: the submenu's own Border carries Margin=10 as a
+    // gutter for its drop shadow, so the popup window is wider than the menu
+    // anyone can see, and the offset pulls it back until the visible edges meet.
+    // WPF flips the popup to the other side when there is no room on the right -
+    // and flips the placement WITHOUT flipping the offset. What was a 12px pull
+    // towards the parent became a 12px push away from it, and a menu you must
+    // cross a gap to reach is a menu that closes as you leave the parent row.
+    //
+    // So the side is DECIDED here rather than left to that fallback, and the
+    // offset is mirrored with it. Asked at the moment a menu opens because that
+    // is the only moment it matters, and because it then covers a floating
+    // window sitting near the right edge as well as a docked one - the flip was
+    // never really about which edge the app is docked to, it was about which
+    // half of the screen it is in.
+    private void ApplySubmenuSide()
+    {
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var work = GetCurrentMonitorWorkArea(dpi);
+        bool openLeft = Left + (Width / 2) > work.Left + (work.Width / 2);
+
+        // App-level, not the window's: a menu is its own window and resolves
+        // DynamicResource somewhere this window's dictionary is not - the same
+        // lesson the menu's font size already paid for.
+        var resources = Application.Current.Resources;
+        resources["SubmenuPlacement"] = openLeft
+            ? System.Windows.Controls.Primitives.PlacementMode.Left
+            : System.Windows.Controls.Primitives.PlacementMode.Right;
+        resources["SubmenuHorizontalOffset"] = openLeft ? 12.0 : -12.0;
+    }
+
     private void AnyMenu_Opened(object sender, RoutedEventArgs e)
     {
+        ApplySubmenuSide();
+
         if (sender is ContextMenu menu)
         {
             _openMenus.Add(menu);
