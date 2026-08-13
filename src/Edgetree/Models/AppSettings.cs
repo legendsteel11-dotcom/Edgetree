@@ -135,19 +135,20 @@ public class AppSettings
     // it was added from.
     public List<string> NetworkLocations { get; set; } = new();
 
-    // Whether dragging a row inside the tree MOVES it instead of copying it -
-    // Explorer's own answer for a same-drive drag, and what someone coming from
-    // Explorer expects. Held behind Shift by default and put on this switch for
-    // anyone who wants it the other way round, at which point Ctrl is the
-    // modifier that forces a copy.
+    // What an UNMODIFIED drag inside the tree means. On, it follows Explorer:
+    // a move within the same volume, a copy across volumes, with Shift and Ctrl
+    // forcing either one anywhere. Off, a plain drag always copies and Shift is
+    // the way to move.
     //
-    // OFF, and the reason is a mistake this app has already made: a click with
-    // a few pixels of travel used to read as a drop. As a copy that leaves a
-    // duplicate somebody notices; as a move it takes the file out of the folder
-    // being looked at, silently, and nothing here can undo it. Switched on,
-    // that risk comes back - which is a choice worth offering and a poor
-    // default.
-    public bool DragMovesInsideTree { get; set; } = false;
+    // ON, after being built off (2026-08-13) and turned round the same day on
+    // the user's call: a drag that leaves the original behind is what someone
+    // coming from Explorer reads as the feature being missing, which is how
+    // this started. The risk that argued for off is real and is written down
+    // where the gesture lives - a click with a few pixels of travel has read as
+    // a drop here before, and a stray move is a file quietly somewhere else
+    // with no undo in this app. The switch is what that risk buys: anyone who
+    // wants a drag that can never take a file away turns it off.
+    public bool DragMovesInsideTree { get; set; } = true;
 
     // Subtitles that sit beside the film as a .smi/.srt (see SubtitleService for
     // why that is the only kind there can be). ON by default, unlike the

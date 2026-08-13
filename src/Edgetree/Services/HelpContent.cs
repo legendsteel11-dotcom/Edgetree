@@ -154,11 +154,28 @@ public static class HelpContent
                     R("F2", "이름 바꾸기", "F2", "Rename"),
                     R("F5", "새로고침", "F5", "Refresh"),
                     R("F7", "새 폴더", "F7", "New folder"),
-                    R("Del", "삭제", "Del", "Delete"),
+                    R("Del", "휴지통으로 삭제", "Del", "Delete to the Recycle Bin"),
+                    R("Shift+Del", "완전 삭제 (휴지통 거치지 않음)",
+                      "Shift+Del", "Delete permanently - not to the Recycle Bin"),
+                    // The one place a delete still asks, so it is the one place
+                    // the help has to say why.
+                    R("네트워크 위치에서 삭제", "휴지통이 없어 확인 후 완전 삭제",
+                      "Deleting from a network location", "There is no Recycle Bin there, so it asks first"),
                     R("Ctrl+C · Ctrl+X · Ctrl+V", "복사 · 잘라내기 · 붙여넣기",
                       "Ctrl+C · Ctrl+X · Ctrl+V", "Copy · cut · paste"),
                     R("Ctrl+Shift+C", "경로 복사", "Ctrl+Shift+C", "Copy path"),
-                    R("드래그", "이동 (다른 앱으로도 가능)", "Drag", "Move it - to another app as well"),
+                    // Said as COPY since 2026-08-13. It always was one - the row
+                    // had claimed 이동 since the drag shipped, which is the kind
+                    // of line that sends someone looking for a feature that is
+                    // there and a behaviour that is not.
+                    R("드래그", "같은 드라이브는 이동, 다른 드라이브는 복사",
+                      "Drag", "Move within a drive, copy between drives"),
+                    R("다른 앱으로 드래그", "복사", "Drag to another app", "Copy"),
+                    // The KEY column carries the timing, because that is the
+                    // part that gets missed: Shift+클릭 is already 범위 선택, so
+                    // holding it first selects instead of dragging.
+                    R("드래그 중 Shift · Ctrl", "이동 · 복사 고정",
+                      "Shift · Ctrl while dragging", "Force a move · force a copy"),
                     R("Ctrl+Alt+K", "북마크 표시 · 해제", "Ctrl+Alt+K", "Bookmark, or take it back"),
                     R("Ctrl+Alt+L · J", "다음 · 이전 북마크로 이동", "Ctrl+Alt+L · J", "Next · previous bookmark"),
                     // The parenthesis is the part a menu label cannot say, and
@@ -346,6 +363,14 @@ public static class HelpContent
                 {
                     R("옵션 → 색상 설정", "직접 선택 · 랜덤 지정", "Options → Colours", "Pick them, or roll the dice"),
                     R("옵션 → 기본 설정", "자동 시작 · 트레이 · 아이콘 · 자동 숨김", "Options → General", "Autostart · tray · icons · auto-hide"),
+                    R("옵션 → 기본 설정 → 드래그로 이동", "끄면 드래그는 항상 복사, 이동은 Shift",
+                      "Options → General → Drag Moves", "Off, a drag always copies and Shift is the way to move"),
+                    // The cost goes on the row, not in a paragraph: it is the
+                    // one setting here that can make the tree slower.
+                    R("옵션 → 한 번에 표시할 개수", "50 다음은 전체 — 큰 폴더에서는 느려짐",
+                      "Options → Items per Folder", "One step past 50 is All - a big folder will feel it"),
+                    R("옵션 → 네트워크 위치", "드라이브 문자 없는 공유 추가 (\\\\서버\\공유)",
+                      "Options → Network Locations", "Add a share with no drive letter (\\\\server\\share)"),
                 }),
             }),
     };

@@ -11740,20 +11740,43 @@ public partial class MainWindow : Window
     // from the key directly rather than from what the drag negotiated.
     private const string InternalDragFormat = "Edgetree.InternalDrag";
 
-    // Which of the two a drop is. The switch turns the pair around rather than
-    // adding a third state: with it off Shift asks for a move, with it on Ctrl
-    // asks for a copy - the same two keys Explorer uses, meaning the same two
-    // things, with only the unmodified drag changing hands.
-    private bool IsMoveDrop(DragEventArgs e)
+    // EXPLORER'S RULE, and all three parts of it (2026-08-13):
+    //
+    //   Shift  - move, wherever it lands
+    //   Ctrl   - copy, wherever it lands
+    //   neither - move within the same volume, copy across volumes
+    //
+    // The last line is the one worth writing down. A same-volume move is a
+    // rename and costs nothing; across volumes it is a full copy followed by a
+    // delete, and nobody dragging a 13GB file onto another drive is asking for
+    // that to happen quietly. Explorer draws exactly this line, which is also
+    // why a drag between drives there says "복사" on the cursor.
+    //
+    // The switch decides only what an UNMODIFIED drag means. Turned off, a
+    // plain drag copies wherever it goes and Shift is the way to move - the
+    // behaviour this tree had before any of it, kept for anyone who wants a
+    // drag that can never take a file away.
+    private bool IsMoveDrop(DragEventArgs e, IReadOnlyList<string> sources, string destination)
     {
         if (!e.Data.GetDataPresent(InternalDragFormat))
         {
             return false;
         }
 
+        if ((e.KeyStates & DragDropKeyStates.ShiftKey) != 0)
+        {
+            return true;
+        }
+
+        if ((e.KeyStates & DragDropKeyStates.ControlKey) != 0)
+        {
+            return false;
+        }
+
+        // Every source has to be on the destination's volume. A mixed
+        // selection falls to a copy rather than moving half of it.
         return _settings.DragMovesInsideTree
-            ? (e.KeyStates & DragDropKeyStates.ControlKey) == 0
-            : (e.KeyStates & DragDropKeyStates.ShiftKey) != 0;
+            && sources.All(p => FileOperationService.IsSameVolumePair(p, destination));
     }
 
     // Which folder a drop on this row lands in: the row itself when it's a
@@ -11871,7 +11894,7 @@ public partial class MainWindow : Window
         }
 
         string? error;
-        if (IsMoveDrop(e))
+        if (IsMoveDrop(e, importablePaths, item.FullPath))
         {
             if (!FileOperationService.TryMoveDroppedPaths(
                     importablePaths, item.FullPath, out var emptied, out error))

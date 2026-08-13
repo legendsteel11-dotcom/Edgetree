@@ -291,6 +291,24 @@ public static class FileOperationService
             trimmedCandidate.StartsWith(trimmedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     }
 
+    // Public since 2026-08-13: the drag decides what it means with it. Same
+    // volume is a rename and costs nothing; across volumes a "move" is a full
+    // copy followed by a delete, which on a big file over a network is a long
+    // silent operation nobody asked for by dragging.
+    public static bool IsSameVolumePair(string a, string b)
+    {
+        try
+        {
+            return IsSameVolume(a, b);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            // Unanswerable means "not the same", which falls to a copy - the
+            // safe half of the pair.
+            return false;
+        }
+    }
+
     private static bool IsSameVolume(string a, string b)
         => string.Equals(Path.GetPathRoot(Path.GetFullPath(a)), Path.GetPathRoot(Path.GetFullPath(b)),
             StringComparison.OrdinalIgnoreCase);
