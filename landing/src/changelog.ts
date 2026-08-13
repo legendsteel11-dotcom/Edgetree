@@ -20,6 +20,31 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // The author's own four lines, used as written. The first groups what the
+    // release notes list one by one - drag to move, Shift+Delete, a folder
+    // copied beside itself - under the thing they have in common, which is the
+    // gesture someone already knows from Explorer. The second names where to
+    // find the new item rather than describing it.
+    //
+    // 일치시킴, NOT 통합, and the author's own correction: "통합" reads as all of
+    // Explorer's features being in here, which is a promise this app does not
+    // make and does not want to be measured against. What is true is narrower -
+    // the file gestures it already had now behave the way Explorer's do.
+    version: 'v2.0.5',
+    ko: [
+      '앱의 탐색기 기능과 윈도우 탐색기 기능을 일치시킴',
+      '네트워크 위치 추가 기능(빈 곳에 우클릭 메뉴)',
+      '폴더 내 파일 전체 펼치기 옵션',
+      '버그 수정 및 안정성 개선',
+    ],
+    en: [
+      "The app's file operations brought in line with Windows Explorer's",
+      'Add a network location (right-click the empty area)',
+      'Option to show every file in a folder at once',
+      'Bug fixes and stability improvements',
+    ],
+  },
+  {
     version: 'v2.0.4',
     ko: [
       '트리 위치 표시 보완',
