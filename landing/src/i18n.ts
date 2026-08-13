@@ -56,21 +56,24 @@ const dict = {
         // to take on their own. "처음 실행 후" belongs here rather than in the
         // hero - by this point the reader is being shown how to use it.
         { title: '트리를 내 작업에 맞게 줄이기', desc: '처음 실행 후 작업에 불필요한 폴더를 감추고, 하단 바의 필터로 볼 파일 종류를 선택해 보세요. 트리가 훨씬 짧아지고, 찾는 것이 눈에 바로 들어옵니다.' },
-        { title: '도킹 / 자동접기 / 창모드 전환', desc: '제목표시줄 핀 클릭 한 번으로 화면 가장자리에 얇게 숨고, 마우스를 가장자리로 가져가면 다시 펼쳐집니다. 제목표시줄을 드래그하여 창모드로 전환할 수 있습니다.' },
-        { title: '간단한 파일 검색', desc: '제목표시줄의 검색 아이콘 혹은 Ctrl + F / Ctrl + E 로 검색창과 탐색기 창을 전환하고 간단한 파일 검색을 할 수 있습니다.' },
+        { title: '도킹 / 자동접기 / 창모드 전환', desc: '제목표시줄 핀 클릭 한 번으로 화면 가장자리에 얇게 숨고, 마우스를 가장자리로 가져가면 다시 펼쳐집니다. 제목표시줄을 드래그하여 창모드로 전환할 수 있습니다. 좌/우측 혹은 다른 모니터에 적용이 가능합니다.' },
+        { title: '파일 검색 및 네트워크 경로 등록', desc: '제목표시줄의 검색 아이콘 혹은 Ctrl + F / Ctrl + E 로 검색창과 탐색기 창을 전환하고 간단한 파일 검색을 할 수 있습니다. 또 네트워크 폴더를 등록하여 트리에서 언제든지 사용할 수 있습니다.' },
         { title: '컨텍스트 메뉴 및 파일 액세스', desc: '탐색기에서 폴더나 파일을 우클릭하여 기본적인 기능 등을 편리하게 사용할 수 있습니다. 이미지 파일은 열지 않고도 메뉴 상단의 미리보기로 바로 확인됩니다. 파일을 창 외부로 복사하거나, VS Code의 탐색기에 바로 등록할 수 있습니다.' },
         { title: '전체 펼침/접기, 자동 아코디언', desc: '제목바의 ▲ 아이콘으로 펼쳐진 폴더 트리 전체를 한 번에 접었다 복원할 수 있습니다. 또 필요한 폴더만 펼치고 나머지는 자동으로 접히게 할 수 있습니다.' },
+        { title: '멀티미디어 패널', desc: '트리 우측의 멀티미디어 패널을 펼쳐 이미지/음악/영상 등을 확인하거나 재생할 수 있습니다. 이미지의 경우 확대/축소/팬/바탕화면 지정(모니터 개별), 슬라이드쇼 기능을 지원하고 음악의 경우 작업 중 백그라운드 재생이 가능합니다. 영상은 HDR 보정과 자막을 지원합니다.' },
+        { title: '경로 직접 입력 및 히스토리 기능', desc: '트리 하단의 입력칸에 경로를 직접 입력하여 빠르게 이동할 수 있습니다. 또 작업 중 사용했던 폴더로 Ctrl + ← / → 키 및 버튼을 눌러 이동이 가능합니다.' },
+        { title: '설정 프리셋 기능', desc: '최대 5개의 형태로 앱의 전체 설정을 미리 저장해 놓고 필요할 때 빠르게 선택하여 사용할 수 있습니다. 예를 들어 음악 재생용일 경우는 미니 MP3 플레이어 형태로, 이미지 작업용일 경우 이미지 파일만 필터로 지정하고 멀티미디어 패널이 열린 상태로, 완전한 탐색기로 사용할 경우 최대 높이와 적절한 텍스트 크기 등을 저장해 놓을 수 있어 편리합니다.' },
       ],
     },
     screenshots: {
       title: '주요기능',
       items: [
         {
-          title: '이미지 뷰어',
+          title: '멀티미디어 패널 — 이미지',
           desc: '폴더에 포함된 이미지 전체를 빠르게 넘기며 볼 수 있습니다. 확대/축소/전체화면 및 내비게이터 기능, 썸네일 실시간 크기조정이 가능하고 바로 끌어 작업할 수 있습니다. 바탕화면 지정도 가능합니다.',
         },
         {
-          title: '음악 · 영상 재생',
+          title: '멀티미디어 패널 — 음악 · 영상',
           desc: '주요 음원을 재생합니다. 백그라운드 재생기능으로 다른 일반 작업과 병행이 가능하고 대부분의 영상을 HDR 보정 및 자막과 함께 감상할 수 있습니다.',
         },
         {
@@ -217,21 +220,24 @@ const dict = {
       title: 'How to Use',
       steps: [
         { title: 'Cut the tree down to your work', desc: 'Right after the first launch, hide the folders you never touch and pick the file kinds you want from the bottom bar. The tree gets much shorter, and what you are looking for is simply there.' },
-        { title: 'Dock / Auto-Hide / Window Mode', desc: 'One click on the titlebar pin tucks it away to a thin sliver at the screen edge; move your mouse there to bring it back. Drag the titlebar to switch into a floating window.' },
-        { title: 'Quick File Search', desc: "The titlebar's search icon (or Ctrl + F / Ctrl + E) toggles between the search box and the explorer for a quick file lookup." },
+        { title: 'Dock / Auto-Hide / Window Mode', desc: 'One click on the titlebar pin tucks it away to a thin sliver at the screen edge; move your mouse there to bring it back. Drag the titlebar to switch into a floating window. It works on either side of the screen, and on any monitor you have.' },
+        { title: 'File Search & Network Locations', desc: "The titlebar's search icon (or Ctrl + F / Ctrl + E) toggles between the search box and the explorer for a quick file lookup. You can also register a network folder and reach it from the tree at any time." },
         { title: 'Context Menu & File Access', desc: 'Right-click a folder or file in the explorer for the essentials at hand — image files show a preview right at the top of the menu, no need to open them. Copy files out to another window, or send them straight to the VS Code explorer.' },
         { title: 'Collapse/Restore All & Auto Accordion', desc: 'The ▲ icon on the titlebar collapses or restores the whole expanded tree at once; you can also keep only the folder you open expanded while the rest auto-collapse.' },
+        { title: 'Multimedia Panel', desc: 'Open the multimedia panel on the right of the tree to view or play images, music and video. Images get zoom, pan, a desktop background you set per monitor, and a slideshow; music keeps playing in the background while you work. Video comes with HDR correction and subtitles.' },
+        { title: 'Path Bar & History', desc: 'Type a path straight into the box below the tree to go there. You can also step through the folders you have already been in with Ctrl + ← / → or the two buttons.' },
+        { title: 'Setting Presets', desc: "Save the app's whole setup as up to five presets and pick the one you need. A mini MP3 player for listening to music; an image-only filter with the multimedia panel already open for picture work; full height and a comfortable text size for using it as a proper explorer." },
       ],
     },
     screenshots: {
       title: 'Key Features',
       items: [
         {
-          title: 'Image viewer',
+          title: 'Multimedia panel — images',
           desc: 'Flip quickly through every image a folder holds. Zoom, full screen and a navigator, thumbnails you resize as you go, and drag one straight out to work with. It can set your desktop background too.',
         },
         {
-          title: 'Music and video',
+          title: 'Multimedia panel — music and video',
           desc: 'Plays the common audio formats. Background playback keeps the sound going while you carry on with something else, and most video plays with HDR correction and subtitles.',
         },
         {
