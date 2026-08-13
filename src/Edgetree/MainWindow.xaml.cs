@@ -12001,10 +12001,58 @@ public partial class MainWindow : Window
                     RemoveFromMultiSelection(target);
                     if (treeViewItem.IsSelected)
                     {
-                        // Un-highlight for real: this row was both natively
-                        // selected and in the set; dropping only the flag would
-                        // leave the native highlight painting it selected.
-                        treeViewItem.IsSelected = false;
+                        // THE SET NEEDS A NATIVE SELECTION INSIDE IT. The
+                        // invariant this whole region rests on (see the
+                        // _multiSelection declaration) is that while the set is
+                        // non-empty, the natively-selected row is one of its
+                        // members - and dropping the row that WAS the native
+                        // selection used to leave the tree with none at all,
+                        // set still full. WPF does not leave a focused
+                        // TreeView selection-less for long: the next thing to
+                        // move focus or selection lands somewhere outside the
+                        // set, which trips the collapse in
+                        // SelectedItemChangedCore and takes the view with it.
+                        // That is the 2026-08-13 report - "Ctrl 클릭으로 마지막
+                        // 하나를 해제하면 선택이 전부 무효되고 팍 이동" -
+                        // intermittent because it depends on what moves next.
+                        //
+                        // So hand the selection to a surviving member instead.
+                        // Explorer does the same: un-picking one of several
+                        // leaves the rest picked, and one of them current.
+                        // Only a REALIZED row can take it (an unrealized one
+                        // has no container to select, and forcing one to
+                        // realize would scroll - the very thing being fixed);
+                        // with none available the old behaviour stands, which
+                        // is no worse than it was.
+                        var successor = _multiSelection.Count > 0
+                            ? _multiSelection[^1]
+                            : null;
+                        var successorContainer = successor is null
+                            ? null
+                            : FindRealizedContainer(successor);
+                        if (successorContainer is not null)
+                        {
+                            // Selected AND focused, for the same reason the
+                            // add branch focuses: Ctrl+C/Delete are read from
+                            // ExplorerTree_KeyDown, which needs the tree to
+                            // hold keyboard focus. Already on screen, so the
+                            // focus-driven BringIntoView has nothing to do.
+                            successorContainer.IsSelected = true;
+                            successorContainer.Focus();
+                        }
+                        else
+                        {
+                            // Un-highlight for real: this row was both natively
+                            // selected and in the set; dropping only the flag
+                            // would leave the native highlight painting it
+                            // selected.
+                            treeViewItem.IsSelected = false;
+                        }
+
+                        LogClickLine(
+                            $"multi ctrl-remove: {target.Name} left={_multiSelection.Count} " +
+                            $"successor={successor?.Name ?? "-"}" +
+                            $"{(successor is not null && successorContainer is null ? " (unrealized)" : "")}");
                     }
                 }
                 else
