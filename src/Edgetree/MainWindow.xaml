@@ -5029,13 +5029,76 @@
                          above comes and goes - so the footer only grows while a
                          track is held, which is a state the user switched on. -->
                     <Grid x:Name="FooterNowPlayingRow"
-                            Margin="8,0,4,6"
+                            Margin="8,2,8,6"
                             Visibility="Collapsed">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
+                        <!-- THE SAME PLATE THE TRANSPORT WEARS, on purpose
+                             (2026-08-13, user request: "우측의 음악 콘트롤 영역
+                             톤으로 맞춰"). Same brush, same opacity, same corner
+                             as ViewerMediaPlate's detached state - not a colour
+                             copied across, because the two are the same thing
+                             said in two places and a second number would drift
+                             from the first.
+
+                             ...AND THAT WAS NOT ENOUGH. Copying the recipe was
+                             tried first and measured: the plate landed on
+                             #252628 over a #191619 ground, i.e. exactly the
+                             colour the transport's own plate resolves to, and
+                             still read as far weaker ("좀 많이 약한데요"). Same
+                             colour, different job - the transport's plate is a
+                             tall block under a whole bank of controls, while
+                             this is one thin strip, and twelve levels of lift
+                             that carry a block do not carry a line.
+                             So the brush moves up a step: a raised surface,
+                             not a hover wash, for about thirty levels over the
+                             ground. That the two are no longer the same value
+                             is the point - matching them by number was what
+                             failed to match them by eye.
+
+                             Its own element behind the row rather than a
+                             background on the Grid, for the reason the viewer's
+                             carries: opacity on the container would take the
+                             name and the buttons down with it. -->
+                        <!-- Spans the row and reaches a little past the content
+                             on every side, so the mark and the stop button sit
+                             INSIDE it rather than on its rim - the padding the
+                             user allowed for ("영역과 패딩이 살짝 들어와도
+                             괜찮습니다"). The row's own margin was widened by the
+                             same amounts, so the plate lands where the content
+                             used to and nothing moves outward. -->
+                        <!-- AND THE WHOLE PLATE LIFTS UNDER THE POINTER, keyed
+                             off the ROW rather than off itself: the plate sits
+                             behind its own siblings, so its own IsMouseOver
+                             would only be true in the gaps between them and the
+                             lift would flicker as the hand crossed the name.
+                             The row is the thing the hand is over.
+
+                             One step, deliberately small (the user's "살짝").
+                             The name keeps its own brighter fill on top, and
+                             the two are saying different things - the plate
+                             says this row is live, the fill says which part of
+                             it you are about to hit. -->
+                        <Border Grid.ColumnSpan="3"
+                                Margin="-4,-2,-4,-2"
+                                Background="{DynamicResource ControlBackground}"
+                                CornerRadius="6">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Opacity" Value="0.85"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Value="True"
+                                                Binding="{Binding IsMouseOver,
+                                                    ElementName=FooterNowPlayingRow}">
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                        </Border>
                         <!-- Material Symbols "music_note". The row only ever
                              shows for audio (see ViewerBackgroundPlaying), so
                              the mark can be literal. -->
@@ -5045,9 +5108,27 @@
                                 Width="{DynamicResource ViewerChipIconSize}"
                                 Height="{DynamicResource ViewerChipIconSize}"
                                 Fill="{DynamicResource ForegroundText}"
-                                Opacity="0.65"
                                 VerticalAlignment="Center"
-                                Margin="0,0,5,0"/>
+                                Margin="0,0,5,0">
+                            <!-- Comes up with the plate, off the same row, so
+                                 the strip answers the pointer as ONE thing
+                                 rather than as a lit background with a dim mark
+                                 still sitting on it. Opacity is the right tool
+                                 here and only here in this row - see the note
+                                 on the name below. -->
+                            <Path.Style>
+                                <Style TargetType="Path">
+                                    <Setter Property="Opacity" Value="0.65"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Value="True"
+                                                Binding="{Binding IsMouseOver,
+                                                    ElementName=FooterNowPlayingRow}">
+                                            <Setter Property="Opacity" Value="0.9"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
                         <!-- The name is the way BACK: clicking it opens the
                              viewer on the track it names, which is the same
                              direction the tree row menu's 보기 goes. One rule,
@@ -5082,23 +5163,60 @@
                                 Margin="0,0,4,0"
                                 Cursor="Hand"
                                 MouseLeftButtonUp="FooterNowPlaying_Click">
+                            <!-- THE NAME IS NO LONGER DIMMED AT REST (2026-08-13).
+                                 It sat at 0.65 so the row would read as quiet,
+                                 which measured out as #7A7C7F ink on the plate
+                                 - the "hover를 해도 글자가 잘 안보이구요" half of
+                                 the same report, and the exact thing
+                                 [[never-dim-menu-text]] is about: text says
+                                 "secondary" with size, never with opacity. The
+                                 mark to its left keeps its own 0.65, because
+                                 that rule is about text and a glyph is where
+                                 opacity is the right tool.
+
+                                 The hover fill moved up with the plate. The
+                                 tree's own hover ink is #2A2C32, which was a
+                                 step above the bare footer and is a step BELOW
+                                 the plate now - so hovering did nothing
+                                 visible. A hover has to be brighter than
+                                 whatever it lands on, and what it lands on
+                                 here is a raised surface. -->
                             <Border.Style>
                                 <Style TargetType="Border">
-                                    <Setter Property="Opacity" Value="0.65"/>
                                     <Style.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
                                             <Setter Property="Background"
-                                                    Value="{DynamicResource TreeRowHoverBackground}"/>
-                                            <Setter Property="Opacity" Value="1"/>
+                                                    Value="{DynamicResource ControlHoverBackground}"/>
                                         </Trigger>
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
+                            <!-- Foreground lives in the STYLE, not on the
+                                 element: a local value would silently beat the
+                                 row-hover trigger below and the name would be
+                                 the one thing on the strip that failed to
+                                 answer (the local-Margin lesson, same rule).
+                                 The step is ForegroundText -> HighlightForeground,
+                                 the same pair the chips' own hover uses. -->
                             <TextBlock x:Name="FooterNowPlayingText"
-                                    Foreground="{DynamicResource ForegroundText}"
                                     FontSize="{DynamicResource FooterChipFontSize}"
                                     TextTrimming="CharacterEllipsis"
-                                    VerticalAlignment="Center"/>
+                                    VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground"
+                                                Value="{DynamicResource ForegroundText}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Value="True"
+                                                    Binding="{Binding IsMouseOver,
+                                                        ElementName=FooterNowPlayingRow}">
+                                                <Setter Property="Foreground"
+                                                        Value="{DynamicResource HighlightForeground}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </Border>
                         <!-- STOP, not pause. Half of what this row is for is
                              that the switch which releases the file lives in the
@@ -5107,9 +5225,37 @@
                              stays with no way out of it. -->
                         <Button x:Name="FooterNowPlayingStop"
                                 Grid.Column="2"
-                                Style="{StaticResource FooterActionGlyphChipStyle}"
                                 Click="FooterNowPlayingStop_Click"
                                 ToolTip="{x:Static services:Strings.ViewerStop}">
+                            <!-- The chip, plus a half-step up while the ROW is
+                                 hovered (0.65 -> 0.9, the mark's own numbers) -
+                                 so the whole strip brightens as one thing under
+                                 the pointer ("요소들이 전부 좀 밝아지면",
+                                 2026-08-13). The second condition keeps this
+                                 trigger out of the way of a direct hover: a
+                                 Style trigger outranks the template's own
+                                 IsMouseOver, so without it the button pointed
+                                 at directly would sit at 0.9 instead of its
+                                 full 1.0. -->
+                            <Button.Style>
+                                <Style TargetType="Button"
+                                        BasedOn="{StaticResource FooterActionGlyphChipStyle}">
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Value="True"
+                                                        Binding="{Binding IsMouseOver,
+                                                            ElementName=FooterNowPlayingRow}"/>
+                                                <Condition Value="False"
+                                                        Binding="{Binding IsMouseOver,
+                                                            RelativeSource={RelativeSource Self}}"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Opacity"
+                                                    Value="0.9"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                             <Path Data="M336-624v288-288Zm-72 360v-432h432v432H264Zm72-72h288v-288H336v288Z"
                                     Stretch="Uniform"
                                     Width="{DynamicResource ViewerChipIconSize}"
