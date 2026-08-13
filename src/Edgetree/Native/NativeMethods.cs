@@ -349,25 +349,19 @@ internal static class NativeMethods
         SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
     }
 
-    // Shared by every Edgetree process regardless of build/version -
-    // RegisterWindowMessage guarantees the OS hands back the same id
-    // system-wide for the same string, so a second instance can broadcast it
-    // (see BroadcastActivateMessage) and the first instance's own WndProc
-    // hook (MainWindow.xaml.cs's MainWindow_SourceInitialized) recognizes it
-    // without any other shared state between the two processes.
-    public static readonly uint ActivateMessage =
-        RegisterWindowMessage("Edgetree-Activate-8f1d6b2e-4a3f-4c9e-9b1a-2d7e5c6f8a90");
-
-    // Broadcast rather than targeting a specific hwnd - a second instance has
-    // no reliable way to find the first instance's hwnd directly (it may be
-    // docked/tool-window or hidden to the tray), but every top-level window
-    // on the system receives a broadcast, so the surviving instance's own
-    // hook just needs to recognize its registered message id and every other
-    // window on the system silently ignores it.
-    public static void BroadcastActivateMessage()
-    {
-        PostMessage(HwndBroadcast, ActivateMessage, IntPtr.Zero, IntPtr.Zero);
-    }
+    // GONE (2026-08-13): a registered window message posted to HWND_BROADCAST,
+    // which is how a second launch used to ask the running instance to come
+    // forward. The reasoning was that a broadcast reaches every top-level
+    // window, so the second process would not have to find the first one's
+    // hwnd - and the flaw is in a single word of that guarantee. A broadcast
+    // reaches invisible and disabled top-level windows, but only UNOWNED ones,
+    // and this app's window is owned whenever ShowInTaskbar is false, which is
+    // every docked moment - i.e. almost always. It was posted and never
+    // arrived. App.OnStartup uses a named EventWaitHandle instead; a kernel
+    // event cannot be filtered out by a window style.
+    //
+    // If a window message is ever wanted here again, it has to be sent to a
+    // hwnd this app finds for itself, not broadcast.
 
     // Our sidebar typically has foreground focus at the moment it launches a
     // sibling process (e.g. opening a file), and Windows' foreground-lock

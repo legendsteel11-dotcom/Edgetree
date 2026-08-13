@@ -217,6 +217,27 @@ public class AppSettings
     // customize it.
     public double AutoHideSliverWidth { get; set; } = 3;
 
+    // The handle's own thickness, separate from the sliver's above because the
+    // two are not the same object. The sliver is a TRIGGER - it is meant to sit
+    // on the edge unnoticed until the pointer touches it, which is why 3px is
+    // its sensible floor. The handle is a CONTROL, and has to be found by eye
+    // before it can be aimed at.
+    //
+    // It used to share the number above, floored at 6 - so the sliver's own
+    // "without eating much screen edge" ceiling of 8 was quietly the handle's
+    // ceiling too. 6px of the sidebar's background colour (which is what the
+    // handle's default colour follows) is a bar that vanishes outright against
+    // a dark wallpaper, and on a multi-monitor setup it sits on the seam
+    // between two displays where nothing draws the eye to it. That is a bug
+    // report from 2026-08-13 (see MainWindow.RestoreFromOutside for the other
+    // half of it).
+    //
+    // 8 rather than the 6 it used to floor at: a deliberately small nudge. The
+    // handle's problem was never mostly its thickness - it was its HEIGHT and
+    // its colour - and a bar thick enough to be found by width alone is a bar
+    // that has started eating the screen edge.
+    public double AutoHideHandleWidth { get; set; } = 8;
+
     // Collapse to a short handle at the middle of the screen edge instead of a
     // sliver running its whole height.
     //
@@ -683,6 +704,7 @@ public class AppSettings
         ViewerWidth = Sane(ViewerWidth, 360, min: 1);
         ViewerFilmstripCellHeight = Sane(ViewerFilmstripCellHeight, 64, min: 1);
         AutoHideSliverWidth = Sane(AutoHideSliverWidth, 3, min: 1);
+        AutoHideHandleWidth = Sane(AutoHideHandleWidth, 8, min: 1);
         TreeFontSize = Sane(TreeFontSize, 12, min: 1);
         FavoritesPanelHeight = Sane(FavoritesPanelHeight, 100, min: 0);
         DockedHeightRatio = Sane(DockedHeightRatio, 1.0, min: 0, max: 1);

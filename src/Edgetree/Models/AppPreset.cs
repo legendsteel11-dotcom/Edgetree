@@ -58,6 +58,7 @@ public class AppPreset
         // 자동 숨김이 어떻게 동작하는지. The state above is which one it is in;
         // these are the terms it is in it on.
         nameof(AppSettings.AutoHideSliverWidth),
+        nameof(AppSettings.AutoHideHandleWidth),
         nameof(AppSettings.AutoHideUseHandle),
         nameof(AppSettings.AutoHideSlide),
         nameof(AppSettings.AutoHideCloseOnMouseLeave),

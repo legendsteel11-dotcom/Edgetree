@@ -21,6 +21,25 @@ public partial class App : Application
     // released early by the GC - see OnStartup/OnExit.
     private Mutex? _singleInstanceMutex;
 
+    // How a second launch reaches the instance that is already running. Named,
+    // so the two processes need nothing else in common - the same reasoning the
+    // mutex above is named for.
+    //
+    // This replaced a PostMessage to HWND_BROADCAST (2026-08-13). A broadcast
+    // reaches every top-level window "including disabled or invisible UNOWNED
+    // windows" - and this app's window is owned for most of its life: docked
+    // means ShowInTaskbar=false, and WPF implements that by parking the window
+    // under a hidden owner. So the message went out and simply never arrived,
+    // in exactly the state the app normally sits in. Measured, not deduced: the
+    // tray's own routes into RestoreMainWindow worked in the same session where
+    // re-running the exe did nothing at all.
+    //
+    // A kernel event has no opinion about window styles, ownership, z-order or
+    // visibility, which is what makes it the right shape for "the window may be
+    // a sliver, hidden to the tray, or behind everything".
+    private EventWaitHandle? _activateSignal;
+    private RegisteredWaitHandle? _activateWait;
+
     // Minimize-to-tray (MainWindow's "_" button calls Hide(), not Close()) needs
     // some way back - so the icon stays visible regardless of the "always show
     // tray icon" setting whenever the window is currently hidden.
@@ -162,16 +181,37 @@ public partial class App : Application
         // still see each other as the same app - the whole point is blocking
         // duplicate launches regardless of which exe/version is running.
         _singleInstanceMutex = new Mutex(true, "Local\\Edgetree-SingleInstance-8f1d6b2e-4a3f-4c9e-9b1a-2d7e5c6f8a90", out bool createdNew);
+        _activateSignal = new EventWaitHandle(false, EventResetMode.AutoReset,
+            "Local\\Edgetree-Activate-8f1d6b2e-4a3f-4c9e-9b1a-2d7e5c6f8a90");
+
         if (!createdNew)
         {
             // Another Edgetree process already holds the mutex - ask it to
             // come to the foreground instead of opening a second window, and
             // exit before constructing anything (window, tray icon, Strings)
-            // so there's no flicker. MainWindow_SourceInitialized's WndProc
-            // hook is what receives this on the other end.
-            NativeMethods.BroadcastActivateMessage();
+            // so there's no flicker. Deliberately no "already running" notice:
+            // the answer to launching an app that is already up is the app,
+            // not a dialog about it.
+            //
+            // Windows' foreground lock would otherwise hold the other process's
+            // window behind whatever is in front, since this process is the one
+            // that was just launched; handing our claim over is what lets the
+            // restore actually surface.
+            NativeMethods.AllowNextWindowToActivate();
+            _activateSignal.Set();
             Environment.Exit(0);
         }
+
+        // Fires on a pool thread whenever a later launch signals, for as long
+        // as this process lives (executeOnlyOnce: false - the exe can be run
+        // any number of times). Hopped onto the UI thread because everything
+        // RestoreMainWindow touches is a window.
+        _activateWait = ThreadPool.RegisterWaitForSingleObject(
+            _activateSignal,
+            (_, _) => Dispatcher.BeginInvoke(new Action(RestoreMainWindow)),
+            state: null,
+            millisecondsTimeOutInterval: Timeout.Infinite,
+            executeOnlyOnce: false);
 
         // Must run before base.OnStartup(e) - that call is what actually
         // constructs the StartupUri (MainWindow) window, and every x:Static
@@ -331,12 +371,16 @@ public partial class App : Application
             return;
         }
 
-        if (window.IsVisible)
+        // NOT window.IsVisible: an auto-hidden sidebar is a few pixels of screen
+        // edge and passes that test, so this row used to offer to hide a window
+        // the user could not see in the first place, and never offered to open
+        // one (see MainWindow.RestoreFromOutside).
+        if (window is MainWindow { IsShowingToUser: true } shown)
         {
             // Same persist-before-hiding rule as the title bar's "_" button -
             // see MainWindow.MinimizeButton_Click for why.
-            (window as MainWindow)?.SaveStateBeforeHiding();
-            window.Hide();
+            shown.SaveStateBeforeHiding();
+            shown.Hide();
             IsTrayIconVisible = true;
         }
         else
@@ -359,16 +403,15 @@ public partial class App : Application
         window.ShowDialog();
     }
 
+    // Every route in from outside the sidebar - a tray click, the tray menu's
+    // 열기, a second launch of the exe - goes through the window's own
+    // RestoreFromOutside, which is where the rule for "put it back on screen"
+    // lives. This used to be Show/Normal/Activate written out here, and that
+    // trio does nothing visible to an auto-hidden window; see that method for
+    // the report.
     public void RestoreMainWindow()
     {
-        if (MainWindow is not { } window)
-        {
-            return;
-        }
-
-        window.Show();
-        window.WindowState = WindowState.Normal;
-        window.Activate();
+        (MainWindow as MainWindow)?.RestoreFromOutside();
     }
 
     // General app "chrome" (menus/context menus/the Color Settings and About
@@ -482,6 +525,10 @@ public partial class App : Application
             NativeMethods.DestroyIcon(_trayUpdateIconHandle);
         }
         _trayBaseIcon?.Dispose();
+        // The wait before the handle it waits on, or the callback can be handed
+        // a disposed event on its way out.
+        _activateWait?.Unregister(null);
+        _activateSignal?.Dispose();
         _singleInstanceMutex?.ReleaseMutex();
         _singleInstanceMutex?.Dispose();
         base.OnExit(e);

@@ -292,11 +292,10 @@ public partial class MainWindow : Window
         // would be decided against defaults; MainWindow_Loaded settles it
         // instead, after the style rewrite above and with the real state.
 
-        // A second Edgetree launch (any build/version) broadcasts this
-        // instead of opening its own window - see App.OnStartup - so this
-        // instance can come to the foreground the same way the tray icon's
-        // "Open" does, regardless of whether it's currently docked or
-        // hidden to the tray.
+        // A second Edgetree launch no longer arrives as a window message - see
+        // the note where BroadcastActivateMessage used to live for why it could
+        // not reach a docked window. App.OnStartup waits on a named event now.
+        // The hook stays for the clipboard listener and the instruments below.
         HwndSource.FromHwnd(hwnd).AddHook(SingleInstanceWndProc);
 
         // Also the only way to hear that our own 잘라내기 has been consumed or
@@ -310,12 +309,7 @@ public partial class MainWindow : Window
 
     private IntPtr SingleInstanceWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == unchecked((int)NativeMethods.ActivateMessage))
-        {
-            (Application.Current as App)?.RestoreMainWindow();
-            handled = true;
-        }
-        else if (msg == WM_WINDOWPOSCHANGED && (_inTopBandDrag || _inBottomBandDrag))
+        if (msg == WM_WINDOWPOSCHANGED && (_inTopBandDrag || _inBottomBandDrag))
         {
             // Instrument only (compiles away in Release): any real geometry
             // change the window manager performed while a band drag ran. The
@@ -2211,17 +2205,38 @@ public partial class MainWindow : Window
     // TabSpacing elsewhere) rather than trusting a hand-edited settings file.
     private double AutoHideSliverWidth => Math.Clamp(_settings.AutoHideSliverWidth, 3, 8);
 
-    // True exactly while the window is standing in as the handle - docked,
-    // auto-hidden, not currently peeked open, and the option on. Everything
-    // about the handle keys off this one expression so the shape can never
-    // disagree with itself.
-    private bool IsCollapsedToHandle =>
-        _isDocked && _settings.IsAutoHidden && !_isAutoHideRevealed && _settings.AutoHideUseHandle;
+    // The handle's own range, and a much wider one than the sliver's - see
+    // AppSettings.AutoHideHandleWidth for why they stopped sharing a number.
+    // 6 is where a handle stops reading as one; 24 is a tab, not a stripe.
+    private const double MinAutoHideHandleWidth = 6;
+    private const double MaxAutoHideHandleWidth = 24;
+
+    private double AutoHideHandleWidth => Math.Clamp(
+        _settings.AutoHideHandleWidth, MinAutoHideHandleWidth, MaxAutoHideHandleWidth);
+
+    // Docked, auto-hidden and not currently peeked open: the window is 3-8px of
+    // screen edge (see CollapsedWidth) whichever shape that takes. On screen in
+    // the technical sense only - which is why anything asking "can the user see
+    // this window" has to ask THIS and not IsVisible (see IsShowingToUser).
+    private bool IsCollapsedToEdge =>
+        _isDocked && _settings.IsAutoHidden && !_isAutoHideRevealed;
+
+    // True exactly while the window is standing in as the handle - collapsed as
+    // above, with the option on. Everything about the handle keys off this one
+    // expression so the shape can never disagree with itself.
+    private bool IsCollapsedToHandle => IsCollapsedToEdge && _settings.AutoHideUseHandle;
+
+    // What "the window is up" means to everything OUTSIDE this window - the
+    // tray icon's menu row and its click handler, both of which used to read
+    // IsVisible. IsVisible is true for a 6px sliver, so the tray offered to
+    // hide a window that was already unreachable, and never offered to open
+    // one (see RestoreFromOutside for the report this comes from).
+    public bool IsShowingToUser => IsVisible && !IsCollapsedToEdge;
 
     // Same width the sliver uses, but with a floor: at the 3px end a handle
     // stops being a handle. The thickness stepper still applies above that.
     private double CollapsedWidth => _settings.AutoHideUseHandle
-        ? Math.Max(AutoHideSliverWidth, 6)
+        ? AutoHideHandleWidth
         : AutoHideSliverWidth;
 
     // The shortest the docked window may be dragged. The header alone is 36px,
@@ -2301,8 +2316,22 @@ public partial class MainWindow : Window
     // Measured from the BAND, not the screen: a sidebar occupying the top third
     // has to leave its handle in that third, or the handle is somewhere the
     // window will never appear.
+    //
+    // The upper clamp was 160, and on any large display that number - not the
+    // 12% - was what decided the height: a 2112px work area asks for 253 and
+    // got 160, i.e. 7.6% of the edge, on the screens with the most edge to
+    // lose it in. A handle that small is hard to FIND, which is the whole job
+    // the 2026-08-13 report says it was failing at (see RestoreFromOutside).
+    // Raised so the share is what governs on a big screen and the clamp goes
+    // back to being what it reads as - a floor for short bands and a ceiling
+    // against absurdity.
+    // The share itself goes up too, and that is the half that actually moves a
+    // shortened band: 12% of a band the user has already dragged down to 60% of
+    // the edge is 12% of a smaller thing twice over, and the old ceiling was
+    // never reached there at all - raising the ceiling alone would have changed
+    // nothing on the very setup that reported it.
     private static double AutoHideHandleHeight(double bandHeight)
-        => Math.Min(bandHeight, Math.Clamp(bandHeight * 0.12, 60, 160));
+        => Math.Min(bandHeight, Math.Clamp(bandHeight * 0.18, 60, 280));
 
     // Only the two corners facing AWAY from the screen edge - the pair against
     // the edge has nothing to show a curve against. Rounding both pairs (which
@@ -6549,8 +6578,9 @@ public partial class MainWindow : Window
         if (FindMenuItem(menu, "trayToggle") is { } toggle)
         {
             // Rewritten every time it opens: the window can be shown or hidden
-            // by the header, the taskbar or auto-hide in between.
-            toggle.Header = IsVisible ? Strings.TrayHide : Strings.TrayOpen;
+            // by the header, the taskbar or auto-hide in between. Auto-hide is
+            // why this cannot be IsVisible - see IsShowingToUser.
+            toggle.Header = IsShowingToUser ? Strings.TrayHide : Strings.TrayOpen;
         }
 
         var update = FindMenuItem(menu, "trayUpdate");
@@ -6606,6 +6636,52 @@ public partial class MainWindow : Window
     {
         ExitLog.Record("tray menu: exit");
         Application.Current.Shutdown();
+    }
+
+    // The one way back in from OUTSIDE this window: a tray icon click, the tray
+    // menu's 열기, and a second launch of the exe (which broadcasts to the
+    // running instance rather than opening a window of its own - see
+    // App.OnStartup) all land here.
+    //
+    // It has to do more than Show(). An auto-hidden sidebar is a few pixels of
+    // screen edge, so Show()/Activate() on one puts nothing the user can see
+    // back on the screen - and that is the whole of a bug report from 2026-08-13:
+    // multiple monitors, the sidebar auto-hidden onto the edge two of them
+    // share (where a cursor crosses to the neighbouring display instead of
+    // resting on the sliver), and every way back returning the same invisible
+    // window. Re-running the exe was worse than useless there: the second
+    // process hands off to this one and exits, so the app reads as permanently
+    // gone with no way left to reach it.
+    //
+    // It PINS the window open (ExitAutoHide) rather than peeking it: a peek
+    // closes again at the next click elsewhere, which puts whoever could not
+    // hover the sliver in the first place straight back where they were. Asking
+    // for the window from outside is a deliberate act, and the answer to it
+    // should be a window that stays. Auto-hide is one click away again on the
+    // pin button, which is the single control that owns that state.
+    public void RestoreFromOutside()
+    {
+        if (!IsVisible)
+        {
+            Show();
+        }
+
+        if (_isDocked && _settings.IsAutoHidden)
+        {
+            // Width and content first: ExitAutoHide only clears the state and
+            // its timers, so on its own it would leave a 6px window that
+            // believes it is expanded. The reveal is what actually re-sizes it
+            // (AnimateWidth runs synchronously), and doing it in this order
+            // means the window arrives at full size exactly once.
+            if (!_isAutoHideRevealed)
+            {
+                RevealFromAutoHide();
+            }
+            ExitAutoHide();
+        }
+
+        WindowState = WindowState.Normal;
+        Activate();
     }
 
     private void HideToTray()
@@ -6831,7 +6907,9 @@ public partial class MainWindow : Window
             }
             UpdateStepperRow(tabSpacingRow, _settings.TabSpacing, 4, 24);
             UpdateStepperRow(rowSpacingRow, _settings.RowSpacing, -4, 8);
-            UpdateStepperRow(autoHideSliverWidthRow, _settings.AutoHideSliverWidth, 3, 8);
+            var collapsedWidth = CollapsedWidthStepperRange();
+            UpdateStepperRow(autoHideSliverWidthRow,
+                collapsedWidth.Value, collapsedWidth.Min, collapsedWidth.Max);
             UpdateStepperRow(scrollBarThicknessRow, _settings.ScrollBarThickness, 6, 20);
 
             // languageMenu's first child is the non-interactive restart note
@@ -9806,26 +9884,45 @@ public partial class MainWindow : Window
     private void AutoHideSliverWidthIncrement_Click(object sender, RoutedEventArgs e)
         => StepAutoHideSliverWidth(sender, +1);
 
-    // Clamped to the user-specified 3~8 range - 3 is the original hardcoded
-    // sliver width (thin enough that going lower risks the mouse missing it
-    // entirely), 8 is thick enough to be an easy target without eating much
-    // screen edge. Purely cosmetic for the next time the window actually
-    // collapses to the sliver (EnterAutoHide/CloseAutoHideReveal both read
-    // the AutoHideSliverWidth property fresh) - not applied live because the
-    // Options button that reaches this setting is itself hidden (see
-    // SetExpandedContentVisibility) for as long as the window is actually
-    // in that collapsed sliver state, so there's no in-place width to
+    // One row, two settings: it steps whichever shape auto-hide is currently
+    // set to collapse to, because they are separate numbers with separate
+    // ranges (see AppSettings.AutoHideHandleWidth). The row is read as "how
+    // thick is the thing at the edge", and the thing at the edge is one or the
+    // other - so a second row would only ever be half wrong.
+    //
+    // The sliver's 3~8: 3 is the original hardcoded width (thin enough that
+    // going lower risks the mouse missing it entirely), 8 is thick enough to be
+    // an easy target without eating much screen edge.
+    //
+    // Purely cosmetic for the next time the window actually collapses
+    // (EnterAutoHide/CloseAutoHideReveal both read the width fresh) - not
+    // applied live because the Options button that reaches this setting is
+    // itself hidden (see SetExpandedContentVisibility) for as long as the
+    // window is in that collapsed state, so there's no in-place width to
     // animate to begin with.
     private void StepAutoHideSliverWidth(object sender, int delta)
     {
-        double value = Math.Clamp(_settings.AutoHideSliverWidth + delta, 3, 8);
-        if (value != _settings.AutoHideSliverWidth)
+        var (current, min, max) = CollapsedWidthStepperRange();
+        double value = Math.Clamp(current + delta, min, max);
+        if (_settings.AutoHideUseHandle)
+        {
+            _settings.AutoHideHandleWidth = value;
+        }
+        else
         {
             _settings.AutoHideSliverWidth = value;
         }
 
-        UpdateStepperRow(sender, value, 3, 8);
+        UpdateStepperRow(sender, value, min, max);
     }
+
+    // The stored value and the bounds for whichever shape is in use - shared by
+    // the stepper above and the options menu opening, so the number on the row
+    // and the number the buttons move can never be different settings.
+    private (double Value, double Min, double Max) CollapsedWidthStepperRange()
+        => _settings.AutoHideUseHandle
+            ? (_settings.AutoHideHandleWidth, MinAutoHideHandleWidth, MaxAutoHideHandleWidth)
+            : (_settings.AutoHideSliverWidth, 3, 8);
 
     // Same live-swap approach as ApplyColorSettings: replacing the resource
     // dictionary entry is picked up immediately by every row's DynamicResource
