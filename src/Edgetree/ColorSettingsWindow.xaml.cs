@@ -825,9 +825,23 @@ public partial class ColorSettingsWindow : Window
             // The daring band sits well above the ordinary one. A dark theme
             // still, but far enough up that a saturated hue reads as that hue
             // rather than as black with a rumour of colour in it.
+            // 0.05~0.11 -> 0.06~0.17, drawn with a bias toward the dark end
+            // (2026-08-13). The move down on 08-10 was asked for and was right,
+            // but it went far enough that the band bottomed out: 0.06 of range
+            // at the black end is a set of rolls nobody can tell apart, and the
+            // quiet die exists precisely for the small differences between one
+            // roll and the next ("다크모드 일반 랜덤들은 좀 다 너무 꺼멓네요").
+            //
+            // So the floor comes up a little and the CEILING is what really
+            // moves - and the curve is what stops that from being a brightness
+            // bump in disguise. A plain linear widening to the same top would
+            // have dragged the average up with it and undone the correction;
+            // squaring the draw leaves most rolls where the user put them and
+            // spends the new headroom on the occasional lighter one. Mean 0.08
+            // -> 0.10, against the 0.11 this band had before 08-10.
             double bgVal = daring
                 ? 0.13 + rng.NextDouble() * 0.15
-                : 0.05 + rng.NextDouble() * 0.06;
+                : 0.06 + Math.Pow(rng.NextDouble(), 1.6) * 0.11;
             var background = FromHsv(baseHue, surfaceSat, bgVal, 255);
             var hover = FromHsv(neighborHue, Math.Min(hoverCap, surfaceSat + 0.06), bgVal + 0.08, 255);
             // A step up in both saturation and brightness, so the selection box
