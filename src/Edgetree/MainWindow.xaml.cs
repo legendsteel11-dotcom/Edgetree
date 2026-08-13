@@ -391,7 +391,7 @@ public partial class MainWindow : Window
         _settings = _settingsService.Load();
         FileSystemService.SortField = ReadSortField(_settings.SortField, _settings.SortByDate);
         FileSystemService.SortDescending = _settings.SortDescending;
-        FileSystemItem.DisplayCap = Math.Clamp(_settings.MaxItemsPerFolder, 1, 50);
+        FileSystemItem.DisplayCap = DisplayCapFor(Math.Clamp(_settings.MaxItemsPerFolder, 1, MaxItemsAll));
 
         AttachViewerMediaContextMenu();
 
@@ -6747,7 +6747,8 @@ public partial class MainWindow : Window
             // off the live tree, not _settings - the two agree, but the tree is
             // what SetTreeFontSize actually drives.
             UpdateStepperRow(fontSizeRow, ExplorerTree.FontSize, TreeFontSizeSteps[0], TreeFontSizeSteps[^1]);
-            UpdateStepperRow(maxItemsRow, _settings.MaxItemsPerFolder, 1, 50);
+            UpdateStepperRow(maxItemsRow, _settings.MaxItemsPerFolder, 1, MaxItemsAll,
+                MaxItemsLabel(_settings.MaxItemsPerFolder));
             UpdateStepperRow(tabSpacingRow, _settings.TabSpacing, 4, 24);
             UpdateStepperRow(rowSpacingRow, _settings.RowSpacing, -4, 8);
             UpdateStepperRow(autoHideSliverWidthRow, _settings.AutoHideSliverWidth, 3, 8);
@@ -7490,18 +7491,37 @@ public partial class MainWindow : Window
     // Menu manages hover/keyboard focus across its own items, and that fought
     // with the TextBox for focus the moment the mouse drifted even slightly
     // outside it mid-edit (see MenuStepperButtonStyle in the XAML).
+    // ONE STEP PAST 50 IS 전체 (2026-08-13). 더 보기 reveals the whole
+    // remainder in a single press, so the complaint was never about clicking it
+    // repeatedly - it was about having to click it at all in folders that are
+    // always going to be looked at whole.
+    //
+    // The cost is real and is the reason the cap exists: nothing else keeps the
+    // virtualizing tree from realizing thousands of rows, which is what makes a
+    // favorite or a search result land in one step however large the folder is.
+    // A folder of a few thousand files will feel it. That is a fair trade to
+    // OFFER and a bad one to impose, which is exactly the shape of a setting -
+    // so it sits one press past the largest number rather than replacing it.
+    private const int MaxItemsAll = 51;
+
     private void StepMaxItemsPerFolder(object sender, int delta)
     {
-        int value = Math.Clamp(_settings.MaxItemsPerFolder + delta, 1, 50);
+        int value = Math.Clamp(_settings.MaxItemsPerFolder + delta, 1, MaxItemsAll);
         if (value != _settings.MaxItemsPerFolder)
         {
             _settings.MaxItemsPerFolder = value;
-            FileSystemItem.DisplayCap = value;
+            FileSystemItem.DisplayCap = DisplayCapFor(value);
             QueueMaxItemsRefresh();
         }
 
-        UpdateStepperRow(sender, value, 1, 50);
+        UpdateStepperRow(sender, value, 1, MaxItemsAll, MaxItemsLabel(value));
     }
+
+    // 51 is not a count, it is the word 전체 - stored as a number only because
+    // every other stepper is, so the settings file keeps one shape.
+    private static int DisplayCapFor(int value) => value >= MaxItemsAll ? int.MaxValue : value;
+
+    private static string? MaxItemsLabel(int value) => value >= MaxItemsAll ? Strings.MenuMaxItemsAll : null;
 
     // RefreshAllLoadedFolders is the heaviest operation in the app - it drops
     // every item instance, re-reads every expanded folder from disk, replays
@@ -9622,7 +9642,10 @@ public partial class MainWindow : Window
     // stepper sitting at its limit still looks pressable and silently does
     // nothing, which reads as the app ignoring the click rather than the value
     // having an end.
-    private static void UpdateStepperRow(object sender, double value, double min, double max)
+    // valueLabel replaces the number for a step that is a WORD rather than a
+    // count - 표시 개수's 전체 is the only one so far.
+    private static void UpdateStepperRow(object sender, double value, double min, double max,
+        string? valueLabel = null)
     {
         StackPanel? stepper = sender switch
         {
@@ -9636,7 +9659,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        valueText.Text = ((int)value).ToString();
+        valueText.Text = valueLabel ?? ((int)value).ToString();
         minus.IsEnabled = value > min;
         plus.IsEnabled = value < max;
     }
