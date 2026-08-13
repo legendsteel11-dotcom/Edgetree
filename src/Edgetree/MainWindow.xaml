@@ -1642,6 +1642,16 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="autoCollapse"
                         Click="AutoCollapseMenuItem_Click"/>
+                <!-- What an unmodified drag inside the tree means. Off = copy,
+                     with Shift asking for a move; on = Explorer's answer, move,
+                     with Ctrl asking for a copy. Off by default because a click
+                     that slipped a few pixels has read as a drop here before,
+                     and a stray copy is a duplicate somebody notices while a
+                     stray move is a file quietly gone. -->
+                <MenuItem Header="{x:Static services:Strings.MenuDragMoves}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="dragMoves"
+                        Click="DragMovesMenuItem_Click"/>
                 <MenuItem Header="{x:Static services:Strings.MenuAutoHideCloseOnLeave}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="autoHideCloseOnLeave"

@@ -190,6 +190,10 @@ public static class Strings
     public static string MenuShowFolderIcons = "폴더 아이콘";
     public static string MenuShowFileIcons = "파일 아이콘";
     public static string MenuHideTitleBarTitle = "제목 표시줄 타이틀 제거";
+    // Names the KEYS, because that is the whole of what the switch changes and
+    // a row that only said "드래그로 이동" would leave someone hunting for how
+    // to get a copy back.
+    public static string MenuDragMoves = "드래그로 이동 (Ctrl 누르면 복사)";
     // The SAME name the colour row uses (색상 설정's 영역 구분선), because they are
     // the same thing seen twice - one decides whether there is a line, the other
     // what colour it is. Two names for it would read as two features.
@@ -806,6 +810,7 @@ public static class Strings
         MenuShowFolderIcons = "Show Folder Icons";
         MenuShowFileIcons = "Show File Icons";
         MenuHideTitleBarTitle = "Hide Title Bar Text";
+        MenuDragMoves = "Drag Moves (hold Ctrl to copy)";
         MenuShowPanelDividers = "Panel Dividers";
         MenuFavoritesAtBottom = "Show at Bottom";
         MenuDockOnRight = "Pin to Right Edge";

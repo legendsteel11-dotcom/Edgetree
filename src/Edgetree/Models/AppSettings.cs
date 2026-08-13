@@ -135,6 +135,20 @@ public class AppSettings
     // it was added from.
     public List<string> NetworkLocations { get; set; } = new();
 
+    // Whether dragging a row inside the tree MOVES it instead of copying it -
+    // Explorer's own answer for a same-drive drag, and what someone coming from
+    // Explorer expects. Held behind Shift by default and put on this switch for
+    // anyone who wants it the other way round, at which point Ctrl is the
+    // modifier that forces a copy.
+    //
+    // OFF, and the reason is a mistake this app has already made: a click with
+    // a few pixels of travel used to read as a drop. As a copy that leaves a
+    // duplicate somebody notices; as a move it takes the file out of the folder
+    // being looked at, silently, and nothing here can undo it. Switched on,
+    // that risk comes back - which is a choice worth offering and a poor
+    // default.
+    public bool DragMovesInsideTree { get; set; } = false;
+
     // Subtitles that sit beside the film as a .smi/.srt (see SubtitleService for
     // why that is the only kind there can be). ON by default, unlike the
     // navigator and the filmstrip: those add something to a panel that was

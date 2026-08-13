@@ -6677,6 +6677,7 @@ public partial class MainWindow : Window
                 FindMenuItem(generalSettings, "autoCollapse") is { } autoCollapse &&
                 FindMenuItem(generalSettings, "autoHideCloseOnLeave") is { } autoHideCloseOnLeave &&
                 FindMenuItem(generalSettings, "autoHideUseHandle") is { } autoHideUseHandle &&
+                FindMenuItem(generalSettings, "dragMoves") is { } dragMoves &&
                 FindMenuItem(generalSettings, "autoHideSlide") is { } autoHideSlide)
             {
                 alwaysOnTop.IsChecked = _settings.AlwaysOnTop;
@@ -6688,6 +6689,7 @@ public partial class MainWindow : Window
                 hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
                 showPanelDividers.IsChecked = _settings.ShowPanelDividers;
                 autoCollapse.IsChecked = _settings.AutoCollapseFolders;
+                dragMoves.IsChecked = _settings.DragMovesInsideTree;
                 autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
                 autoHideUseHandle.IsChecked = _settings.AutoHideUseHandle;
                 autoHideSlide.IsChecked = _settings.AutoHideSlide;
@@ -8391,6 +8393,15 @@ public partial class MainWindow : Window
         if (sender is MenuItem menuItem)
         {
             _settings.AutoCollapseFolders = menuItem.IsChecked;
+            _settingsService.Save(_settings);
+        }
+    }
+
+    private void DragMovesMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.DragMovesInsideTree = menuItem.IsChecked;
             _settingsService.Save(_settings);
         }
     }
@@ -11690,9 +11701,21 @@ public partial class MainWindow : Window
     // from the key directly rather than from what the drag negotiated.
     private const string InternalDragFormat = "Edgetree.InternalDrag";
 
-    private static bool IsMoveDrop(DragEventArgs e)
-        => (e.KeyStates & DragDropKeyStates.ShiftKey) != 0
-            && e.Data.GetDataPresent(InternalDragFormat);
+    // Which of the two a drop is. The switch turns the pair around rather than
+    // adding a third state: with it off Shift asks for a move, with it on Ctrl
+    // asks for a copy - the same two keys Explorer uses, meaning the same two
+    // things, with only the unmodified drag changing hands.
+    private bool IsMoveDrop(DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(InternalDragFormat))
+        {
+            return false;
+        }
+
+        return _settings.DragMovesInsideTree
+            ? (e.KeyStates & DragDropKeyStates.ControlKey) == 0
+            : (e.KeyStates & DragDropKeyStates.ShiftKey) != 0;
+    }
 
     // Which folder a drop on this row lands in: the row itself when it's a
     // folder, otherwise the folder the file sits in. The file fallback is the
