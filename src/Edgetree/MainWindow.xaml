@@ -1890,23 +1890,36 @@
                     </Grid>
                 </MenuItem.Header>
             </MenuItem>
-            <!-- StaysOpenOnClick so stepping the value doesn't close the whole
-                 options menu out from under the user. -->
-            <MenuItem StaysOpenOnClick="True"
-                    Focusable="False"
-                    Padding="{DynamicResource MenuStepperRowPadding}"
-                    AutomationProperties.AutomationId="maxItemsRow">
+            <!-- ITS OWN SUBMENU, holding the switch and the count together.
+                 The two are one question - how much of a folder to show - and
+                 side by side in the main list the 전체 row read as a value for
+                 the number beside it. Its first shape put 전체 INSIDE the
+                 stepper as a step past 50, which made a readout sized for two
+                 digits draw a word. -->
+            <MenuItem Header="{x:Static services:Strings.MenuMaxItemsPerFolder}"
+                    AutomationProperties.AutomationId="maxItems">
+                <MenuItem Header="{x:Static services:Strings.MenuMaxItemsAll}"
+                        IsCheckable="True"
+                        StaysOpenOnClick="True"
+                        AutomationProperties.AutomationId="showAllItems"
+                        Click="ShowAllItemsMenuItem_Click"/>
+                <!-- StaysOpenOnClick so stepping the value doesn't close the
+                     whole options menu out from under the user. -->
+                <MenuItem StaysOpenOnClick="True"
+                        Focusable="False"
+                        Padding="{DynamicResource MenuStepperRowPadding}"
+                        AutomationProperties.AutomationId="maxItemsRow">
                 <MenuItem.Header>
+                    <!-- NO LABEL on this one: the submenu it lives in is called
+                         한 번에 표시할 개수, and a row under it saying 개수 is
+                         the same word twice on two lines. Every other stepper
+                         in this menu needs its own because it sits among
+                         unrelated rows. -->
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                Text="{x:Static services:Strings.MenuMaxItemsPerFolder}"
-                                Foreground="{DynamicResource MenuForeground}"
-                                VerticalAlignment="Center"
-                                Margin="0,0,8,0"/>
                         <StackPanel Grid.Column="1"
                                 Orientation="Horizontal">
                             <Button Content="−"
@@ -1923,6 +1936,7 @@
                         </StackPanel>
                     </Grid>
                 </MenuItem.Header>
+                </MenuItem>
             </MenuItem>
             <!-- StaysOpenOnClick so stepping the value doesn't close the whole
                  options menu out from under the user. -->

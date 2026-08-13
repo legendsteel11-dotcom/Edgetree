@@ -282,9 +282,10 @@ public static class Strings
     // the row itself).
     public static string MenuFontSize = "글꼴 크기 (Ctrl +/-)";
     public static string MenuMaxItemsPerFolder = "한 번에 표시할 개수";
-    // The step past the largest number. Two characters, because the readout it
-    // replaces is a two-digit number and the row must not change width.
-    public static string MenuMaxItemsAll = "전체";
+    // Its own row above the count, which it greys out. Says 표시 rather than
+    // standing alone as "전체", since the row above it is a number and a bare
+    // 전체 next to one reads as a value for it.
+    public static string MenuMaxItemsAll = "전체 표시";
     public static string MenuTabSpacing = "들여쓰기 간격";
     public static string MenuRowSpacing = "행 간격";
     public static string MenuScrollBarThickness = "스크롤바 두께";
@@ -849,7 +850,7 @@ public static class Strings
         SortModeDateDesc = "Date descending";
         MenuFontSize = "Font Size (Ctrl +/-)";
         MenuMaxItemsPerFolder = "Items per Folder";
-        MenuMaxItemsAll = "All";
+        MenuMaxItemsAll = "Show All";
         MenuTabSpacing = "Indent Width";
         MenuRowSpacing = "Row Spacing";
         MenuScrollBarThickness = "Scrollbar Width";

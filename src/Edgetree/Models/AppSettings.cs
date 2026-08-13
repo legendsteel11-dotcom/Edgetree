@@ -150,6 +150,15 @@ public class AppSettings
     // wants a drag that can never take a file away turns it off.
     public bool DragMovesInsideTree { get; set; } = true;
 
+    // 전체 표시. Its own switch rather than a value past the top of the count's
+    // range, which is what it was for half a day: 51 meaning "all" made the
+    // number stop being a number, and the stepper's readout - two digits wide -
+    // had to draw a word inside it.
+    //
+    // The count below keeps its own value while this is on, so turning it off
+    // comes back to the number that was there rather than to a default.
+    public bool ShowAllItemsPerFolder { get; set; } = false;
+
     // Subtitles that sit beside the film as a .smi/.srt (see SubtitleService for
     // why that is the only kind there can be). ON by default, unlike the
     // navigator and the filmstrip: those add something to a panel that was

@@ -155,8 +155,7 @@ public static class HelpContent
                     R("F5", "새로고침", "F5", "Refresh"),
                     R("F7", "새 폴더", "F7", "New folder"),
                     R("Del", "휴지통으로 삭제", "Del", "Delete to the Recycle Bin"),
-                    R("Shift+Del", "완전 삭제 (휴지통 거치지 않음)",
-                      "Shift+Del", "Delete permanently - not to the Recycle Bin"),
+                    R("Shift+Del", "완전 삭제", "Shift+Del", "Delete permanently"),
                     // The one place a delete still asks, so it is the one place
                     // the help has to say why.
                     R("네트워크 위치에서 삭제", "휴지통이 없어 확인 후 완전 삭제",
@@ -170,7 +169,7 @@ public static class HelpContent
                     // there and a behaviour that is not.
                     R("드래그", "같은 드라이브는 이동, 다른 드라이브는 복사",
                       "Drag", "Move within a drive, copy between drives"),
-                    R("다른 앱으로 드래그", "복사", "Drag to another app", "Copy"),
+                    R("다른 탐색기로 드래그", "복사", "Drag to another explorer", "Copy"),
                     // The KEY column carries the timing, because that is the
                     // part that gets missed: Shift+클릭 is already 범위 선택, so
                     // holding it first selects instead of dragging.
@@ -367,8 +366,8 @@ public static class HelpContent
                       "Options → General → Drag Moves", "Off, a drag always copies and Shift is the way to move"),
                     // The cost goes on the row, not in a paragraph: it is the
                     // one setting here that can make the tree slower.
-                    R("옵션 → 한 번에 표시할 개수", "50 다음은 전체 — 큰 폴더에서는 느려짐",
-                      "Options → Items per Folder", "One step past 50 is All - a big folder will feel it"),
+                    R("옵션 → 한 번에 표시할 개수 → 전체 표시", "더 보기 없이 전부 — 큰 폴더에서는 느려짐",
+                      "Options → Items per Folder → Show All", "No 더 보기 row at all - a big folder will feel it"),
                     R("옵션 → 네트워크 위치", "드라이브 문자 없는 공유 추가 (\\\\서버\\공유)",
                       "Options → Network Locations", "Add a share with no drive letter (\\\\server\\share)"),
                 }),

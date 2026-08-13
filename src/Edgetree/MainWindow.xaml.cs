@@ -391,7 +391,9 @@ public partial class MainWindow : Window
         _settings = _settingsService.Load();
         FileSystemService.SortField = ReadSortField(_settings.SortField, _settings.SortByDate);
         FileSystemService.SortDescending = _settings.SortDescending;
-        FileSystemItem.DisplayCap = DisplayCapFor(Math.Clamp(_settings.MaxItemsPerFolder, 1, MaxItemsAll));
+        FileSystemItem.DisplayCap = _settings.ShowAllItemsPerFolder
+            ? int.MaxValue
+            : Math.Clamp(_settings.MaxItemsPerFolder, 1, 50);
 
         AttachViewerMediaContextMenu();
 
@@ -6643,7 +6645,11 @@ public partial class MainWindow : Window
             FindMenuItem(menu, "generalSettings") is { } generalSettings &&
             FindMenuItem(menu, "bookmarkList") is { } bookmarkList &&
             FindMenuItem(menu, "fontSizeRow") is { } fontSizeRow &&
-            FindMenuItem(menu, "maxItemsRow") is { } maxItemsRow &&
+            // The submenu, not the stepper inside it: 표시할 개수 gained one on
+            // 2026-08-13, and looking for a nested id from here would fail this
+            // whole conjunction and take every row below it down in silence -
+            // see the note above about ids that stop existing.
+            FindMenuItem(menu, "maxItems") is { } maxItems &&
             FindMenuItem(menu, "tabSpacingRow") is { } tabSpacingRow &&
             FindMenuItem(menu, "rowSpacingRow") is { } rowSpacingRow &&
             FindMenuItem(menu, "autoHideSliverWidthRow") is { } autoHideSliverWidthRow &&
@@ -6788,8 +6794,18 @@ public partial class MainWindow : Window
             // off the live tree, not _settings - the two agree, but the tree is
             // what SetTreeFontSize actually drives.
             UpdateStepperRow(fontSizeRow, ExplorerTree.FontSize, TreeFontSizeSteps[0], TreeFontSizeSteps[^1]);
-            UpdateStepperRow(maxItemsRow, _settings.MaxItemsPerFolder, 1, MaxItemsAll,
-                MaxItemsLabel(_settings.MaxItemsPerFolder));
+            if (FindMenuItem(maxItems, "maxItemsRow") is { } maxItemsRow &&
+                FindMenuItem(maxItems, "showAllItems") is { } showAllItems)
+            {
+                showAllItems.IsChecked = _settings.ShowAllItemsPerFolder;
+                UpdateStepperRow(maxItemsRow, _settings.MaxItemsPerFolder, 1, 50);
+                // The count means nothing while everything is shown.
+                maxItemsRow.IsEnabled = !_settings.ShowAllItemsPerFolder;
+            }
+            else
+            {
+                LogClickLine("options menu: a 표시할 개수 row is missing");
+            }
             UpdateStepperRow(tabSpacingRow, _settings.TabSpacing, 4, 24);
             UpdateStepperRow(rowSpacingRow, _settings.RowSpacing, -4, 8);
             UpdateStepperRow(autoHideSliverWidthRow, _settings.AutoHideSliverWidth, 3, 8);
@@ -7532,37 +7548,66 @@ public partial class MainWindow : Window
     // Menu manages hover/keyboard focus across its own items, and that fought
     // with the TextBox for focus the moment the mouse drifted even slightly
     // outside it mid-edit (see MenuStepperButtonStyle in the XAML).
-    // ONE STEP PAST 50 IS 전체 (2026-08-13). 더 보기 reveals the whole
-    // remainder in a single press, so the complaint was never about clicking it
-    // repeatedly - it was about having to click it at all in folders that are
-    // always going to be looked at whole.
+    // 전체 표시 IS ITS OWN SWITCH, not a step past the top of the count
+    // (2026-08-13, corrected the same day it shipped as one). A 51 that meant
+    // "all" made the number stop being a number, and the readout - sized for
+    // two digits - had to draw a word inside it.
     //
-    // The cost is real and is the reason the cap exists: nothing else keeps the
+    // 더 보기 already reveals the whole remainder in a single press, so the
+    // objection was never about clicking it repeatedly; it was about clicking
+    // it at all in folders that are always read whole.
+    //
+    // The cost is real and is the reason a cap exists: nothing else keeps the
     // virtualizing tree from realizing thousands of rows, which is what makes a
     // favorite or a search result land in one step however large the folder is.
-    // A folder of a few thousand files will feel it. That is a fair trade to
-    // OFFER and a bad one to impose, which is exactly the shape of a setting -
-    // so it sits one press past the largest number rather than replacing it.
-    private const int MaxItemsAll = 51;
-
+    // A folder of a few thousand files will feel it. Worth offering, wrong to
+    // impose - which is the shape of a setting.
     private void StepMaxItemsPerFolder(object sender, int delta)
     {
-        int value = Math.Clamp(_settings.MaxItemsPerFolder + delta, 1, MaxItemsAll);
+        int value = Math.Clamp(_settings.MaxItemsPerFolder + delta, 1, 50);
         if (value != _settings.MaxItemsPerFolder)
         {
             _settings.MaxItemsPerFolder = value;
-            FileSystemItem.DisplayCap = DisplayCapFor(value);
-            QueueMaxItemsRefresh();
+            ApplyDisplayCap();
         }
 
-        UpdateStepperRow(sender, value, 1, MaxItemsAll, MaxItemsLabel(value));
+        UpdateStepperRow(sender, value, 1, 50);
     }
 
-    // 51 is not a count, it is the word 전체 - stored as a number only because
-    // every other stepper is, so the settings file keeps one shape.
-    private static int DisplayCapFor(int value) => value >= MaxItemsAll ? int.MaxValue : value;
+    private void ShowAllItemsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem)
+        {
+            return;
+        }
 
-    private static string? MaxItemsLabel(int value) => value >= MaxItemsAll ? Strings.MenuMaxItemsAll : null;
+        _settings.ShowAllItemsPerFolder = menuItem.IsChecked;
+        _settingsService.Save(_settings);
+        ApplyDisplayCap();
+
+        // The count means nothing while everything is shown, and a stepper that
+        // still answers the pointer would be inviting a number to be set that
+        // changes nothing. Reached through the submenu this row actually sits
+        // in rather than through a remembered menu - the same lesson the
+        // bookmark list learned when a hardcoded host quietly did nothing in
+        // the other menu it was built into.
+        if (ItemsControl.ItemsControlFromItemContainer(menuItem) is MenuItem host &&
+            FindMenuItem(host, "maxItemsRow") is { } row)
+        {
+            row.IsEnabled = !_settings.ShowAllItemsPerFolder;
+        }
+    }
+
+    // The cap is applied on the spot so anything loaded from here on honours it;
+    // only the re-cap of folders ALREADY loaded waits for the stepper to settle
+    // (see QueueMaxItemsRefresh).
+    private void ApplyDisplayCap()
+    {
+        FileSystemItem.DisplayCap = _settings.ShowAllItemsPerFolder
+            ? int.MaxValue
+            : Math.Clamp(_settings.MaxItemsPerFolder, 1, 50);
+        QueueMaxItemsRefresh();
+    }
 
     // RefreshAllLoadedFolders is the heaviest operation in the app - it drops
     // every item instance, re-reads every expanded folder from disk, replays
@@ -9692,15 +9737,15 @@ public partial class MainWindow : Window
     // stepper sitting at its limit still looks pressable and silently does
     // nothing, which reads as the app ignoring the click rather than the value
     // having an end.
-    // valueLabel replaces the number for a step that is a WORD rather than a
-    // count - 표시 개수's 전체 is the only one so far.
-    private static void UpdateStepperRow(object sender, double value, double min, double max,
-        string? valueLabel = null)
+    private static void UpdateStepperRow(object sender, double value, double min, double max)
     {
         StackPanel? stepper = sender switch
         {
             Button { Parent: StackPanel panel } => panel,
-            MenuItem { Header: Grid { Children: [_, StackPanel panel] } } => panel,
+            // The LAST child, not the second: 표시할 개수 lost its label when it
+            // moved into a submenu named for it, so that row's Grid holds the
+            // stepper alone while every other one still holds a label first.
+            MenuItem { Header: Grid { Children: [.., StackPanel panel] } } => panel,
             _ => null
         };
 
@@ -9709,7 +9754,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        valueText.Text = valueLabel ?? ((int)value).ToString();
+        valueText.Text = ((int)value).ToString();
         minus.IsEnabled = value > min;
         plus.IsEnabled = value < max;
     }
