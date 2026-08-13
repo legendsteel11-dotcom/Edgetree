@@ -4639,6 +4639,7 @@
                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                     ItemContainerStyle="{StaticResource BookmarkPanelItemStyle}"
                     Visibility="Collapsed"
+                    PreviewMouseLeftButtonDown="BookmarkPanelList_PreviewMouseLeftButtonDown"
                     PreviewMouseLeftButtonUp="BookmarkPanelList_PreviewMouseLeftButtonUp"/>
 
             <!-- Where a dragged favorite would land. Sits over the list rather

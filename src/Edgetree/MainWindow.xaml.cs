@@ -5615,6 +5615,12 @@ public partial class MainWindow : Window
         }
 
         SettleRowAtTop(anchor, scrollViewer, index, item.Name);
+
+        // And come back once the tree stops moving - the settle above can
+        // report success against a tree that expansions are still landing in,
+        // which is the one remaining way a jump ends up below the top (the
+        // 08-13 round's third cause; see the 확인 패스 section below).
+        ArmSettleConfirm(item);
     }
 
     // The scroll above is arithmetic; this LOOKS. Every version of this routine
@@ -5638,6 +5644,17 @@ public partial class MainWindow : Window
         int blind = 0;
         int grows = 0;
         double lastTop = double.NaN;
+        // Which way the steps went, and how many moved the OFFSET without
+        // moving the ROW. Added 2026-08-13 (afternoon): a bookmark click
+        // logged "gave-up steps=64 offset 571 -> 571" - sixty-four steps,
+        // no refusal, no net movement - which arithmetic allows only if the
+        // walk OSCILLATED (measurement flips sign step to step) or the steps
+        // went deaf (offset moves, measured top doesn't). The two need
+        // different fixes, and this is what tells them apart.
+        int ups = 0;
+        int downs = 0;
+        int deaf = 0;
+        int rescrolls = 0;
 
         // Holds the gap's own reclaim watch off while this walks - see
         // TreeScrollViewer_ScrollChanged. Cleared on every exit below.
@@ -5657,7 +5674,8 @@ public partial class MainWindow : Window
             LogClickLine(
                 $"settle: {name} {outcome} steps={steps} blind={blind} " +
                 $"top={(double.IsNaN(lastTop) ? "-" : lastTop.ToString("F0"))} " +
-                $"offset {startOffset:F0} -> {scrollViewer.VerticalOffset:F0} counted={countedIndex}");
+                $"offset {startOffset:F0} -> {scrollViewer.VerticalOffset:F0} counted={countedIndex}" +
+                (steps > 0 ? $" ups={ups} downs={downs} deaf={deaf}" : ""));
         }
 
         // A screenful and a bit. The scroll above has already landed near the
@@ -5721,14 +5739,42 @@ public partial class MainWindow : Window
                 return;
             }
 
+            // A row more than a screenful away is not a CORRECTION any more,
+            // and a one-row-per-step walk can never cover it inside the
+            // budget - the instrument's answer, 2026-08-13 afternoon:
+            // "gave-up steps=64 top=9696 ups=0 downs=64 deaf=0", sixty-four
+            // healthy steps against a 400-row distance, opened up by the
+            // previous jump's chain collapsing the extent mid-walk. What
+            // actually landed those jumps was the NEXT pin's absolute
+            // scroll - so do that here, now, with a fresh index: the stale
+            // count is the very thing being walked off. Bounded like the
+            // gap growths and for the same reason: a third ask means the
+            // distance keeps reopening, and stepping is then the only
+            // honest thing left.
+            if (Math.Abs(top) > scrollViewer.ActualHeight + 1
+                && rescrolls < 2
+                && anchor.DataContext is FileSystemItem anchorItem
+                && VisibleRowIndexOf(anchorItem) is { } freshIndex)
+            {
+                rescrolls++;
+                LogClickLine(
+                    $"settle: {name} far ({top:F0}px), rescroll to {freshIndex} " +
+                    $"(counted was {countedIndex})");
+                scrollViewer.ScrollToVerticalOffset(
+                    Math.Min(freshIndex, scrollViewer.ScrollableHeight));
+                continue;
+            }
+
             double before = scrollViewer.VerticalOffset;
             if (top > 0)
             {
                 scrollViewer.LineDown();
+                downs++;
             }
             else
             {
                 scrollViewer.LineUp();
+                ups++;
             }
             steps++;
 
@@ -5741,6 +5787,27 @@ public partial class MainWindow : Window
             // scrollable=277). The loop-top UpdateLayout serves the NEXT
             // measurement; the refusal test needs its own.
             scrollViewer.UpdateLayout();
+
+            // The step's own after-measurement, for the deaf counter: the
+            // offset moved, and the row measured exactly where it was. The
+            // loop-top measurement can't provide this - by then a deaf step
+            // and a normal one look the same.
+            if (Math.Abs(scrollViewer.VerticalOffset - before) >= 0.01
+                && anchor.IsDescendantOf(scrollViewer))
+            {
+                try
+                {
+                    double topAfter = anchor.TransformToAncestor(scrollViewer)
+                        .Transform(new System.Windows.Point(0, 0)).Y;
+                    if (Math.Abs(topAfter - top) < 0.5)
+                    {
+                        deaf++;
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
 
             if (Math.Abs(scrollViewer.VerticalOffset - before) < 0.01)
             {
@@ -5773,6 +5840,16 @@ public partial class MainWindow : Window
                 {
                     double rowHeight = scrollViewer.ActualHeight / scrollViewer.ViewportHeight;
                     int need = rowHeight > 0 ? (int)Math.Ceiling(top / rowHeight) : 0;
+                    // A gap can never USEFULLY exceed a viewport of rows: it
+                    // exists to let the target row reach the top, and the
+                    // most that ever takes is a screenful of range below it.
+                    // Unbounded, a `top` measured against a mid-collapse tree
+                    // sized it to 646 blank rows in one ask (click.log
+                    // 2026-08-13 15:20) - a safety device ballooning off a
+                    // bad measurement, which the cap turns back into one
+                    // screenful at worst. The far-rescroll above makes that
+                    // measurement rare; this makes it harmless.
+                    need = Math.Min(need, (int)Math.Ceiling(scrollViewer.ViewportHeight) + 1);
                     if (need > 0)
                     {
                         grows++;
@@ -5791,6 +5868,255 @@ public partial class MainWindow : Window
         }
 
         Report("gave-up");
+    }
+
+    // ----- 확인 패스: settle이 끝난 뒤에도 트리가 움직이는 경우 ----------------
+    //
+    // The settle loop walks against a tree that can still be MUTATING under
+    // it: a jump expands its chain, the settle reports, and the stored-path
+    // replay plus late-arriving children keep landing for another second or
+    // two - each one moving the extent and carrying the just-pinned row back
+    // down. click.log 2026-08-13 14:15 has the shape plainly: three gave-up
+    // settles inside 1.1s with the extent collapsing 70407 -> 2507 -> 1613
+    // between them, and expansion lines continuing past the last report. More
+    // steps cannot fix that - the walk is bounded and the target moves - so
+    // the answer is to come back once the tree has actually stopped. This is
+    // the third cause from the 08-13 round (settle-then-expansion ordering);
+    // the first two were fixed in e2c64c2/17193d8.
+    //
+    // Built once before and pulled at release time for being unverified, not
+    // for being wrong - which is why every exit logs itself: the next release
+    // call gets made on click.log lines, not on trust.
+    //
+    // PERFORMANCE: nothing here exists outside the few seconds after a pin.
+    // The timer runs only from a pin until the row is confirmed or given up
+    // (200ms ticks, ~3s cap), each tick is one ExtentHeight read, and the
+    // confirm itself is one UpdateLayout against an already-clean layout plus
+    // one transform. Quiet is judged by EXTENT STABILITY rather than by
+    // hooking every mutation source: the fault is extent movement, so
+    // watching the extent watches the fault - late children, replays and
+    // recollapses included, with no per-event cost anywhere.
+    //
+    // THE MOMENT THE HAND ARRIVES, THIS STANDS DOWN. A re-pin is app-driven
+    // motion, tolerable only while it is finishing the user's own jump; after
+    // any tree press or key (_lastTreeUserInputTicks), any wheel notch
+    // (_lastTreeWheelTicks), or while anything holds mouse capture (a
+    // scrollbar or band drag), the view belongs to the user again and a
+    // correction would be the app yanking it back.
+
+    private const int SettleConfirmTickMs = 200;
+    // ~3s of not-yet-quiet before giving up. A tree that churns longer than
+    // this is being driven by something (a huge replay, a slow disk) that a
+    // late correction would only fight with.
+    private const int SettleConfirmMaxWaits = 15;
+    // TWO consecutive stable reads, not one (2026-08-13, same day as the
+    // pass itself). One tick of stillness is what a PAUSE between expansion
+    // waves looks like - children arrive folder by folder off the disk - so
+    // the confirm fired mid-churn, corrected, got walked over, and corrected
+    // again: the user watched the row climb "슥슥 ... 한 3~4단계로 끊어서",
+    // like wheel notches. Each correction is one frame; it is corrections
+    // ARRIVING SEPARATELY that read as steps, so the fix is to be surer the
+    // churn is over and correct once.
+    private const int SettleConfirmQuietTicks = 2;
+    // The legitimate need is one re-pin (plus one more if a second wave of
+    // children lands while the first re-pin settles). A third means the row
+    // cannot be kept at the top by scrolling at all, and repeating it would
+    // just be visible twitching.
+    private const int SettleConfirmMaxRepins = 2;
+
+    private System.Windows.Threading.DispatcherTimer? _settleConfirmTimer;
+    private FileSystemItem? _settleConfirmItem;
+    private int _settleConfirmToken;
+    private long _settleConfirmArmedTicks;
+    private double _settleConfirmLastExtent = double.NaN;
+    private int _settleConfirmStableTicks;
+    private int _settleConfirmWaits;
+    private int _settleConfirmRepins;
+    // True for the duration of a confirm-triggered re-pin, so the pin's own
+    // arming call doesn't reset the repin budget and loop.
+    private bool _inSettleConfirm;
+    private long _lastTreeWheelTicks = long.MinValue / 2;
+
+    private void ArmSettleConfirm(FileSystemItem item)
+    {
+        if (_inSettleConfirm)
+        {
+            return;
+        }
+
+        _settleConfirmItem = item;
+        _settleConfirmToken = _navigationToken;
+        _settleConfirmArmedTicks = Environment.TickCount64;
+        _settleConfirmLastExtent = double.NaN;
+        _settleConfirmStableTicks = 0;
+        _settleConfirmWaits = 0;
+        _settleConfirmRepins = 0;
+
+        _settleConfirmTimer ??= CreateSettleConfirmTimer();
+        _settleConfirmTimer.Stop();
+        _settleConfirmTimer.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateSettleConfirmTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(SettleConfirmTickMs)
+        };
+        timer.Tick += SettleConfirmTimer_Tick;
+        return timer;
+    }
+
+    private void SettleConfirmTimer_Tick(object? sender, EventArgs e)
+    {
+        _settleConfirmTimer!.Stop();
+
+        if (_settleConfirmItem is not { } item)
+        {
+            return;
+        }
+
+        // A newer navigation owns the view now; its own pin arms its own
+        // confirm. Silent - this isn't an outcome, it's a handover.
+        if (_settleConfirmToken != _navigationToken)
+        {
+            _settleConfirmItem = null;
+            return;
+        }
+
+        if (_lastTreeUserInputTicks > _settleConfirmArmedTicks
+            || _lastTreeWheelTicks > _settleConfirmArmedTicks)
+        {
+            LogClickLine($"confirm: {item.Name} dropped (user input)");
+            _settleConfirmItem = null;
+            return;
+        }
+
+        // Mid-drag (scrollbar thumb, a band grip, a row drag) counts as the
+        // hand being on the tree, but unlike a press it has no stamp to
+        // compare - so it waits rather than drops, and the wait budget caps
+        // a drag that never ends.
+        if (Mouse.Captured is not null
+            || FindTreeScrollViewer() is not { } scrollViewer)
+        {
+            if (++_settleConfirmWaits >= SettleConfirmMaxWaits)
+            {
+                _settleConfirmItem = null;
+                return;
+            }
+            _settleConfirmTimer.Start();
+            return;
+        }
+
+        // The quiet test: the extent unchanged for SettleConfirmQuietTicks
+        // consecutive reads (see the constant for why one was not enough).
+        // The first tick always resets the streak (NaN never compares equal),
+        // which is deliberate: it puts a full quiet window between the settle
+        // and the check even when the tree stopped instantly.
+        double extent = scrollViewer.ExtentHeight;
+        bool stable = !double.IsNaN(_settleConfirmLastExtent)
+            && Math.Abs(extent - _settleConfirmLastExtent) <= 0.5;
+        _settleConfirmLastExtent = extent;
+        _settleConfirmStableTicks = stable ? _settleConfirmStableTicks + 1 : 0;
+
+        if (_settleConfirmStableTicks < SettleConfirmQuietTicks)
+        {
+            if (++_settleConfirmWaits >= SettleConfirmMaxWaits)
+            {
+                LogClickLine(
+                    $"confirm: {item.Name} never quiet " +
+                    $"(extent still moving after {_settleConfirmWaits} ticks)");
+                _settleConfirmItem = null;
+                return;
+            }
+            _settleConfirmTimer.Start();
+            return;
+        }
+
+        ConfirmRowAtTop(item, scrollViewer);
+    }
+
+    private void ConfirmRowAtTop(FileSystemItem item, ScrollViewer scrollViewer)
+    {
+        scrollViewer.UpdateLayout();
+
+        var container = FindRealizedContainer(item);
+        double top = double.NaN;
+        if (container is not null && container.IsDescendantOf(scrollViewer))
+        {
+            try
+            {
+                top = container.TransformToAncestor(scrollViewer)
+                    .Transform(new System.Windows.Point(0, 0)).Y;
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        if (!double.IsNaN(top) && Math.Abs(top) <= 0.5)
+        {
+            // The ordinary ending, logged so the instrument can say how often
+            // the pass had nothing to do - which is the number the release
+            // decision needs.
+            LogClickLine($"confirm: {item.Name} quiet and at top (repins={_settleConfirmRepins})");
+            _settleConfirmItem = null;
+            return;
+        }
+
+        if (_settleConfirmRepins >= SettleConfirmMaxRepins)
+        {
+            LogClickLine(
+                $"confirm: {item.Name} still off after {_settleConfirmRepins} re-pins " +
+                $"(top={(double.IsNaN(top) ? "unmeasured" : top.ToString("F0") + "px")}) - giving up");
+            _settleConfirmItem = null;
+            return;
+        }
+
+        _settleConfirmRepins++;
+        LogClickLine(
+            $"confirm: {item.Name} off top " +
+            $"({(double.IsNaN(top) ? "unmeasured" : top.ToString("F0") + "px")}), " +
+            $"re-pin {_settleConfirmRepins}");
+
+        _inSettleConfirm = true;
+        try
+        {
+            if (container is null)
+            {
+                // Virtualized away - scroll near it by index so a container
+                // exists to pin. The index can be stale the way it always
+                // can; the pin's own settle corrects that, which is its job.
+                if (VisibleRowIndexOf(item) is { } index)
+                {
+                    scrollViewer.ScrollToVerticalOffset(
+                        Math.Min(index, scrollViewer.ScrollableHeight));
+                    scrollViewer.UpdateLayout();
+                    container = FindRealizedContainer(item);
+                }
+            }
+
+            if (container is null)
+            {
+                LogClickLine($"confirm: {item.Name} no container to re-pin");
+                _settleConfirmItem = null;
+                return;
+            }
+
+            PinRowToTop(container, scrollViewer);
+        }
+        finally
+        {
+            _inSettleConfirm = false;
+        }
+
+        // Keep watching: the re-pin can itself be walked over by a second
+        // wave, and the repin budget above is what bounds the cycle.
+        _settleConfirmArmedTicks = Environment.TickCount64;
+        _settleConfirmLastExtent = double.NaN;
+        _settleConfirmStableTicks = 0;
+        _settleConfirmWaits = 0;
+        _settleConfirmTimer!.Start();
     }
 
     // The row one below the current selection, in the order the tree is drawn -
@@ -6262,6 +6588,15 @@ public partial class MainWindow : Window
 
     private void ExplorerTree_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
     {
+        // Every wheel notch over the tree, Ctrl or not - the plain-wheel case
+        // falls through to the ScrollViewer below and never touches app code
+        // anywhere else, so this is the one place the confirm pass can hear
+        // it. NOT _lastTreeUserInputTicks: that field gates auto-collapse
+        // ("did a real gesture precede this expansion"), and a wheel scroll
+        // has never counted as one - stamping it here would quietly widen
+        // that gate.
+        _lastTreeWheelTicks = Environment.TickCount64;
+
         if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
             return;
@@ -11268,6 +11603,15 @@ public partial class MainWindow : Window
     // spot, which is what made a folder impossible to pick up.
     private FileSystemItem? _deferredExpandItem;
 
+    // Where that press put the cursor, in tree coordinates - so the release
+    // can tell "the hand moved" from "the CONTENT moved under a still hand".
+    // Selecting a row only partly visible at the bottom edge makes WPF scroll
+    // it fully in between press and release (focus -> BringIntoView), which
+    // slides the next row under the unmoved cursor - see the release handler
+    // for the two-click symptom that was. Always armed and cleared together
+    // with _deferredExpandItem.
+    private System.Windows.Point? _deferredExpandPressPoint;
+
     private void ClearMultiSelection()
     {
         foreach (var item in _multiSelection)
@@ -11405,10 +11749,39 @@ public partial class MainWindow : Window
         // Before the early return below, because that one is about the
         // multi-selection collapse and this has to happen on every ordinary
         // click on a folder - which is most of them.
+        // The release side of the press instrument: which row the up actually
+        // landed on, what was deferred, and what became of it. Added for the
+        // half-visible-row case, where click.log showed presses whose WM_LBUTTONUP
+        // never reached the window at all ("win up" missing) - so a release
+        // line here separates "the up never came" from "the up came and the
+        // decision went wrong", which look identical to the hand.
+        LogClickLine(
+            $"tree up: row={(treeViewItem.DataContext as FileSystemItem)?.Name ?? "?"} " +
+            $"deferred={_deferredExpandItem?.Name ?? "-"} " +
+            $"captured={Mouse.Captured?.GetType().Name ?? "-"}");
+
         if (_deferredExpandItem is { } toDeferredExpand)
         {
+            var pressPoint = _deferredExpandPressPoint;
             _deferredExpandItem = null;
-            if (ReferenceEquals(treeViewItem.DataContext, toDeferredExpand))
+            _deferredExpandPressPoint = null;
+
+            // Same row, or the same SPOT. The row check alone dropped a real
+            // click whenever the press itself scrolled the tree: a folder only
+            // partly visible at the bottom edge is scrolled fully in the
+            // moment the press selects it (focus -> BringIntoView), so the
+            // release - under a hand that never moved - landed on whichever
+            // row slid up beneath the cursor, and the half-visible folder took
+            // one click to come on screen and a SECOND to open (2026-08-13).
+            // The content moving is not the hand moving: within the system
+            // drag slop, the click is a click whatever is under it now. An
+            // abandoned gesture (pressed here, released somewhere else) still
+            // fails both tests, which is all the row check was ever for.
+            bool sameRow = ReferenceEquals(treeViewItem.DataContext, toDeferredExpand);
+            bool handHeldStill = pressPoint is { } p
+                && Math.Abs(e.GetPosition(ExplorerTree).X - p.X) < SystemParameters.MinimumHorizontalDragDistance
+                && Math.Abs(e.GetPosition(ExplorerTree).Y - p.Y) < SystemParameters.MinimumVerticalDragDistance;
+            if (sameRow || handHeldStill)
             {
                 toDeferredExpand.IsExpanded = !toDeferredExpand.IsExpanded;
             }
@@ -11725,11 +12098,19 @@ public partial class MainWindow : Window
         // Selection is NOT deferred with it. Selecting on the press is what
         // makes a drag carry the row it started on, and it was never the half
         // that conflicted.
+        // A fresh press always starts the deferred toggle from a clean slate.
+        // A toggle whose release landed on empty tree space never got
+        // consumed, and the release handler's still-hand fallback would
+        // otherwise replay it against THIS press's release.
+        _deferredExpandItem = null;
+        _deferredExpandPressPoint = null;
+
         if (!clickedOnExpander && !clickedInIndent && e.ClickCount == 1 &&
             treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsDirectory: true, IsEditing: false } item)
         {
             treeViewItem.IsSelected = true;
             _deferredExpandItem = item;
+            _deferredExpandPressPoint = e.GetPosition(ExplorerTree);
         }
 
         // Explorer-style "slow double-click" rename. Files only: a click on a
@@ -11789,6 +12170,12 @@ public partial class MainWindow : Window
         {
             _itemDragStart = null;
             _itemDragCandidate = null;
+            // The deferred toggle dies with it. It used to be harmless dead
+            // weight here (the next release's row check could never match);
+            // the still-hand fallback makes a stale entry actionable, so it
+            // has to be retired the same way the drag candidate is.
+            _deferredExpandItem = null;
+            _deferredExpandPressPoint = null;
             return;
         }
 
@@ -11811,6 +12198,7 @@ public partial class MainWindow : Window
         // up must not also open or shut it.
         _deferredMultiClearItem = null;
         _deferredExpandItem = null;
+        _deferredExpandPressPoint = null;
 
         // Dragging the file out, not renaming it in place.
         CancelPendingRename();
@@ -13553,10 +13941,53 @@ public partial class MainWindow : Window
         BookmarkPanelList.SelectedItem = match;
     }
 
+    // The row the press landed on, held until its release - the same
+    // press-capture the favorites list has always used for its drag split
+    // (FavoriteListBoxItem_PreviewMouseLeftButtonDown). This list has no drag,
+    // so it never needed one - until the 2026-08-13 report: pressing the LAST
+    // row while it sat half-clipped at the panel's bottom edge navigated to
+    // the bookmark BELOW it, every time. Selecting the row on the press makes
+    // the ListBox scroll it fully in, the rows slide up under a hand that
+    // never moves, and a release-time hit test (which is what this handler
+    // was) reads whichever neighbour arrived under the cursor. click.log
+    // 15:46: three presses on 보관's row, navigations to 보관, 4k, 강의.
+    private BookmarkPanelRow? _bookmarkPressRow;
+    private System.Windows.Point? _bookmarkPressPoint;
+
+    private void BookmarkPanelList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _bookmarkPressRow =
+            ItemsControl.ContainerFromElement(BookmarkPanelList, (DependencyObject)e.OriginalSource)
+                is ListBoxItem { Content: BookmarkPanelRow row } ? row : null;
+        _bookmarkPressPoint = e.GetPosition(BookmarkPanelList);
+    }
+
     private void BookmarkPanelList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (ItemsControl.ContainerFromElement(BookmarkPanelList, (DependencyObject)e.OriginalSource)
-            is not ListBoxItem { Content: BookmarkPanelRow row })
+        var pressed = _bookmarkPressRow;
+        var pressPoint = _bookmarkPressPoint;
+        _bookmarkPressRow = null;
+        _bookmarkPressPoint = null;
+
+        if (pressed is null)
+        {
+            return;
+        }
+
+        // Same release test as the tree's deferred toggle: the row under the
+        // cursor, or the cursor where the press put it (the content moving is
+        // not the hand moving). Pressed here and released somewhere else
+        // fails both, which keeps an abandoned gesture from navigating -
+        // this list sits above the tree, and a press dragged off it has
+        // always meant "never mind".
+        var releaseRow =
+            ItemsControl.ContainerFromElement(BookmarkPanelList, (DependencyObject)e.OriginalSource)
+                is ListBoxItem { Content: BookmarkPanelRow underCursor } ? underCursor : null;
+        var releasePoint = e.GetPosition(BookmarkPanelList);
+        bool handHeldStill = pressPoint is { } p
+            && Math.Abs(releasePoint.X - p.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(releasePoint.Y - p.Y) < SystemParameters.MinimumVerticalDragDistance;
+        if (!ReferenceEquals(releaseRow, pressed) && !handHeldStill)
         {
             return;
         }
@@ -13565,8 +13996,8 @@ public partial class MainWindow : Window
         // carries on from where the eye is instead of from wherever the cycle
         // last landed on its own. The MARK is not set here - the jump below
         // selects the row in the tree, and the mark follows that.
-        _bookmarkCycleIndex = row.Number - 1;
-        JumpToBookmarkPath(row.Path);
+        _bookmarkCycleIndex = pressed.Number - 1;
+        JumpToBookmarkPath(pressed.Path);
     }
 
     // So the context menu acts on the row under the cursor rather than on
@@ -26169,13 +26600,21 @@ public partial class MainWindow : Window
         _lastTreePressLabel =
             $"{item?.Name ?? "(none)"}/{(item?.IsExpanded == true ? "collapse" : "expand")}";
 
+        // The press point's distance to the window's bottom edge, for the
+        // half-visible-row case: presses near the bottom lose their
+        // WM_LBUTTONUP entirely (click.log 2026-08-13 15:38, "win up" absent),
+        // and how close to the edge the press sat is the first thing that
+        // separates "released past the window/band boundary" from every other
+        // way an up can vanish.
+        double pressY = Mouse.GetPosition(this).Y;
         LogClickLine(
             $"tree press: gap={(gap < 0 ? "-" : gap + "ms")} click={clickCount} " +
             $"expander={(onExpander ? "yes" : "no")} " +
             $"target={item?.Name ?? "(none)"} dir={(item?.IsDirectory == true ? "yes" : "no")} " +
             $"wasExpanded={(item?.IsExpanded == true ? "yes" : "no")} " +
             $"menu={(IsCapturingUiOpen ? "open" : "-")} " +
-            $"captured={(Mouse.Captured?.GetType().Name ?? "-")}");
+            $"captured={(Mouse.Captured?.GetType().Name ?? "-")} " +
+            $"y={pressY:F0}/{ActualHeight - RootContent.Margin.Bottom:F0}");
     }
 
     // The outcome half: did a toggle actually happen, and how long after the
