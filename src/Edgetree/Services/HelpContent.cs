@@ -68,6 +68,16 @@ public static class HelpContent
                 {
                     R("가장자리 혹은 손잡이에 커서 이동", "다시 펼치기",
                       "Point at the screen edge, or at the handle", "Bring it back"),
+                    // THE ROW SOMEONE LOOKS UP IN A PANIC, added 2026-08-14
+                    // after a report of exactly that: two monitors, the sidebar
+                    // auto-hidden onto the edge they share, and a handle a
+                    // cursor crosses to the next display instead of resting on.
+                    // The help had one way back and it was the one that had
+                    // stopped working for them. Both of these open the sidebar
+                    // fully, not to the handle, which is why the row says 펼치기
+                    // rather than 표시.
+                    R("트레이 아이콘 클릭 · 프로그램 다시 실행", "숨은 사이드바 다시 펼치기",
+                      "Click the tray icon, or run the app again", "Opens a hidden sidebar back up"),
                     R("핀 클릭", "고정하기 ↔ 자동 숨김",
                       "Click the pin", "Stay open ↔ auto-hide"),
                     // Three answers under one button, so the row is split rather
@@ -274,6 +284,14 @@ public static class HelpContent
                       "F8 · Right-click → Slideshow", "Turn the folder's images over, one by one (needs two or more)"),
                     R("슬라이드 쇼 중 클릭 · ↑ ↓ · 트리 선택", "쇼 종료 — 보고 있던 사진에서 멈춤",
                       "Click, ↑ ↓, or pick a row while it runs", "Ends the show, staying on the picture you were looking at"),
+                    // The wallpaper item had NO row at all until now - it has
+                    // been in the picture's menu for weeks. Worth a line on its
+                    // own account, and more so since 2.1.0: which monitor it
+                    // lands on is a rule someone has to be told, because
+                    // nothing on screen says the sidebar's own display is the
+                    // one being set.
+                    R("우클릭 → 배경 설정", "사이드바가 있는 모니터의 배경화면으로 지정",
+                      "Right-click → Set as wallpaper", "Sets it on the monitor the sidebar is on"),
                 }),
 
                 new Group(T("영상", "Film"), new[]

@@ -3,9 +3,22 @@
 // Kept here rather than fetched from the GitHub release body on purpose: those
 // notes run several paragraphs per item in two languages, which is the wrong
 // shape for a card someone glances at on the way to the download button. Three
-// short lines per version is the shape to aim for; a release that genuinely
+// short lines per version was the shape to aim for; a release that genuinely
 // carries a fourth thing worth stopping for can take a fourth line (v1.4.0,
 // the user's call). It is a glance, not a list - don't let it grow past that.
+//
+// FROM v2.1.0 the ceiling is softer, because fixes are named now rather than
+// summed up in one line (see that entry for why). A round that fixed five
+// things a person could actually have hit gets five lines; a round that fixed
+// one gets one. Every line is still a GLANCE - a few words, never a paragraph.
+//
+// A fix line may name the PROBLEM where that is what makes it recognisable -
+// an intermittent one especially, since the person who hit it knows it by the
+// symptom and by nothing else. Two judgements go with that. It is written from
+// the outside, in what someone SAW, never in the app's internals. And a
+// symptom that would frighten a reader who never hit it stays out of the card
+// altogether rather than being softened into vagueness: the fix ships either
+// way, and this list sits directly above a download button.
 //
 // One rule when releasing: add an entry here in the same pass that bumps the
 // csproj. If this list falls behind, the card notices - the section only shows
@@ -20,21 +33,50 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    // Two features first, then the round of fixes under one line. The
-    // slideshow names WHERE it lives, because it only appears on a picture
+    // FIXES GET NAMED FROM HERE ON (author's call, 2026-08-14). Every entry
+    // above closes with "버그 수정 및 안정성 개선", which says a round happened
+    // and nothing about it. What changed the mind was the reply thread on the
+    // community post: people answered warmly to being told what specifically
+    // had been fixed, and the app is long past the launch weeks where a tidy
+    // headline mattered more than a record. Naming a fix is not the app
+    // talking itself down - it is the one line that shows someone is still
+    // holding the thing.
+    //
+    // Which still leaves the card a GLANCE - one line each, and only for what
+    // a person could have hit. Anything invisible from outside stays out and
+    // lives in the release notes.
+    //
+    // THE LAST TWO NAME THE PROBLEM, not the working state, and that is the
+    // author's own edit - they wrote both lines. A fix worth listing is worth
+    // being recognised by the person who hit it, and "여러 개 선택 후 하나를
+    // 해제할 때 간혹 발생하던 전체 해제" is a sentence that finds them where
+    // "나머지 선택 유지" does not. Note it is the shape used for the two
+    // INTERMITTENT ones: the reliable fix above them still reads as what now
+    // works, because nobody needs help recognising a click that never worked.
+    //
+    // THE AUTO-HIDE LINES CAME OUT, also the author's edit. They were the two
+    // that read as "this app can lose itself and you may not find it again" -
+    // true of the version being replaced, and directly above a download
+    // button. The fix ships; the sentence does not. Same call as v1.2.0's
+    // 행 사라짐 - see [[release-notes-tone]] - and worth re-reading before
+    // writing any card line about something going missing.
+    //
+    // The slideshow names WHERE it lives, because it only appears on a picture
     // with others beside it and would otherwise be a feature nobody finds.
     version: 'v2.1.0',
     ko: [
       '이미지 슬라이드 쇼(이미지 우클릭 · F8)',
-      '모니터별로 다른 배경화면 지정',
-      '트리 위치 표시 및 클릭 정확도 개선',
-      '버그 수정 및 안정성 개선',
+      '모니터별로 다른 배경화면 지정(해당 모니터 위에서 지정할 때마다)',
+      '패널 아래쪽에 반쯤 걸친 항목도 한 번에 클릭',
+      '여러 개 선택 후 하나를 해제할 때 간혹 발생하던 전체 해제 문제 수정',
+      '즐겨찾기·북마크로 이동한 뒤 부분적으로 해당 항목이 항상 상단으로 오지 않던 문제 수정',
     ],
     en: [
       'Image slideshow (right-click a picture, or F8)',
-      'Set a different wallpaper on each monitor',
-      'Steadier tree positioning and more accurate clicks',
-      'Bug fixes and stability improvements',
+      'Set a different wallpaper on each monitor (whichever one the sidebar is on)',
+      'A row half-clipped at the bottom of the panel now takes one click',
+      'Fixed: un-picking one of several selected rows could sometimes clear the whole selection',
+      'Fixed: a favorite or bookmark did not always land at the top after the jump',
     ],
   },
   {
