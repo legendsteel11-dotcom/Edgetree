@@ -711,7 +711,7 @@ public class AppSettings
         ViewerFilmstripCellHeight = Sane(ViewerFilmstripCellHeight, 64, min: 1);
         AutoHideSliverWidth = Sane(AutoHideSliverWidth, 3, min: 1);
         AutoHideHandleWidth = Sane(AutoHideHandleWidth, 8, min: 1);
-        SlideshowSeconds = (int)Sane(SlideshowSeconds, 5, min: 1);
+        SlideshowSeconds = (int)Sane(SlideshowSeconds, 5, min: 3);
         TreeFontSize = Sane(TreeFontSize, 12, min: 1);
         FavoritesPanelHeight = Sane(FavoritesPanelHeight, 100, min: 0);
         DockedHeightRatio = Sane(DockedHeightRatio, 1.0, min: 0, max: 1);

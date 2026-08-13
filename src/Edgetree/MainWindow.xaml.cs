@@ -22535,7 +22535,7 @@ public partial class MainWindow : Window
             }
 
             ViewerSlideshowItem.IsChecked = true;
-            UpdateStepperRow(ViewerSlideshowSecondsRow, _settings.SlideshowSeconds, 2, 60);
+            UpdateStepperRow(ViewerSlideshowSecondsRow, _settings.SlideshowSeconds, 3, 60);
             return;
         }
 
@@ -22649,7 +22649,7 @@ public partial class MainWindow : Window
         ViewerSlideshowItem.IsChecked = IsSlideshowRunning;
         if (slideshowRows == Visibility.Visible)
         {
-            UpdateStepperRow(ViewerSlideshowSecondsRow, _settings.SlideshowSeconds, 2, 60);
+            UpdateStepperRow(ViewerSlideshowSecondsRow, _settings.SlideshowSeconds, 3, 60);
         }
 
         // A folder can land here via its shell thumbnail; the picker is a
@@ -24600,7 +24600,11 @@ public partial class MainWindow : Window
 
     private bool IsSlideshowRunning => _slideshowTimer?.IsEnabled == true;
 
-    private int SlideshowSeconds => Math.Clamp(_settings.SlideshowSeconds, 2, 60);
+    // 3 at the bottom, not 2 (raised 2026-08-14, with the fade): the two ends
+    // of a 520ms fade plus the decode between them is most of a two-second
+    // hold, so that setting was a picture never quite arriving before the next
+    // one was asked for.
+    private int SlideshowSeconds => Math.Clamp(_settings.SlideshowSeconds, 3, 60);
 
     private void SlideshowMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -24680,6 +24684,8 @@ public partial class MainWindow : Window
         ViewerImage.BeginAnimation(OpacityProperty, null);
         ViewerImage.Opacity = 1;
 
+        _slideshowPending = null;
+
         if (_slideshowDriving)
         {
             var shown = ViewerItem;
@@ -24722,21 +24728,70 @@ public partial class MainWindow : Window
         // no arrow here to grey out and say so.
         var next = images[(index + 1) % images.Count];
 
-        // Out, then in when the picture lands (see NoteSlideshowPictureArrived).
+        // A picture that never arrived (a file deleted under the show, a decode
+        // that failed) would leave the panel dark until the next tick. This is
+        // that tick: whatever went wrong, the opacity comes back rather than
+        // the show sitting on a black panel. Cheaper than a second timer and
+        // bounded by the interval the user chose.
+        if (_slideshowAwaitingPicture)
+        {
+            _slideshowAwaitingPicture = false;
+            ViewerImage.BeginAnimation(OpacityProperty, null);
+            ViewerImage.Opacity = 1;
+        }
+
+        // THE SWAP WAITS FOR THE DARK. Asking for the next picture here and
+        // letting it appear whenever it decoded was the first cut, and it made
+        // the fade look hurried at any duration: a local photo lands in about
+        // 150ms, so the fade-out was cut off around 0.7, the new picture
+        // appeared AT that opacity, and the fade-in took over from there. What
+        // reads as a fade is the picture reaching the ground and coming back
+        // from it, so the request now waits for the fade-out to finish (see
+        // SlideshowFadeOutCompleted) and the decode happens in the dark.
+        //
         // Fading the IMAGE rather than its host leaves the panel's background
         // still, so the transition reads as one picture replacing another
         // rather than as the whole panel blinking.
-        _slideshowAwaitingPicture = true;
-        ViewerImage.BeginAnimation(OpacityProperty,
-            new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.FromMilliseconds(SlideshowFadeMs))
-            {
-                FillBehavior = System.Windows.Media.Animation.FillBehavior.HoldEnd
-            });
+        _slideshowPending = next;
+        var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(
+            0, TimeSpan.FromMilliseconds(SlideshowFadeMs))
+        {
+            FillBehavior = System.Windows.Media.Animation.FillBehavior.HoldEnd
+        };
+        fadeOut.Completed += SlideshowFadeOutCompleted;
+        ViewerImage.BeginAnimation(OpacityProperty, fadeOut);
+    }
 
+    // The picture the fade-out is making room for, held between the tick and
+    // the moment the screen is actually dark.
+    private FileSystemItem? _slideshowPending;
+
+    private void SlideshowFadeOutCompleted(object? sender, EventArgs e)
+    {
+        // Stopped mid-fade - StopSlideshow has already put the opacity back,
+        // and asking for a picture now would move the panel off whatever the
+        // user stopped on.
+        if (!IsSlideshowRunning || _slideshowPending is not { } next)
+        {
+            _slideshowPending = null;
+            return;
+        }
+
+        _slideshowPending = null;
+        _slideshowAwaitingPicture = true;
         ShowViewerItemWithoutTree(next);
     }
 
-    private const int SlideshowFadeMs = 260;
+    // 260 first, raised on seeing it run (2026-08-14): a quick fade reads as
+    // the panel swapping pictures, which is what a viewer does, and the thing
+    // being built here is a frame on a shelf. Slow enough that the change is
+    // the point rather than the interruption.
+    //
+    // It is NOT bounded by the interval, deliberately. At the 2-second floor
+    // this spends most of the hold in transition, and that looks like what
+    // someone asking for two seconds wanted; anyone using it as an album is at
+    // five and up, where the fade is a moment at either end.
+    private const int SlideshowFadeMs = 520;
 
     // Points the panel at a file without touching the tree - the slideshow's
     // one move. Shared with MoveViewerTo so the filmstrip and the chevrons
@@ -24786,12 +24841,12 @@ public partial class MainWindow : Window
     private void SlideshowSecondsIncrement_Click(object sender, RoutedEventArgs e)
         => StepSlideshowSeconds(sender, +1);
 
-    // 2~60. Below two the decode of the next picture has not landed before the
-    // one after is asked for; past a minute the row would take a dozen presses
-    // to cross and a photo frame that slow is set once and left.
+    // 3~60. See SlideshowSeconds for the floor; past a minute the row would
+    // take a dozen presses to cross, and a photo frame that slow is set once
+    // and left.
     private void StepSlideshowSeconds(object sender, int delta)
     {
-        int value = Math.Clamp(_settings.SlideshowSeconds + delta, 2, 60);
+        int value = Math.Clamp(_settings.SlideshowSeconds + delta, 3, 60);
         if (value != _settings.SlideshowSeconds)
         {
             _settings.SlideshowSeconds = value;
@@ -24804,7 +24859,7 @@ public partial class MainWindow : Window
             }
         }
 
-        UpdateStepperRow(sender, value, 2, 60);
+        UpdateStepperRow(sender, value, 3, 60);
     }
 
     private void ViewerImageHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
