@@ -267,6 +267,13 @@ public static class HelpContent
                     R("↑ ↓", "이전 · 다음 항목", "↑ ↓", "Previous · next item"),
                     R("← →", "썸네일 바 켜져 있을 때 이전 · 다음",
                       "← →", "Previous · next, while the thumbnail bar is open"),
+                    // Where someone looks for it: the menu row only appears
+                    // over a picture with others beside it, so a folder of one
+                    // photo gives no clue the feature exists at all.
+                    R("F8 · 우클릭 → 슬라이드 쇼", "폴더의 이미지를 차례로 표시 (2장 이상일 때)",
+                      "F8 · Right-click → Slideshow", "Turn the folder's images over, one by one (needs two or more)"),
+                    R("슬라이드 쇼 중 클릭 · ↑ ↓ · 트리 선택", "쇼 종료 — 보고 있던 사진에서 멈춤",
+                      "Click, ↑ ↓, or pick a row while it runs", "Ends the show, staying on the picture you were looking at"),
                 }),
 
                 new Group(T("영상", "Film"), new[]

@@ -5874,6 +5874,61 @@
                                 <MenuItem x:Name="ViewerSetWallpaperItem"
                                         Header="{x:Static services:Strings.MenuSetWallpaper}"
                                         Click="ViewerSetWallpaper_Click"/>
+                                <!-- 슬라이드 쇼, on the picture rather than in
+                                     the options menu (moved 2026-08-14, the
+                                     user's call and the right one): it is a
+                                     thing done TO the pictures on screen, and
+                                     the hand is already here. Present only
+                                     while there is a set to walk - two or more
+                                     images in the folder - which is this
+                                     menu's own convention throughout: absent,
+                                     never greyed, for anything the panel
+                                     cannot do (see 배경 설정 above).
+                                     PICTURES only, which comes for free: the
+                                     set it walks is the carousel's, and a film
+                                     or a track has its own length and its own
+                                     transport. -->
+                                <Separator x:Name="ViewerSlideshowSeparator"
+                                        Visibility="Collapsed"/>
+                                <MenuItem x:Name="ViewerSlideshowItem"
+                                        Header="{x:Static services:Strings.MenuSlideshow}"
+                                        InputGestureText="F8"
+                                        IsCheckable="True"
+                                        Visibility="Collapsed"
+                                        Click="SlideshowMenuItem_Click"/>
+                                <MenuItem x:Name="ViewerSlideshowSecondsRow"
+                                        StaysOpenOnClick="True"
+                                        Focusable="False"
+                                        Visibility="Collapsed"
+                                        Padding="{DynamicResource MenuStepperRowPadding}">
+                                    <MenuItem.Header>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                    Text="{x:Static services:Strings.MenuSlideshowSeconds}"
+                                                    Foreground="{DynamicResource MenuForeground}"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,8,0"/>
+                                            <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal">
+                                                <Button Content="−"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="SlideshowSecondsDecrement_Click"/>
+                                                <TextBlock Text="5"
+                                                        Foreground="{DynamicResource MenuForeground}"
+                                                        Width="34"
+                                                        TextAlignment="Center"
+                                                        VerticalAlignment="Center"/>
+                                                <Button Content="+"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="SlideshowSecondsIncrement_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </MenuItem.Header>
+                                </MenuItem>
                                 <!-- The playback group, shown only while a film
                                      is up. Play/pause and back-to-start are
                                      here as well as in the strip because a

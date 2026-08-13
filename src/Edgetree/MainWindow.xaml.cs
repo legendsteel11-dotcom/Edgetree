@@ -1344,6 +1344,32 @@ public partial class MainWindow : Window
             return;
         }
 
+        // F8 toggles the slideshow. A function key rather than a letter because
+        // this one has to work while the keyboard is anywhere - the panel, the
+        // tree, a picture in full screen - and every letter in that state
+        // already means something to the tree's type-ahead. F8 was the free one
+        // (F1 help, F2 rename, F5 refresh, F7 new folder are taken).
+        //
+        // Gated on the panel being open, so the key is dead rather than
+        // mysterious in a window with no pictures in it. StartSlideshow does
+        // the rest of the deciding - a folder with nothing to walk simply does
+        // not start, the same as the menu row.
+        if (e.Key == Key.F8 && Keyboard.Modifiers == ModifierKeys.None &&
+            _viewerOpen &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            if (IsSlideshowRunning)
+            {
+                StopSlideshow("F8");
+            }
+            else
+            {
+                StartSlideshow();
+            }
+            e.Handled = true;
+            return;
+        }
+
         // The two transport actions that had no key, both gated on a film
         // actually being loaded so the tree keeps these keys everywhere else -
         // Home is "first row" in a TreeView and P starts its type-ahead.
@@ -7128,6 +7154,7 @@ public partial class MainWindow : Window
                 openMediaInViewer.IsChecked = _settings.OpenMediaInViewer;
             }
 
+
             if (FindMenuItem(imageViewer, "precacheThumbnails") is { } precacheThumbnails &&
                 FindMenuItem(imageViewer, "clearThumbnailCache") is { } clearThumbnailCache)
             {
@@ -12799,6 +12826,13 @@ public partial class MainWindow : Window
         {
             ClearMultiSelection();
         }
+
+        // The tree moving is a hand on the tree, and the slideshow stands down
+        // for one - the same rule stated here that the override's own release
+        // is stated in (the tree moving hands the panel back). It cannot be
+        // the show's own doing: it never touches the tree, which is the whole
+        // point of the override it drives through.
+        StopSlideshow("tree selection", landOnShownPicture: false);
 
         ReHideFoldersLeftBehind(e.NewValue as FileSystemItem);
 
@@ -18513,6 +18547,8 @@ public partial class MainWindow : Window
             ViewerImage.Visibility = Visibility.Visible;
             ViewerImage.Source = bitmap;
             _viewerShowingDecodedImage = true;
+            // The picture the slideshow's fade-out was waiting for.
+            NoteSlideshowPictureArrived();
             SetViewerCaption(
                 $"{pixelWidth} × {pixelHeight}  ·  {FormatFileSize(fileLength)}  ·  {modified:yyyy-MM-dd HH:mm}");
 
@@ -18701,6 +18737,7 @@ public partial class MainWindow : Window
         ViewerImage.Visibility = Visibility.Visible;
         ViewerImage.Source = _viewerGifCanvas;
         _viewerShowingDecodedImage = true;
+        NoteSlideshowPictureArrived();
         SetViewerCaption(
             $"{width} × {height}  ·  {FormatFileSize(bytes.LongLength)}  ·  {modified:yyyy-MM-dd HH:mm}");
 
@@ -22476,6 +22513,32 @@ public partial class MainWindow : Window
         // simply unreachable there - and it is the film that has something
         // extra to offer (its marked positions). ViewerImage is Collapsed in
         // that state, which is why the first test can't stand alone.
+        // A RUNNING SLIDESHOW GETS A MENU OF ITS OWN - two rows, and nothing
+        // else. The gate below is the reason: a show deliberately does not move
+        // the tree, so the picture on screen is not the selection and every
+        // file action in this menu would act on the wrong file. Blocking the
+        // menu outright was the honest answer to that and left the show with no
+        // way to be stopped from the surface it is running on. Showing the two
+        // rows that ARE about the show is the answer to both.
+        if (IsSlideshowRunning && ViewerImageHost.ContextMenu is { } runningMenu)
+        {
+            foreach (var entry in runningMenu.Items)
+            {
+                if (entry is UIElement row)
+                {
+                    row.Visibility =
+                        ReferenceEquals(row, ViewerSlideshowItem) ||
+                        ReferenceEquals(row, ViewerSlideshowSecondsRow)
+                            ? Visibility.Visible
+                            : Visibility.Collapsed;
+                }
+            }
+
+            ViewerSlideshowItem.IsChecked = true;
+            UpdateStepperRow(ViewerSlideshowSecondsRow, _settings.SlideshowSeconds, 2, 60);
+            return;
+        }
+
         bool showingVideo = _viewerVideoPath is not null;
         if ((!showingVideo && (ViewerImage.Visibility != Visibility.Visible || ViewerImage.Source is null))
             || ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsShowMore: false } item
@@ -22483,6 +22546,22 @@ public partial class MainWindow : Window
         {
             e.Handled = true;
             return;
+        }
+
+        // Everything back on before the rules below decide what to hide - the
+        // running-show branch above collapses the whole menu, and without this
+        // the rows it hid would stay hidden for the rest of the session. Each
+        // row that should not be here is collapsed again a few lines down, by
+        // the same conditions as always.
+        if (ViewerImageHost.ContextMenu is { } fullMenu)
+        {
+            foreach (var entry in fullMenu.Items)
+            {
+                if (entry is UIElement row)
+                {
+                    row.Visibility = Visibility.Visible;
+                }
+            }
         }
 
         // TWO conditions now, not one. A track is played by the same transport
@@ -22555,6 +22634,24 @@ public partial class MainWindow : Window
         ViewerSetWallpaperItem.Visibility = _viewerShowingDecodedImage
             ? Visibility.Visible
             : Visibility.Collapsed;
+
+        // The show, and the two rows that drive it - present only when there
+        // is a set of pictures to walk. Running counts on its own so the way
+        // to STOP one never disappears: the show can outlive the condition
+        // that offered it (a folder refreshed down to a single picture), and a
+        // running show with no visible switch would be a thing that cannot be
+        // turned off.
+        bool canWalk = IsViewerCarouselItem(item) && GetViewerCarouselItems(item).Count > 1;
+        var slideshowRows = canWalk || IsSlideshowRunning ? Visibility.Visible : Visibility.Collapsed;
+        ViewerSlideshowSeparator.Visibility = slideshowRows;
+        ViewerSlideshowItem.Visibility = slideshowRows;
+        ViewerSlideshowSecondsRow.Visibility = slideshowRows;
+        ViewerSlideshowItem.IsChecked = IsSlideshowRunning;
+        if (slideshowRows == Visibility.Visible)
+        {
+            UpdateStepperRow(ViewerSlideshowSecondsRow, _settings.SlideshowSeconds, 2, 60);
+        }
+
         // A folder can land here via its shell thumbnail; the picker is a
         // file-only verb (same rule the row menu applies).
         ViewerOpenWithItem.IsEnabled = !item.IsDirectory;
@@ -24230,6 +24327,18 @@ public partial class MainWindow : Window
     // which is exactly what the single click was split apart to stop.
     private void MoveViewerTo(FileSystemItem target)
     {
+        // Two things can be driving the panel instead of the tree, and they
+        // move differently: the search view moves its own LIST selection (the
+        // picture follows), while the slideshow has no list on screen to move
+        // and simply points the panel at the next file. Both hang off
+        // _viewerListOverride, so the driver has to be named or the strip and
+        // the chevrons would go looking for a search row that never existed.
+        if (_slideshowDriving)
+        {
+            ShowViewerItemWithoutTree(target);
+            return;
+        }
+
         if (_viewerListOverride is not null)
         {
             SelectSearchViewerItem(target);
@@ -24434,6 +24543,9 @@ public partial class MainWindow : Window
 
     private void ViewerCarouselStep(int direction)
     {
+        // A chevron is someone taking the pictures back into their own hands.
+        StopSlideshowOnUserAction("chevron");
+
         if (ViewerItem is not { } current || !IsViewerCarouselItem(current))
         {
             return;
@@ -24454,8 +24566,253 @@ public partial class MainWindow : Window
         MoveViewerTo(images[next]);
     }
 
+    // ----- 슬라이드 쇼 (2026-08-14) ------------------------------------------
+    //
+    // Asked for as a mini album: the app floated in a corner of the desktop,
+    // in its own full screen, holding a folder of photographs and turning them
+    // over by itself. Almost all of it already existed - the carousel walks a
+    // folder's IMAGE rows and the chevrons step through them - so this is a
+    // timer on ViewerCarouselStep and very little else.
+    //
+    // IT DOES NOT MOVE THE TREE, and that is the one design decision in here.
+    // A chevron click moves the tree selection and lets selection-follow bring
+    // the picture, which is right for a click and wrong several times over for
+    // something firing every few seconds: the tree would scroll itself on a
+    // timer (see [[no-app-driven-scroll]]), every step would push a history
+    // entry, and the path bar, the bookmark panel and the favorites list would
+    // all be rewritten for a file nobody navigated to. So the slideshow drives
+    // the panel through the same override the search results use - the one
+    // path in this app that already means "show this without moving the tree".
+    //
+    // Pictures only, which comes for free: the carousel's list IS the folder's
+    // images, so a film or a track simply is not in it.
+
+    private System.Windows.Threading.DispatcherTimer? _slideshowTimer;
+
+    // True while the slideshow owns _viewerListOverride, so MoveViewerTo and
+    // the release path can tell which of the two drivers is in charge.
+    private bool _slideshowDriving;
+
+    // Set between fading a picture out and the next one arriving, so the
+    // arrival knows to fade in rather than appear. Cleared by the arrival or
+    // by the safety timer below.
+    private bool _slideshowAwaitingPicture;
+
+    private bool IsSlideshowRunning => _slideshowTimer?.IsEnabled == true;
+
+    private int SlideshowSeconds => Math.Clamp(_settings.SlideshowSeconds, 2, 60);
+
+    private void SlideshowMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (IsSlideshowRunning)
+        {
+            StopSlideshow("menu");
+            return;
+        }
+
+        StartSlideshow();
+        if (sender is MenuItem item)
+        {
+            // The row's own check follows what actually happened, not what was
+            // clicked: nothing to walk means the slideshow declined to start.
+            item.IsChecked = IsSlideshowRunning;
+        }
+    }
+
+    private void StartSlideshow()
+    {
+        if (!_viewerOpen || ViewerItem is not { } current || !IsViewerCarouselItem(current))
+        {
+            return;
+        }
+
+        var images = GetViewerCarouselItems(current);
+        if (images.Count < 2)
+        {
+            // One picture is not a slideshow, and a timer over it would flash
+            // the same file at itself forever.
+            return;
+        }
+
+        // The list is CAPTURED, not re-read each tick. It is the set the
+        // counter was already promising, and re-asking every few seconds would
+        // let a background refresh quietly change what "next" means mid-show.
+        _viewerListOverride = images;
+        _searchViewerItem = current;
+        _slideshowDriving = true;
+
+        _slideshowTimer ??= CreateSlideshowTimer();
+        _slideshowTimer.Interval = TimeSpan.FromSeconds(SlideshowSeconds);
+        _slideshowTimer.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateSlideshowTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer();
+        timer.Tick += SlideshowTimer_Tick;
+        return timer;
+    }
+
+    // Every way out, named - the reason goes to click.log so a slideshow that
+    // stops on its own can be told from one the user stopped.
+    //
+    // landOnShownPicture: THE TREE CATCHES UP TO WHERE THE SHOW LEFT OFF. The
+    // show runs without moving the tree, so when it ends the two are looking at
+    // different files - and everything that reads "the panel's file" from the
+    // SELECTION is wrong from that moment: the picture's own right-click menu
+    // refuses to open (its gate is exactly that comparison), the carousel
+    // counter reverts, and the next chevron steps from the file the show
+    // started at rather than the one on screen. Snapping the PANEL back to the
+    // tree instead would answer the same objection by throwing away the
+    // picture the user chose to stop on, which is the wrong half to give up.
+    // Passed false only from the tree's own selection change, which is already
+    // moving the tree and must not be re-entered.
+    private void StopSlideshow(string reason, bool landOnShownPicture = true)
+    {
+        if (_slideshowTimer is null && !_slideshowDriving)
+        {
+            return;
+        }
+
+        bool wasRunning = IsSlideshowRunning;
+        _slideshowTimer?.Stop();
+        _slideshowAwaitingPicture = false;
+        ViewerImage.BeginAnimation(OpacityProperty, null);
+        ViewerImage.Opacity = 1;
+
+        if (_slideshowDriving)
+        {
+            var shown = ViewerItem;
+            _slideshowDriving = false;
+            _viewerListOverride = null;
+            _searchViewerItem = null;
+
+            // Ordered: the flags come off FIRST, so the selection change this
+            // raises finds no show to stop and cannot recurse.
+            if (landOnShownPicture && shown is not null && !ReferenceEquals(shown, _selectedItem))
+            {
+                SelectVisibleItem(shown);
+            }
+        }
+
+        if (wasRunning)
+        {
+            LogClickLine($"slideshow: stopped ({reason})");
+        }
+    }
+
+    private void SlideshowTimer_Tick(object? sender, EventArgs e)
+    {
+        if (!_viewerOpen || !_slideshowDriving || _viewerListOverride is not { } images)
+        {
+            StopSlideshow("panel gone");
+            return;
+        }
+
+        int index = ViewerItem is { } current ? images.IndexOf(current) : -1;
+        if (index < 0)
+        {
+            StopSlideshow("lost its place");
+            return;
+        }
+
+        // Always wraps. The chevrons deliberately do not - a disabled arrow at
+        // the end says "you are at the edge" - but an album that stops at the
+        // last picture and sits there is not what was asked for, and there is
+        // no arrow here to grey out and say so.
+        var next = images[(index + 1) % images.Count];
+
+        // Out, then in when the picture lands (see NoteSlideshowPictureArrived).
+        // Fading the IMAGE rather than its host leaves the panel's background
+        // still, so the transition reads as one picture replacing another
+        // rather than as the whole panel blinking.
+        _slideshowAwaitingPicture = true;
+        ViewerImage.BeginAnimation(OpacityProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.FromMilliseconds(SlideshowFadeMs))
+            {
+                FillBehavior = System.Windows.Media.Animation.FillBehavior.HoldEnd
+            });
+
+        ShowViewerItemWithoutTree(next);
+    }
+
+    private const int SlideshowFadeMs = 260;
+
+    // Points the panel at a file without touching the tree - the slideshow's
+    // one move. Shared with MoveViewerTo so the filmstrip and the chevrons
+    // land in the same place while a show is running.
+    private void ShowViewerItemWithoutTree(FileSystemItem target)
+    {
+        _searchViewerItem = target;
+        ScheduleViewerPreview();
+        UpdateViewerCarousel();
+    }
+
+    // Called from the picture-arrival paths. The fade-in belongs HERE rather
+    // than on a second timer because a picture off a sleeping NAS can take
+    // seconds to arrive, and a fade-in that ran to schedule would spend them
+    // showing an empty panel.
+    private void NoteSlideshowPictureArrived()
+    {
+        if (!_slideshowAwaitingPicture)
+        {
+            return;
+        }
+
+        _slideshowAwaitingPicture = false;
+        ViewerImage.BeginAnimation(OpacityProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(1, TimeSpan.FromMilliseconds(SlideshowFadeMs))
+            {
+                FillBehavior = System.Windows.Media.Animation.FillBehavior.HoldEnd
+            });
+    }
+
+    // THE HAND ARRIVING ENDS THE SHOW. Same rule the tree's confirm pass
+    // follows: motion the app drives is only tolerable while nobody is doing
+    // anything else. Deliberately a full stop rather than a pause - a show
+    // that resumes by itself a few seconds after a click is the app arguing
+    // with the person using it, and the menu row is one click away.
+    private void StopSlideshowOnUserAction(string reason)
+    {
+        if (IsSlideshowRunning)
+        {
+            StopSlideshow(reason);
+        }
+    }
+
+    private void SlideshowSecondsDecrement_Click(object sender, RoutedEventArgs e)
+        => StepSlideshowSeconds(sender, -1);
+
+    private void SlideshowSecondsIncrement_Click(object sender, RoutedEventArgs e)
+        => StepSlideshowSeconds(sender, +1);
+
+    // 2~60. Below two the decode of the next picture has not landed before the
+    // one after is asked for; past a minute the row would take a dozen presses
+    // to cross and a photo frame that slow is set once and left.
+    private void StepSlideshowSeconds(object sender, int delta)
+    {
+        int value = Math.Clamp(_settings.SlideshowSeconds + delta, 2, 60);
+        if (value != _settings.SlideshowSeconds)
+        {
+            _settings.SlideshowSeconds = value;
+            // Live, so holding the stepper while a show runs is how the right
+            // speed gets found - and applied from the NEXT picture rather than
+            // restarting the current one's wait.
+            if (_slideshowTimer is not null)
+            {
+                _slideshowTimer.Interval = TimeSpan.FromSeconds(value);
+            }
+        }
+
+        UpdateStepperRow(sender, value, 2, 60);
+    }
+
     private void ViewerImageHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        // Before every branch below: zoom, pan, flick or play, all of them are
+        // the hand arriving on the picture.
+        StopSlideshowOnUserAction("picture click");
+
         if (e.ClickCount == 2)
         {
             // The gesture every viewer has: fit and 1:1 with nothing to aim
@@ -25224,6 +25581,9 @@ public partial class MainWindow : Window
                 ViewerImage.Visibility = Visibility.Visible;
                 ViewerImage.Source = frame;
                 _viewerShowingDecodedImage = false;
+                // A shell thumbnail standing in for a picture WIC could not
+                // open is still the picture as far as the show is concerned.
+                NoteSlideshowPictureArrived();
 
                 // The thumbnail's own pixels are all there is, so they are what
                 // the zoom measures against - and marking them as the decoded
@@ -25973,6 +26333,13 @@ public partial class MainWindow : Window
 
     private void ReleaseSearchViewerLink()
     {
+        // Not the search's override to release - the slideshow borrows the
+        // same field, and StopSlideshow is what hands that one back.
+        if (_slideshowDriving)
+        {
+            return;
+        }
+
         if (_viewerListOverride is null)
         {
             return;

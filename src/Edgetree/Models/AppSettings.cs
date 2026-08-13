@@ -295,6 +295,12 @@ public class AppSettings
     // Options ("...") menu toggles.
     public bool AutoCollapseFolders { get; set; } = false;
     public bool AlwaysOnTop { get; set; } = false;
+    // 슬라이드 쇼 - how long each picture is held, in seconds. The RUNNING
+    // state deliberately does not live here: an app that started moving
+    // pictures by itself on launch would be answering a question nobody asked
+    // this session. Turning it on is one menu row away.
+    public int SlideshowSeconds { get; set; } = 5;
+
     public bool StartWithWindows { get; set; } = false;
 
     // Defaults to true to match the tray icon's existing always-on behavior
@@ -705,6 +711,7 @@ public class AppSettings
         ViewerFilmstripCellHeight = Sane(ViewerFilmstripCellHeight, 64, min: 1);
         AutoHideSliverWidth = Sane(AutoHideSliverWidth, 3, min: 1);
         AutoHideHandleWidth = Sane(AutoHideHandleWidth, 8, min: 1);
+        SlideshowSeconds = (int)Sane(SlideshowSeconds, 5, min: 1);
         TreeFontSize = Sane(TreeFontSize, 12, min: 1);
         FavoritesPanelHeight = Sane(FavoritesPanelHeight, 100, min: 0);
         DockedHeightRatio = Sane(DockedHeightRatio, 1.0, min: 0, max: 1);

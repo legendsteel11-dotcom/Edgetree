@@ -372,6 +372,12 @@ public static class Strings
     // the footer chip that means sound and film only, and this covers pictures
     // too - so the label lists them rather than borrowing a word that is taken.
     public static string MenuOpenMediaInViewer = "이미지·음악·영상 더블클릭으로 열기";
+    // "쇼" spaced off, matching the way Windows itself writes it. The seconds
+    // row says its unit in the label rather than beside the number: the
+    // stepper's own digits are already narrow, and every other stepper in this
+    // menu carries a bare number.
+    public static string MenuSlideshow = "슬라이드 쇼";
+    public static string MenuSlideshowSeconds = "슬라이드 간격 (초)";
     // The size rides in the row itself, because the only reason to press it is
     // that the number has grown - and a row that has to be pressed to find out
     // is a row that gets pressed for no reason.
@@ -890,6 +896,8 @@ public static class Strings
         MenuImageViewer = "Multimedia panel";
         MenuPrecacheThumbnails = "Preload image thumbnails";
         MenuOpenMediaInViewer = "Open images, music and video on double-click";
+        MenuSlideshow = "Slideshow";
+        MenuSlideshowSeconds = "Seconds per picture";
         MenuClearThumbnailCache = "Clean up thumbnail files";
         MenuClearThumbnailCacheSized = "Clean up thumbnail files ({0})";
         ViewerPrecaching = "Preloading {0}";
