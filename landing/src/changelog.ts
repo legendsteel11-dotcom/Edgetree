@@ -20,6 +20,24 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // Two features first, then the round of fixes under one line. The
+    // slideshow names WHERE it lives, because it only appears on a picture
+    // with others beside it and would otherwise be a feature nobody finds.
+    version: 'v2.1.0',
+    ko: [
+      '이미지 슬라이드 쇼(이미지 우클릭 · F8)',
+      '모니터별로 다른 배경화면 지정',
+      '트리 위치 표시 및 클릭 정확도 개선',
+      '버그 수정 및 안정성 개선',
+    ],
+    en: [
+      'Image slideshow (right-click a picture, or F8)',
+      'Set a different wallpaper on each monitor',
+      'Steadier tree positioning and more accurate clicks',
+      'Bug fixes and stability improvements',
+    ],
+  },
+  {
     // The author's own four lines, used as written. The first groups what the
     // release notes list one by one - drag to move, Shift+Delete, a folder
     // copied beside itself - under the thing they have in common, which is the
