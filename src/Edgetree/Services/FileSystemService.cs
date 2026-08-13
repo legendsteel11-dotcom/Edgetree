@@ -376,7 +376,10 @@ public static class FileSystemService
     // to declare C: gone.
     private static readonly HashSet<string> NetworkRoots = new(StringComparer.OrdinalIgnoreCase);
 
-    private static bool IsOnNetworkRoot(string path)
+    // Public since 2026-08-13: the delete path asks it too. A network location
+    // has no Recycle Bin, so a delete there is final whatever was requested -
+    // which is the one case the app still puts a question in front of.
+    public static bool IsOnNetworkRoot(string path)
     {
         if (path.StartsWith(@"\\", StringComparison.Ordinal))
         {

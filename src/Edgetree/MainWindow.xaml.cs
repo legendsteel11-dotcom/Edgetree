@@ -15317,6 +15317,32 @@ public partial class MainWindow : Window
         }
     }
 
+    // THE ONE QUESTION LEFT IN FRONT OF A DELETE, and it is asked only where
+    // the delete cannot be taken back: a share has no Recycle Bin, so the file
+    // is gone the moment it goes. Everywhere else this returns true without
+    // drawing anything, which is the whole point - the silence people asked for
+    // on a local delete is not worth a file on the NAS.
+    //
+    // WHAT THIS DEVICE HIDES: nothing about the delete itself. It is a question
+    // and not a guard - answering 예 does exactly what answering nothing used
+    // to. If it ever starts appearing on local files, the thing to look at is
+    // FileSystemService.IsOnNetworkRoot, not this.
+    private bool ConfirmUnrecyclableDelete(IReadOnlyList<string> paths)
+    {
+        int count = paths.Count(FileSystemService.IsOnNetworkRoot);
+        if (count == 0)
+        {
+            return true;
+        }
+
+        string body = paths.Count == 1
+            ? string.Format(Strings.DeleteNoRecycleBinBody, Path.GetFileName(paths[0].TrimEnd('\\')))
+            : string.Format(Strings.DeleteNoRecycleBinBodyMultiple, count);
+
+        return MessageBox.Show(this, body, Strings.DeleteNoRecycleBinTitle,
+            MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+    }
+
     private void DeleteItem_Click(object sender, RoutedEventArgs e)
     {
         var items = GetEffectiveSelection();
@@ -15325,16 +15351,32 @@ public partial class MainWindow : Window
             return;
         }
 
-        string confirmBody = items.Count == 1
-            ? string.Format(Strings.DeleteConfirmBody, items[0].Name)
-            : string.Format(Strings.DeleteConfirmBodyMultiple, items.Count);
-        var result = MessageBox.Show(
-            this,
-            confirmBody,
-            Strings.DeleteConfirmTitle,
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes)
+        // Shift+Delete skips the Recycle Bin, which is what it means everywhere
+        // in Windows. Read from the KEYBOARD rather than from the event, so the
+        // row menu's 삭제 - which nobody reaches with a key held - keeps its
+        // ordinary meaning.
+        //
+        // THE SHELL ASKS, NOT US - both ways round, and this app now asks
+        // nothing of its own about a delete.
+        //
+        // Shift skips the Recycle Bin, and there the shell's own confirmation
+        // appears: it names the file, its type, its size and its date, it is the
+        // dialog this gesture already opens everywhere else in Windows, and it
+        // comes translated into languages this app is not.
+        //
+        // Without Shift there is no question at all, because Windows has not
+        // asked one in years and a box saying "휴지통으로 보낼까요?" only tells
+        // people something they already know.
+        //
+        // WITH ONE EXCEPTION, and it was measured rather than assumed: a
+        // network location has NO Recycle Bin, so a delete there is final. The
+        // shell was asked to warn about exactly that (FOF_WANTNUKEWARNING) and
+        // does not - a NAS file deleted through it simply vanished, with the
+        // Recycle Bin holding nothing from that drive. So the question comes
+        // back for that case alone, ours this time.
+        bool permanent = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+
+        if (!permanent && !ConfirmUnrecyclableDelete(items.Select(i => i.FullPath).ToList()))
         {
             return;
         }
@@ -15366,19 +15408,40 @@ public partial class MainWindow : Window
         // Every failure is collected and shown once at the end rather than
         // popping a box per item mid-loop. A selection can also contain both a
         // folder and something inside it - deleting the folder first makes the
-        // child's delete a silent no-op (TryDeleteToRecycleBin succeeds on an
-        // already-gone path), which is the right outcome.
+        // child's delete a silent no-op (the shell takes the whole list and an
+        // already-gone path is simply not there), which is the right outcome.
         var failures = new List<string>();
         var parentsToRefresh = new HashSet<FileSystemItem>();
         bool anchorDeleted = false;
+
+        // ONE CALL for the whole selection, and it happens BEFORE the loop -
+        // that is what makes Windows ask once about twelve files instead of
+        // twelve times about one, on the path where it asks at all. Nothing has
+        // happened yet at this point, so a "no" simply leaves it all as it was.
+        if (!FileOperationService.TryShellDelete(
+                items.Select(i => i.FullPath).ToList(),
+                new System.Windows.Interop.WindowInteropHelper(this).Handle,
+                permanent,
+                out bool cancelled, out string? shellError))
+        {
+            if (shellError is not null)
+            {
+                failures.Add(shellError);
+            }
+        }
+        else if (cancelled)
+        {
+            return;
+        }
+
         foreach (var item in items)
         {
-            if (!FileOperationService.TryDeleteToRecycleBin(item.FullPath, out var error))
+            // The shell answers once for the batch, so which ROWS actually went
+            // is read off the disk rather than from a return value. Cheap, and
+            // it also covers the case a selection holds both a folder and
+            // something inside it - the child is already gone with its parent.
+            if (File.Exists(item.FullPath) || Directory.Exists(item.FullPath))
             {
-                if (error is not null)
-                {
-                    failures.Add(error);
-                }
                 continue;
             }
 
@@ -26374,23 +26437,30 @@ public partial class MainWindow : Window
             return;
         }
 
-        var result = MessageBox.Show(
-            this,
-            string.Format(Strings.DeleteConfirmBody, entry.FileName),
-            Strings.DeleteConfirmTitle,
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes)
+        // The same shell call the tree's delete uses, and the same question in
+        // front of it, so one gesture cannot mean two different things depending
+        // on which list it was performed in. Shift is read here too.
+        bool searchPermanent = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        if (!searchPermanent && !ConfirmUnrecyclableDelete(new[] { entry.FullPath }))
         {
             return;
         }
 
-        if (!FileOperationService.TryDeleteToRecycleBin(entry.FullPath, out var error))
+        if (!FileOperationService.TryShellDelete(
+                new[] { entry.FullPath },
+                new System.Windows.Interop.WindowInteropHelper(this).Handle,
+                searchPermanent,
+                out bool searchDeleteCancelled, out var error))
         {
             if (error is not null)
             {
                 MessageBox.Show(this, error, Strings.DeleteFailedTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+            return;
+        }
+
+        if (searchDeleteCancelled || File.Exists(entry.FullPath) || Directory.Exists(entry.FullPath))
+        {
             return;
         }
 

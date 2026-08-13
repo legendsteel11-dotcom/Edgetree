@@ -633,6 +633,19 @@ public static class Strings
     public static string DeleteConfirmTitle = "삭제 확인";
     public static string DeleteConfirmBody = "'{0}'을(를) 휴지통으로 보낼까요?";
     public static string DeleteConfirmBodyMultiple = "선택한 {0}개 항목을 휴지통으로 보낼까요?";
+    // Shift+Delete goes through the shell, which asks and reports in its own
+    // dialogs. This is only for the case it comes back with a code and no
+    // dialog of its own - rare, and worse than saying nothing.
+    public static string DeleteFailedShellBody = "삭제하지 못했습니다. (오류 {0})";
+
+    // The only question this app still puts in front of a delete. Names the
+    // REASON rather than the risk - "휴지통이 없습니다" is a fact about the
+    // place, and it is the fact that makes the rest true.
+    public static string DeleteNoRecycleBinTitle = "네트워크 위치에서 삭제";
+    public static string DeleteNoRecycleBinBody =
+        "'{0}'을(를) 삭제할까요?\n\n네트워크 위치에는 휴지통이 없어 되돌릴 수 없습니다.";
+    public static string DeleteNoRecycleBinBodyMultiple =
+        "네트워크 위치의 {0}개 항목을 삭제할까요?\n\n휴지통이 없어 되돌릴 수 없습니다.";
     public static string DeleteFailedTitle = "삭제 실패";
     public static string CompressFailedTitle = "압축 실패";
     public static string ExtractFailedTitle = "압축 풀기 실패";
@@ -1003,6 +1016,12 @@ public static class Strings
         DeleteConfirmTitle = "Confirm Delete";
         DeleteConfirmBody = "Send '{0}' to the Recycle Bin?";
         DeleteConfirmBodyMultiple = "Send {0} selected items to the Recycle Bin?";
+        DeleteFailedShellBody = "Could not delete. (error {0})";
+        DeleteNoRecycleBinTitle = "Delete from a Network Location";
+        DeleteNoRecycleBinBody =
+            "Delete '{0}'?\n\nA network location has no Recycle Bin, so this cannot be undone.";
+        DeleteNoRecycleBinBodyMultiple =
+            "Delete {0} items from a network location?\n\nThere is no Recycle Bin, so this cannot be undone.";
         DeleteFailedTitle = "Delete Failed";
         CompressFailedTitle = "Compress Failed";
         ExtractFailedTitle = "Extract Failed";

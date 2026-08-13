@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using Microsoft.VisualBasic.FileIO;
 using Clipboard = System.Windows.Clipboard;
 
@@ -487,28 +488,118 @@ public static class FileOperationService
         }
     }
 
-    // Sends to the Recycle Bin rather than permanently deleting, so an
-    // accidental delete from the sidebar is still recoverable.
-    public static bool TryDeleteToRecycleBin(string path, out string? error)
-    {
-        error = null;
-        try
-        {
-            if (Directory.Exists(path))
-            {
-                FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-            }
-            else if (File.Exists(path))
-            {
-                FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-            }
+    // ----- Shift+Delete ------------------------------------------------------
+    //
+    // WINDOWS ASKS, NOT US. A MessageBox of our own was written first and taken
+    // out again: the shell's own confirmation names the file, its type, its size
+    // and when it was last changed, is the dialog everyone already knows for
+    // this exact gesture, and is translated into every language this app is not.
+    // Ours could only ever have been a worse copy of it.
+    //
+    // THE WHOLE SELECTION GOES IN ONE CALL, which is the other half of the
+    // reason. SHFileOperation takes a double-null-terminated LIST, so deleting
+    // twelve files asks "이 항목 12개를..." once - deleting them one at a time
+    // would have asked twelve times, and that is the shape that trains a hand to
+    // click 예 without reading.
+    //
+    // No FOF_ALLOWUNDO, so this really is permanent; and deliberately NO
+    // FOF_NOCONFIRMATION, since the confirmation is the point.
+    //
+    // THE RECYCLED DELETE GOES THROUGH THE SAME CALL with different flags, and
+    // the combination is what Explorer itself does by default:
+    //
+    //   FOF_ALLOWUNDO       - to the Recycle Bin, where it can be fetched back
+    //   FOF_NOCONFIRMATION  - so an ordinary delete asks nothing at all, which
+    //                         is what Windows has done for years and what a box
+    //                         of ours was only repeating
+    //   FOF_WANTNUKEWARNING - EXCEPT when the file cannot be recycled, and this
+    //                         is the whole reason the flag exists. A network
+    //                         share has no Recycle Bin, so a delete there is
+    //                         permanent whatever was asked for; without this,
+    //                         dropping our own question would have made files on
+    //                         a NAS disappear in silence. It partially overrides
+    //                         FOF_NOCONFIRMATION, and only for that case.
+    private const int FO_DELETE = 0x0003;
+    private const ushort FOF_NOCONFIRMATION = 0x0010;
+    private const ushort FOF_ALLOWUNDO = 0x0040;
+    private const ushort FOF_NOCONFIRMMKDIR = 0x0200;
+    private const ushort FOF_WANTNUKEWARNING = 0x4000;
+    private const int ERROR_CANCELLED_SHELL = 0x4C7;
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode, Pack = 8)]
+    private struct SHFILEOPSTRUCT
+    {
+        public IntPtr hwnd;
+        public uint wFunc;
+        public string pFrom;
+        public string? pTo;
+        public ushort fFlags;
+        public int fAnyOperationsAborted;
+        public IntPtr hNameMappings;
+        public string? lpszProgressTitle;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHFileOperation(ref SHFILEOPSTRUCT lpFileOp);
+
+    // cancelled is TRUE when the person said no - which is not a failure and
+    // must not be reported as one.
+    public static bool TryShellDelete(IReadOnlyList<string> paths, IntPtr owner, bool permanent,
+        out bool cancelled, out string? error)
+    {
+        cancelled = false;
+        error = null;
+
+        var existing = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+        if (existing.Count == 0)
+        {
             return true;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+
+        var op = new SHFILEOPSTRUCT
+        {
+            hwnd = owner,
+            wFunc = FO_DELETE,
+            // Double-null-terminated: one trailing \0 per entry from the join,
+            // and one more to close the list.
+            pFrom = string.Join('\0', existing) + "\0\0",
+            fFlags = permanent
+                ? FOF_NOCONFIRMMKDIR
+                : (ushort)(FOF_NOCONFIRMMKDIR | FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_WANTNUKEWARNING),
+        };
+
+        int result;
+        try
+        {
+            result = SHFileOperation(ref op);
+        }
+        catch (Exception ex) when (ex is EntryPointNotFoundException or DllNotFoundException)
         {
             error = ex.Message;
             return false;
         }
+
+        if (op.fAnyOperationsAborted != 0 || result == ERROR_CANCELLED_SHELL)
+        {
+            cancelled = true;
+            return true;
+        }
+
+        if (result != 0)
+        {
+            // The shell has already shown whatever went wrong in its own dialog,
+            // so this is for the log and for the caller's own summary rather
+            // than a second box saying the same thing in worse words.
+            error = string.Format(Strings.DeleteFailedShellBody, result);
+            return false;
+        }
+
+        return true;
     }
+
+    // The VB FileSystem delete that used to live here is GONE (2026-08-13).
+    // Every delete in the app now goes through TryShellDelete above, and a
+    // second way to remove a file is a second set of rules about recycling,
+    // confirming and reporting that can drift from the first without anyone
+    // noticing which one they were looking at.
 }
