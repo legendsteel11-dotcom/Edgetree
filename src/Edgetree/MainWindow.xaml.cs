@@ -3309,8 +3309,30 @@ public partial class MainWindow : Window
         resources["SubmenuPlacement"] = openLeft
             ? System.Windows.Controls.Primitives.PlacementMode.Left
             : System.Windows.Controls.Primitives.PlacementMode.Right;
-        resources["SubmenuHorizontalOffset"] = openLeft ? 12.0 : -12.0;
+        resources["SubmenuHorizontalOffset"] = openLeft ? SubmenuGutterPull : -SubmenuGutterPull;
     }
+
+    // How far the submenu popup is pulled back over its own 10px shadow gutter.
+    // It reads as "overlap the parent by 12 minus 10 = 2px", and the arithmetic
+    // is right about the wrong edge: the popup hangs off the MENU ITEM, while
+    // the parent's own VISIBLE edge is further out again - its padding (5) and
+    // border (1), plus a SCROLLBAR (the thickness setting, 10 by default) on any
+    // menu long enough to have one. So the pull was landing the submenu 8px
+    // inside a short menu and 18px inside a scrolling one, which is why the
+    // options menu - the one long enough to scroll - was where two people
+    // noticed it (2026-08-13/14; the same person who found the right-docked flip
+    // reported it, from the mirrored side).
+    //
+    // 6 leaves ~2px of overlap on a short menu and takes the scrolling case from
+    // 18 to 12. It does not go lower: at 4 a short menu opens a GAP, and a gap
+    // is not cosmetic here - the shadow gutter is transparent and does not
+    // hit-test, so a cursor crossing it leaves the menu and the submenu closes.
+    // That failure is exactly what the pull exists to prevent.
+    //
+    // Making the overlap even everywhere needs the offset to know whether THIS
+    // parent is scrolling, which the resource - one value shared by every open
+    // submenu - cannot say.
+    private const double SubmenuGutterPull = 6.0;
 
     private void AnyMenu_Opened(object sender, RoutedEventArgs e)
     {

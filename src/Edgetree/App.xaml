@@ -14,7 +14,7 @@
              Declared here rather than in MainWindow's dictionary because a menu
              is its own window and does not resolve keys from that one. -->
         <primitives:PlacementMode x:Key="SubmenuPlacement">Right</primitives:PlacementMode>
-        <system:Double x:Key="SubmenuHorizontalOffset">-12</system:Double>
+        <system:Double x:Key="SubmenuHorizontalOffset">-6</system:Double>
         <!-- Application-level (not MainWindow.Resources) so ColorSettingsWindow
              and AboutWindow - separate Window instances with their own resource
              dictionaries - can share the exact same DynamicResource keys instead
