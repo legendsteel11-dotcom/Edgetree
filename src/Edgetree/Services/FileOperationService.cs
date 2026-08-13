@@ -180,6 +180,31 @@ public static class FileOperationService
         string trimmedSource = sourcePath.TrimEnd(Path.DirectorySeparatorChar);
         string name = Path.GetFileName(trimmedSource);
 
+        // COPIED, THEN PASTED ONTO ITSELF - which is what Ctrl+C, Ctrl+V on one
+        // folder means in a TREE, where the thing selected IS the destination.
+        // In a file list the same two presses paste into the folder being
+        // LOOKED AT, and Explorer answers with a numbered duplicate beside the
+        // original. This used to answer "폴더를 자기 자신이나 그 하위 폴더로
+        // 복사할 수 없습니다", which is true of the letter of the request and
+        // not of any of its meaning.
+        //
+        // So the copy lands in the PARENT and numbers up, exactly as the same
+        // paste into any other folder would. Only the exact-self case: pasting
+        // into something further down inside the source really is the endless
+        // walk, and stays refused below.
+        if (Directory.Exists(sourcePath) && IsSamePath(trimmedSource, destinationFolder))
+        {
+            if (Path.GetDirectoryName(trimmedSource) is not { } parent)
+            {
+                // A drive root has nowhere to be a sibling of.
+                throw new IOException(Strings.CopyIntoSelfError);
+            }
+
+            CopyDirectoryRecursive(sourcePath, GetUniqueDestination(Path.Combine(parent, name)),
+                overwrite: false);
+            return;
+        }
+
         if (Directory.Exists(sourcePath))
         {
             // Into itself or into its own subtree. MoveEntry has refused this
