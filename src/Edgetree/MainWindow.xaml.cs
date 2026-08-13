@@ -1443,6 +1443,23 @@ public partial class MainWindow : Window
             }
         }
 
+        // M MUTES, on the same terms as the volume keys below: the panel's own
+        // file, and only while it is PLAYING. Free everywhere else, so nobody
+        // loses a key they had - the one thing it does take is the TreeView's
+        // type-ahead jump to a name beginning with m, and only for as long as
+        // something is playing in front of you.
+        if (Keyboard.Modifiers == ModifierKeys.None &&
+            _viewerOpen &&
+            ViewerMediaIsSelection &&
+            _viewerVideoPlaying &&
+            e.Key == Key.M &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            SetViewerMediaMuted(!_viewerMediaMuted);
+            e.Handled = true;
+            return;
+        }
+
         // ↑↓ AND A FILM: the rule the user arrived at after living with both
         // extremes (2026-08-10).
         //
@@ -1471,10 +1488,16 @@ public partial class MainWindow : Window
         {
             if (_viewerVideoPlaying)
             {
+                // VOLUME (2026-08-13). These presses were already swallowed
+                // here and did nothing at all, so nothing is being taken from
+                // anything: the one state where ↑↓ have no meaning is exactly
+                // the state where a volume has one.
+                //
                 // Swallowed even when the keyboard is in the TREE - that is
                 // where it usually is, and letting the TreeView's own handling
                 // through there would leave the guard covering only the case it
                 // was not written for.
+                StepViewerMediaVolume(e.Key == Key.Up ? +1 : -1);
                 e.Handled = true;
                 return;
             }
@@ -20772,6 +20795,29 @@ public partial class MainWindow : Window
 
     private void ViewerMediaMute_Click(object sender, RoutedEventArgs e)
         => SetViewerMediaMuted(!_viewerMediaMuted);
+
+    // ↑↓ while the panel's own file is playing. THROUGH THE SLIDER, not
+    // straight at the element: the slider is where the volume lives, its
+    // ValueChanged is what un-mutes and what writes it to the element, and a
+    // key that set the element directly would leave the control it is drawn on
+    // saying something else.
+    //
+    // 5% a press. Ten presses across the whole range is a key you can hold
+    // without overshooting, and it is what the wheel over the same control
+    // already takes.
+    private const double ViewerVolumeStep = 0.05;
+
+    private void StepViewerMediaVolume(int direction)
+    {
+        double next = Math.Clamp(
+            ViewerMediaVolume.Value + (direction * ViewerVolumeStep),
+            ViewerMediaVolume.Minimum,
+            ViewerMediaVolume.Maximum);
+
+        // Rounded to the step so a run of presses lands on flat numbers rather
+        // than accumulating whatever the slider happened to be sitting on.
+        ViewerMediaVolume.Value = Math.Round(next / ViewerVolumeStep) * ViewerVolumeStep;
+    }
 
     // Hands the file to whatever it is associated with, and pauses first: two
     // copies of the same video playing over each other is the one thing this
