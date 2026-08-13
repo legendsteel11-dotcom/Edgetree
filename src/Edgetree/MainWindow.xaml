@@ -6979,10 +6979,19 @@
                              following Ctrl +/-; it is the same relationship,
                              now expressed as the resource that holds it at
                              every zoom step. -->
+                        <!-- The 4 up top and the 6-to-2 below are ONE move, not
+                             two settings: the row slid 4px down toward the name
+                             (2026-08-13, it was sitting almost against the
+                             filmstrip's scrollbar). Taking the 4 back out of the
+                             bottom is what keeps the caption - and the panel's
+                             whole height - exactly where it was; adding air
+                             instead would have grown the caption to fix a
+                             position. Keep the pair summing to 6 if either is
+                             ever retuned. -->
                         <StackPanel x:Name="ViewerCarouselBar"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
-                                Margin="0,0,0,6"
+                                Margin="0,4,0,2"
                                 Visibility="Collapsed">
                             <!-- Material Symbols "chevron_left" / "chevron_right"
                                  (2026-08-10). These two were the
