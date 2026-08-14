@@ -176,6 +176,32 @@
                                         Property="BorderBrush"
                                         Value="{DynamicResource ControlHoverBorder}"/>
                             </Trigger>
+                            <!-- A LIT switch keeps its stamp under the pointer.
+                                 The theme pair never needed this because the
+                                 lit one stops taking the mouse - a switch
+                                 cannot do that, since the press that turns it
+                                 off has to land. Without this the hover brush
+                                 paints over the accent and the ink picked for
+                                 contrast AGAINST that accent is left standing
+                                 on a colour it was not picked for, which in the
+                                 light theme is white on near-white (2026-08-15).
+                                 The border still brightens, so the hover is
+                                 still said. Tag is how PaintToggleFill marks a
+                                 lit button, there being no IsChecked on a
+                                 Button; declared after the plain hover trigger
+                                 because the later of two matching triggers is
+                                 the one that wins. -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver"
+                                            Value="True"/>
+                                    <Condition Property="Tag"
+                                            Value="lit"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd"
+                                        Property="Background"
+                                        Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            </MultiTrigger>
                             <!-- A fully custom template has no built-in disabled
                                  look at all otherwise - ResetDefaultsButton relies
                                  on this to read as unclickable when colors are

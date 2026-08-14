@@ -420,6 +420,9 @@ public partial class ColorSettingsWindow : Window
     // the right way round here - it says the thing can still be pressed.
     private void PaintToggleFill(Button button, bool on)
     {
+        // Read by the template's hover MultiTrigger - see DialogButtonStyle.
+        button.Tag = on ? "lit" : null;
+
         if (!on)
         {
             button.ClearValue(BackgroundProperty);
