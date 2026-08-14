@@ -25577,6 +25577,12 @@ public partial class MainWindow : Window
     {
         if (!_viewerOpen)
         {
+            // No panel to re-aim - but the expand HANDLE is on screen in
+            // exactly this state, and it points where the panel will come
+            // from, which just changed with the side. Without this it kept
+            // pointing at the old edge until the panel was opened once
+            // (reported 2026-08-14).
+            UpdateViewerExpandButton();
             return;
         }
 
