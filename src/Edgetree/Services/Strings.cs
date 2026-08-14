@@ -375,10 +375,14 @@ public static class Strings
     // thing that is left behind - which is what the row below cleans up. The two
     // rows now share a noun, so the pair reads as one subject.
     public static string MenuPrecacheThumbnails = "이미지 썸네일 캐싱";
-    // Names the three kinds on purpose. "미디어" is already this app's word for
-    // the footer chip that means sound and film only, and this covers pictures
-    // too - so the label lists them rather than borrowing a word that is taken.
-    public static string MenuOpenMediaInViewer = "이미지·음악·영상 더블클릭으로 열기";
+    // The SUBJECT IS THE SUBMENU (2026-08-15). This row sits under 멀티미디어
+    // 패널, so naming the kinds again made it the one explanatory line in a
+    // menu of short ones - the same reason 아래에 표시 does not repeat 패널.
+    // What it cannot be shortened to is "미디어": that word is already the
+    // footer chip meaning sound and film ONLY, with 이미지 its own chip beside
+    // it, so borrowing it here would read as leaving pictures out - and
+    // pictures are most of what this setting is for.
+    public static string MenuOpenMediaInViewer = "더블클릭으로 열기";
     // "쇼" spaced off, matching the way Windows itself writes it. The seconds
     // row says its unit in the label rather than beside the number: the
     // stepper's own digits are already narrow, and every other stepper in this
@@ -905,7 +909,7 @@ public static class Strings
         ViewerFilmstrip = "Thumbnail bar";
         MenuImageViewer = "Multimedia panel";
         MenuPrecacheThumbnails = "Preload image thumbnails";
-        MenuOpenMediaInViewer = "Open images, music and video on double-click";
+        MenuOpenMediaInViewer = "Open on double-click";
         MenuSlideshow = "Slideshow";
         MenuSlideshowSeconds = "Seconds per picture";
         MenuClearThumbnailCache = "Clean up thumbnail files";
