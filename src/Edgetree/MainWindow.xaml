@@ -8169,12 +8169,14 @@
              alone - so the two do not disturb each other. Writing a third
              geometry path here is exactly how this area has gone wrong before.
 
-             VIEWER ONLY, on the user's call (2026-08-11): with the panel closed
-             the sidebar is narrow and the corner sits among controls that get
-             used, and a resize started by accident there is not a cheap
-             mistake. Side and cursor are set in UpdateResizeThumbVisibility,
-             since which corner it is depends on which edge the window docks
-             to. -->
+             Viewer-only from 2026-08-11 to 2026-08-14, both on the user's
+             call: first closed because with the panel shut the sidebar is
+             narrow and an accidental resize there is not a cheap mistake,
+             then opened for both states - the squares are grip pixels either
+             way, so the only real cost is a corner grab meant as width-only
+             moving the height too. Side and cursor are set in
+             UpdateResizeThumbVisibility, since which corner it is depends on
+             which edge the window docks to. -->
         <Thumb x:Name="TopCornerResizeThumb"
                 VerticalAlignment="Top"
                 Width="6"

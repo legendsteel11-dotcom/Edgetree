@@ -3792,11 +3792,15 @@ public partial class MainWindow : Window
             : System.Windows.HorizontalAlignment.Right;
         ResizeThumb.HorizontalAlignment = outerEdge;
 
-        // The corners ride the same edge, and only while the viewer is open -
-        // see their note in the XAML. The diagonal a corner points along
-        // depends on which side that edge is, so the two cursors swap with the
-        // dock: a top-LEFT corner runs ↖↘ where a top-RIGHT one runs ↗↙.
-        bool corners = show && _viewerOpen;
+        // The corners ride the same edge. They were viewer-only from 2026-08-11
+        // (the user's call - see the XAML note) until 2026-08-14, when the same
+        // user opened them for the closed-panel state too: the 6×6 squares are
+        // pixels that are ALREADY grips either way, so the whole cost of this
+        // is a corner grab meant as width-only also moving the height.
+        // The diagonal a corner points along depends on which side that edge
+        // is, so the two cursors swap with the dock: a top-LEFT corner runs
+        // ↖↘ where a top-RIGHT one runs ↗↙.
+        bool corners = show;
         var cornerVisibility = corners ? Visibility.Visible : Visibility.Collapsed;
         bool onLeftEdge = _settings.DockOnRight;
 
