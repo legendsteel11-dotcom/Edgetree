@@ -167,6 +167,14 @@
              FolderNameForeground at reduced opacity (see ShowMoreText's own
              Opacity below); same default so existing users see no change
              until they customize it separately. -->
+        <!-- AND NOTHING DIMS IT AFTERWARDS (2026-08-15). Two places still laid
+             an Opacity over this brush - the tree's 더 보기 row at 0.65 and the
+             search status line at 0.8 - left from when the colour was inherited
+             rather than chosen. Once it is a row in the colour window, a second
+             alpha means the colour picked is not the colour drawn: white came
+             out grey. The row exists so a quiet 더 보기 can be CHOSEN, which is
+             also the app's standing rule about not dimming text to mark it
+             secondary. -->
         <SolidColorBrush x:Key="ShowMoreForeground"
                 Color="#FFA8AAAE"/>
         <SolidColorBrush x:Key="TreeRowSelectedActiveBackground"
@@ -3345,7 +3353,6 @@
                            Foreground="{DynamicResource ShowMoreForeground}"
                            VerticalAlignment="Center"
                            Visibility="Collapsed"
-                           Opacity="0.65"
                            FontStyle="Italic"
                            TextTrimming="CharacterEllipsis"/>
                 <!-- Shown only when this folder has its own remembered sort
@@ -5869,7 +5876,6 @@
                                 Grid.Column="0"
                                 Text="{x:Static services:Strings.SearchStatusEmpty}"
                                 Foreground="{DynamicResource ShowMoreForeground}"
-                                Opacity="0.8"
                                 FontSize="11"
                                 VerticalAlignment="Center"
                                 TextTrimming="CharacterEllipsis"
