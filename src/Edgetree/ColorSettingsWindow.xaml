@@ -278,6 +278,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <!-- Two ordinary buttons of this window's one button style,
                      and the ON one is stamped in the app's blue - painted in
@@ -310,6 +311,16 @@
                      Wears the same accent stamp as the theme pair when it is
                      on, but unlike that pair it stays clickable - it is a
                      switch, and the press that turns it off has to land. -->
+                <!-- Says the row is two groups: what you are LOOKING at on the
+                     left, what you can DO to it on the right. It rides in the
+                     `*` gap column so it costs no width of its own - the gap
+                     is the one thing in this row that can give pixels back,
+                     and the line sits in the middle of whatever is left. -->
+                <Border Grid.Column="2"
+                        Width="1"
+                        Margin="0,3"
+                        HorizontalAlignment="Center"
+                        Background="{DynamicResource PanelBorder}"/>
                 <Button x:Name="EdgeShadesButton"
                         Grid.Column="3"
                         Content="{x:Static services:Strings.ButtonEdgeShades}"
@@ -318,8 +329,23 @@
                         Margin="0,0,6,0"
                         ToolTip="{x:Static services:Strings.ButtonEdgeShadesTip}"
                         Click="EdgeShades_Click"/>
-                <Button x:Name="RandomButton"
+                <!-- The dice's grey cousin. It rolls exactly as the calm die
+                     does and then takes the colour out, rather than drawing
+                     greys of its own: every readability floor in a roll is
+                     computed from LUMINANCE, and a swap to grey that keeps
+                     each colour's luminance keeps every one of those floors
+                     with it. Drawing greys directly would have to restate
+                     them. -->
+                <Button x:Name="MonoButton"
                         Grid.Column="4"
+                        Content="{x:Static services:Strings.ButtonMonoColors}"
+                        Style="{StaticResource DialogButtonStyle}"
+                        Padding="10,0"
+                        Margin="0,0,6,0"
+                        ToolTip="{x:Static services:Strings.ButtonMonoColorsTip}"
+                        Click="Mono_Click"/>
+                <Button x:Name="RandomButton"
+                        Grid.Column="5"
                         Content="{x:Static services:Strings.ButtonRandomColors}"
                         Style="{StaticResource DialogButtonStyle}"
                         Padding="10,0"
@@ -332,7 +358,7 @@
                      all. This one starts from a primary hue and lifts the
                      saturation ceilings - same readability floors. -->
                 <Button x:Name="DaringButton"
-                        Grid.Column="5"
+                        Grid.Column="6"
                         Style="{StaticResource DialogButtonStyle}"
                         Padding="9,0"
                         Margin="4,0,0,0"

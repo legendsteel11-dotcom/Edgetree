@@ -594,9 +594,17 @@ public static class Strings
     // they were the only pictures in a window of text buttons, they came from
     // the system's emoji font rather than from the app's own marks, and the
     // words already say which is which.
-    public static string ColorThemeDarkMode = "다크 모드";
-    public static string ColorThemeLightMode = "라이트 모드";
+    // "모드" dropped 2026-08-15: this row gained buttons, and these two were
+    // the only ones carrying a word they did not need - the pair is obviously
+    // a mode, and the row has clipped its wordy buttons before.
+    public static string ColorThemeDarkMode = "다크";
+    public static string ColorThemeLightMode = "라이트";
     public static string ButtonRandomColors = "랜덤";
+    // The dice's grey cousin: same roll, same floors, colour taken out. Kept
+    // beside them rather than in the palette rows because it is a whole-
+    // palette action, which is what that half of the row holds.
+    public static string ButtonMonoColors = "모노";
+    public static string ButtonMonoColorsTip = "회색톤으로 한 번에";
     // Said as what it GIVES, so the pair reads as a choice rather than as one
     // button and its louder twin: this one lands on combinations that go
     // together, the other one on combinations that do not have to.
@@ -1011,9 +1019,11 @@ public static class Strings
         ColorFileDefaultName = "edgetree-colors.json";
         ColorImportFailedTitle = "Import Colours";
         ColorImportFailedBody = "That file holds no colours.";
-        ColorThemeDarkMode = "Dark Mode";
-        ColorThemeLightMode = "Light Mode";
+        ColorThemeDarkMode = "Dark";
+        ColorThemeLightMode = "Light";
         ButtonRandomColors = "Random";
+        ButtonMonoColors = "Mono";
+        ButtonMonoColorsTip = "Greyscale in one press";
         ButtonRandomColorsTip = "Combinations that go together";
         ButtonDaringColors = "Bold";
         ButtonDaringColorsTip = "Bolder combinations, starting from a primary hue";

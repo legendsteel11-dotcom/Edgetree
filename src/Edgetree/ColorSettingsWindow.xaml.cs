@@ -151,6 +151,7 @@ public partial class ColorSettingsWindow : Window
         // after a roll, and that is LockRollButtons, not this.
         RandomButton.IsEnabled = true;
         DaringButton.IsEnabled = true;
+        MonoButton.IsEnabled = true;
         RefreshLabelPreviews();
         UpdateResetButtonEnabled();
     }
@@ -649,6 +650,30 @@ public partial class ColorSettingsWindow : Window
     private void Daring_Click(object sender, RoutedEventArgs e)
         => ApplyRandomPalette(light: _settings.IsLightMode, daring: true);
 
+    private void Mono_Click(object sender, RoutedEventArgs e)
+        => ApplyRandomPalette(light: _settings.IsLightMode, mono: true);
+
+    // Grey at the SAME LUMINANCE the colour had. That is the whole reason the
+    // mono button rolls first and drains the colour after, instead of drawing
+    // greys of its own: every readability floor in GenerateRandomPalette is a
+    // contrast ratio, contrast is computed from luminance alone, and a swap
+    // that holds luminance still holds every one of those floors with it. A
+    // hand-drawn grey set would have to restate them and could drift from
+    // them later.
+    //
+    // The inverse of the sRGB transfer curve, because averaging the bytes
+    // instead ("(R+G+B)/3") is a different number - it would move the contrast
+    // it is supposed to preserve, most visibly on saturated blues.
+    private static Color ToGrey(Color c)
+    {
+        double linear = Luminance(c);
+        double srgb = linear <= 0.0031308
+            ? linear * 12.92
+            : 1.055 * Math.Pow(linear, 1 / 2.4) - 0.055;
+        byte level = (byte)Math.Clamp(Math.Round(srgb * 255), 0, 255);
+        return Color.FromArgb(c.A, level, level, level);
+    }
+
     // ----- 연타를 막는 짧은 잠금 ---------------------------------------------
     //
     // A roll rewrites every colour in the app and the whole tree is repainted
@@ -666,6 +691,7 @@ public partial class ColorSettingsWindow : Window
     {
         RandomButton.IsEnabled = false;
         DaringButton.IsEnabled = false;
+        MonoButton.IsEnabled = false;
 
         _rollLockTimer ??= CreateRollLockTimer();
         _rollLockTimer.Stop();
@@ -708,7 +734,7 @@ public partial class ColorSettingsWindow : Window
         _onChanged();
     }
 
-    private void ApplyRandomPalette(bool light, bool daring = false)
+    private void ApplyRandomPalette(bool light, bool daring = false, bool mono = false)
     {
         // The inactive theme's die is disabled (see RefreshSwatches), so this
         // guard is belt-and-braces: rolling a theme that isn't showing would
@@ -726,25 +752,29 @@ public partial class ColorSettingsWindow : Window
         LockRollButtons();
 
         var palette = GenerateRandomPalette(light, PaletteRandom, daring);
-        CurrentBackgroundColorHex = Hex(palette.Background);
-        CurrentHeaderBackgroundColorHex = Hex(palette.Header);
-        CurrentHistoryBackgroundColorHex = Hex(palette.History);
-        CurrentViewerBackgroundColorHex = Hex(palette.Viewer);
-        CurrentHoverBackgroundColorHex = Hex(palette.Hover);
-        CurrentSelectionColorHex = Hex(palette.Selection);
-        CurrentGuideLineColorHex = Hex(palette.Guide);
-        CurrentGuideLineActiveColorHex = Hex(palette.GuideActive);
-        CurrentPanelDividerColorHex = Hex(palette.Guide);
-        CurrentFolderNameColorHex = Hex(palette.Text);
-        CurrentFileNameColorHex = Hex(palette.Text);
-        CurrentFolderNameHoverColorHex = Hex(palette.TextHover);
-        CurrentFileNameHoverColorHex = Hex(palette.TextHover);
-        CurrentFolderNameHighlightColorHex = Hex(palette.Highlight);
-        CurrentFileNameHighlightColorHex = Hex(palette.Highlight);
-        CurrentShowMoreColorHex = Hex(palette.ShowMore);
+        // Every colour drained at once, through the one call below - so a
+        // colour added to the palette later cannot be the one that stays
+        // coloured on a mono press.
+        Func<Color, string> Write = mono ? c => Hex(ToGrey(c)) : Hex;
+        CurrentBackgroundColorHex = Write(palette.Background);
+        CurrentHeaderBackgroundColorHex = Write(palette.Header);
+        CurrentHistoryBackgroundColorHex = Write(palette.History);
+        CurrentViewerBackgroundColorHex = Write(palette.Viewer);
+        CurrentHoverBackgroundColorHex = Write(palette.Hover);
+        CurrentSelectionColorHex = Write(palette.Selection);
+        CurrentGuideLineColorHex = Write(palette.Guide);
+        CurrentGuideLineActiveColorHex = Write(palette.GuideActive);
+        CurrentPanelDividerColorHex = Write(palette.Guide);
+        CurrentFolderNameColorHex = Write(palette.Text);
+        CurrentFileNameColorHex = Write(palette.Text);
+        CurrentFolderNameHoverColorHex = Write(palette.TextHover);
+        CurrentFileNameHoverColorHex = Write(palette.TextHover);
+        CurrentFolderNameHighlightColorHex = Write(palette.Highlight);
+        CurrentFileNameHighlightColorHex = Write(palette.Highlight);
+        CurrentShowMoreColorHex = Write(palette.ShowMore);
         // The handle is the roll's one loud voice - see RollHandle for why it
         // is no longer just the rolled background.
-        CurrentAutoHideHandleColorHex = Hex(palette.Handle);
+        CurrentAutoHideHandleColorHex = Write(palette.Handle);
 
         RefreshSwatches();
         _onChanged();
