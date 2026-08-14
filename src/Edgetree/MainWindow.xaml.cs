@@ -22601,9 +22601,51 @@ public partial class MainWindow : Window
     {
         // The picture never scrolls, so the wheel is free to mean zoom with no
         // modifier - and it has to be Handled either way, or the notch carries
-        // on into whatever is behind the panel.
+        // on into whatever is behind the panel. With a modifier held the
+        // notch is a fine nudge instead of a ladder rung - Ctrl the coarser
+        // of the two, Shift the finer, and with both held the finer wins.
         e.Handled = true;
-        StepViewerZoom(Math.Sign(e.Delta), e.GetPosition(ViewerImageHost));
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        {
+            NudgeViewerZoom(Math.Sign(e.Delta), ViewerZoomNudgeFine,
+                e.GetPosition(ViewerImageHost));
+        }
+        else if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+        {
+            NudgeViewerZoom(Math.Sign(e.Delta), ViewerZoomNudgeCoarse,
+                e.GetPosition(ViewerImageHost));
+        }
+        else
+        {
+            StepViewerZoom(Math.Sign(e.Delta), e.GetPosition(ViewerImageHost));
+        }
+    }
+
+    // The fine half of the wheel: multiplicative, so a notch feels the same
+    // at 5% and at 800%, and a notch up followed by a notch down returns
+    // exactly. Lands off the ladder on purpose; the next plain step finds
+    // its nearest rung from wherever this leaves the zoom.
+    private const double ViewerZoomNudgeCoarse = 1.05;
+    private const double ViewerZoomNudgeFine = 1.02;
+
+    private void NudgeViewerZoom(int direction, double factor, System.Windows.Point? anchor)
+    {
+        if (_viewerPixelWidth <= 0 || ViewerImage.Source is null)
+        {
+            return;
+        }
+
+        double current = ViewerDisplayScale;
+        double target = direction > 0
+            ? current * factor
+            : current / factor;
+        target = Math.Clamp(target, ViewerZoomSteps[0], ViewerZoomSteps[^1]);
+        if (Math.Abs(target - current) < 0.0001)
+        {
+            return;
+        }
+
+        SetViewerZoom(target, anchor);
     }
 
     // Middle-click on the picture toggles a full cover: the window maximizes
