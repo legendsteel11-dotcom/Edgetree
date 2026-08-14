@@ -22155,7 +22155,20 @@ public partial class MainWindow : Window
                 return 1;
             }
 
-            return Math.Max(availableWidth / _viewerPixelWidth, availableHeight / _viewerPixelHeight);
+            double byWidth = availableWidth / _viewerPixelWidth;
+            double byHeight = availableHeight / _viewerPixelHeight;
+
+            // ONE PIXEL OF OVERSCAN on whichever axis has to come out flush.
+            // An exact cover asks the scaled picture and the panel to round to
+            // the same whole pixel, and they round independently - so some
+            // sizes leave a hairline of background along that edge, and a
+            // resize walks through those sizes one after another, which is
+            // what read as the edge trembling (2026-08-15). The overflow is
+            // cropped by the host's clip either way, so a pixel too much costs
+            // nothing that can be seen and a pixel too little costs a seam.
+            return byWidth >= byHeight
+                ? byWidth + 1.0 / _viewerPixelWidth
+                : byHeight + 1.0 / _viewerPixelHeight;
         }
     }
 
@@ -22223,8 +22236,26 @@ public partial class MainWindow : Window
         ClampViewerPan();
     }
 
+    // The 10px inset that makes a fitted picture sit like an object on a
+    // surface is exactly what 자름맞춤 must not have: fill means no empty
+    // space, and with the margin left on, the picture reached the panel's
+    // edge sideways (the host clips the overflow) while stopping 10px short
+    // top and bottom - an asymmetry that read as the mode simply not working
+    // (reported 2026-08-15, after a dock to the right made it obvious).
+    // Full screen already zeroed the same margin for its own reason, so the
+    // value lives here now and the two rules cannot drift apart. Writing the
+    // same Thickness back is free - WPF only invalidates on a real change -
+    // which is what makes this safe to run from the zoom funnel.
+    private void ApplyViewerImageFraming()
+    {
+        ViewerImage.Margin = _viewerFullscreen || _viewerFill ? default : new Thickness(10);
+    }
+
     private void ApplyViewerZoom()
     {
+        // Before the transform: it divides by the fit, and the fit is measured
+        // against the margin this sets.
+        ApplyViewerImageFraming();
         ApplyViewerZoomTransform();
         // Asked here rather than only from SetViewerZoom, which was the first
         // version and left two ways in uncovered (reported 2026-08-08): going
@@ -22790,7 +22821,9 @@ public partial class MainWindow : Window
         // subtitle line stays - it is part of watching, not chrome, and it
         // lives outside this panel already for that reason.
         ViewerCaptionPanel.Visibility = chrome;
-        ViewerImage.Margin = on ? default : new Thickness(10);
+        // The picture's own margin is decided in one place now - full screen is
+        // no longer the only state that has to take it away. See
+        // ApplyViewerImageFraming; ApplyViewerZoom below runs it.
         // THE FILM TOO. This line was missing, and the picture element beside it
         // has always had it: a 10px margin is right in the panel, where the
         // picture is an object sitting on a surface next to the tree, and wrong
