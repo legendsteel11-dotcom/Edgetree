@@ -11307,11 +11307,11 @@ public partial class MainWindow : Window
     // on the main window - starting them near the options menu instead, where
     // the user's attention already is, means less hunting for where the new
     // window landed. Clamped to the virtual screen so a window docked near a
-    // screen edge doesn't push most of the dialog off-screen; only Left is
-    // clamped against the dialog's own (fixed, pre-SizeToContent) Width -
-    // these dialogs all use SizeToContent="Height", so the actual height
-    // isn't known yet at this point, and Top is just kept from going above
-    // the screen entirely.
+    // screen edge doesn't push most of the dialog off-screen; only Left can be
+    // clamped against the dialog's own size here, because these dialogs all
+    // use SizeToContent="Height" and the height is not decided until the first
+    // layout - which is why the bottom edge is handled by KeepWindowOnScreen
+    // below rather than here.
     private void PositionNearOptionsButton(Window window)
     {
         window.WindowStartupLocation = WindowStartupLocation.Manual;
@@ -11325,6 +11325,44 @@ public partial class MainWindow : Window
         double screenRight = screenLeft + SystemParameters.VirtualScreenWidth;
         window.Left = Math.Clamp(left, screenLeft, Math.Max(screenLeft, screenRight - window.Width));
         window.Top = Math.Max(top, SystemParameters.VirtualScreenTop);
+
+        // The height arrives with the first layout, so the bottom edge is
+        // answered then - ONE SHOT, unsubscribed immediately. Left standing it
+        // would also fire on a font-size change and pull a window the user had
+        // dragged somewhere deliberate (these dialogs move by their header).
+        window.SizeChanged += KeepOnScreenOnce;
+
+        void KeepOnScreenOnce(object? sender, SizeChangedEventArgs e)
+        {
+            window.SizeChanged -= KeepOnScreenOnce;
+            KeepWindowOnScreen(window);
+        }
+    }
+
+    // Pulls a dialog back up if it would hang off the bottom. Measured against
+    // the WORK AREA of the screen it actually landed on, not the virtual
+    // screen: a dialog under the taskbar is as unreachable as one off the
+    // edge, and on a multi-monitor desktop the virtual rectangle spans screens
+    // whose bottoms do not line up.
+    //
+    // A dialog TALLER than the work area keeps its top edge and overflows the
+    // bottom - the order of Max and Min below says so on purpose. Its top is
+    // where its title bar and its first controls are; the alternative loses
+    // those instead, which is the worse half to lose.
+    private static void KeepWindowOnScreen(Window window)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero || window.ActualHeight <= 0)
+        {
+            return;
+        }
+
+        var work = System.Windows.Forms.Screen.FromHandle(hwnd).WorkingArea;
+        var dpi = VisualTreeHelper.GetDpi(window);
+        double workTop = work.Top / dpi.DpiScaleY;
+        double workBottom = work.Bottom / dpi.DpiScaleY;
+
+        window.Top = Math.Max(workTop, Math.Min(window.Top, workBottom - window.ActualHeight));
     }
 
     // Top edge level with the app's own header row, left edge just past the
