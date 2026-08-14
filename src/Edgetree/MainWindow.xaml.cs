@@ -24832,6 +24832,16 @@ public partial class MainWindow : Window
         }
     }
 
+    // The show's own set: PICTURES, not everything the panel can show. Sound
+    // and film ride in the carousel set (they joined "what the panel can
+    // show", see IsViewerCarouselItem's note), and the slideshow captured that
+    // whole set - so a mixed folder dealt album art and film stills out as
+    // slides (asked off 2026-08-14). A slideshow is a picture show; its set is
+    // the image kinds alone.
+    private static bool IsViewerSlideshowItem(FileSystemItem item)
+        => IsViewerCarouselItem(item)
+           && ThumbnailExtensions.Contains(Path.GetExtension(item.FullPath));
+
     private void StartSlideshow()
     {
         if (!_viewerOpen || ViewerItem is not { } current || !IsViewerCarouselItem(current))
@@ -24839,7 +24849,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var images = GetViewerCarouselItems(current);
+        var images = GetViewerCarouselItems(current).Where(IsViewerSlideshowItem).ToList();
         if (images.Count < 2)
         {
             // One picture is not a slideshow, and a timer over it would flash
@@ -24853,6 +24863,17 @@ public partial class MainWindow : Window
         _viewerListOverride = images;
         _searchViewerItem = current;
         _slideshowDriving = true;
+
+        // Started while standing on a track or a film: the show can start, it
+        // just cannot start THERE. The first picture takes the panel now,
+        // because the first tick would otherwise find a file outside the set
+        // and stop - "lost its place" is for files that vanish mid-show. The
+        // sound is not touched: a track playing on keeps playing, which is
+        // the pairing this exclusion exists for.
+        if (!IsViewerSlideshowItem(current))
+        {
+            ShowViewerItemWithoutTree(images[0]);
+        }
 
         _slideshowTimer ??= CreateSlideshowTimer();
         _slideshowTimer.Interval = TimeSpan.FromSeconds(SlideshowSeconds);
