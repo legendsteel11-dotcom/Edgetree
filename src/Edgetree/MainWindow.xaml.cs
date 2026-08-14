@@ -10229,7 +10229,7 @@ public partial class MainWindow : Window
         }
 
         string fallback = string.Format(Strings.PresetDefaultName, _settings.Presets.Count + 1);
-        if (AskPresetName(string.Empty, fallback, Strings.PresetNameTitle, Strings.PresetNameHint)
+        if (AskForLine(string.Empty, fallback, Strings.PresetNameTitle, Strings.PresetNameHint)
             is not { } name)
         {
             return;
@@ -10250,7 +10250,7 @@ public partial class MainWindow : Window
     private void PresetRename_Click(object sender, RoutedEventArgs e)
     {
         if (PresetFor(sender) is not { } preset ||
-            AskPresetName(preset.Name, preset.Name, Strings.PresetRenameTitle) is not { } name)
+            AskForLine(preset.Name, preset.Name, Strings.PresetRenameTitle) is not { } name)
         {
             return;
         }
@@ -10279,7 +10279,7 @@ public partial class MainWindow : Window
     private void PresetOverwrite_Click(object sender, RoutedEventArgs e)
     {
         if (PresetFor(sender) is not { } preset ||
-            AskPresetName(preset.Name, preset.Name, Strings.PresetSaveTitle, Strings.PresetNameHint)
+            AskForLine(preset.Name, preset.Name, Strings.PresetSaveTitle, Strings.PresetNameHint)
                 is not { } name)
         {
             return;
@@ -10318,7 +10318,12 @@ public partial class MainWindow : Window
     private void NoteCurrentPlace()
         => _settings.LastSelectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
 
-    private string? AskPresetName(string current, string fallback, string title, string hint = "")
+    // The app's ONE line-prompt. Named for presets when it was only theirs;
+    // 네트워크 위치 추가 asks the same question with different words, and it
+    // built its own copy of this window instead - which is how that one prompt
+    // came up centred while every other dialog opens under the options button
+    // (2026-08-15). One way in, so the placement cannot be forgotten again.
+    private string? AskForLine(string current, string fallback, string title, string hint = "")
     {
         var window = new PresetNameWindow(current, fallback, title, hint) { Owner = this };
         PositionNearOptionsButton(window);
@@ -15375,16 +15380,14 @@ public partial class MainWindow : Window
     // be awake. So the user is told and decides.
     private async void AddNetworkLocation_Click(object sender, RoutedEventArgs e)
     {
-        var prompt = new PresetNameWindow(
-            string.Empty,
-            string.Empty,
-            Strings.NetworkLocationPromptTitle,
-            Strings.NetworkLocationPromptHint)
-        {
-            Owner = this,
-        };
-
-        if (prompt.ShowDialog() != true || prompt.Result is not { } typed)
+        // Through the shared prompt, which is also what places it under the
+        // options button like every other dialog - this used to build its own
+        // window and opened centred instead.
+        if (AskForLine(
+                string.Empty,
+                string.Empty,
+                Strings.NetworkLocationPromptTitle,
+                Strings.NetworkLocationPromptHint) is not { } typed)
         {
             return;
         }
