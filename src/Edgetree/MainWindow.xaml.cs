@@ -17378,12 +17378,18 @@ public partial class MainWindow : Window
     // to have would silently stop fitting the moment the panel changed width.
     // Non-null is a DISPLAY scale where 1.0 means the bitmap's own pixels.
     private double? _viewerZoom;
-    // Which rest state a NEW picture arrives in: fit (false) or 1:1 (true).
-    // Set only by the two chips and the double-click that toggles them, so
-    // picking 1:1 once carries down a folder - the wheel and +/- stay a
+    // Which rest state a NEW picture arrives in: fit, 1:1 or fill. Set only
+    // by the three chips and the double-click that toggles the first two, so
+    // picking one once carries down a folder - the wheel and +/- stay a
     // one-off zoom on the picture in front of you and are deliberately NOT
     // remembered (2026-08-09). Session-only; nothing is persisted.
-    private bool _viewerRestAtActualSize;
+    private enum ViewerRestMode { Fit, Actual, Fill }
+    private ViewerRestMode _viewerRest;
+    // Fill is fit's sibling, not a number: cover the panel, cropping the
+    // overflow. Like fit it is a moving ratio recomputed from the host size,
+    // so it cannot live in _viewerZoom - this flag says the null there means
+    // cover rather than fit. Any explicit zoom (wheel, +/-, 1:1) clears it.
+    private bool _viewerFill;
     // Which file the zoom above belongs to. The panel reloads the SAME file
     // whenever a width drag settles (to re-decode at the new size), and
     // "arriving picture resets to fit" read that as a new picture - so any
@@ -18806,6 +18812,7 @@ public partial class MainWindow : Window
                 // The REMEMBERED rest state, not always fit: picking 1:1 once
                 // is meant to carry down a folder.
                 _viewerZoom = ViewerRestZoom;
+                _viewerFill = ViewerRestIsFill;
                 ViewerZoomPan.X = 0;
                 ViewerZoomPan.Y = 0;
             }
@@ -18987,6 +18994,7 @@ public partial class MainWindow : Window
         {
             _viewerZoomPath = path;
             _viewerZoom = ViewerRestZoom;
+            _viewerFill = ViewerRestIsFill;
             ViewerZoomPan.X = 0;
             ViewerZoomPan.Y = 0;
         }
@@ -20248,8 +20256,10 @@ public partial class MainWindow : Window
             _viewerDecodedWidth = _viewerPixelWidth;
             // Arrives fitted, like every other file - a zoom carried over from
             // the picture before it would drop the viewer into a corner of the
-            // film.
+            // film. Fill is a picture rest: a film cropped to the panel's
+            // shape unasked is not what pressing play meant.
             _viewerZoom = ViewerRestZoom;
+            _viewerFill = false;
             ApplyViewerZoom();
         }
 
@@ -22092,6 +22102,30 @@ public partial class MainWindow : Window
         }
     }
 
+    // Fill's ratio: the same arithmetic as fit with Max where fit has Min, so
+    // the shorter overhang is what leaves the panel. No full-screen ceiling -
+    // covering the surface is the entire meaning of the mode.
+    private double ViewerCoverScale
+    {
+        get
+        {
+            if (_viewerPixelWidth <= 0 || _viewerPixelHeight <= 0)
+            {
+                return 1;
+            }
+
+            var margin = ViewerImage.Margin;
+            double availableWidth = ViewerImageHost.ActualWidth - margin.Left - margin.Right;
+            double availableHeight = ViewerImageHost.ActualHeight - margin.Top - margin.Bottom;
+            if (availableWidth <= 0 || availableHeight <= 0)
+            {
+                return 1;
+            }
+
+            return Math.Max(availableWidth / _viewerPixelWidth, availableHeight / _viewerPixelHeight);
+        }
+    }
+
     // The scale the picture RESTS at. In the panel that is plain fit, ceiling
     // and all - the round-1 call was that a small picture may scale up to fill
     // the slot. Full screen it stops at 100% - small stays small, large is
@@ -22114,7 +22148,8 @@ public partial class MainWindow : Window
             ? Math.Min(1, ViewerFitScale)
             : ViewerFitScale;
 
-    private double ViewerDisplayScale => _viewerZoom ?? ViewerRestScale;
+    private double ViewerDisplayScale =>
+        _viewerZoom ?? (_viewerFill ? ViewerCoverScale : ViewerRestScale);
 
     // Only a picture bigger than its panel can be dragged; at or below fit
     // there is nothing off-screen to bring into view, so the cursor stays
@@ -22233,13 +22268,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        double fit = ViewerRestScale;
-        double display = _viewerZoom ?? fit;
+        double display = ViewerDisplayScale;
         // The real percentage even while fitted (a fit at 34% says "34%"),
         // which is the number someone reading the strip actually wants; the
         // lit 맞춤 chip beside it already says WHICH state that number is.
         ViewerZoomText.Text = $"{Math.Round(display * 100)}%";
-        ViewerFitChip.IsChecked = _viewerZoom is null;
+        ViewerFitChip.IsChecked = _viewerZoom is null && !_viewerFill;
+        ViewerFillChip.IsChecked = _viewerZoom is null && _viewerFill;
         ViewerActualChip.IsChecked = _viewerZoom is { } z && Math.Abs(z - 1) < 0.001;
         ViewerZoomOutButton.IsEnabled = display > ViewerZoomSteps[0] + 0.001;
         ViewerZoomInButton.IsEnabled = display < ViewerZoomSteps[^1] - 0.001;
@@ -22475,6 +22510,9 @@ public partial class MainWindow : Window
     private void SetViewerZoom(double? zoom, System.Windows.Point? anchor)
     {
         double before = ViewerDisplayScale;
+        // Any explicit zoom leaves fill - captured into `before` first, so a
+        // wheel turn from fill anchors against the cover scale it is leaving.
+        _viewerFill = false;
 
         if (zoom is null)
         {
@@ -22515,8 +22553,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        double fit = ViewerRestScale;
-        double current = _viewerZoom ?? fit;
+        double current = ViewerDisplayScale;
 
         if (direction > 0)
         {
@@ -22751,6 +22788,7 @@ public partial class MainWindow : Window
         // same reason in reverse: a zoom chosen for the whole screen is a
         // strange place to drop someone back into a 900px panel.
         _viewerZoom = ViewerRestZoom;
+        _viewerFill = ViewerRestIsFill && _viewerVideoPath is null;
         ViewerZoomPan.X = 0;
         ViewerZoomPan.Y = 0;
 
@@ -25212,9 +25250,11 @@ public partial class MainWindow : Window
             // The gesture every viewer has: fit and 1:1 with nothing to aim
             // at. It lands on the same two states the chips do, so it moves
             // the remembered rest state with them.
-            // At fit it goes to 1:1; from anywhere else - including a wheel
-            // zoom - it comes back to fit, which is the behaviour it had.
-            SetViewerRest(_viewerZoom is null);
+            // At fit it goes to 1:1; from anywhere else - a wheel zoom, and
+            // fill too - it comes back to fit, which is the behaviour it had.
+            SetViewerRest(_viewerZoom is null && !_viewerFill
+                ? ViewerRestMode.Actual
+                : ViewerRestMode.Fit);
             e.Handled = true;
             return;
         }
@@ -25578,6 +25618,7 @@ public partial class MainWindow : Window
     private void ClearViewerZoom()
     {
         _viewerZoom = null;
+        _viewerFill = false;
         _viewerZoomPath = null;
         _viewerPixelWidth = 0;
         _viewerPixelHeight = 0;
@@ -25593,21 +25634,39 @@ public partial class MainWindow : Window
         UpdateViewerZoomBar();
     }
 
-    // The two chips are the ONLY things that move the remembered rest state -
-    // see _viewerRestAtActualSize.
-    private void ViewerFitChip_Click(object sender, RoutedEventArgs e) => SetViewerRest(false);
+    // The three chips are the ONLY things that move the remembered rest
+    // state - see _viewerRest.
+    private void ViewerFitChip_Click(object sender, RoutedEventArgs e) => SetViewerRest(ViewerRestMode.Fit);
 
-    private void ViewerActualChip_Click(object sender, RoutedEventArgs e) => SetViewerRest(true);
+    private void ViewerActualChip_Click(object sender, RoutedEventArgs e) => SetViewerRest(ViewerRestMode.Actual);
 
-    private void SetViewerRest(bool atActualSize)
+    private void ViewerFillChip_Click(object sender, RoutedEventArgs e) => SetViewerRest(ViewerRestMode.Fill);
+
+    private void SetViewerRest(ViewerRestMode rest)
     {
-        _viewerRestAtActualSize = atActualSize;
-        SetViewerZoom(ViewerRestZoom, null);
+        _viewerRest = rest;
+        if (rest == ViewerRestMode.Fill)
+        {
+            // Not through SetViewerZoom - that method means "an explicit
+            // number or fit" and clears the fill flag on its way in.
+            _viewerZoom = null;
+            _viewerFill = true;
+            ViewerZoomPan.X = 0;
+            ViewerZoomPan.Y = 0;
+            ApplyViewerZoom();
+        }
+        else
+        {
+            SetViewerZoom(ViewerRestZoom, null);
+        }
     }
 
     // null means fit, which is how the zoom stores it (fit is a ratio that
-    // moves, so it has no number of its own).
-    private double? ViewerRestZoom => _viewerRestAtActualSize ? 1 : null;
+    // moves, so it has no number of its own). Fill is null too - the flag
+    // beside it says which of the two moving ratios the null means.
+    private double? ViewerRestZoom => _viewerRest == ViewerRestMode.Actual ? 1 : null;
+
+    private bool ViewerRestIsFill => _viewerRest == ViewerRestMode.Fill;
 
     private void ViewerZoomInButton_Click(object sender, RoutedEventArgs e) => StepViewerZoom(+1, null);
 
@@ -25996,6 +26055,7 @@ public partial class MainWindow : Window
                 {
                     _viewerZoomPath = path;
                     _viewerZoom = ViewerRestZoom;
+                    _viewerFill = ViewerRestIsFill;
                     ViewerZoomPan.X = 0;
                     ViewerZoomPan.Y = 0;
                 }

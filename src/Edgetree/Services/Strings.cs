@@ -335,9 +335,10 @@ public static class Strings
     // footer chip that filters to sound and film ONLY, with 이미지 its own chip
     // beside it, so that word is taken and taken narrowly.
     public static string ToolTipViewer = "멀티미디어 패널";
-    // Viewer zoom strip - two chips wide, so both stay short in every language.
+    // Viewer zoom strip - a few chips wide, so all stay short in every language.
     public static string ViewerZoomFit = "맞춤";
     public static string ViewerZoomActual = "1:1";
+    public static string ViewerZoomFill = "자름맞춤";
     public static string ViewerNavigator = "내비게이터";
     public static string ViewerClose = "멀티미디어 패널 닫기";
     // The footer's now-playing row, which only exists while the viewer is shut
@@ -888,6 +889,7 @@ public static class Strings
         ToolTipViewer = "Multimedia Panel";
         ViewerZoomFit = "Fit";
         ViewerZoomActual = "1:1";
+        ViewerZoomFill = "Fill";
         ViewerNavigator = "Navigator";
         ViewerClose = "Close the multimedia panel";
         FooterNowPlayingOpen = "Open in the multimedia panel";
