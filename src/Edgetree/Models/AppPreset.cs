@@ -82,6 +82,7 @@ public class AppPreset
         nameof(AppSettings.ViewerFilmstrip),
         nameof(AppSettings.ViewerFilmstripCellHeight),
         nameof(AppSettings.ViewerNavigator),
+        nameof(AppSettings.ViewerSideSwapped),
     };
 
     internal static readonly string[] LookFields =

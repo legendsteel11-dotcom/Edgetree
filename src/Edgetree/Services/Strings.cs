@@ -204,6 +204,8 @@ public static class Strings
     // Named after the PANEL, not favorites: it now holds either list. Lives
     // inside the 패널 표시 submenu, under the three modes.
     public static string MenuFavoritesAtBottom = "아래에 표시";
+    // Inside the 멀티미디어 패널 submenu, so the subject is already named.
+    public static string MenuViewerSideSwapped = "좌우 위치 반전";
     public static string MenuDockOnRight = "고정 위치 오른쪽";
     public static string MenuAutoHideCloseOnLeave = "마우스 이탈 시 닫기";
     public static string MenuAutoHideUseHandle = "숨김 시 손잡이만";
@@ -826,6 +828,7 @@ public static class Strings
         MenuDragMoves = "Drag Moves (hold Ctrl to copy)";
         MenuShowPanelDividers = "Panel Dividers";
         MenuFavoritesAtBottom = "Show at Bottom";
+        MenuViewerSideSwapped = "Swap Sides";
         MenuDockOnRight = "Pin to Right Edge";
         MenuAutoHideCloseOnLeave = "Close on Mouse Leave";
         MenuAutoHideUseHandle = "Handle Instead of Full Edge";

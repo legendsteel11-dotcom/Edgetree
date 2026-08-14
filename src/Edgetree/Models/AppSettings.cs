@@ -18,6 +18,16 @@ public class AppSettings
     public bool ViewerOpen { get; set; } = false;
     public double ViewerWidth { get; set; } = 360;
 
+    // Puts the panel on the other side of the tree than the dock would choose.
+    // Left alone, the panel takes the screen-INTERIOR side - right of the tree
+    // while docked left, left of it while docked right - so the tree always
+    // keeps the screen edge. This turns that around for anyone who wants the
+    // opposite (asked 2026-08-15). See MainWindow.xaml.cs's ApplyViewerSide,
+    // which is the one place the choice is turned into _viewerOnLeft, and note
+    // that the side the panel sits on is NOT the same question as which window
+    // edge stays pinned - see ViewerGrowsLeftward there.
+    public bool ViewerSideSwapped { get; set; } = false;
+
     // The zoom navigator (chip at the end of the viewer's zoom strip). OFF by
     // default on purpose: it was asked for on behalf of other people rather
     // than wanted on the asker's own screen, so it exists for whoever goes

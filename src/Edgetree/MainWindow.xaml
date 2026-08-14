@@ -1702,6 +1702,16 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="openMediaInViewer"
                         Click="OpenMediaInViewerMenuItem_Click"/>
+                <!-- Which side of the tree the panel takes. Left alone it takes
+                     the screen-interior side so the tree keeps the edge it is
+                     docked against; this turns that around. Disabled while the
+                     panel is shut - there is nothing on screen to move, and a
+                     switch that appears to do nothing is worse than one that
+                     says it cannot. -->
+                <MenuItem Header="{x:Static services:Strings.MenuViewerSideSwapped}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="viewerSideSwapped"
+                        Click="ViewerSideSwappedMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="{x:Static services:Strings.MenuPrecacheThumbnails}"
                         IsCheckable="True"

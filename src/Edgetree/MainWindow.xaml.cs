@@ -7363,6 +7363,15 @@ public partial class MainWindow : Window
                 openMediaInViewer.IsChecked = _settings.OpenMediaInViewer;
             }
 
+            if (FindMenuItem(imageViewer, "viewerSideSwapped") is { } viewerSideSwapped)
+            {
+                viewerSideSwapped.IsChecked = _settings.ViewerSideSwapped;
+                // Nothing to swap with the panel shut. The setting is left
+                // alone rather than cleared, so it applies the moment the
+                // panel is opened again.
+                viewerSideSwapped.IsEnabled = _viewerOpen;
+            }
+
 
             if (FindMenuItem(imageViewer, "precacheThumbnails") is { } precacheThumbnails &&
                 FindMenuItem(imageViewer, "clearThumbnailCache") is { } clearThumbnailCache)
@@ -10016,6 +10025,21 @@ public partial class MainWindow : Window
             : Visibility.Collapsed;
     }
 
+    // ApplyViewerSide is the whole of it: it re-aims the panel's column, the
+    // divider, the collapse chevron and the border, all of which already read
+    // the side from one field. The window's own geometry is deliberately NOT
+    // touched - the sidebar keeps its width and its edges, and only what is
+    // inside changes sides.
+    private void ViewerSideSwappedMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.ViewerSideSwapped = menuItem.IsChecked;
+            _settingsService.Save(_settings);
+            ApplyViewerSide();
+        }
+    }
+
     private void FavoritesAtBottomMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem menuItem)
@@ -10429,7 +10453,9 @@ public partial class MainWindow : Window
         else if (viewerLookChanged && _viewerOpen)
         {
             // The panel stayed up, so its own switches are the only thing to
-            // put on it.
+            // put on it - including which side it is on, which is a column
+            // move rather than a window one.
+            ApplyViewerSide();
             UpdateViewerNavigator();
             _filmstripBuiltFor = default;
             UpdateViewerCarousel();
@@ -17544,6 +17570,25 @@ public partial class MainWindow : Window
 
     private bool _viewerOpen;
     private bool _viewerOnLeft;
+
+    // WHICH SIDE OF THE TREE THE PANEL TAKES. Left alone the panel takes the
+    // screen-interior side, so the TREE keeps the screen edge it is docked
+    // against: docked right that puts the panel on the left, docked left on
+    // the right, and floating there is no edge to keep so it stays right.
+    // 좌우 위치 반전 turns that around.
+    private bool ViewerBelongsOnLeft
+        => (_isDocked && _settings.DockOnRight) ^ _settings.ViewerSideSwapped;
+
+    // WHICH WINDOW EDGE STAYS PUT while the panel opens and closes - a
+    // different question, and the dock alone answers it. Docked right the
+    // right edge is against the screen and cannot move, so the window has to
+    // grow leftward; anywhere else the left edge holds and it grows rightward.
+    //
+    // These two were one expression until the swap option existed, because a
+    // panel on the interior side is always on the same side the window grows
+    // toward. Reading the panel's side here instead would mean the sidebar
+    // walking off its own screen edge every time the panel was toggled.
+    private bool ViewerGrowsLeftward => _isDocked && _settings.DockOnRight;
     // The tree's width, held across every window resize that isn't the middle
     // divider (the standing rule: the divider is the ONE gesture that moves
     // it). Kept by the app rather than read back off the window, because the
@@ -17718,8 +17763,10 @@ public partial class MainWindow : Window
         }
 
         // Points where the panel will come FROM, which is the side it opens on
-        // - the mirror of the collapse chevron, which points at the tree.
-        bool opensOnLeft = _isDocked && _settings.DockOnRight;
+        // - the mirror of the collapse chevron, which points at the tree. The
+        // PANEL's question, so it follows the swap option too; the window's
+        // own growth direction is the other one (ViewerGrowsLeftward).
+        bool opensOnLeft = ViewerBelongsOnLeft;
         Grid.SetColumn(ViewerExpandButton, 1);
         ViewerExpandButton.HorizontalAlignment = opensOnLeft
             ? System.Windows.HorizontalAlignment.Left
@@ -17745,7 +17792,10 @@ public partial class MainWindow : Window
         _viewerOpen = true;
         UpdateResizeThumbVisibility();
 
-        bool onLeft = _isDocked && _settings.DockOnRight;
+        // The DOCK's question, not the panel's - see ViewerGrowsLeftward. This
+        // line happened to read the same as the panel's side until the swap
+        // option existed.
+        bool growsLeftward = ViewerGrowsLeftward;
 
         // The stored panel width was saved on whatever screen the divider was
         // last dragged on, so it can be wider than the whole screen the window
@@ -17761,7 +17811,7 @@ public partial class MainWindow : Window
         var workArea = GetCurrentMonitorWorkArea();
         double panelWidth = Math.Max(0,
             Math.Min(Width + ViewerPanelWidth, workArea.Width) - Width);
-        if (onLeft)
+        if (growsLeftward)
         {
             Left -= panelWidth;
         }
@@ -17853,7 +17903,11 @@ public partial class MainWindow : Window
         ViewerIconImage.Source = null;
 
         Width = Math.Max(MinExpandedWidth, Width - panelWidth);
-        if (_viewerOnLeft)
+        // ViewerGrowsLeftward, NOT _viewerOnLeft: this puts back the edge the
+        // open moved, and that is the dock's edge. Reading the panel's side
+        // here would take the sidebar off its screen edge on every close once
+        // the two could differ (see ApplyViewerSide's note).
+        if (ViewerGrowsLeftward)
         {
             Left += panelWidth;
         }
@@ -25919,7 +25973,13 @@ public partial class MainWindow : Window
         // place all three pass through, so the columns below are the real ones.
         SetViewerFullscreen(false);
 
-        _viewerOnLeft = _isDocked && _settings.DockOnRight;
+        // TWO QUESTIONS, and they were one expression until 2026-08-15. Which
+        // SIDE the panel sits on is this line; which window EDGE stays pinned
+        // while the panel opens and closes is ViewerGrowsLeftward, and that one
+        // belongs to the dock alone. They agreed exactly as long as the panel
+        // was always on the screen-interior side, and the swap option is what
+        // pulls them apart.
+        _viewerOnLeft = ViewerBelongsOnLeft;
         double sideWidth = double.IsNaN(Width) ? ActualWidth : Width;
         double panelWidth = Math.Min(ViewerPanelWidth, Math.Max(0, sideWidth - MinTreeSplitWidth));
 
