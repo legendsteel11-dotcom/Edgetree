@@ -2233,8 +2233,12 @@ public partial class MainWindow : Window
 
     // The handle's own range, and a much wider one than the sliver's - see
     // AppSettings.AutoHideHandleWidth for why they stopped sharing a number.
-    // 6 is where a handle stops reading as one; 24 is a tab, not a stripe.
-    private const double MinAutoHideHandleWidth = 6;
+    // The floor was 6 ("where a handle stops reading as one") until the user
+    // asked for 2 outright (2026-08-14, same day and same reasoning as the
+    // sliver's floor): the screen edge pins the cursor, so thinness costs
+    // visibility, not reachability - and how faint is fine is their call.
+    // 24 is a tab, not a stripe.
+    private const double MinAutoHideHandleWidth = 2;
     private const double MaxAutoHideHandleWidth = 24;
 
     private double AutoHideHandleWidth => Math.Clamp(
