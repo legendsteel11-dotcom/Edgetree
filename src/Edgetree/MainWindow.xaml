@@ -4060,6 +4060,19 @@
              reusing MinimalScrollViewerTemplate here matches the tree below. -->
         <Style x:Key="FavoritesListBoxStyle"
                 TargetType="ListBox">
+            <!-- The default the template binding below reads. WITHOUT this
+                 setter the attached property's own default applies, and that
+                 is FALSE - not True, as the first cut of the binding assumed
+                 ("ListBox's default") - so every list wearing this style
+                 silently switched to pixel scrolling, and the favorites-panel
+                 height math, which states outright that it is built on
+                 item-based scrolling, met a list that no longer was (blank row
+                 under the last bookmark on selecting it, 2026-08-14). The
+                 style hands back the item-unit default; the two history
+                 popups opt out locally, which is the whole point of routing
+                 it through a binding. -->
+            <Setter Property="ScrollViewer.CanContentScroll"
+                    Value="True"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBox">
@@ -4067,10 +4080,22 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 SnapsToDevicePixels="True">
+                            <!-- CanContentScroll was hardcoded True here. Item-unit
+                                 scrolling stays the default - via the style's own
+                                 setter above, NOT the attached property's default,
+                                 which is False (assuming otherwise cost a blank row
+                                 under the bookmark panel's last row, 2026-08-14) -
+                                 but it also leaves the last row half-shown, and a
+                                 click on a half-shown row is spent SCROLLING it
+                                 into view instead of picking it. A short list with
+                                 tall rows would rather have pixels, so the choice
+                                 is the list's to make. Read the same way as the two
+                                 scrollbar properties: TemplateBinding does not
+                                 reach an attached property. -->
                             <ScrollViewer Focusable="False"
                                     Padding="{TemplateBinding Padding}"
                                     Template="{StaticResource MinimalScrollViewerTemplate}"
-                                    CanContentScroll="True"
+                                    CanContentScroll="{Binding Path=(ScrollViewer.CanContentScroll), RelativeSource={RelativeSource TemplatedParent}}"
                                     HorizontalScrollBarVisibility="{Binding Path=(ScrollViewer.HorizontalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}"
                                     VerticalScrollBarVisibility="{Binding Path=(ScrollViewer.VerticalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}">
                                 <ItemsPresenter/>
@@ -4170,8 +4195,14 @@
             </Style.Triggers>
         </Style>
 
-        <!-- Recent-search dropdown rows (history Popup under the search box). -->
-        <Style x:Key="SearchHistoryItemStyle"
+        <!-- Rows in a dropdown Popup: recent searches under the search box, and
+             the folders you have been in above the path bar.
+             THE HOVER IS THE MENU'S, NOT THE DIALOG'S. These lists sit on
+             PanelBackground (#282828) and HoverBackground is #2A2D2E - two
+             points apart, so the row under the pointer looked unhighlighted.
+             That is the same trap MenuHighlightBackground was created for; see
+             its note in App.xaml. -->
+        <Style x:Key="PopupListItemStyle"
                 TargetType="ListBoxItem">
             <Setter Property="Padding"
                     Value="8,4"/>
@@ -4184,6 +4215,7 @@
                     <ControlTemplate TargetType="ListBoxItem">
                         <Border x:Name="Bd"
                                 Background="Transparent"
+                                CornerRadius="3"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter/>
                         </Border>
@@ -4192,7 +4224,7 @@
                                     Value="True">
                                 <Setter TargetName="Bd"
                                         Property="Background"
-                                        Value="{DynamicResource HoverBackground}"/>
+                                        Value="{DynamicResource MenuHighlightBackground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -4896,6 +4928,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <!-- Same outline-only treatment as the search box: a
                              border, not a filled field. -->
@@ -4955,6 +4988,7 @@
                                 Height="22"
                                 Margin="4,0,0,0"
                                 Click="TreeHistoryBackButton_Click"
+                                PreviewMouseRightButtonUp="TreeHistoryChevron_PreviewMouseRightButtonUp"
                                 ToolTip="{x:Static services:Strings.TreeHistoryBack}">
                             <Path Data="M576-240 336-480l240-240 51 51-189 189 189 189-51 51Z"
                                     Fill="{DynamicResource ForegroundText}"
@@ -4971,6 +5005,7 @@
                                 Height="22"
                                 Margin="2,0,0,0"
                                 Click="TreeHistoryForwardButton_Click"
+                                PreviewMouseRightButtonUp="TreeHistoryChevron_PreviewMouseRightButtonUp"
                                 ToolTip="{x:Static services:Strings.TreeHistoryForward}">
                             <Path Data="M522-480 333-669l51-51 240 240-240 240-51-51 189-189Z"
                                     Fill="{DynamicResource ForegroundText}"
@@ -4978,6 +5013,140 @@
                                     Width="12"
                                     Height="12"/>
                         </Button>
+                        <!-- The stack the two chevrons walk, as a list. It is the
+                             SAME "list_arrow" the search box uses for its own
+                             history, because it is the same promise - a list
+                             comes down - and the app should not learn a second
+                             glyph for it.
+                             OUTSIDE the field's outline, with the chevrons and
+                             wearing their outline rather than the search
+                             button's borderless look. Position is what says
+                             which history this is: inside the box it would read
+                             as "paths typed into this box", which is not what
+                             the stack holds - most of its places were reached by
+                             clicking a row.
+                             It stays usable when either chevron is dead: a
+                             disabled WPF button takes no mouse events at all, so
+                             right-clicking 뒤로 at the start of the stack does
+                             nothing, and this button is then the only way in. -->
+                        <Button x:Name="TreeHistoryListButton"
+                                Grid.Column="3"
+                                Style="{StaticResource ToggleButtonStyle}"
+                                BorderBrush="{DynamicResource ControlBorder}"
+                                BorderThickness="1"
+                                Width="22"
+                                Height="22"
+                                Margin="2,0,0,0"
+                                Click="TreeHistoryListButton_Click"
+                                ToolTip="{x:Static services:Strings.TreeHistoryList}">
+                            <Path Data="M240-192 96-336l50-50 58 57v-391h72v391l57-57 51 50-144 144Zm240-48v-72h384v72H480Zm0-204v-72h384v72H480Zm0-204v-72h384v72H480Z M0-960H960M0 0H960"
+                                    Fill="{DynamicResource ForegroundText}"
+                                    Stretch="Uniform"
+                                    Width="15"
+                                    Height="15"/>
+                        </Button>
+
+                        <!-- Opens UPWARD: this strip sits at the bottom of the
+                             window, and it follows the search view down there
+                             too, so Bottom placement would put the list off the
+                             screen and let WPF flip it back on its own terms.
+                             Anchored to the whole row rather than the button so
+                             a long path has the full strip width to be read in.
+                             The popup lives inside PathBarRow so MovePathBarInto
+                             carries it between the two views along with
+                             everything else on the strip. -->
+                        <Popup x:Name="TreeHistoryPopup"
+                                PlacementTarget="{Binding ElementName=PathBarRow}"
+                                Placement="Top"
+                                StaysOpen="False"
+                                AllowsTransparency="True"
+                                PopupAnimation="Fade">
+                            <Border Background="{DynamicResource PanelBackground}"
+                                    BorderBrush="{DynamicResource PanelBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="3"
+                                    Width="{Binding ActualWidth, ElementName=PathBarRow}"
+                                    Effect="{DynamicResource MenuDropShadow}"
+                                    Margin="0,8,0,2">
+                                <ListBox x:Name="TreeHistoryList"
+                                        Style="{StaticResource FavoritesListBoxStyle}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        MaxHeight="220"
+                                        Padding="2"
+                                        ItemContainerStyle="{StaticResource PopupListItemStyle}"
+                                        ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                        ScrollViewer.CanContentScroll="False"
+                                        PreviewMouseLeftButtonUp="TreeHistoryList_PreviewMouseLeftButtonUp">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <!-- Where the tree is standing now.
+                                                     A bar rather than lighter text:
+                                                     nothing in this app marks a
+                                                     state by fading the words.
+                                                     NOT the accent blue: blue is
+                                                     this app's word for BOOKMARK
+                                                     (the tree's marker glyph, the
+                                                     bookmark panel's own bar), so a
+                                                     blue bar here read as "this
+                                                     folder is bookmarked" rather
+                                                     than "you are here" (user,
+                                                     2026-08-14). The parent line's
+                                                     grey below is already proven in
+                                                     both themes, and a grey bar
+                                                     reads as structure, not as a
+                                                     mark on the folder. -->
+                                                <Border x:Name="CurrentMark"
+                                                        Grid.Column="0"
+                                                        Width="3"
+                                                        CornerRadius="1.5"
+                                                        Background="Transparent"
+                                                        Margin="0,1,7,1"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{Binding Name}"
+                                                            Foreground="{DynamicResource DialogForeground}"
+                                                            FontSize="12"
+                                                            TextTrimming="CharacterEllipsis"/>
+                                                    <!-- The parent, one size down -
+                                                     two folders called "img" are
+                                                     the whole reason this line is
+                                                     here. CharacterEllipsis, never
+                                                     MiddleEllipsis: that one parses
+                                                     and then throws at runtime. -->
+                                                    <TextBlock x:Name="ParentLine"
+                                                            Text="{Binding Parent}"
+                                                            Foreground="{DynamicResource SecondaryForeground}"
+                                                            FontSize="10"
+                                                            TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                            </Grid>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsCurrent}"
+                                                        Value="True">
+                                                    <Setter TargetName="CurrentMark"
+                                                            Property="Background"
+                                                            Value="{DynamicResource SecondaryForeground}"/>
+                                                </DataTrigger>
+                                                <!-- A drive root has no parent to
+                                                     show; an empty line would still
+                                                     take its height. -->
+                                                <DataTrigger Binding="{Binding Parent}"
+                                                        Value="">
+                                                    <Setter TargetName="ParentLine"
+                                                            Property="Visibility"
+                                                            Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                        </Popup>
                     </Grid>
 
                     <!-- The version, and then one toggle per file-kind filter
@@ -5484,8 +5653,9 @@
                                         BorderThickness="0"
                                         MaxHeight="220"
                                         Padding="2"
-                                        ItemContainerStyle="{StaticResource SearchHistoryItemStyle}"
+                                        ItemContainerStyle="{StaticResource PopupListItemStyle}"
                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                        ScrollViewer.CanContentScroll="False"
                                         PreviewMouseLeftButtonUp="SearchHistoryList_PreviewMouseLeftButtonUp">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>

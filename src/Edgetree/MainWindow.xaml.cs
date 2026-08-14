@@ -3297,7 +3297,7 @@ public partial class MainWindow : Window
         get
         {
             _openMenus.RemoveWhere(menu => !menu.IsOpen);
-            return _openMenus.Count > 0 || SearchHistoryPopup.IsOpen;
+            return _openMenus.Count > 0 || SearchHistoryPopup.IsOpen || TreeHistoryPopup.IsOpen;
         }
     }
 
@@ -9350,10 +9350,24 @@ public partial class MainWindow : Window
 
     private void TreeHistoryForwardButton_Click(object sender, RoutedEventArgs e) => GoTreeHistory(+1);
 
-    private void GoTreeHistory(int direction)
+    private void GoTreeHistory(int direction) => GoTreeHistoryTo(_treeHistoryIndex + direction);
+
+    // The chevrons ask for a step; the dropdown asks for a slot. Both arrive
+    // here, so the two rules that make this work at all - the dead-entry test
+    // that never touches the disk, and moving the index BEFORE the walk - are
+    // written once and cannot drift apart.
+    //
+    // landOnFolder: WHAT WAS PROMISED IS WHAT IS DELIVERED. An entry carries
+    // the exact row that was selected when the place was left - a track, say -
+    // and the chevrons return to it, because a chevron means "retrace my
+    // steps". The dropdown shows the FOLDER's name, so a click there lands on
+    // the folder: labelled 영화음악선별 and landing on the file inside it put
+    // the file at the top and the named folder one row above the viewport
+    // (reported 2026-08-14, "폴더가 아니라 바로 밑에 파일이 최상단"). One
+    // list, two doors, each door keeping its own word.
+    private void GoTreeHistoryTo(int target, bool landOnFolder = false)
     {
-        int target = _treeHistoryIndex + direction;
-        if (target < 0 || target >= _treeHistory.Count)
+        if (target < 0 || target >= _treeHistory.Count || target == _treeHistoryIndex)
         {
             return;
         }
@@ -9381,7 +9395,7 @@ public partial class MainWindow : Window
         // absorbed by the replace branch above instead of being recorded as a
         // new place.
         _treeHistoryIndex = target;
-        NavigateToPath(entry.Path, source: "history");
+        NavigateToPath(landOnFolder ? entry.Folder : entry.Path, source: "history");
         UpdateTreeHistoryButtons();
     }
 
@@ -9397,7 +9411,107 @@ public partial class MainWindow : Window
         TreeHistoryForwardButton.IsEnabled = usable
             && _treeHistoryIndex >= 0
             && _treeHistoryIndex < _treeHistory.Count - 1;
+        // Not tied to either end: the list is worth opening while standing at
+        // the start of the stack, which is exactly where 뒤로 is dead.
+        TreeHistoryListButton.IsEnabled = usable && _treeHistory.Count > 0;
+
+        if (!usable && TreeHistoryPopup.IsOpen)
+        {
+            TreeHistoryPopup.IsOpen = false;
+        }
     }
+
+    // ----- 히스토리 목록 --------------------------------------------------------
+    //
+    // The same stack the chevrons walk, shown as a list. Nothing new is
+    // recorded for it and no state is added - it reads _treeHistory as it
+    // stands, which is why it cannot fall out of step with the buttons.
+    //
+    // Two ways in, one popup: the button beside the chevrons, and a right-click
+    // on either chevron (what a browser does, for anyone who tries it there).
+    private void TreeHistoryListButton_Click(object sender, RoutedEventArgs e) => ToggleTreeHistoryPopup();
+
+    private void TreeHistoryChevron_PreviewMouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        // Handled, or the strip's own context menu opens on top of the list.
+        e.Handled = true;
+        ToggleTreeHistoryPopup();
+    }
+
+    private void ToggleTreeHistoryPopup()
+    {
+        if (TreeHistoryPopup.IsOpen)
+        {
+            TreeHistoryPopup.IsOpen = false;
+            return;
+        }
+
+        if (_isSearchViewActive || _treeHistory.Count == 0)
+        {
+            return;
+        }
+
+        // NEWEST FIRST, the order the search box's own history dropdown uses.
+        // The rows carry the index they came from rather than their position in
+        // this list, so the reversal lives here and nowhere else.
+        var rows = new List<TreeHistoryRow>(_treeHistory.Count);
+        for (int i = _treeHistory.Count - 1; i >= 0; i--)
+        {
+            string folder = _treeHistory[i].Folder;
+            rows.Add(new TreeHistoryRow(
+                i,
+                FolderDisplayName(folder),
+                FolderParentText(folder),
+                i == _treeHistoryIndex));
+        }
+
+        TreeHistoryList.ItemsSource = rows;
+        TreeHistoryPopup.IsOpen = true;
+
+        // Opened while standing part-way back, the current row can be anywhere
+        // in the list - and it is the one the eye looks for first.
+        if (rows.FirstOrDefault(r => r.IsCurrent) is { } current)
+        {
+            TreeHistoryList.ScrollIntoView(current);
+        }
+    }
+
+    // A drive root prints as "C:\" and has nothing above it; everything else
+    // shows its own name with the road to it on the line below. Path.GetFileName
+    // and GetDirectoryName are string work - neither asks the disk anything,
+    // which is the only thing that matters here (see the entry record's note).
+    private static string FolderDisplayName(string folder)
+    {
+        string trimmed = folder.TrimEnd('\\');
+        string name = System.IO.Path.GetFileName(trimmed);
+        return name.Length > 0 ? name : folder;
+    }
+
+    private static string FolderParentText(string folder)
+    {
+        string trimmed = folder.TrimEnd('\\');
+        if (System.IO.Path.GetFileName(trimmed).Length == 0)
+        {
+            return string.Empty;
+        }
+        return System.IO.Path.GetDirectoryName(trimmed) ?? string.Empty;
+    }
+
+    private void TreeHistoryList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (ItemsControl.ContainerFromElement(TreeHistoryList, (DependencyObject)e.OriginalSource)
+            is ListBoxItem { Content: TreeHistoryRow row })
+        {
+            TreeHistoryPopup.IsOpen = false;
+            // The row is labelled with the folder, so the folder is where it
+            // goes - see GoTreeHistoryTo's landOnFolder note.
+            GoTreeHistoryTo(row.Index, landOnFolder: true);
+        }
+    }
+
+    // Index is the slot in _treeHistory, NOT the row's place in the list the
+    // popup shows - that one is reversed.
+    private sealed record TreeHistoryRow(int Index, string Name, string Parent, bool IsCurrent);
 
     // ALWAYS ON since 2026-08-11 - the toggle is gone from the options menu (see
     // the note where it stood). The strip stopped being a display of where you

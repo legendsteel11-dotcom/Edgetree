@@ -354,6 +354,10 @@ public static class Strings
     // column, and a shortcut nobody can discover is one nobody uses.
     public static string TreeHistoryBack = "뒤로  (Ctrl+←)";
     public static string TreeHistoryForward = "앞으로  (Ctrl+→)";
+    // The right-click rides in the tooltip for the same reason the keys do:
+    // it is the gesture a browser taught, and the two chevrons are where a hand
+    // that knows it will try first.
+    public static string TreeHistoryList = "다녀온 폴더  (뒤로/앞으로 우클릭)";
     public static string ViewerPrevImage = "이전 이미지";
     public static string ViewerNextImage = "다음 이미지";
     // 썸네일 바, not 필름스트립: the loanword is barely used in Korean, and the
@@ -890,6 +894,7 @@ public static class Strings
         MenuSetWallpaper = "Set as desktop background";
         TreeHistoryBack = "Back  (Ctrl+←)";
         TreeHistoryForward = "Forward  (Ctrl+→)";
+        TreeHistoryList = "Folders you have been in  (right-click Back/Forward)";
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
         ViewerFilmstrip = "Thumbnail bar";
