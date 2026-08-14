@@ -1,4 +1,4 @@
-﻿<!-- Crispness settings on the Window below, inherited by everything in it.
+<!-- Crispness settings on the Window below, inherited by everything in it.
 
      UseLayoutRounding: without it, layout lands on fractional device pixels, so
      a 1px divider gets spread across two pixels as two grey halves. Subtle at
@@ -2700,7 +2700,6 @@
                                      so the falloff stays gentle the whole way
                                      down instead of dropping off early. -->
                                 <Border x:Name="TreeTopShade"
-                                        Height="42"
                                         VerticalAlignment="Top"
                                         IsHitTestVisible="False"
                                         Opacity="0">
@@ -2717,7 +2716,6 @@
                                     </Border.Background>
                                 </Border>
                                 <Border x:Name="TreeBottomShade"
-                                        Height="42"
                                         VerticalAlignment="Bottom"
                                         IsHitTestVisible="False"
                                         Opacity="0">
@@ -4208,7 +4206,6 @@
                                     <ItemsPresenter/>
                                 </ScrollViewer>
                                 <Border x:Name="PanelTopShade"
-                                        Height="24"
                                         VerticalAlignment="Top"
                                         IsHitTestVisible="False"
                                         Opacity="0">
@@ -4225,7 +4222,6 @@
                                     </Border.Background>
                                 </Border>
                                 <Border x:Name="PanelBottomShade"
-                                        Height="24"
                                         VerticalAlignment="Bottom"
                                         IsHitTestVisible="False"
                                         Opacity="0">

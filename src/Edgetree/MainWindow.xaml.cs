@@ -6666,7 +6666,34 @@ public partial class MainWindow : Window
     // Not a derived contrast pair like the viewer's edge inks - this veil is
     // deliberately black on both themes, because what it dims is the CONTENT
     // (names and icons), not the background behind it.
-    private double TreeEdgeShadeStrength => _settings.IsLightMode ? 1.0 / 3 : 0.7;
+    // Dark went 0.7 → 1.0 when the depth became proportional (2026-08-15): the
+    // same ink spread over a taller band is fainter per pixel, so a value
+    // calibrated against a 42px band read as too soft once the band grew. At 1
+    // the gradient is drawn at full strength and the alphas in it are the whole
+    // story - anything darker has to come from the stops themselves. The light
+    // theme was left alone; it is drawn on a ground that shows the veil far
+    // more readily, and it was not what got called out.
+    private double TreeEdgeShadeStrength => _settings.IsLightMode ? 1.0 / 3 : 1.0;
+
+    // HOW DEEP the veil is, as a share of the list it sits on rather than a
+    // fixed number of pixels (asked 2026-08-15). A band that was right in a
+    // short window reads as a hairline in a tall one - it is the proportion
+    // that carries the effect, not the pixels. Measured off the scroller's own
+    // ActualHeight, which also gives the side panels a shallower band than the
+    // tree for free: they are a few rows tall and the same share of a smaller
+    // number is a smaller band. That is why two hardcoded depths (42 and 24)
+    // could be replaced by one share.
+    //
+    // ActualHeight, NOT ViewportHeight: these lists scroll by ITEM
+    // (CanContentScroll), so the viewport is a count of rows there and would
+    // give a depth in rows.
+    //
+    // The floor keeps a short panel's veil from vanishing; the ceiling stops a
+    // full-height tree on a 4K screen turning it into a gradient across two
+    // fingers of rows.
+    private const double EdgeShadeShare = 0.05;
+    private const double EdgeShadeMin = 20;
+    private const double EdgeShadeMax = 72;
 
     private void AttachEdgeShades()
     {
@@ -6705,6 +6732,11 @@ public partial class MainWindow : Window
         // one would blink the shades with it. Attached once, for the life of
         // the app.
         scroller.ScrollChanged += EdgeShades_ScrollChanged;
+        // The depth follows the list's height, and a resize that does not
+        // change how many ROWS fit raises no ScrollChanged at all - these
+        // lists scroll by item, so the viewport it reports moves in whole
+        // rows. This is the event that hears every pixel of it.
+        scroller.SizeChanged += (_, _) => UpdateEdgeShades();
     }
 
     private void EdgeShades_ScrollChanged(object sender, ScrollChangedEventArgs e)
@@ -6723,6 +6755,11 @@ public partial class MainWindow : Window
         double strength = _settings.TreeEdgeShades ? TreeEdgeShadeStrength : 0;
         foreach (var shades in _edgeShades)
         {
+            double depth = Math.Clamp(
+                shades.Scroller.ActualHeight * EdgeShadeShare, EdgeShadeMin, EdgeShadeMax);
+            shades.Top.Height = depth;
+            shades.Bottom.Height = depth;
+
             double offset = shades.Scroller.VerticalOffset;
             double scrollable = shades.Scroller.ScrollableHeight;
             shades.Top.Opacity = offset > 0.5 ? strength : 0;
