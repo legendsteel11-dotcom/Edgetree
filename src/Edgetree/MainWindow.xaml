@@ -1222,6 +1222,19 @@
                  cannot show. -->
             <MenuItem Tag="viewHere"
                     Click="ViewHere_Click"/>
+            <!-- The same way in, for a FOLDER: the panel's own folder play bar
+                 (전체 재생, ViewerFolderPlay_Click) reachable from the tree, so
+                 music can be set going without first opening the panel and
+                 selecting the folder there. Visibility is set in
+                 ExplorerItemContextMenu_Opened, and the row appears ONLY for a
+                 folder whose children are already read and hold something
+                 playable (the user's call, 2026-08-14: no dead 재생 row).
+                 That is the play bar's own gate - the two entrances answer to
+                 one rule, and neither ever reads a disk to draw a menu. -->
+            <MenuItem Tag="folderPlay"
+                    Visibility="Collapsed"
+                    Header="{x:Static services:Strings.MenuPlayHere}"
+                    Click="FolderPlayHere_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpen}"
                     InputGestureText="Enter"
                     Click="OpenItem_Click"/>

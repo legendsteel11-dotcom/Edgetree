@@ -13221,6 +13221,25 @@ public partial class MainWindow : Window
                 }
             }
 
+            // 재생 on a FOLDER row. Absent unless the folder's children are
+            // already read AND hold something playable - the user's call
+            // (2026-08-14): no 재생 row that turns out to have nothing to play.
+            // The ChildrenLoaded half is the same cost rule the panel's folder
+            // strip states at UpdateViewerCarousel: enumerating an unexpanded
+            // folder here would put a directory read under every right-click,
+            // and a sleeping NAS answers that in tens of seconds. So a folder
+            // never expanded offers no 재생 - expanding it is the gesture that
+            // pays for knowing, exactly as it is for the strip and the play
+            // bar. The Any() below reads only the model.
+            if (FindTaggedMenuElement<MenuItem>(menu, "folderPlay") is { } folderPlayItem)
+            {
+                bool canPlayFolder = _multiSelection.Count <= 1
+                    && ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false } folderRow
+                    && IsViewerFolderStripSource(folderRow)
+                    && GetViewerFolderItems(folderRow).Any(i => IsViewerPlayable(i.FullPath));
+                folderPlayItem.Visibility = canPlayFolder ? Visibility.Visible : Visibility.Collapsed;
+            }
+
             if (thumbnailItem is null || thumbnailSeparator is null || multiInfoItem is null ||
                 multiInfoSeparator is null || addFavoriteItem is null || newFolderItem is null ||
                 refreshItem is null || searchInFolderItem is null || sortMenu is null ||
@@ -19636,6 +19655,35 @@ public partial class MainWindow : Window
         {
             ViewHere(item);
         }
+    }
+
+    // The folder row's 재생 - the panel's 전체 재생 button, reached from the
+    // tree. Everything after the first three lines is machinery that already
+    // existed: StartViewerFolderPlayback picks the first track, moves the
+    // selection there once (the deliberate click pays for that one move), and
+    // the landing presses play; from then on the ordinary advance and the
+    // background rule ("playing in the background moves nothing") carry it.
+    private void FolderPlayHere_Click(object sender, RoutedEventArgs e)
+    {
+        if (ExplorerTree.SelectedItem is not FileSystemItem { IsDirectory: true } folder
+            || !IsViewerFolderStripSource(folder))
+        {
+            return;
+        }
+
+        if (_settings.IsAutoHidden)
+        {
+            ExitAutoHide();
+        }
+
+        OpenViewer();
+
+        // The same immediate refresh ViewHere gives, for the same reason: the
+        // folder-playback start below reads what the preview publishes, and an
+        // explicit ask must not wait out the selection debounce.
+        UpdateViewerPreview();
+
+        StartViewerFolderPlayback(ViewerRepeatMode.All);
     }
 
     // ----- 더블클릭·Enter 를 어디로 보낼 것인가 -------------------------------
