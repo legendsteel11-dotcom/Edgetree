@@ -2229,7 +2229,7 @@ public partial class MainWindow : Window
 
     // Clamped defensively at the point of use (like MaxItemsPerFolder/
     // TabSpacing elsewhere) rather than trusting a hand-edited settings file.
-    private double AutoHideSliverWidth => Math.Clamp(_settings.AutoHideSliverWidth, 3, 8);
+    private double AutoHideSliverWidth => Math.Clamp(_settings.AutoHideSliverWidth, 2, 8);
 
     // The handle's own range, and a much wider one than the sliver's - see
     // AppSettings.AutoHideHandleWidth for why they stopped sharing a number.
@@ -10483,9 +10483,11 @@ public partial class MainWindow : Window
     // thick is the thing at the edge", and the thing at the edge is one or the
     // other - so a second row would only ever be half wrong.
     //
-    // The sliver's 3~8: 3 is the original hardcoded width (thin enough that
-    // going lower risks the mouse missing it entirely), 8 is thick enough to be
-    // an easy target without eating much screen edge.
+    // The sliver's 2~8: 3 was the original hardcoded width and the floor,
+    // lowered to 2 on request (2026-08-14). The old "the mouse would miss it"
+    // worry undersold the screen edge: the cursor PINS there, so even a 2px
+    // stripe is an easy target - the width is visual, not a hit-test budget.
+    // 8 is thick enough to be an easy target without eating much screen edge.
     //
     // Purely cosmetic for the next time the window actually collapses
     // (EnterAutoHide/CloseAutoHideReveal both read the width fresh) - not
@@ -10515,7 +10517,7 @@ public partial class MainWindow : Window
     private (double Value, double Min, double Max) CollapsedWidthStepperRange()
         => _settings.AutoHideUseHandle
             ? (_settings.AutoHideHandleWidth, MinAutoHideHandleWidth, MaxAutoHideHandleWidth)
-            : (_settings.AutoHideSliverWidth, 3, 8);
+            : (_settings.AutoHideSliverWidth, 2, 8);
 
     // Same live-swap approach as ApplyColorSettings: replacing the resource
     // dictionary entry is picked up immediately by every row's DynamicResource
