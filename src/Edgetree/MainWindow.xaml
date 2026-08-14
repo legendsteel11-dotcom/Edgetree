@@ -2645,15 +2645,77 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 SnapsToDevicePixels="True">
-                            <ScrollViewer x:Name="PART_TreeScrollViewer"
-                                    Focusable="False"
-                                    Padding="{TemplateBinding Padding}"
-                                          Template="{StaticResource MinimalScrollViewerTemplate}"
-                                          CanContentScroll="True"
-                                          HorizontalScrollBarVisibility="{Binding Path=(ScrollViewer.HorizontalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}"
-                                          VerticalScrollBarVisibility="{Binding Path=(ScrollViewer.VerticalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}">
-                                <ItemsPresenter/>
-                            </ScrollViewer>
+                            <!-- The two edge shades ride INSIDE this template on
+                                 purpose. As siblings in the window's own grid
+                                 they would be pinned to a row number, and
+                                 ApplyFavoritesPosition swaps the tree between
+                                 Row1 and Row3 - the shades would stay behind at
+                                 the old edge. Here they travel with the tree,
+                                 and the ScrollViewer they answer to is right
+                                 beside them.
+                                 A LinearGradientBrush rather than a bitmap
+                                 (resolution-independent, one brush for both
+                                 themes) and rather than a DropShadowEffect
+                                 (that is a pixel shader with an intermediate
+                                 surface, for a rectangle that never moves).
+                                 Their job is to veil the CONTENT - names and
+                                 icons - at the edge, not to shade the
+                                 background, which is why one black gradient
+                                 works on the dark theme as well as the light
+                                 one. Lit by UpdateTreeEdgeShades. -->
+                            <Grid>
+                                <ScrollViewer x:Name="PART_TreeScrollViewer"
+                                        Focusable="False"
+                                        Padding="{TemplateBinding Padding}"
+                                              Template="{StaticResource MinimalScrollViewerTemplate}"
+                                              CanContentScroll="True"
+                                              HorizontalScrollBarVisibility="{Binding Path=(ScrollViewer.HorizontalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}"
+                                              VerticalScrollBarVisibility="{Binding Path=(ScrollViewer.VerticalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ItemsPresenter/>
+                                </ScrollViewer>
+                                <!-- Deep and faint rather than short and dark:
+                                     the same veil spread over more rows reads
+                                     as depth, where concentrating it at the
+                                     edge reads as a grey bar drawn on top of
+                                     the list. The middle stop sits just above
+                                     the straight line between the other two,
+                                     so the falloff stays gentle the whole way
+                                     down instead of dropping off early. -->
+                                <Border x:Name="TreeTopShade"
+                                        Height="42"
+                                        VerticalAlignment="Top"
+                                        IsHitTestVisible="False"
+                                        Opacity="0">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0"
+                                                EndPoint="0,1">
+                                            <GradientStop Offset="0"
+                                                    Color="#48000000"/>
+                                            <GradientStop Offset="0.5"
+                                                    Color="#26000000"/>
+                                            <GradientStop Offset="1"
+                                                    Color="#00000000"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border x:Name="TreeBottomShade"
+                                        Height="42"
+                                        VerticalAlignment="Bottom"
+                                        IsHitTestVisible="False"
+                                        Opacity="0">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,1"
+                                                EndPoint="0,0">
+                                            <GradientStop Offset="0"
+                                                    Color="#48000000"/>
+                                            <GradientStop Offset="0.5"
+                                                    Color="#26000000"/>
+                                            <GradientStop Offset="1"
+                                                    Color="#00000000"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                            </Grid>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -4105,14 +4167,64 @@
                                  is the list's to make. Read the same way as the two
                                  scrollbar properties: TemplateBinding does not
                                  reach an attached property. -->
-                            <ScrollViewer Focusable="False"
-                                    Padding="{TemplateBinding Padding}"
-                                    Template="{StaticResource MinimalScrollViewerTemplate}"
-                                    CanContentScroll="{Binding Path=(ScrollViewer.CanContentScroll), RelativeSource={RelativeSource TemplatedParent}}"
-                                    HorizontalScrollBarVisibility="{Binding Path=(ScrollViewer.HorizontalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}"
-                                    VerticalScrollBarVisibility="{Binding Path=(ScrollViewer.VerticalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}">
-                                <ItemsPresenter/>
-                            </ScrollViewer>
+                            <!-- FIVE lists wear this style - the favorites and
+                                 bookmark panels, the two history dropdowns and
+                                 the search results - and the edge shades below
+                                 are declared for all of them but LIT for none.
+                                 The only thing that raises them is
+                                 AttachEdgeShades, and the only callers are the
+                                 two panels. Same arrangement the "more this
+                                 way" chevrons in MinimalScrollViewerTemplate
+                                 already use, and for the same reason: one
+                                 template beats a duplicate of it per list.
+                                 Thinner than the tree's (2026-08-15): this
+                                 panel is a few rows tall, so the tree's depth
+                                 here would shade most of the list. -->
+                            <Grid>
+                                <ScrollViewer x:Name="PART_PanelScrollViewer"
+                                        Focusable="False"
+                                        Padding="{TemplateBinding Padding}"
+                                        Template="{StaticResource MinimalScrollViewerTemplate}"
+                                        CanContentScroll="{Binding Path=(ScrollViewer.CanContentScroll), RelativeSource={RelativeSource TemplatedParent}}"
+                                        HorizontalScrollBarVisibility="{Binding Path=(ScrollViewer.HorizontalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}"
+                                        VerticalScrollBarVisibility="{Binding Path=(ScrollViewer.VerticalScrollBarVisibility), RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ItemsPresenter/>
+                                </ScrollViewer>
+                                <Border x:Name="PanelTopShade"
+                                        Height="24"
+                                        VerticalAlignment="Top"
+                                        IsHitTestVisible="False"
+                                        Opacity="0">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0"
+                                                EndPoint="0,1">
+                                            <GradientStop Offset="0"
+                                                    Color="#48000000"/>
+                                            <GradientStop Offset="0.5"
+                                                    Color="#26000000"/>
+                                            <GradientStop Offset="1"
+                                                    Color="#00000000"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <Border x:Name="PanelBottomShade"
+                                        Height="24"
+                                        VerticalAlignment="Bottom"
+                                        IsHitTestVisible="False"
+                                        Opacity="0">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,1"
+                                                EndPoint="0,0">
+                                            <GradientStop Offset="0"
+                                                    Color="#48000000"/>
+                                            <GradientStop Offset="0.5"
+                                                    Color="#26000000"/>
+                                            <GradientStop Offset="1"
+                                                    Color="#00000000"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                            </Grid>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>

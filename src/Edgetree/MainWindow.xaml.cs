@@ -532,6 +532,11 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(new Action(() => AttachScrollJumpWatch()),
             System.Windows.Threading.DispatcherPriority.Loaded);
 
+        // Same moment, same reason (the templates have to exist first) - but
+        // not Debug-only: this one is a visible feature, not an instrument.
+        Dispatcher.BeginInvoke(new Action(AttachEdgeShades),
+            System.Windows.Threading.DispatcherPriority.Loaded);
+
         // Row sizing for the current favorite count/collapsed state was
         // already handled above by SetExpandedContentVisibility.
         FavoritesList.ItemsSource = _settings.Favorites;
@@ -952,6 +957,10 @@ public partial class MainWindow : Window
         if (themeChanged)
         {
             UpdateSearchSortIcon();
+            // The edge shades are one black gradient scaled per theme, so the
+            // theme moving is the only thing besides a scroll that changes
+            // what they draw.
+            UpdateEdgeShades();
         }
     }
 
@@ -6619,6 +6628,103 @@ public partial class MainWindow : Window
     {
         ExplorerTree.ApplyTemplate();
         return ExplorerTree.Template.FindName("PART_TreeScrollViewer", ExplorerTree) as ScrollViewer;
+    }
+
+    // ----- 트리 위/아래 가장자리 그늘 -----------------------------------------
+    //
+    // A soft veil over the first and last rows, lit only while there is more
+    // tree in that direction. Two things come out of that condition. It says
+    // "the list carries on past here", which a plain divider line cannot -
+    // and both seams already have a line, so an always-on shade would be a
+    // second separator drawn on top of the first. And it answers the case it
+    // was asked for (2026-08-15): after a bookmark jump the pinned row sits
+    // flush under the favorites panel, same background on both sides, and the
+    // two read as one surface split oddly - which is exactly a scrolled state,
+    // so the shade is up precisely then.
+    //
+    // The panel-side alternative that was weighed and not taken: give the
+    // favorites panel its own background colour. It separates the two, but a
+    // second surface colour has to be picked against every palette the colour
+    // window can roll.
+    // One entry per list that lights its shades. The template they come from
+    // is shared with lists that never do (see FavoritesListBoxStyle), so being
+    // in this collection - not carrying the parts - is what turns them on.
+    private sealed record EdgeShades(ScrollViewer Scroller, Border Top, Border Bottom);
+
+    private readonly List<EdgeShades> _edgeShades = new();
+
+    // How much of the gradient's own ink each theme actually gets. ONE brush,
+    // scaled - rather than a second gradient per theme - because "the same
+    // shade at 70%" is literally an opacity, and two brushes would be two
+    // places to keep in step every time the shape is tuned.
+    //
+    // The two numbers are the user's own calibration (2026-08-15) against the
+    // shape above: the light theme wants a third, the dark theme seven tenths.
+    // Not a derived contrast pair like the viewer's edge inks - this veil is
+    // deliberately black on both themes, because what it dims is the CONTENT
+    // (names and icons), not the background behind it.
+    private double TreeEdgeShadeStrength => _settings.IsLightMode ? 1.0 / 3 : 0.7;
+
+    private void AttachEdgeShades()
+    {
+        // The tree and both side panels. The panels share their template with
+        // the search results and the two history dropdowns, which are left out
+        // deliberately - a dropdown carries its own border and shadow already,
+        // and the search list was not what was asked for. Adding either is one
+        // line here, not a template change.
+        AttachEdgeShades(ExplorerTree, "PART_TreeScrollViewer", "TreeTopShade", "TreeBottomShade");
+        AttachEdgeShades(FavoritesList, "PART_PanelScrollViewer", "PanelTopShade", "PanelBottomShade");
+        AttachEdgeShades(BookmarkPanelList, "PART_PanelScrollViewer", "PanelTopShade", "PanelBottomShade");
+        UpdateEdgeShades();
+    }
+
+    private void AttachEdgeShades(
+        System.Windows.Controls.Control control,
+        string scrollerName,
+        string topName,
+        string bottomName)
+    {
+        // A panel that is Collapsed right now still builds its template here,
+        // which matters: ApplySidePanelMode shows exactly one of the two, and
+        // the hidden one has to arrive already wired for the day it is shown.
+        control.ApplyTemplate();
+        if (control.Template is not { } template ||
+            template.FindName(scrollerName, control) is not ScrollViewer scroller ||
+            template.FindName(topName, control) is not Border top ||
+            template.FindName(bottomName, control) is not Border bottom)
+        {
+            return;
+        }
+
+        _edgeShades.Add(new EdgeShades(scroller, top, bottom));
+        // Its own subscription, like the jump watch's: the bottom gap's reclaim
+        // handler attaches and detaches as rows come and go, and riding on that
+        // one would blink the shades with it. Attached once, for the life of
+        // the app.
+        scroller.ScrollChanged += EdgeShades_ScrollChanged;
+    }
+
+    private void EdgeShades_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        => UpdateEdgeShades();
+
+    // Offsets here are in ITEMS, not pixels (CanContentScroll=True), which the
+    // comparisons below do not care about - both sides of each are the same
+    // unit. Extent changes raise ScrollChanged too, so expanding a folder into
+    // an overflowing tree lights the bottom shade without anyone scrolling.
+    //
+    // Also called on a THEME change, which is why it reads the scroll state
+    // back rather than taking it as an argument: the strength moves under a
+    // shade that is already lit, and nothing has scrolled to say so.
+    private void UpdateEdgeShades()
+    {
+        double strength = TreeEdgeShadeStrength;
+        foreach (var shades in _edgeShades)
+        {
+            double offset = shades.Scroller.VerticalOffset;
+            double scrollable = shades.Scroller.ScrollableHeight;
+            shades.Top.Opacity = offset > 0.5 ? strength : 0;
+            shades.Bottom.Opacity = offset < scrollable - 0.5 ? strength : 0;
+        }
     }
 
     // ----- 스크롤 점프 계측기 (Debug 전용) ------------------------------------
@@ -17140,10 +17246,9 @@ public partial class MainWindow : Window
             // band, where the answer is margins and a clip region. The width
             // drag already resizes the window every event on both sides, and
             // this only stops the origin move from being a second, separate
-            // write. What that ruling DOES still predict is the residue the
-            // user reports after this fix ("부드러워졌지만 여전함"): a window
-            // whose origin moves shows any late frame shifted by the delta,
-            // and that one is framework-deep.
+            // write. What that ruling DOES still predict is the residue left
+            // after this fix: a window whose origin moves shows any late frame
+            // displaced by the delta, and that one is framework-deep.
             SetDockedRightGeometry(newWidth);
             return;
         }
