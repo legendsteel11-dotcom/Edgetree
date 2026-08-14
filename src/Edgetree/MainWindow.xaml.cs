@@ -5789,27 +5789,36 @@ public partial class MainWindow : Window
 
             // A row more than a screenful away is not a CORRECTION any more,
             // and a one-row-per-step walk can never cover it inside the
-            // budget - the instrument's answer, 2026-08-13 afternoon:
-            // "gave-up steps=64 top=9696 ups=0 downs=64 deaf=0", sixty-four
-            // healthy steps against a 400-row distance, opened up by the
-            // previous jump's chain collapsing the extent mid-walk. What
-            // actually landed those jumps was the NEXT pin's absolute
-            // scroll - so do that here, now, with a fresh index: the stale
-            // count is the very thing being walked off. Bounded like the
-            // gap growths and for the same reason: a third ask means the
-            // distance keeps reopening, and stepping is then the only
-            // honest thing left.
+            // budget (2026-08-13: "gave-up steps=64 top=9696", sixty-four
+            // healthy steps against a 400-row distance). The first version
+            // re-scrolled to a freshly-counted index here, on the theory that
+            // the count had merely gone stale mid-walk. 2026-08-14 refuted
+            // that: "counted=344 panel≈423.4 modelRows=380 extent=460" - the
+            // PANEL was carrying 80 rows the model no longer had (a subtree
+            // recapped or collapsed while its region was virtualized out
+            // keeps its old drawn size, and history jumps chain exactly that:
+            // leave a far folder, it collapses off-screen), so every count
+            // below the ghost aimed 80 rows high, FRESH OR NOT - and 80 is
+            // more than the 64-step budget, which is why those folders missed
+            // 100% of the time, every retry re-aiming from the same ledger.
+            //
+            // The row's MEASURED position needs no agreement between model
+            // and panel: `top` says how far the row is from the viewport's
+            // top in the panel's own pixels, so aim there. The same lesson
+            // the gap growth below already paid for - "sized from the pixels,
+            // not the model."
             if (Math.Abs(top) > scrollViewer.ActualHeight + 1
                 && rescrolls < 2
-                && anchor.DataContext is FileSystemItem anchorItem
-                && VisibleRowIndexOf(anchorItem) is { } freshIndex)
+                && scrollViewer.ViewportHeight > 0)
             {
                 rescrolls++;
+                double stepRowHeight = scrollViewer.ActualHeight / scrollViewer.ViewportHeight;
+                double measured = scrollViewer.VerticalOffset + top / stepRowHeight;
                 LogClickLine(
-                    $"settle: {name} far ({top:F0}px), rescroll to {freshIndex} " +
-                    $"(counted was {countedIndex})");
+                    $"settle: {name} far ({top:F0}px), rescroll to measured {measured:F1} " +
+                    $"(counted {countedIndex})");
                 scrollViewer.ScrollToVerticalOffset(
-                    Math.Min(freshIndex, scrollViewer.ScrollableHeight));
+                    Math.Max(0, Math.Min(measured, scrollViewer.ScrollableHeight)));
                 continue;
             }
 
@@ -5916,6 +5925,91 @@ public partial class MainWindow : Window
         }
 
         Report("gave-up");
+        LogPinDiagnosis(anchor, scrollViewer, countedIndex);
+    }
+
+    // ----- 계측기: 세어지지 않는 80줄 (Debug 전용) ------------------------------
+    //
+    // Written 2026-08-14, for the folders that miss the top 100% of the time.
+    // click.log already says the SHAPE of it: a rescroll to the counted index
+    // leaves the row measuring ~80 rows further down ("far (1896px)" right
+    // after "rescroll to 344"), and 62 line-steps from there still end 432px
+    // short - so the count aims high, persistently, by the same amount every
+    // time. Counted rows and drawn rows disagree.
+    //
+    // Both are supposed to read the same model - the tree binds Children and
+    // IsExpanded (TwoWay), and CountRowsUntil walks exactly those - so the
+    // disagreement has a HOME somewhere: a folder whose drawn state has parted
+    // from its model state, or panel rows the model no longer owns. This logs
+    // enough to name it:
+    //   counted vs panel   - the anchor's real row position, measured in pixels
+    //                        and converted with the viewport's own row height
+    //   modelRows vs extent - the walk's total against the panel's total;
+    //                        which side of the disagreement carries the ghost
+    //   MISMATCH lines     - every realized container whose IsExpanded differs
+    //                        from its item's (a virtualized culprit stays
+    //                        invisible here, but then modelRows/extent points
+    //                        at it instead)
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogPinDiagnosis(TreeViewItem? anchor, ScrollViewer scrollViewer, int countedIndex)
+    {
+        int modelRows = _bottomGapRows.Count;
+        foreach (var root in _roots)
+        {
+            // A target no row can be: counts the whole tree.
+            CountRowsUntil(root, null!, ref modelRows);
+        }
+
+        double rowHeight = scrollViewer.ViewportHeight > 0
+            ? scrollViewer.ActualHeight / scrollViewer.ViewportHeight
+            : 0;
+        string panelRow = "-";
+        if (anchor is not null && rowHeight > 0 && anchor.IsDescendantOf(scrollViewer))
+        {
+            try
+            {
+                double top = anchor.TransformToAncestor(scrollViewer)
+                    .Transform(new System.Windows.Point(0, 0)).Y;
+                panelRow = (scrollViewer.VerticalOffset + top / rowHeight).ToString("F1");
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+
+        LogClickLine(
+            $"diagnose: counted={countedIndex} panel≈{panelRow} " +
+            $"modelRows={modelRows} extent={scrollViewer.ExtentHeight:F0} " +
+            $"rowHeight={rowHeight:F1}px offset={scrollViewer.VerticalOffset:F0}");
+
+        int scanned = 0;
+        int mismatches = 0;
+        void Scan(ItemsControl host)
+        {
+            foreach (object? entry in host.Items)
+            {
+                if (host.ItemContainerGenerator.ContainerFromItem(entry) is not TreeViewItem tvi)
+                {
+                    continue;
+                }
+                scanned++;
+                if (tvi.DataContext is FileSystemItem { IsDirectory: true } fsi
+                    && tvi.IsExpanded != fsi.IsExpanded)
+                {
+                    mismatches++;
+                    LogClickLine(
+                        $"diagnose: MISMATCH {fsi.Name} " +
+                        $"container={(tvi.IsExpanded ? "open" : "closed")} " +
+                        $"model={(fsi.IsExpanded ? "open" : "closed")}");
+                }
+                if (tvi.IsExpanded)
+                {
+                    Scan(tvi);
+                }
+            }
+        }
+        Scan(ExplorerTree);
+        LogClickLine($"diagnose: scanned {scanned} realized, {mismatches} mismatched");
     }
 
     // ----- 확인 패스: settle이 끝난 뒤에도 트리가 움직이는 경우 ----------------
@@ -6117,6 +6211,7 @@ public partial class MainWindow : Window
             LogClickLine(
                 $"confirm: {item.Name} still off after {_settleConfirmRepins} re-pins " +
                 $"(top={(double.IsNaN(top) ? "unmeasured" : top.ToString("F0") + "px")}) - giving up");
+            LogPinDiagnosis(container, scrollViewer, VisibleRowIndexOf(item) ?? -1);
             _settleConfirmItem = null;
             return;
         }
