@@ -17126,9 +17126,55 @@ public partial class MainWindow : Window
 
         if (_settings.DockOnRight)
         {
-            Left -= newWidth - Width;
+            // ONE call, not `Left` then `Width` (which is what this was until
+            // 2026-08-15). Both are dependency properties and each issues its
+            // own SetWindowPos, so the window spent a composed frame with the
+            // new Left and the old Width - its right edge short of the screen
+            // edge by the drag delta. Reported exactly that way: the sidebar
+            // tears away from the edge and snaps back, further the faster the
+            // drag. Docked LEFT never showed it because there the origin does
+            // not move at all and only Width is written.
+            //
+            // Not the falsified "resize the window per event" path from
+            // [[wpf-resize-no-geometry]] - that ruling is about the vertical
+            // band, where the answer is margins and a clip region. The width
+            // drag already resizes the window every event on both sides, and
+            // this only stops the origin move from being a second, separate
+            // write. What that ruling DOES still predict is the residue the
+            // user reports after this fix ("부드러워졌지만 여전함"): a window
+            // whose origin moves shows any late frame shifted by the delta,
+            // and that one is framework-deep.
+            SetDockedRightGeometry(newWidth);
+            return;
         }
+
         Width = newWidth;
+    }
+
+    // The right edge is the anchor, so it is what the arithmetic holds fixed -
+    // in PHYSICAL pixels, not DIPs. Deriving the left edge as "right minus
+    // width" in the same unit the OS positions windows in is what keeps the
+    // anchored edge from wandering by a pixel as the width crosses rounding
+    // boundaries mid-drag.
+    private void SetDockedRightGeometry(double newWidth)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero)
+        {
+            // Before the handle exists there is nothing to compose, so the
+            // two-write version is harmless - and it is the only one available.
+            Left -= newWidth - Width;
+            Width = newWidth;
+            return;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        int rightPx = (int)Math.Round((Left + Width) * dpi.DpiScaleX);
+        int widthPx = (int)Math.Round(newWidth * dpi.DpiScaleX);
+        int topPx = (int)Math.Round(Top * dpi.DpiScaleY);
+        int heightPx = (int)Math.Round(Height * dpi.DpiScaleY);
+
+        NativeMethods.MoveAndResize(hwnd, rightPx - widthPx, topPx, widthPx, heightPx);
     }
 
     // Double-clicking the resize thumb auto-fits the window to exactly the

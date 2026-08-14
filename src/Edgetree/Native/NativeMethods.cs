@@ -14,6 +14,7 @@ internal static class NativeMethods
     private static readonly IntPtr HwndNoTopmost = new(-2);
     private const uint SWP_NOSIZE = 0x0001;
     private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOZORDER = 0x0004;
     private const uint SWP_NOACTIVATE = 0x0010;
 
     private const int ASFW_ANY = -1;
@@ -137,6 +138,17 @@ internal static class NativeMethods
     public static bool SetTopmost(IntPtr hWnd, bool topmost)
         => SetWindowPos(hWnd, topmost ? HwndTopmost : HwndNoTopmost, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
+    // Position AND size in one call, which WPF cannot express: its Left and
+    // Width are separate dependency properties and each one issues its own
+    // SetWindowPos, so a window that has to move while it resizes passes
+    // through a state where only one of the two has landed - and that state
+    // gets composed. Visible as the right-docked sidebar tearing away from the
+    // screen edge and snapping back, further the faster the drag (2026-08-15).
+    // Everything in PHYSICAL pixels, like every other call in this file.
+    public static bool MoveAndResize(IntPtr hWnd, int x, int y, int width, int height)
+        => SetWindowPos(hWnd, IntPtr.Zero, x, y, width, height,
+            SWP_NOZORDER | SWP_NOACTIVATE);
 
     // Clips the window to the horizontal band [topPx, bottomPx), in physical
     // pixels relative to the window's own top-left. The region's right edge is
