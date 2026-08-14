@@ -17321,7 +17321,14 @@ public partial class MainWindow : Window
             // two part company the moment the window has squeezed or grown
             // the panel away from what settings remember, and the difference
             // used to leak straight into the tree.
-            double treeShare = _viewerTreeShare ?? (Width - viewerWidth);
+            //
+            // NO SHARE AT ALL IN FULL COVER (2026-08-15). The tree is not on
+            // screen there - the panel has the whole window - so reserving its
+            // width made the narrowest possible media window `tree + 240`,
+            // around 450px. On a 1920 screen that is a quarter of the width
+            // for a window meant to be small. The share itself is untouched,
+            // so leaving the mode puts the tree back where it was.
+            double treeShare = _viewerFullscreen ? 0 : (_viewerTreeShare ?? (Width - viewerWidth));
             viewerWidth = Math.Clamp(newWidth - treeShare, MinViewerWidth, MaxViewerWidth);
             newWidth = treeShare + viewerWidth;
 
@@ -17329,7 +17336,15 @@ public partial class MainWindow : Window
             // (that is the rule this whole branch exists for), and the panel
             // is the star column, so it simply takes the window's new
             // remainder on its own.
-            _settings.ViewerWidth = viewerWidth;
+            //
+            // NOT REMEMBERED from full cover: a width chosen for a small media
+            // window is not the width the panel should come back as beside the
+            // tree, and storing it would carry that answer into every later
+            // open of the split view.
+            if (!_viewerFullscreen)
+            {
+                _settings.ViewerWidth = viewerWidth;
+            }
         }
         else
         {
