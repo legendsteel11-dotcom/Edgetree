@@ -102,10 +102,57 @@ public class FileSystemItem : INotifyPropertyChanged
         get => _isExpanded;
         set
         {
+            bool changed = _isExpanded != value;
             if (SetField(ref _isExpanded, value) && IsDirectory)
             {
                 OnPropertyChanged(nameof(Icon));
             }
+
+            if (changed)
+            {
+                LogExpandedWrite(value);
+            }
+        }
+    }
+
+    // Debug instrument (2026-08-14): folders collapse with no hand on the
+    // tree - during a window resize with a slideshow running, the whole
+    // expanded chain went false top-down and the selection fell to the drive
+    // root. autocollapse.log's existing lines cover only the accordion path
+    // (TreeViewItem_Expanded), and that path logged nothing at those moments,
+    // so the writer is something else - suspected: virtualization container
+    // work pushing values through the TwoWay IsExpanded binding. This names
+    // the writer: every model-side transition lands in the same log with the
+    // caller's frames, so accordion (CollapseExcept), restore, and binding
+    // write-backs (WPF frames) read differently at a glance.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogExpandedWrite(bool value)
+    {
+        try
+        {
+            var trace = new System.Diagnostics.StackTrace(2, false);
+            var sb = new System.Text.StringBuilder();
+            int count = Math.Min(8, trace.FrameCount);
+            for (int i = 0; i < count; i++)
+            {
+                var method = trace.GetFrame(i)?.GetMethod();
+                if (i > 0)
+                {
+                    sb.Append(" < ");
+                }
+
+                sb.Append(method?.DeclaringType?.Name).Append('.').Append(method?.Name);
+            }
+
+            string dir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            System.IO.Directory.CreateDirectory(dir);
+            System.IO.File.AppendAllText(
+                System.IO.Path.Combine(dir, "autocollapse.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}  {(value ? "EXPAND  " : "COLLAPSE")} {FullPath}  via {sb}{Environment.NewLine}");
+        }
+        catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException)
+        {
         }
     }
 

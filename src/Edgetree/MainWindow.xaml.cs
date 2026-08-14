@@ -11291,6 +11291,10 @@ public partial class MainWindow : Window
     // LogAutoCollapseSuppressed - so the theory is checkable next time).
     private long _lastTreeUserInputTicks = long.MinValue / 2;
 
+    // Debug companion to the stamp above: which site wrote it last, so the
+    // gate instrument can say what opened the window (see LogAccordionGate).
+    private string _lastTreeInputSource = "-";
+
     private const long TreeGestureWindowMs = 1000;
 
     private bool IsWithinTreeGestureWindow
@@ -11337,8 +11341,17 @@ public partial class MainWindow : Window
             RefreshFolderPreservingState(item);
         }
 
+        // Debug instrument (2026-08-14): a phantom Expanded during a window
+        // resize got PAST this gate and the accordion collapsed the whole
+        // C: chain (autocollapse.log 21:40:16, stack = OnIsExpandedChanged →
+        // here → ApplyAutoCollapse) - yet no known stamp site had run within
+        // the window. Both branches now log the measured age and WHERE the
+        // last stamp came from, so the next repro names the stamp that let
+        // it through.
+        long sinceInput = Environment.TickCount64 - _lastTreeUserInputTicks;
         if (IsWithinTreeGestureWindow)
         {
+            LogAccordionGate(item.FullPath, sinceInput, applied: true);
             ApplyAutoCollapse(item);
         }
         else
@@ -11347,16 +11360,12 @@ public partial class MainWindow : Window
             // programmatically) - harmless, it applies its own collapse once
             // at the end of the walk. Same for startup state restore, which
             // was never meant to auto-collapse the paths it restores.
-            LogAutoCollapseSuppressed(item.FullPath);
+            LogAccordionGate(item.FullPath, sinceInput, applied: false);
         }
     }
 
-    // Debug builds only - exists to confirm or kill the phantom-Expanded
-    // theory above: if folders collapse on their own again, this file says
-    // whether container regeneration fired Expanded around that moment (and
-    // for which folders) without any tree input preceding it.
     [System.Diagnostics.Conditional("DEBUG")]
-    private static void LogAutoCollapseSuppressed(string path)
+    private void LogAccordionGate(string path, long sinceInput, bool applied)
     {
         try
         {
@@ -11365,7 +11374,8 @@ public partial class MainWindow : Window
             Directory.CreateDirectory(dir);
             File.AppendAllText(
                 Path.Combine(dir, "autocollapse.log"),
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  Expanded without recent tree input (auto-collapse suppressed): {path}{Environment.NewLine}");
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}  gate: {(applied ? "APPLIED " : "suppressed")} {path}  " +
+                $"sinceInput={sinceInput}ms  stampedBy={_lastTreeInputSource}{Environment.NewLine}");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -11543,7 +11553,27 @@ public partial class MainWindow : Window
         // TreeView after this tunnel - stamp the gesture here so the
         // auto-collapse guard treats it like a click (see
         // _lastTreeUserInputTicks).
-        _lastTreeUserInputTicks = Environment.TickCount64;
+        //
+        // NOT for a bare modifier. Key events tunnel to the FOCUSED element
+        // wherever the mouse is, so Ctrl/Shift+wheel over the viewer lands
+        // the modifier press here whenever the tree holds focus - and none
+        // of these keys can expand anything. Stamping them opened the 1s
+        // gesture window at arbitrary moments, and a phantom Expanded from
+        // container regeneration (a window resize re-realizing a drive row
+        // whose model was already expanded) inside that window read as a
+        // deliberate expansion: the accordion then collapsed the whole open
+        // chain, WPF walked the selection up to the drive root, and the
+        // slideshow stopped on the selection change (autocollapse.log
+        // 2026-08-14 21:44:53, "gate: APPLIED D:\ sinceInput=47ms
+        // stampedBy=key:LeftShift").
+        if (e.Key is not (Key.LeftShift or Key.RightShift
+            or Key.LeftCtrl or Key.RightCtrl
+            or Key.LeftAlt or Key.RightAlt
+            or Key.LWin or Key.RWin or Key.System))
+        {
+            _lastTreeUserInputTicks = Environment.TickCount64;
+            _lastTreeInputSource = $"key:{e.Key}";
+        }
 
         switch (e.Key)
         {
@@ -12144,6 +12174,8 @@ public partial class MainWindow : Window
         // filter and the expander check: any press that can lead to an
         // expansion (row click, expander arrow) passes through here first.
         _lastTreeUserInputTicks = Environment.TickCount64;
+        _lastTreeInputSource =
+            $"row-press:{(treeViewItem.DataContext as FileSystemItem)?.Name ?? "?"}";
 
         // Preview (tunneling) events pass through every ANCESTOR TreeViewItem on
         // the way down to the one actually clicked. Only act on the pass where
@@ -15773,6 +15805,7 @@ public partial class MainWindow : Window
             // the tree - stamp it so the expansion below still auto-collapses
             // the way it always has (see _lastTreeUserInputTicks).
             _lastTreeUserInputTicks = Environment.TickCount64;
+            _lastTreeInputSource = $"menu-open:{item.Name}";
             item.IsExpanded = true;
         }
         else if (!IsUnreachableNetworkItem(item))
