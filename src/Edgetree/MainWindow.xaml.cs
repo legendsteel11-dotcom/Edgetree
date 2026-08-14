@@ -957,11 +957,14 @@ public partial class MainWindow : Window
         if (themeChanged)
         {
             UpdateSearchSortIcon();
-            // The edge shades are one black gradient scaled per theme, so the
-            // theme moving is the only thing besides a scroll that changes
-            // what they draw.
-            UpdateEdgeShades();
         }
+
+        // OUTSIDE the themeChanged gate: the shades follow the theme for their
+        // strength, but their on/off switch lives in the colour window and
+        // comes back through this same callback with the theme unchanged. Two
+        // opacity writes, so running it on every colour apply costs nothing
+        // worth gating.
+        UpdateEdgeShades();
     }
 
     // ----- 배경 따라가는 가장자리 잉크 (2026-08-09) --------------------------
@@ -6717,7 +6720,7 @@ public partial class MainWindow : Window
     // shade that is already lit, and nothing has scrolled to say so.
     private void UpdateEdgeShades()
     {
-        double strength = TreeEdgeShadeStrength;
+        double strength = _settings.TreeEdgeShades ? TreeEdgeShadeStrength : 0;
         foreach (var shades in _edgeShades)
         {
             double offset = shades.Scroller.VerticalOffset;

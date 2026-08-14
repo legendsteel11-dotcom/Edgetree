@@ -562,6 +562,14 @@ public class AppSettings
     // who wants the row back turns it off in 기본 설정.
     public bool ShowPathBar { get; set; } = true;
 
+    // The soft veil over the first and last rows of the tree and the side
+    // panels, up only while there is more list that way (see MainWindow's
+    // UpdateEdgeShades). Lives with the COLOURS rather than in the options
+    // menu, and that was a deliberate call: named among the app's behaviour
+    // toggles it reads as a window shadow for the whole app, where beside the
+    // palette it reads as what it is - shading inside these lists.
+    public bool TreeEdgeShades { get; set; } = true;
+
     // Swaps the favorites panel and the tree between the top and bottom Grid
     // row - see MainWindow.xaml's Row1/Row3 comment and
     // MainWindow.xaml.cs's ApplyFavoritesPosition.

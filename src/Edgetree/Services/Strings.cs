@@ -204,6 +204,10 @@ public static class Strings
     // Named after the PANEL, not favorites: it now holds either list. Lives
     // inside the 패널 표시 submenu, under the three modes.
     public static string MenuFavoritesAtBottom = "아래에 표시";
+    // In the colour window, not the options menu - among behaviour toggles the
+    // word reads as a shadow around the whole app. The tip says which shadow.
+    public static string ButtonEdgeShades = "그림자";
+    public static string ButtonEdgeShadesTip = "목록의 위아래 끝을 옅게 덮습니다";
     // Inside the 멀티미디어 패널 submenu, so the subject is already named.
     public static string MenuViewerSideSwapped = "좌우 위치 반전";
     public static string MenuDockOnRight = "고정 위치 오른쪽";
@@ -832,6 +836,8 @@ public static class Strings
         MenuDragMoves = "Drag Moves (hold Ctrl to copy)";
         MenuShowPanelDividers = "Panel Dividers";
         MenuFavoritesAtBottom = "Show at Bottom";
+        ButtonEdgeShades = "Shading";
+        ButtonEdgeShadesTip = "Veils the top and bottom ends of a list";
         MenuViewerSideSwapped = "Swap Sides";
         MenuDockOnRight = "Pin to Right Edge";
         MenuAutoHideCloseOnLeave = "Close on Mouse Leave";

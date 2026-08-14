@@ -378,6 +378,19 @@ public partial class ColorSettingsWindow : Window
     {
         PaintThemeToggle(DarkModeButton, on: !_settings.IsLightMode);
         PaintThemeToggle(LightModeButton, on: _settings.IsLightMode);
+        // Repainted with them because the stamp comes from AccentForeground,
+        // which is a per-theme brush - the switch would otherwise keep the
+        // outgoing theme's blue after a mode change.
+        PaintToggleFill(EdgeShadesButton, on: _settings.TreeEdgeShades);
+    }
+
+    private void EdgeShades_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.TreeEdgeShades = !_settings.TreeEdgeShades;
+        PaintToggleFill(EdgeShadesButton, on: _settings.TreeEdgeShades);
+        // The same callback every colour edit uses - it ends at the app's own
+        // apply pass, which is where the shades are put up or taken down.
+        _onChanged();
     }
 
     // The ink over the blue is CHOSEN rather than fixed, because the accent is
@@ -395,7 +408,17 @@ public partial class ColorSettingsWindow : Window
         // disabled look, which is the thing being got rid of here.
         button.IsHitTestVisible = !on;
         button.Cursor = on ? Cursors.Arrow : Cursors.Hand;
+        PaintToggleFill(button, on);
+    }
 
+    // The stamp alone, for a button that is a SWITCH rather than one of a
+    // pair. The theme buttons can afford to stop taking the mouse when lit
+    // because pressing the lit one would do nothing anyway; a switch has to
+    // stay pressable, since the press that turns it back off lands on the lit
+    // state. The hover fill painting over the stamp is the price, and it is
+    // the right way round here - it says the thing can still be pressed.
+    private void PaintToggleFill(Button button, bool on)
+    {
         if (!on)
         {
             button.ClearValue(BackgroundProperty);

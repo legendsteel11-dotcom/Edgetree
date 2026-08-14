@@ -100,6 +100,7 @@ public class AppPreset
         // always on, so a preset carrying it would be storing an answer to a
         // question nobody asks.
         nameof(AppSettings.HideTitleBarTitle),
+        nameof(AppSettings.TreeEdgeShades),
 
         // 옆 패널들.
         nameof(AppSettings.FavoritesAtBottom),

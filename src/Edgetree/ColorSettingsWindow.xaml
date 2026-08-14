@@ -277,6 +277,7 @@
                     <ColumnDefinition Width="*" MinWidth="12"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <!-- Two ordinary buttons of this window's one button style,
                      and the ON one is stamped in the app's blue - painted in
@@ -301,8 +302,24 @@
                         Padding="10,0"
                         Margin="6,0,0,0"
                         Click="LightMode_Click"/>
-                <Button x:Name="RandomButton"
+                <!-- The tree's and the panels' edge shading, on/off. It is not
+                     a colour, and it is here anyway: named among the options
+                     menu's behaviour toggles, "그림자" reads as a shadow around
+                     the whole app, where beside the palette it reads as
+                     shading inside these lists (the author's call, 2026-08-15).
+                     Wears the same accent stamp as the theme pair when it is
+                     on, but unlike that pair it stays clickable - it is a
+                     switch, and the press that turns it off has to land. -->
+                <Button x:Name="EdgeShadesButton"
                         Grid.Column="3"
+                        Content="{x:Static services:Strings.ButtonEdgeShades}"
+                        Style="{StaticResource DialogButtonStyle}"
+                        Padding="10,0"
+                        Margin="0,0,6,0"
+                        ToolTip="{x:Static services:Strings.ButtonEdgeShadesTip}"
+                        Click="EdgeShades_Click"/>
+                <Button x:Name="RandomButton"
+                        Grid.Column="4"
                         Content="{x:Static services:Strings.ButtonRandomColors}"
                         Style="{StaticResource DialogButtonStyle}"
                         Padding="10,0"
@@ -315,7 +332,7 @@
                      all. This one starts from a primary hue and lifts the
                      saturation ceilings - same readability floors. -->
                 <Button x:Name="DaringButton"
-                        Grid.Column="4"
+                        Grid.Column="5"
                         Style="{StaticResource DialogButtonStyle}"
                         Padding="9,0"
                         Margin="4,0,0,0"
