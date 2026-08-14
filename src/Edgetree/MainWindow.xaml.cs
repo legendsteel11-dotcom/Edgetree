@@ -22874,7 +22874,16 @@ public partial class MainWindow : Window
         // that cannot happen. Copy goes with them: it copies the PATH into a
         // file-drop, and pasting it while the source is held is the same trap
         // one step later. Better refused visibly than failing after the fact.
-        bool fileActions = !showingVideo;
+        //
+        // THE FILE THE ENGINE HOLDS, not "an engine holds something". The old
+        // test (!showingVideo) also went dark for a PICTURE being looked at
+        // while a track played in the background - a file nothing holds open,
+        // whose Del and F2 in the tree worked all along, so the menu was
+        // saying "cannot" about something the keyboard was happily doing
+        // (reported 2026-08-14). The lock argument is about one file; the
+        // refusal now names exactly that one.
+        bool fileActions = !(_viewerVideoPath is { } heldPath
+            && string.Equals(heldPath, item.FullPath, StringComparison.OrdinalIgnoreCase));
         ViewerCutItem.IsEnabled = fileActions;
         ViewerCopyItem.IsEnabled = fileActions;
         ViewerRenameItem.IsEnabled = fileActions;
