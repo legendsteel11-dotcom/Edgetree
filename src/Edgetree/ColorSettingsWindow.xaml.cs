@@ -152,6 +152,7 @@ public partial class ColorSettingsWindow : Window
         RandomButton.IsEnabled = true;
         DaringButton.IsEnabled = true;
         MonoButton.IsEnabled = true;
+        RefreshChainToggles();
         RefreshLabelPreviews();
         UpdateResetButtonEnabled();
     }
@@ -1206,6 +1207,109 @@ public partial class ColorSettingsWindow : Window
     // One place that says which swatch edits which colour, so the left-click
     // picker and this cannot end up disagreeing - or a colour added later be
     // wired to one and not the other.
+    // ----- 체인: 묶어서 한 번에 -----------------------------------------------
+    //
+    // EVERY LIT ROW IS ONE GROUP. Predefined pairs were the first cut - folder
+    // against file at each of the three roles, which is what a random roll
+    // already does - and they were wrong, because a link on every row promises
+    // that the rows YOU light are the ones that move (2026-08-15: two rows lit
+    // in different pairs, and setting one left the other standing). A mark
+    // that appears on a row has to mean something about that row.
+    //
+    // So there is no group table; the chained set is the group. The cost is
+    // that there is exactly ONE chain - names and backgrounds cannot be two
+    // separate links at once - which is the honest first version of this and
+    // the thing to revisit if it ever gets in the way.
+    private Border[]? _colorSwatches;
+
+    private Border[] ColorSwatches => _colorSwatches ??= new[]
+    {
+        FolderNameFontSwatch, FolderNameHighlightFontSwatch, FolderNameHoverFontSwatch,
+        FileNameFontSwatch, FileNameHighlightFontSwatch, FileNameHoverFontSwatch,
+        ShowMoreFontSwatch, HeaderSwatch, HistorySwatch, BackgroundSwatch,
+        ViewerBackgroundSwatch, SelectionSwatch, HoverBackgroundSwatch,
+        GuideLineSwatch, GuideLineActiveSwatch, PanelDividerSwatch,
+        AutoHideHandleSwatch,
+    };
+
+    private bool IsChained(Border swatch)
+        => swatch.Name is { Length: > 0 } name && _settings.ChainedColorRows.Contains(name);
+
+    // The one write. Everything that sets a colour from this window goes
+    // through it - the picker (live, per frame of a drag) and the hex box -
+    // so a linked row cannot be updated by one path and missed by the other.
+    //
+    // A row that is not itself linked moves alone even if its partner is
+    // lit: the link is a property of the PAIR, and reading it any other way
+    // would let an unlit row be dragged along by a lit one.
+    private void SetColorChained(Border swatch, string hex)
+    {
+        WriteColorRow(swatch, hex);
+
+        if (!IsChained(swatch))
+        {
+            return;
+        }
+
+        foreach (var other in ColorSwatches)
+        {
+            if (!ReferenceEquals(other, swatch) && IsChained(other))
+            {
+                WriteColorRow(other, hex);
+            }
+        }
+    }
+
+    private void WriteColorRow(Border swatch, string hex)
+    {
+        if (ColorBindingFor(swatch) is not { } binding)
+        {
+            return;
+        }
+
+        binding.Set(hex);
+        if (ColorConverter.ConvertFromString(hex) is Color color)
+        {
+            swatch.Background = new SolidColorBrush(color);
+        }
+    }
+
+    private void ChainToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Primitives.ToggleButton toggle || toggle.Tag is not string name)
+        {
+            return;
+        }
+
+        if (toggle.IsChecked == true)
+        {
+            if (!_settings.ChainedColorRows.Contains(name))
+            {
+                _settings.ChainedColorRows.Add(name);
+            }
+        }
+        else
+        {
+            _settings.ChainedColorRows.Remove(name);
+        }
+
+        // Linking does NOT pull the rows together on the spot. The press says
+        // "from now on these move as one", and making it also overwrite one of
+        // the two colours would mean a click that quietly threw a colour away
+        // - with no way to know which of the pair was about to win.
+    }
+
+    private void RefreshChainToggles()
+    {
+        foreach (var swatch in ColorSwatches)
+        {
+            if (FindName(swatch.Name + "Chain") is System.Windows.Controls.Primitives.ToggleButton toggle)
+            {
+                toggle.IsChecked = IsChained(swatch);
+            }
+        }
+    }
+
     private (Func<string> Get, Action<string> Set)? ColorBindingFor(Border swatch)
     {
         if (ReferenceEquals(swatch, BackgroundSwatch))
@@ -1322,9 +1426,14 @@ public partial class ColorSettingsWindow : Window
             return;
         }
 
-        binding.Set($"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}");
-        swatch.Background = new SolidColorBrush(color);
-        RefreshHexBox(sender);
+        // The chain paints this row's swatch as well as any linked partner's,
+        // so there is no separate Background write here any more.
+        SetColorChained(swatch, $"#{color.A:X2}{color.R:X2}{color.G:X2}{color.B:X2}");
+        foreach (var other in _hexBoxes)
+        {
+            RefreshHexBox(other);
+        }
+
         UpdateResetButtonEnabled();
         _onChanged();
     }
@@ -1435,7 +1544,9 @@ public partial class ColorSettingsWindow : Window
         }
 
         _pickerSwatch = swatch;
-        _pickerSet = setHex;
+        // Through the chain, not the setter the caller handed in - that one
+        // knows about one row only. See SetColorChained.
+        _pickerSet = hex => SetColorChained(swatch, hex);
         _pickerOriginalHex = getHex();
         _pickerAlpha = current.A;
         (_pickerHue, _pickerSat, _pickerVal) = ToHsv(current);

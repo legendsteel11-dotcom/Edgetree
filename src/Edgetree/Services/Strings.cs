@@ -605,6 +605,9 @@ public static class Strings
     // palette action, which is what that half of the row holds.
     public static string ButtonMonoColors = "모노";
     public static string ButtonMonoColorsTip = "회색톤으로 한 번에";
+    // On every chainable row's link mark. Says the rule that is not obvious -
+    // that BOTH have to be lit - since one lit link on its own does nothing.
+    public static string ColorChainTip = "묶기 · 함께 켠 줄끼리 같은 색";
     // Said as what it GIVES, so the pair reads as a choice rather than as one
     // button and its louder twin: this one lands on combinations that go
     // together, the other one on combinations that do not have to.

@@ -562,6 +562,18 @@ public class AppSettings
     // who wants the row back turns it off in 기본 설정.
     public bool ShowPathBar { get; set; } = true;
 
+    // Which colour rows are LINKED in the colour window - by the swatch name
+    // the hex boxes already address them with. Setting one linked row sets
+    // every other linked row in its group, so a palette can be kept in step
+    // without editing the same colour twice (see ColorSettingsWindow's
+    // ChainGroups). Membership rather than a group switch: the name pairs are
+    // usually wanted joined and the four backgrounds usually are not.
+    //
+    // NOT in presets. A preset carries what the app LOOKS like; this is about
+    // how the colour window edits, and a preset that silently relinked rows
+    // would change what the next edit does rather than what is on screen.
+    public List<string> ChainedColorRows { get; set; } = new();
+
     // The soft veil over the first and last rows of the tree and the side
     // panels, up only while there is more list that way (see MainWindow's
     // UpdateEdgeShades). Lives with the COLOURS rather than in the options

@@ -81,6 +81,77 @@
                     Value="Hand"/>
         </Style>
 
+        <!-- 체인: the rows whose link is lit hold ONE colour between them -
+             set any of them and the rest follow. A lone lit link moves
+             nothing, so turning one off is how a row is held still while the
+             others stay joined.
+
+             It reads the rows the user lit, not a table of pairs the app
+             decided on. That table was the first cut and it broke the promise
+             the mark makes: a link on a row says THAT row can be joined, and
+             two lit rows that happened to sit in different pairs did nothing
+             at all when one of them was set (2026-08-15).
+
+             The mark changes rather than dimming: link when joined, link_off
+             when not, and the accent only on the joined one. An icon at
+             reduced opacity would say "unavailable" here, which is the same
+             mistake the theme buttons already made once and undid. Material
+             Symbols "link" / "link_off", supplied 2026-08-15. -->
+        <Style x:Key="ChainToggleStyle"
+                TargetType="ToggleButton">
+            <Setter Property="Width"
+                    Value="{DynamicResource DialogSwatchHeight}"/>
+            <Setter Property="Height"
+                    Value="{DynamicResource DialogSwatchHeight}"/>
+            <!-- The gap is on the RIGHT: the link sits BEFORE the hex box, so
+                 that the hex box and the swatch line up down the whole window.
+                 Put after them it pushed those two left on the ten rows that
+                 have a link and left the other seven where they were, and the
+                 column read as ragged (2026-08-15). Hanging off the left costs
+                 the label a little width and lines up what the eye follows. -->
+            <Setter Property="Margin"
+                    Value="0,0,6,0"/>
+            <Setter Property="Cursor"
+                    Value="Hand"/>
+            <Setter Property="Background"
+                    Value="Transparent"/>
+            <Setter Property="Foreground"
+                    Value="{DynamicResource DialogForeground}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="3">
+                            <Path x:Name="Mark"
+                                    Data="m754-308-56-55q41.78-11.3 67.89-43.65Q792-439 792-480q0-50-35-85t-85-35H528v-72h144q79.68 0 135.84 56.22 56.16 56.23 56.16 136Q864-425 834.5-379T754-308ZM618-444l-72-72h78v72h-6ZM768-90 90-768l51-51 678 678-51 51ZM432-288H288q-79.68 0-135.84-56.16T96-480q0-63.93 38-113.97Q172-644 242-673l70 73h-23q-51 0-86 35t-35 85q0 50 35 85t85 35h144v72Zm-96-156v-72h56l71 72H336Z"
+                                    Stretch="Uniform"
+                                    Width="{DynamicResource DialogFontSize}"
+                                    Height="{DynamicResource DialogFontSize}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Fill="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked"
+                                    Value="True">
+                                <Setter TargetName="Mark"
+                                        Property="Data"
+                                        Value="M432-288H288q-79.68 0-135.84-56.23Q96-400.45 96-480.23 96-560 152.16-616q56.16-56 135.84-56h144v72H288q-50 0-85 35t-35 85q0 50 35 85t85 35h144v72Zm-96-156v-72h288v72H336Zm192 156v-72h144q50 0 85-35t35-85q0-50-35-85t-85-35H528v-72h144q79.68 0 135.84 56.23 56.16 56.22 56.16 136Q864-400 807.84-344 751.68-288 672-288H528Z"/>
+                                <Setter TargetName="Mark"
+                                        Property="Fill"
+                                        Value="{DynamicResource AccentForeground}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver"
+                                    Value="True">
+                                <Setter Property="Background"
+                                        Value="{DynamicResource HoverBackground}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- The colour code beside each swatch. Requested by mail 2026-07-31:
              Windows' own picker has three RGB number boxes and nowhere to paste
              "#2E7D32" from a browser or a design tool, which is how colours
@@ -337,16 +408,6 @@
                      Wears the same accent stamp as the theme pair when it is
                      on, but unlike that pair it stays clickable - it is a
                      switch, and the press that turns it off has to land. -->
-                <!-- Says the row is two groups: what you are LOOKING at on the
-                     left, what you can DO to it on the right. It rides in the
-                     `*` gap column so it costs no width of its own - the gap
-                     is the one thing in this row that can give pixels back,
-                     and the line sits in the middle of whatever is left. -->
-                <Border Grid.Column="2"
-                        Width="1"
-                        Margin="0,3"
-                        HorizontalAlignment="Center"
-                        Background="{DynamicResource PanelBorder}"/>
                 <Button x:Name="EdgeShadesButton"
                         Grid.Column="3"
                         Content="{x:Static services:Strings.ButtonEdgeShades}"
@@ -362,6 +423,16 @@
                      each colour's luminance keeps every one of those floors
                      with it. Drawing greys directly would have to restate
                      them. -->
+                <!-- Says the row is two groups: what you are LOOKING at on the
+                     left, what you can DO to it on the right. It rides in the
+                     `*` gap column so it costs no width of its own - the gap
+                     is the one thing in this row that can give pixels back,
+                     and the line sits in the middle of whatever is left. -->
+                <Border Grid.Column="2"
+                        Width="1"
+                        Margin="0,3"
+                        HorizontalAlignment="Center"
+                        Background="{DynamicResource PanelBorder}"/>
                 <Button x:Name="MonoButton"
                         Grid.Column="4"
                         Content="{x:Static services:Strings.ButtonMonoColors}"
@@ -441,6 +512,11 @@
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
+                    <ToggleButton x:Name="FolderNameFontSwatchChain"
+                            Tag="FolderNameFontSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="FolderNameFontSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="FolderNameFontSwatch"
@@ -459,6 +535,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="FolderNameHighlightFontSwatchChain"
+                            Tag="FolderNameHighlightFontSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="FolderNameHighlightFontSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="FolderNameHighlightFontSwatch"
@@ -477,6 +558,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="FolderNameHoverFontSwatchChain"
+                            Tag="FolderNameHoverFontSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="FolderNameHoverFontSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="FolderNameHoverFontSwatch"
@@ -495,6 +581,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="FileNameFontSwatchChain"
+                            Tag="FileNameFontSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="FileNameFontSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="FileNameFontSwatch"
@@ -513,6 +604,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="FileNameHighlightFontSwatchChain"
+                            Tag="FileNameHighlightFontSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="FileNameHighlightFontSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="FileNameHighlightFontSwatch"
@@ -531,6 +627,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="FileNameHoverFontSwatchChain"
+                            Tag="FileNameHoverFontSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="FileNameHoverFontSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="FileNameHoverFontSwatch"
@@ -549,6 +650,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="ShowMoreFontSwatchChain"
+                            Tag="ShowMoreFontSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="ShowMoreFontSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="ShowMoreFontSwatch"
@@ -573,6 +679,11 @@
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right">
+                    <ToggleButton x:Name="HeaderSwatchChain"
+                            Tag="HeaderSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="HeaderSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="HeaderSwatch"
@@ -590,6 +701,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="HistorySwatchChain"
+                            Tag="HistorySwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="HistorySwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="HistorySwatch"
@@ -607,6 +723,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="BackgroundSwatchChain"
+                            Tag="BackgroundSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="BackgroundSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="BackgroundSwatch"
@@ -624,6 +745,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="SelectionSwatchChain"
+                            Tag="SelectionSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="SelectionSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="SelectionSwatch"
@@ -642,6 +768,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="HoverBackgroundSwatchChain"
+                            Tag="HoverBackgroundSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="HoverBackgroundSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="HoverBackgroundSwatch"
@@ -659,6 +790,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="GuideLineSwatchChain"
+                            Tag="GuideLineSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="GuideLineSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="GuideLineSwatch"
@@ -676,6 +812,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="GuideLineActiveSwatchChain"
+                            Tag="GuideLineActiveSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="GuideLineActiveSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="GuideLineActiveSwatch"
@@ -693,6 +834,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="PanelDividerSwatchChain"
+                            Tag="PanelDividerSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="PanelDividerSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="PanelDividerSwatch"
@@ -713,6 +859,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="ViewerBackgroundSwatchChain"
+                            Tag="ViewerBackgroundSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="ViewerBackgroundSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="ViewerBackgroundSwatch"
@@ -734,6 +885,11 @@
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="AutoHideHandleSwatchChain"
+                            Tag="AutoHideHandleSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
                     <TextBox Tag="AutoHideHandleSwatch"
                             Style="{StaticResource ColorHexBoxStyle}"/>
                     <Border x:Name="AutoHideHandleSwatch"
