@@ -260,6 +260,8 @@ public static class HelpContent
                 new Group(T("이미지", "Images"), new[]
                 {
                     R("휠", "확대 · 축소", "Wheel", "Zoom in · out"),
+                    R("Ctrl+휠 · Shift+휠", "정밀 확대 축소 - Shift 조합시 더 세밀하게",
+                      "Ctrl+wheel · Shift+wheel", "Precision zoom - finer with Shift"),
                     // SVG has no decoder in Windows at all, so this one is the
                     // shell's answer or nothing - which is why the same file
                     // shows on one PC and not another. Said here rather than
