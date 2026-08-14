@@ -22821,7 +22821,13 @@ public partial class MainWindow : Window
         // same reason in reverse: a zoom chosen for the whole screen is a
         // strange place to drop someone back into a 900px panel.
         _viewerZoom = ViewerRestZoom;
-        _viewerFill = ViewerRestIsFill && _viewerVideoPath is null;
+        // ViewerMediaIsSelection, not "_viewerVideoPath is null" - the fifth
+        // guard in this panel to need the same correction: with background
+        // play the path holds a TRACK while the panel shows a picture, and
+        // the null form read that as "a film is showing" and dropped the fill
+        // rest on every full-screen crossing (reported 2026-08-14, music
+        // playing was the only difference).
+        _viewerFill = ViewerRestIsFill && !ViewerMediaIsSelection;
         ViewerZoomPan.X = 0;
         ViewerZoomPan.Y = 0;
 
