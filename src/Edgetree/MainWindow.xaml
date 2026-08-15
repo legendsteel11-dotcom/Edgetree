@@ -289,6 +289,9 @@
              CompactScale in ApplyLayoutMetrics for the curve. -->
         <Thickness x:Key="FooterChipPadding">5,1</Thickness>
         <Thickness x:Key="FooterChipMargin">0,0,2,0</Thickness>
+        <!-- Lifts the LABEL inside the chip, and it is optical rather than
+             arithmetic - the box is already centred. See ApplyLayoutMetrics. -->
+        <Thickness x:Key="FooterChipTextNudge">0,0,0,2</Thickness>
         <system:Double x:Key="ViewerChipGlyphFontSize">11</system:Double>
         <system:Double x:Key="ViewerChipIconSize">11</system:Double>
         <!-- Every button in the viewer's strip draws the same box, whether it
@@ -2896,7 +2899,8 @@
                                 Padding="{DynamicResource FooterChipPadding}"
                                 SnapsToDevicePixels="True">
                             <TextBlock Text="{TemplateBinding Content}"
-                                    VerticalAlignment="Center"/>
+                                    VerticalAlignment="Center"
+                                    Margin="{DynamicResource FooterChipTextNudge}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"
@@ -3036,7 +3040,8 @@
                                 Padding="{DynamicResource FooterChipPadding}"
                                 SnapsToDevicePixels="True">
                             <TextBlock Text="{TemplateBinding Content}"
-                                    VerticalAlignment="Center"/>
+                                    VerticalAlignment="Center"
+                                    Margin="{DynamicResource FooterChipTextNudge}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"
@@ -3133,7 +3138,8 @@
                                 SnapsToDevicePixels="True">
                             <TextBlock Text="{TemplateBinding Content}"
                                     VerticalAlignment="Center"
-                                    HorizontalAlignment="Center"/>
+                                    HorizontalAlignment="Center"
+                                    Margin="{DynamicResource FooterChipTextNudge}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"

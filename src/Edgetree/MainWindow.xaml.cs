@@ -11439,6 +11439,26 @@ public partial class MainWindow : Window
             Math.Max(1.0, Math.Round(1.0 * compact)));
         Resources["FooterChipMargin"] =
             new Thickness(0, 0, Math.Max(1.0, Math.Round(2.0 * compact)), 0);
+
+        // THE LABEL SITS LOW IN ITS OWN BOX, and no amount of padding fixes it
+        // because the padding is already even - what is uneven is the type
+        // (reported 2026-08-15: "영어는 아래로 가서 박혀 있는데").
+        //
+        // Two things stack up. The chips set no FontFamily, so Korean falls back
+        // to Malgun Gothic while Latin stays on Segoe UI, and the two reserve
+        // different amounts above and below. And the strip's longest Latin label
+        // is "jpg, png, webp…" - j, p and g are all descenders, so the ink hangs
+        // below the baseline and drags the eye's centre of the word down with
+        // it, while a Korean label with no descender at all sits nearer the
+        // middle. Which is exactly the difference reported between the two.
+        //
+        // A bottom margin under a vertically CENTRED element lifts it by half
+        // itself, so this is a half-pixel-per-unit dial and nothing else - the
+        // box, the padding and the chip's height are all untouched. Optical
+        // corrections are the one kind that cannot be derived, so it is one
+        // number in one place, sized off the font so it holds at every zoom.
+        Resources["FooterChipTextNudge"] =
+            new Thickness(0, 0, 0, Math.Max(1.0, Math.Round(chipFontSize * 0.22)));
         // One step back UP, for the two things in the viewer that were drawn
         // deliberately larger than the strip around them: the carousel counter
         // with its chevrons (the caption's primary control) and the transport
