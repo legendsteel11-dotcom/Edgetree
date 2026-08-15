@@ -6796,6 +6796,24 @@ public partial class MainWindow : Window
     private string _lastNavLabel = "-";
     private long _lastNavTicks = long.MinValue / 2;
 
+    // 2026-08-15 신고: "간혹 더보기/접기 시 트리가 튄다." 재현이 안 되는데,
+    // 위의 문턱으로는 잡히지도 않는다 - 사람이 "튄다"고 부르는 것은 몇 행이고
+    // 문턱은 (단위가 행이라) 200행이다. 문턱을 조금 낮추는 것으로는 그 사이를
+    // 다 덮지 못하므로, 신고된 손짓 직후에는 **크기와 무관하게 전부** 남긴다.
+    //
+    // 창이 짧아서 평소에는 조용하다: 이 손짓을 한 뒤 1.5초 안에 일어난 스크롤
+    // 변화만 해당한다. 행이 사라지는 쪽(접기·다시 접기)과 늘어나는 쪽(더 보기)
+    // 둘 다 창을 연다 - 어느 쪽에서 나는지가 아직 확인된 것이 아니다.
+    private const int RevealWatchMs = 1500;
+    private long _lastRevealPressTicks = long.MinValue / 2;
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void NoteRevealPressForScrollWatch(string what)
+    {
+        _lastRevealPressTicks = Environment.TickCount64;
+        _lastTreePressLabel = $"더보기/{what}";
+    }
+
     [System.Diagnostics.Conditional("DEBUG")]
     private void NoteNavigationForScrollWatch(string source, string targetPath)
     {
@@ -6821,10 +6839,29 @@ public partial class MainWindow : Window
 
     private void ScrollJumpWatch_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
+        // THE UNITS HERE ARE ROWS, NOT PIXELS. The tree scrolls by item, so
+        // ViewportHeight is how many rows fit (41 in a normal sidebar) and
+        // VerticalChange is a count of rows. The floor below was reasoned about
+        // as pixels when it was written - "a wheel notch is ~48px, so ordinary
+        // scrolling stays quiet" - and so landed as a floor of TWO HUNDRED
+        // ROWS. That is why this file has only ever carried drive-to-drive
+        // jumps: everything a user would describe as the tree 튀는 것 is an
+        // order of magnitude smaller and never reached the log (2026-08-15).
+        //
+        // A wheel notch moves 3 rows, so 4 is the first count that is not one.
+        // The extent test keeps a high floor - a big extent swing is what
+        // EXPANDING a folder legitimately does, and the symptom under
+        // investigation is the view moving, not the range growing.
         double viewport = e.ViewportHeight;
-        bool bigJump = Math.Abs(e.VerticalChange) > Math.Max(viewport / 2, 200);
+        bool bigJump = Math.Abs(e.VerticalChange) > Math.Max(viewport / 4, 4);
         bool bigExtentSwing = Math.Abs(e.ExtentHeightChange) > Math.Max(viewport, 200);
-        if (!bigJump && !bigExtentSwing)
+
+        // 더보기/접기 직후에는 크기를 묻지 않는다 - RevealWatchMs 참고.
+        long sinceReveal = Environment.TickCount64 - _lastRevealPressTicks;
+        bool watchingReveal = sinceReveal is >= 0 and <= RevealWatchMs
+            && (e.VerticalChange != 0 || e.ExtentHeightChange != 0);
+
+        if (!bigJump && !bigExtentSwing && !watchingReveal)
         {
             return;
         }
@@ -6834,13 +6871,14 @@ public partial class MainWindow : Window
         long sinceGesture = Environment.TickCount64 - _lastTreeUserInputTicks;
 
         LogScrollLine(
-            $"{(bigJump ? "JUMP  " : "EXTENT")}  " +
+            $"{(bigJump ? "JUMP  " : bigExtentSwing ? "EXTENT" : "reveal")}  " +
             $"offset {offsetBefore:F0} -> {e.VerticalOffset:F0} ({e.VerticalChange:+0;-0;0})  " +
             $"extent {extentBefore:F0} -> {e.ExtentHeight:F0} ({e.ExtentHeightChange:+0;-0;0})  " +
             $"viewport {viewport:F0}  " +
             $"toZero={(e.VerticalOffset <= 0.5 ? "yes" : "no")}  " +
             $"wasAtEnd={(offsetBefore + viewport >= extentBefore - 1 ? "yes" : "no")}  " +
             $"sinceGesture={(sinceGesture is < 0 or > 60000 ? "-" : sinceGesture + "ms")}  " +
+            $"sinceReveal={(sinceReveal is < 0 or > RevealWatchMs ? "-" : sinceReveal + "ms")}  " +
             $"nav={(Environment.TickCount64 - _lastNavTicks is < 0 or > 3000 ? "-" : _lastNavLabel)}  " +
             $"lastPress={_lastTreePressLabel}  " +
             $"gap={_bottomGapRows.Count}rows  " +
@@ -12413,6 +12451,17 @@ public partial class MainWindow : Window
         // also select this non-file placeholder row.
         if (treeViewItem.DataContext is FileSystemItem { IsShowMore: true } showMore)
         {
+            // LOGGED HERE because this branch returns before the LogTreeClick
+            // call further down, so until 2026-08-15 a 더보기/접기 press was the
+            // one tree gesture neither instrument could see: click.log never
+            // got a row line for it, and any scroll jump that followed carried
+            // a lastPress= naming whatever had been clicked before it - stale
+            // by seconds or minutes. That is precisely the gesture the "간혹
+            // 더보기/접기 시 트리가 튄다" report points at, so the watch was
+            // blind in exactly the place it was being asked about.
+            LogTreeClick(showMore, onExpander: false, e.ClickCount);
+            NoteRevealPressForScrollWatch(showMore.IsShowLess ? "recollapse" : "reveal");
+
             if (showMore.IsShowLess)
             {
                 // Queued for the same reason the collapse handler queues it:
@@ -27895,8 +27944,18 @@ public partial class MainWindow : Window
         // Carried over to the scroll-jump watch (scrolljump.log), which needs to
         // say WHAT was clicked just before a jump - the reported case was a
         // plain expand on a folder nowhere near the top.
+        bool willCollapse = item?.IsExpanded == true;
         _lastTreePressLabel =
-            $"{item?.Name ?? "(none)"}/{(item?.IsExpanded == true ? "collapse" : "expand")}";
+            $"{item?.Name ?? "(none)"}/{(willCollapse ? "collapse" : "expand")}";
+
+        // A plain folder collapse opens the same close watch a 더보기 press does
+        // (see RevealWatchMs). The report said "더보기/접기" and the two are the
+        // same shape from the scroller's side - rows disappear and the extent
+        // shrinks under a viewport that was sitting somewhere inside them.
+        if (willCollapse)
+        {
+            _lastRevealPressTicks = now;
+        }
 
         // The press point's distance to the window's bottom edge, for the
         // half-visible-row case: presses near the bottom lose their
