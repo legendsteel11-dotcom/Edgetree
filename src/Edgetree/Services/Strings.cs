@@ -387,6 +387,11 @@ public static class Strings
     // it, so borrowing it here would read as leaving pictures out - and
     // pictures are most of what this setting is for.
     public static string MenuOpenMediaInViewer = "더블클릭으로 열기";
+    // "펼치기"이지 "열기"가 아님 - 바로 위 줄의 "열기"는 재생·실행까지 가는
+    // 동사이고, 이쪽은 패널을 펼치기만 할 뿐 아무것도 시작하지 않음. 한 메뉴 안에
+    // 두 줄이 나란히 있으니 같은 낱말을 쓰면 같은 일로 읽힘(2026-08-15).
+    // 닫는 쪽은 만들었다가 뺐음(같은 날, 사용자 판단).
+    public static string MenuViewerFollowsSelection = "자동 펼치기";
     // "쇼" spaced off, matching the way Windows itself writes it. The seconds
     // row says its unit in the label rather than beside the number: the
     // stepper's own digits are already narrow, and every other stepper in this
@@ -935,6 +940,7 @@ public static class Strings
         MenuImageViewer = "Multimedia panel";
         MenuPrecacheThumbnails = "Preload image thumbnails";
         MenuOpenMediaInViewer = "Open on double-click";
+        MenuViewerFollowsSelection = "Expand on selection";
         MenuSlideshow = "Slideshow";
         MenuSlideshowSeconds = "Seconds per picture";
         MenuClearThumbnailCache = "Clean up thumbnail files";

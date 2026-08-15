@@ -101,6 +101,21 @@ public class AppSettings
     // click has previewed the file there anyway.
     public bool OpenMediaInViewer { get; set; } = false;
 
+    // The panel opens on a media file without being asked - "매번..좀
+    // 귀찮군요" (2026-08-15).
+    //
+    // OPENS ONLY. It shut on a non-media file too for the few hours between
+    // being built and being tried, and the author cut that half: opening is a
+    // convenience, closing is a decision, and the panel's width belongs to
+    // whoever set it. Folders were already exempt for the same reason at a
+    // faster rate - a tree is WALKED through them.
+    //
+    // It acts when the selection SETTLES rather than on each change; see
+    // ScheduleViewerAutoToggle for why that distinction is the whole feature.
+    //
+    // Off by default: an app that moves the window on its own has to be asked.
+    public bool ViewerFollowsSelection { get; set; } = false;
+
     // The help window's size, because it is the one dialog here that can be
     // resized and therefore the one someone can have an opinion about. 0 means
     // "never sized by hand" - the window works out its own first size then, and

@@ -7508,6 +7508,11 @@ public partial class MainWindow : Window
                 openMediaInViewer.IsChecked = _settings.OpenMediaInViewer;
             }
 
+            if (FindMenuItem(imageViewer, "viewerFollowsSelection") is { } viewerFollowsSelection)
+            {
+                viewerFollowsSelection.IsChecked = _settings.ViewerFollowsSelection;
+            }
+
             if (FindMenuItem(imageViewer, "viewerSideSwapped") is { } viewerSideSwapped)
             {
                 viewerSideSwapped.IsChecked = _settings.ViewerSideSwapped;
@@ -9454,6 +9459,31 @@ public partial class MainWindow : Window
 
         _settings.OpenMediaInViewer = menuItem.IsChecked;
         _settingsService.Save(_settings);
+    }
+
+    private void ViewerFollowsSelectionMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem)
+        {
+            return;
+        }
+
+        _settings.ViewerFollowsSelection = menuItem.IsChecked;
+        _settingsService.Save(_settings);
+
+        // Turning it ON acts on what is already selected rather than waiting for
+        // the next move: the switch was pressed while looking at something, and
+        // a setting that appears to do nothing until you click elsewhere reads
+        // as broken. Turning it OFF leaves the panel exactly as it stands - it
+        // stops deciding, it does not undo what it decided.
+        if (menuItem.IsChecked)
+        {
+            ScheduleViewerAutoToggle();
+        }
+        else
+        {
+            _viewerAutoTimer?.Stop();
+        }
     }
 
     private void PrecacheThumbnailsMenuItem_Click(object sender, RoutedEventArgs e)
@@ -13713,6 +13743,10 @@ public partial class MainWindow : Window
         // The viewer panel follows the selection (debounced - see the
         // method). A no-op while the panel is closed.
         ScheduleViewerPreview();
+        // And, if asked, OPENS AND SHUTS with it. Here and only here: the
+        // search view has its own way into the panel and a result list is not
+        // a tree being walked.
+        ScheduleViewerAutoToggle();
         // Debounced for a different reason than the preview's: not to spare
         // work, but so a selection the APP moved is overwritten before it can
         // be recorded. See the 트리 히스토리 region.
@@ -18468,6 +18502,94 @@ public partial class MainWindow : Window
     // Not the Debug-only one used by the instrument: this decides behaviour, so
     // it has to exist in Release too.
     private long _lastPreviewRequest;
+
+    // ----- 선택시 패널 열기 (ViewerFollowsSelection) ----------------------------
+    //
+    // WAITS FOR THE SELECTION TO SETTLE, and that is the whole feature rather
+    // than a refinement of it. Opening the panel moves the window - or, with the
+    // swap option on, slides the tree sideways - so acting per selection change
+    // would shove the sidebar about on the way down a folder. The preview above
+    // can afford to act on a near-miss; this cannot.
+    //
+    // 200ms, and the number comes off the measurements already in
+    // ScheduleViewerPreview rather than out of the air: auto-repeat lands at
+    // 38-65ms and deliberate tapping at 110-145ms. 200 is clear of BOTH, so
+    // neither a held arrow key nor a run of taps moves the window - it moves
+    // once, where the hand stopped.
+    //
+    // A FOLDER CHANGES NOTHING, and neither does anything at all once the panel
+    // is up: this only ever opens. The closing half existed for a few hours and
+    // was cut - see ApplyViewerAutoToggle.
+    private System.Windows.Threading.DispatcherTimer? _viewerAutoTimer;
+
+    private void ScheduleViewerAutoToggle()
+    {
+        if (!_settings.ViewerFollowsSelection)
+        {
+            return;
+        }
+
+        // Auto-hidden means there is no sidebar on screen to widen, and popping
+        // it out because a selection moved is not something a size option should
+        // do. OpenViewer declines from a sliver anyway; this keeps the close
+        // side quiet too.
+        if (_settings.IsAutoHidden && !_isAutoHideRevealed)
+        {
+            return;
+        }
+
+        if (_viewerAutoTimer is null)
+        {
+            _viewerAutoTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(200),
+            };
+            _viewerAutoTimer.Tick += (_, _) =>
+            {
+                _viewerAutoTimer!.Stop();
+                ApplyViewerAutoToggle();
+            };
+        }
+
+        _viewerAutoTimer.Stop();
+        _viewerAutoTimer.Start();
+    }
+
+    private void ApplyViewerAutoToggle()
+    {
+        if (!_settings.ViewerFollowsSelection)
+        {
+            return;
+        }
+
+        // Re-asked at the tick rather than captured when the timer started: the
+        // selection is allowed to move all it likes in between, and what matters
+        // is where it came to rest.
+        if (ExplorerTree.SelectedItem is not FileSystemItem
+            { IsPlaceholder: false, IsShowMore: false } item)
+        {
+            return;
+        }
+
+        if (item.IsDirectory || _viewerOpen)
+        {
+            return;
+        }
+
+        // OPENING ONLY. The closing half was built with it and taken out the
+        // same day (2026-08-15, author's call): it is the half that takes the
+        // panel away from someone who did not ask, and the panel's width is
+        // theirs. Opening is a convenience; closing is a decision, and the
+        // handle and the switch already make it a cheap one.
+        //
+        // The same predicate every other door into the panel asks, so a kind the
+        // panel learns to show is a kind this opens for, with nothing to keep in
+        // step - see HasViewerPreview for the times that went wrong.
+        if (HasViewerPreview(item.FullPath))
+        {
+            OpenViewer();
+        }
+    }
 
     private void ScheduleViewerPreview()
     {
