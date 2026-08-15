@@ -27250,7 +27250,23 @@ public partial class MainWindow : Window
     // Re-filtering the whole growing list on every streamed batch would be
     // O(n^2) across a big scan; this throttles the mid-scan re-filter. A final,
     // unthrottled filter always runs once the scan completes.
+    //
+    // A DUTY CYCLE, not an interval, since 2026-08-15 - and the difference is a
+    // frozen app. A fixed 150ms stops throttling anything the moment one pass
+    // takes longer than 150ms: the pass returns already past its own deadline,
+    // the next batch qualifies immediately, and the O(n^2) this was written to
+    // prevent arrives anyway as a livelock. Reported from a NAS share indexing
+    // 399,936 files with one character typed in the box - a thread pegged at
+    // exactly 100% of one core, no log line anywhere, and the UI's own timers
+    // starved out (memory.log simply stopped).
+    //
+    // So the quiet period is measured off what the LAST PASS ACTUALLY COST.
+    // At a factor of 4 the filter can never take more than a fifth of the UI
+    // thread, whatever the index grows to - a pass costing 500ms buys two
+    // seconds of quiet, and the app stays usable while the numbers climb.
+    private const int SearchFilterDutyFactor = 4;
     private int _lastSearchFilterTick;
+    private int _lastSearchFilterCostMs;
 
     // How many file rows the results currently show. Starts at one page and
     // grows by a page each time "더 보기" is clicked; reset to one page whenever
@@ -27954,6 +27970,9 @@ public partial class MainWindow : Window
 
         SetSearchScanning(true);
         _lastSearchFilterTick = 0;
+        // A new scope can be a tenth the size of the last one; carrying its cost
+        // over would hold the first passes back for no reason.
+        _lastSearchFilterCostMs = 0;
         SearchStatusText.Text = string.Format(Strings.SearchStatusScanning, 0);
 
         // Each scan's Progress closure captures its own token, so a stale batch
@@ -27969,11 +27988,19 @@ public partial class MainWindow : Window
             _searchEntries.AddRange(batch);
             SearchStatusText.Text = string.Format(Strings.SearchStatusScanning, _searchEntries.Count);
 
-            int now = Environment.TickCount;
-            if (now - _lastSearchFilterTick > 150 && SearchBox.Text.Trim().Length > 0)
+            int quiet = Math.Max(150, _lastSearchFilterCostMs * SearchFilterDutyFactor);
+            if (Environment.TickCount - _lastSearchFilterTick > quiet &&
+                SearchBox.Text.Trim().Length > 0)
             {
-                _lastSearchFilterTick = now;
+                // Measured, because the throttle above is priced in it.
+                var filterClock = System.Diagnostics.Stopwatch.StartNew();
                 RunSearchFilter(updateStatusWhileScanning: false);
+                _lastSearchFilterCostMs = (int)filterClock.ElapsedMilliseconds;
+                // STAMPED ON THE WAY OUT, not on the way in. Timing the gap from
+                // where the previous pass STARTED lets a pass longer than the
+                // gap spend its own quiet period running, which is half of how
+                // the freeze above got in.
+                _lastSearchFilterTick = Environment.TickCount;
                 // RunSearchFilter would otherwise leave a result count up; put
                 // the scanning progress line back so it stays visible.
                 SearchStatusText.Text = string.Format(Strings.SearchStatusScanning, _searchEntries.Count);
