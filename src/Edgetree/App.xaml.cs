@@ -498,12 +498,34 @@ public partial class App : Application
         }
     }
 
+    // RECOLOURED IN PLACE, not replaced (2026-08-15). Replacing the brush left
+    // every element that had already READ it holding the old one - a
+    // DynamicResource follows the swap, but a brush handed to a property in
+    // code does not. The F1 help is where that showed: it is built once and
+    // kept, and its rows take their colours through FindResource, so a window
+    // built in the dark theme went on drawing #CCCCCC text after the app moved
+    // to the light one - pale grey on white.
+    //
+    // The same lesson SetBrushColor already carries for the tree's own
+    // palette, and the fix belongs here rather than in each window: any code
+    // that reads a chrome brush once is now correct by default.
+    //
+    // The first call still replaces, because a brush declared in XAML arrives
+    // frozen; from then on the instance is ours and can be recoloured.
     private void SetChromeBrush(string resourceKey, string hex)
     {
-        if (ColorConverter.ConvertFromString(hex) is Color color)
+        if (ColorConverter.ConvertFromString(hex) is not Color color)
         {
-            Resources[resourceKey] = new SolidColorBrush(color);
+            return;
         }
+
+        if (Resources[resourceKey] is SolidColorBrush brush && !brush.IsFrozen)
+        {
+            brush.Color = color;
+            return;
+        }
+
+        Resources[resourceKey] = new SolidColorBrush(color);
     }
 
     protected override void OnExit(ExitEventArgs e)
