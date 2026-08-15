@@ -25132,6 +25132,34 @@ public partial class MainWindow : Window
         cell.Requested = false;
     }
 
+    // The formats only the SHELL can draw, and that it draws SLOWLY. Measured
+    // rather than assumed - viewerload.log on a NAS share, 2026-08-15:
+    //
+    //   embedded x 285   avg   60 ms   max    629 ms   none 279
+    //   shell    x  25    avg 2113 ms   max  14590 ms   none 4
+    //
+    // A folder of PSDs failed the cheap embedded-header pass 279 times out of
+    // 285, so every one of them fell through to the shell at two seconds a
+    // piece and fourteen at worst. The strip repainted for minutes and the
+    // 캐싱 중 line flickered as cells landed seconds apart - and the same share
+    // was being indexed for the search at the time, which is the other half of
+    // why it hurt.
+    //
+    // THIS IS NOT "the panel cannot show them". Pressing one still opens the
+    // panel and a cell actually on screen still fetches; what these are kept out
+    // of is the SPECULATIVE walk. Adding PSD and RAW to HasViewerPreview was
+    // right for the one file someone asked for and wrong for a folder of them
+    // nobody has looked at yet, and that is the line this set draws.
+    private static readonly HashSet<string> SlowThumbnailExtensions =
+        new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".psd",
+        ".dng", ".cr2", ".cr3", ".crw", ".nef", ".nrw", ".arw", ".sr2", ".srf",
+        ".orf", ".ori", ".raf", ".rw2", ".rwl", ".pef", ".ptx", ".srw", ".x3f",
+        ".raw", ".mrw", ".dcr", ".dcs", ".kdc", ".k25", ".erf", ".mef", ".mos",
+        ".3fr", ".ari", ".bay", ".cap", ".drf", ".eip", ".fff", ".iiq", ".pxn"
+    };
+
     private FilmstripCell? TrickleCandidate(int index)
     {
         if (index < 0 || index >= _filmstripCells.Count)
@@ -25149,6 +25177,16 @@ public partial class MainWindow : Window
 
         var cell = _filmstripCells[index];
         if (cell.Requested || cell.Thumbnail is not null)
+        {
+            return null;
+        }
+
+        // OFF SCREEN AND EXPENSIVE - the one combination that is never worth
+        // it. On screen, the cell is what someone is looking at and it pays
+        // whatever it costs; ahead of that, a two-second read buys a picture
+        // nobody has asked to see and holds up the ones they have.
+        if ((index < _filmstripTrickleRange.First || index > _filmstripTrickleRange.Last) &&
+            SlowThumbnailExtensions.Contains(Path.GetExtension(cell.Path)))
         {
             return null;
         }
