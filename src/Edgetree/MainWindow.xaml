@@ -303,6 +303,26 @@
              as ViewerCaptionChipRowGap does for the zoom row - and like that
              one it has to track the gap rather than restate it. -->
         <Thickness x:Key="ViewerMediaButtonRowMargin">0,4,-4,0</Thickness>
+        <!-- The multimedia panel's own gaps, all replaced from
+             ApplyLayoutMetrics and all written here at what they hold at the
+             default 12pt font - which is also exactly what the curve returns
+             there, so these numbers are the tuned ones and not an
+             approximation of them. They were literals on the controls
+             themselves until 2026-08-15; the panel then kept every pixel of
+             them while the text shrank, and the small font sizes read as gaps
+             with text in them. -->
+        <Thickness x:Key="ViewerCaptionPanelMargin">10,0,10,10</Thickness>
+        <Thickness x:Key="ViewerCarouselBarMargin">0,4,0,2</Thickness>
+        <Thickness x:Key="ViewerMediaBarMargin">0,8,0,0</Thickness>
+        <Thickness x:Key="ViewerMediaContentPadding">6,5,6,3</Thickness>
+        <system:Double x:Key="ViewerMediaSliderHeight">18</system:Double>
+        <!-- 경로 표시줄. Same story as the block above - see PathBarRow. -->
+        <system:Double x:Key="PathBarFontSize">12</system:Double>
+        <system:Double x:Key="PathBarRowHeight">24</system:Double>
+        <system:Double x:Key="PathBarButtonSize">22</system:Double>
+        <system:Double x:Key="PathBarGlyphSize">12</system:Double>
+        <system:Double x:Key="PathBarListGlyphSize">15</system:Double>
+        <Thickness x:Key="PathBarRowMargin">6,5,6,2</Thickness>
         <Thickness x:Key="FolderRowIconMargin">0,0,6,0</Thickness>
         <Thickness x:Key="FileRowIconMargin">0,0,6,0</Thickness>
         <Thickness x:Key="FileNameMargin">0,0,0,0</Thickness>
@@ -3147,7 +3167,7 @@
             <Setter Property="Focusable"
                     Value="False"/>
             <Setter Property="Height"
-                    Value="18"/>
+                    Value="{DynamicResource ViewerMediaSliderHeight}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
@@ -5058,9 +5078,23 @@
                          the field's outline: they are not part of what the box
                          accepts. The field's three layers carry no Grid.Column
                          and so stay in the star column they always had. -->
+                    <!-- FOLLOWS Ctrl +/- (2026-08-15). Every size in this row
+                         used to be a literal, and the argument for that is
+                         still sound in itself - a row where one control
+                         answered the zoom and the rest did not would read as
+                         broken. What it missed is that the row does not stand
+                         alone: it is the last strip of a sidebar whose tree,
+                         chips and menus all take the zoom, so the row holding
+                         still WAS the odd one out, just at a level up. On a
+                         1920-wide screen, where the font is turned down to fit
+                         the sidebar in a quarter of the width, a 24px strip of
+                         12pt text under a 9pt tree is the tallest thing on the
+                         bottom of the window. So the literals become resources
+                         - all of them together, which is what the original
+                         comment actually asked for. -->
                     <Grid x:Name="PathBarRow"
-                            Margin="6,5,6,2"
-                            Height="24"
+                            Margin="{DynamicResource PathBarRowMargin}"
+                            Height="{DynamicResource PathBarRowHeight}"
                             Visibility="Collapsed">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -5078,7 +5112,7 @@
                                 Text="{x:Static services:Strings.PathBarPlaceholder}"
                                 Foreground="{DynamicResource SecondaryForeground}"
                                 Opacity="0.55"
-                                FontSize="12"
+                                FontSize="{DynamicResource PathBarFontSize}"
                                 IsHitTestVisible="False"
                                 VerticalAlignment="Center"
                                 Margin="7,0,0,0"/>
@@ -5087,7 +5121,7 @@
                                 BorderThickness="0"
                                 Foreground="{DynamicResource DialogForeground}"
                                 CaretBrush="{DynamicResource ForegroundText}"
-                                FontSize="12"
+                                FontSize="{DynamicResource PathBarFontSize}"
                                 Padding="6,0"
                                 VerticalContentAlignment="Center"
                                 TextChanged="PathBarBox_TextChanged"
@@ -5097,11 +5131,10 @@
                                 LostKeyboardFocus="PathBarBox_LostKeyboardFocus"/>
                         <!-- The SAME chevrons the carousel walks a folder with,
                              which is the pair this app already means "one step
-                             either way" by. Sizes are literals here rather than
-                             resources because this whole row is - the box's 12pt
-                             and the row's 24 are literals too, so a button that
-                             followed Ctrl +/- would be the only thing in it that
-                             moved.
+                             either way" by. They take the row's resources for
+                             the reason the row's own comment gives: the whole
+                             strip moves together or none of it does, and it now
+                             moves.
 
                              The style brings its own disabled state (0.45), so
                              the end of the stack shows as a greyed chevron that
@@ -5122,8 +5155,8 @@
                                 Style="{StaticResource ToggleButtonStyle}"
                                 BorderBrush="{DynamicResource ControlBorder}"
                                 BorderThickness="1"
-                                Width="22"
-                                Height="22"
+                                Width="{DynamicResource PathBarButtonSize}"
+                                Height="{DynamicResource PathBarButtonSize}"
                                 Margin="4,0,0,0"
                                 Click="TreeHistoryBackButton_Click"
                                 PreviewMouseRightButtonUp="TreeHistoryChevron_PreviewMouseRightButtonUp"
@@ -5131,16 +5164,16 @@
                             <Path Data="M576-240 336-480l240-240 51 51-189 189 189 189-51 51Z"
                                     Fill="{DynamicResource ForegroundText}"
                                     Stretch="Uniform"
-                                    Width="12"
-                                    Height="12"/>
+                                    Width="{DynamicResource PathBarGlyphSize}"
+                                    Height="{DynamicResource PathBarGlyphSize}"/>
                         </Button>
                         <Button x:Name="TreeHistoryForwardButton"
                                 Grid.Column="2"
                                 Style="{StaticResource ToggleButtonStyle}"
                                 BorderBrush="{DynamicResource ControlBorder}"
                                 BorderThickness="1"
-                                Width="22"
-                                Height="22"
+                                Width="{DynamicResource PathBarButtonSize}"
+                                Height="{DynamicResource PathBarButtonSize}"
                                 Margin="2,0,0,0"
                                 Click="TreeHistoryForwardButton_Click"
                                 PreviewMouseRightButtonUp="TreeHistoryChevron_PreviewMouseRightButtonUp"
@@ -5148,8 +5181,8 @@
                             <Path Data="M522-480 333-669l51-51 240 240-240 240-51-51 189-189Z"
                                     Fill="{DynamicResource ForegroundText}"
                                     Stretch="Uniform"
-                                    Width="12"
-                                    Height="12"/>
+                                    Width="{DynamicResource PathBarGlyphSize}"
+                                    Height="{DynamicResource PathBarGlyphSize}"/>
                         </Button>
                         <!-- The stack the two chevrons walk, as a list. It is the
                              SAME "list_arrow" the search box uses for its own
@@ -5172,16 +5205,21 @@
                                 Style="{StaticResource ToggleButtonStyle}"
                                 BorderBrush="{DynamicResource ControlBorder}"
                                 BorderThickness="1"
-                                Width="22"
-                                Height="22"
+                                Width="{DynamicResource PathBarButtonSize}"
+                                Height="{DynamicResource PathBarButtonSize}"
                                 Margin="2,0,0,0"
                                 Click="TreeHistoryListButton_Click"
                                 ToolTip="{x:Static services:Strings.TreeHistoryList}">
+                            <!-- Its own size, larger than the chevrons': this
+                                 mark carries the "M0-960H960M0 0H960" tail, which
+                                 fits the ink to the whole 960 box and so draws
+                                 smaller than a mark without it at the same
+                                 number. -->
                             <Path Data="M240-192 96-336l50-50 58 57v-391h72v391l57-57 51 50-144 144Zm240-48v-72h384v72H480Zm0-204v-72h384v72H480Zm0-204v-72h384v72H480Z M0-960H960M0 0H960"
                                     Fill="{DynamicResource ForegroundText}"
                                     Stretch="Uniform"
-                                    Width="15"
-                                    Height="15"/>
+                                    Width="{DynamicResource PathBarListGlyphSize}"
+                                    Height="{DynamicResource PathBarListGlyphSize}"/>
                         </Button>
 
                         <!-- Opens UPWARD: this strip sits at the bottom of the
@@ -7315,7 +7353,7 @@
                     </Border>
                     <StackPanel x:Name="ViewerCaptionPanel"
                             Grid.Row="2"
-                            Margin="10,0,10,10">
+                            Margin="{DynamicResource ViewerCaptionPanelMargin}">
                         <!-- Carousel row, < 35 / 257 > ABOVE the caption - the
                              the placement chosen (2026-08-09), and the one that
                              dissolves the recorded conflict: chevrons OVER the
@@ -7353,7 +7391,7 @@
                         <StackPanel x:Name="ViewerCarouselBar"
                                 Orientation="Horizontal"
                                 HorizontalAlignment="Center"
-                                Margin="0,4,0,2"
+                                Margin="{DynamicResource ViewerCarouselBarMargin}"
                                 Visibility="Collapsed">
                             <!-- Material Symbols "chevron_left" / "chevron_right"
                                  (2026-08-10). These two were the
@@ -7662,7 +7700,7 @@
                              as the StackPanel did. -->
                         <Border x:Name="ViewerMediaBar"
                                 Visibility="Collapsed"
-                                Margin="0,8,0,0"
+                                Margin="{DynamicResource ViewerMediaBarMargin}"
                                 SizeChanged="ViewerMediaBar_SizeChanged">
                         <Grid>
                             <!-- The plate is its OWN element behind the row,
@@ -7682,7 +7720,7 @@
                                     CornerRadius="6"
                                     Opacity="0.3"/>
                         <StackPanel x:Name="ViewerMediaContent"
-                                Margin="6,5,6,3">
+                                Margin="{DynamicResource ViewerMediaContentPadding}">
                             <!-- WHICH TRACK IS PLAYING, and only while that is
                                  not the file on screen. The caption above names
                                  what the PANEL is showing, so once background

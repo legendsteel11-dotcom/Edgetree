@@ -47,7 +47,20 @@ public partial class MainWindow : Window
     // still holds a useful amount of a file name. Everything that matters
     // scales off this (see ApplyLayoutMetrics: icons, row padding, indent
     // margins), so the extra steps needed no other layout work.
-    private static readonly double[] TreeFontSizeSteps = { 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+    //
+    // The 8 at the bottom DID need other work. It was added for 1920-wide
+    // screens, where the sidebar is a quarter of the width it is on the screen
+    // this is developed on and the whole chrome wants taking down a size. A 7
+    // went in with it and came straight back out - tried on a 24" FHD panel the
+    // same day and judged one step further than the text stays worth reading.
+    // Two things had to change for the step that stayed:
+    //  · Every "one step smaller" size was written Math.Max(floor, font - n)
+    //    with an absolute floor of 8 or 9 - which INVERTS below the floor, so
+    //    at 7pt the chips and hints came out larger than the text they are
+    //    secondary to. See SecondaryFontSize.
+    //  · Fixed pixel gaps keep their pixels while the text shrinks, so the
+    //    small end read as airy rather than compact. See CompactScale.
+    private static readonly double[] TreeFontSizeSteps = { 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
     private const double DefaultTreeFontSize = 12;
     private const double HeaderHeight = 36;
     private const double FloatingResizeBorder = 6;
@@ -10784,6 +10797,47 @@ public partial class MainWindow : Window
     // metric below is a multiple of.
     private double TreeFontScale => ExplorerTree.FontSize / DefaultTreeFontSize;
 
+    // What a fixed pixel GAP should be multiplied by. Above the default font it
+    // is the plain scale; below it the scale SQUARED, so spacing gives way
+    // ahead of the text.
+    //
+    // The menu's own vertical padding has worked this way since 2026-07-21 and
+    // the reason it gave then is the reason it is now shared: proportionally
+    // equal spacing does not LOOK equal on small text, and someone who has
+    // zoomed the font down is trying to fit more on screen - the breathing room
+    // is what they meant to spend. Everything else kept its pixels while the
+    // text shrank, which is why the small end read as gaps with text in them
+    // (reported 2026-08-15, from a 1920-wide screen).
+    //
+    // EXACTLY 1.0 at the default font, so every gap tuned by eye at 12pt is
+    // still the same number of pixels it was tuned to. Only the zoomed sizes
+    // move. The menu keeps its own pivot of 14 (it is a popup sized against the
+    // screen, not against the sidebar) and is left alone here.
+    private double CompactScale
+    {
+        get
+        {
+            double scale = TreeFontScale;
+            return scale < 1.0 ? scale * scale : scale;
+        }
+    }
+
+    // A size for something SECONDARY to text of `primary` - a chip label, a
+    // hint under a field, the metadata line under a name. This app marks
+    // secondary by size rather than by fading it (see the bookmark panel's
+    // leading number), so these are all `primary` minus a step or two.
+    //
+    // The floor is what needed saying out loud. Written as Math.Max(9, font-3)
+    // the floor holds the size up once the font drops past it - correct as far
+    // as it goes, and it gave "at the smallest font the two meet exactly" for
+    // free while the smallest font WAS 9. With 8 below it, the same expression
+    // hands an 8pt tree a 9pt chip: the secondary thing comes out bigger than
+    // the thing it is secondary to, which is the relationship backwards.
+    // Clamping to `primary` keeps the meet-exactly behaviour and extends it
+    // down the new step instead of inverting.
+    private static double SecondaryFontSize(double primary, double stepsDown, double floor)
+        => Math.Min(primary, Math.Max(floor, primary - stepsDown));
+
     // The vertical padding on every tree AND favorites row: the font-scaled
     // base plus the user's flat "행 간격" offset, clamped at 0 so a small font
     // with the most negative offset can't go negative. Defined here rather than
@@ -10798,12 +10852,22 @@ public partial class MainWindow : Window
     // out as Thicknesses below so no control has to spell one out locally - a
     // local Margin replaces the style's whole Thickness, and that is exactly
     // how 내비게이터 came to sit flush against 필름스트립.
+    // The values AT THE DEFAULT FONT - ApplyLayoutMetrics puts them on the
+    // compact curve from here.
     private const double ViewerChipGap = 4;
     private const double ViewerChipGroupGap = 10;
 
     private void ApplyLayoutMetrics()
     {
         double scale = TreeFontScale;
+        double compact = CompactScale;
+
+        // The strip's two gaps, on the curve. Floored at a pixel and two: a gap
+        // that rounds to nothing stops being a gap, and the group gap has to
+        // stay visibly the larger of the two or the row loses its grouping at
+        // exactly the size where the chips are hardest to tell apart.
+        double chipGap = Math.Max(1.0, Math.Round(ViewerChipGap * compact));
+        double chipGroupGap = Math.Max(2.0, Math.Round(ViewerChipGroupGap * compact));
 
         // Rounded to whole pixels rather than left fractional. The source PNGs
         // are 32x32 being scaled down, which is clean at the default font
@@ -10821,7 +10885,8 @@ public partial class MainWindow : Window
         // names below ten and above it still share one left edge; a third digit
         // simply pushes the column, which is rarer than it is worth reserving
         // room for.
-        double panelNumberFontSize = Math.Max(9.0, Math.Round(ExplorerTree.FontSize) - 2);
+        double panelNumberFontSize =
+            SecondaryFontSize(Math.Round(ExplorerTree.FontSize), stepsDown: 2, floor: 9.0);
         Resources["PanelNumberFontSize"] = panelNumberFontSize;
 
         // Two digits' worth, so rows below ten and above it share one left
@@ -10917,7 +10982,7 @@ public partial class MainWindow : Window
         // number here shows up as the whole row sitting off-centre.
         Resources["ViewerCaptionRowGap"] = new Thickness(0, verticalPadding, 0, 0);
         Resources["ViewerCaptionChipRowGap"] =
-            new Thickness(0, verticalPadding, -ViewerChipGap, 0);
+            new Thickness(0, verticalPadding, -chipGap, 0);
 
         // Not scaled by the font like the metrics around it: this is a pointer
         // target, so it wants to stay the size the user picked regardless of
@@ -10931,6 +10996,35 @@ public partial class MainWindow : Window
         // the "행 간격" option and font zoom move them in step), just with the
         // wider horizontal padding the results list already had.
         Resources["SearchRowPadding"] = new Thickness(8, verticalPadding, 8, verticalPadding);
+
+        // 경로 표시줄 (see PathBarRow, which held every one of these as a
+        // literal until 2026-08-15 - its comment has the why).
+        //
+        // FULL font size, not a step down: the box holds a path the user reads
+        // and types into, which is content rather than chrome. The row around
+        // it is what shrinks.
+        double pathBarFont = ExplorerTree.FontSize;
+        Resources["PathBarFontSize"] = pathBarFont;
+        // The text's own line box (~1.34x for the UI font) plus air, the air on
+        // the compact curve. 24 at the default font, which is what the strip was
+        // drawn at and tuned to. The 4px floor under the air is what keeps 7pt
+        // from squeezing the box down onto the letters: the curve is meant to
+        // take the ROOM out of a small row, not the row.
+        double pathBarAir = Math.Max(4.0, 8.0 * CompactScale);
+        double pathBarHeight = Math.Round(pathBarFont * 1.34 + pathBarAir);
+        Resources["PathBarRowHeight"] = pathBarHeight;
+        // 2px inside the row, so the outline of a button and the outline of the
+        // field beside it stay the same height - they read as one strip and any
+        // difference between them shows up as a step in that line.
+        Resources["PathBarButtonSize"] = Math.Max(12.0, pathBarHeight - 2.0);
+        Resources["PathBarGlyphSize"] = Math.Round(pathBarFont);
+        Resources["PathBarListGlyphSize"] = Math.Round(pathBarFont * 1.25);
+        // The 5-above/2-below split is deliberate and stays a split - see the
+        // XAML's own comment for the move that produced it. Only its size
+        // follows the font; the horizontal 6 lines the strip up with the chips
+        // under it and has nothing to do with the text.
+        Resources["PathBarRowMargin"] = new Thickness(
+            6, Math.Round(5.0 * CompactScale), 6, Math.Round(2.0 * CompactScale));
 
         double tabSpacing = Math.Clamp(_settings.TabSpacing, 4, 24);
         Resources["TabSpacingWidth"] = new GridLength(tabSpacing);
@@ -10981,7 +11075,8 @@ public partial class MainWindow : Window
         // zoom). Bound as DynamicResource in the results DataTemplate.
         double searchFileFont = ExplorerTree.FontSize;
         Resources["SearchFileFontSize"] = searchFileFont;
-        Resources["SearchHeaderFontSize"] = Math.Max(searchFileFont - 1, 8.0);
+        Resources["SearchHeaderFontSize"] =
+            SecondaryFontSize(searchFileFont, stepsDown: 1, floor: 8.0);
 
         // Menus (context menus + the options menu) render in their own popup
         // windows outside the tree's visual tree, so nothing above reaches
@@ -11056,7 +11151,10 @@ public partial class MainWindow : Window
         //
         // Floored at 9 so the small end stays legible, which also gives the
         // user's other request for free: at the smallest tree font the two meet
-        // exactly rather than the strip shrinking past readable.
+        // exactly rather than the strip shrinking past readable. That last part
+        // is now SecondaryFontSize's clamp rather than a property of the floor
+        // happening to sit on the smallest step - see it for what went wrong
+        // once 8 and 7 were added below.
         //
         // ONE number for both strips, and it is read in FooterFilterChipStyle /
         // FooterActionChipStyle rather than applied per chip in code, so the
@@ -11064,7 +11162,8 @@ public partial class MainWindow : Window
         // could not before was the fixed-width readouts - ViewerZoomText's 34
         // and the media time - and both now reserve their width with a hidden
         // twin, which grows with the font instead of being cut for one size.
-        double chipFontSize = Math.Max(9.0, ExplorerTree.FontSize - 3.0);
+        double chipFontSize =
+            SecondaryFontSize(ExplorerTree.FontSize, stepsDown: 3, floor: 9.0);
         Resources["FooterChipFontSize"] = chipFontSize;
         // One step back UP, for the two things in the viewer that were drawn
         // deliberately larger than the strip around them: the carousel counter
@@ -11098,18 +11197,47 @@ public partial class MainWindow : Window
         // carries it and smaller still when only one does.
         Resources["ViewerChipWideIconSize"] = chipIconSize * 4.0 / 3.0;
         Resources["ViewerChipBoxHeight"] = chipIconSize + 6.0;
-        Resources["ViewerChipMargin"] = new Thickness(0, 0, ViewerChipGap, 0);
+        Resources["ViewerChipMargin"] = new Thickness(0, 0, chipGap, 0);
         Resources["ViewerChipGroupMargin"] =
-            new Thickness(ViewerChipGroupGap, 0, ViewerChipGap, 0);
+            new Thickness(chipGroupGap, 0, chipGap, 0);
         Resources["ViewerMediaButtonRowMargin"] =
-            new Thickness(0, 4, -ViewerChipGap, 0);
+            new Thickness(0, Math.Round(4.0 * compact), -chipGap, 0);
+
+        // ----- 멀티미디어 패널의 고정 여백들 ------------------------------------
+        //
+        // These were pixels written into the XAML and tuned by eye at the
+        // default font, so at 9pt and below the panel came out as gaps with
+        // text in them ("행간이 비어보임", 2026-08-15). They keep their tuned
+        // values at 12pt exactly - CompactScale is 1.0 there - and only the
+        // zoomed sizes move.
+        //
+        // The transport's band above it, and the padding inside the band.
+        Resources["ViewerMediaBarMargin"] = new Thickness(0, Math.Round(8.0 * compact), 0, 0);
+        Resources["ViewerMediaContentPadding"] = new Thickness(
+            6, Math.Round(5.0 * compact), 6, Math.Max(1.0, Math.Round(3.0 * compact)));
+        // The seek bar. 18px is a POINTER TARGET as much as a control - the
+        // whole band takes the click, which is what stopped the strip demanding
+        // the cursor hit a 3-pixel line (2026-08-09). So it comes down with the
+        // font but stops well above the 3px bar it draws inside itself.
+        Resources["ViewerMediaSliderHeight"] = Math.Max(11.0, Math.Round(18.0 * compact));
+        // The caption block's own frame, and the carousel row above the name.
+        // The carousel's 4-above/2-below pair sums to 6 by design (see the
+        // XAML) - rounding each separately can break that sum by a pixel, so
+        // the bottom is worked out as the remainder.
+        double carouselTop = Math.Round(4.0 * compact);
+        double carouselTotal = Math.Round(6.0 * compact);
+        Resources["ViewerCarouselBarMargin"] = new Thickness(
+            0, carouselTop, 0, Math.Max(0, carouselTotal - carouselTop));
+        Resources["ViewerCaptionPanelMargin"] = new Thickness(
+            10, 0, 10, Math.Round(10.0 * compact));
 
         var appResources = Application.Current.Resources;
         appResources["MenuFontSize"] = ExplorerTree.FontSize;
         // The "해제" chip on a list row (MenuRowActionButtonStyle). Follows the
         // zoom like everything else, one step down and floored so it stays
         // legible at the smallest tree font.
-        double menuChipFontSize = Math.Max(9.0, ExplorerTree.FontSize - 2.0);
+        double menuChipFontSize =
+            SecondaryFontSize(ExplorerTree.FontSize, stepsDown: 2, floor: 9.0);
         appResources["MenuChipFontSize"] = menuChipFontSize;
         // The middle of every stepper row in a menu, whether it holds a number
         // or a mark. ONE width, so the − and + land in the same two places on
@@ -11129,7 +11257,12 @@ public partial class MainWindow : Window
         appResources["MenuStepperMarkMargin"] =
             new Thickness(Math.Max(0, (stepperValueWidth - stepperButtonSize) / 2), 0,
                           Math.Max(0, (stepperValueWidth - stepperButtonSize) / 2), 0);
-        appResources["MenuGestureFontSize"] = Math.Max(8.0, Math.Round(11.0 * scale));
+        // Not SecondaryFontSize: this one is a fraction of the menu font rather
+        // than a fixed number of steps below it. Same clamp for the same
+        // reason though - the 8 floor meets the font exactly at the smallest
+        // step, and would pass it if a smaller one were ever added.
+        appResources["MenuGestureFontSize"] =
+            Math.Min(ExplorerTree.FontSize, Math.Max(8.0, Math.Round(11.0 * scale)));
         // The dialogs (색상 설정, 앱 정보) live in their own windows, so nothing
         // of the tree's zoom reached them - they stayed at a hardcoded 12pt in a
         // 300px frame however large the rest of the app had been made. Someone
@@ -11166,7 +11299,8 @@ public partial class MainWindow : Window
         // "#RRGGBB" with room to spare, and the hint a step smaller - set apart
         // by size, never by fading.
         appResources["DialogHexInputWidth"] = Math.Round(70.0 * scale);
-        appResources["DialogHintFontSize"] = Math.Max(9.0, ExplorerTree.FontSize - 2.0);
+        appResources["DialogHintFontSize"] =
+            SecondaryFontSize(ExplorerTree.FontSize, stepsDown: 2, floor: 9.0);
         // Lines the title up with the body below it, which sits at 16 - it had
         // been at 10, close enough to look like a near-miss rather than a
         // choice.
@@ -11222,7 +11356,8 @@ public partial class MainWindow : Window
             new Thickness(0, 0, 0, Math.Ceiling(ExplorerTree.FontSize * 0.13));
         // The thumbnail's info/date lines: one zoom step (1pt) below the menu
         // text - it's metadata under a picture, not a menu item.
-        appResources["MenuThumbnailInfoFontSize"] = Math.Max(8.0, ExplorerTree.FontSize - 1.0);
+        appResources["MenuThumbnailInfoFontSize"] =
+            SecondaryFontSize(ExplorerTree.FontSize, stepsDown: 1, floor: 8.0);
         // The context menu's image-thumbnail slot (see UpdateThumbnailRow):
         // 4:3, sized to roughly fill the menu's own width at any font zoom.
         // The MAX matters as much as the min: the slot's Image reports the
