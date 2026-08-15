@@ -23330,6 +23330,10 @@ public partial class MainWindow : Window
         // screen is one of those. Widened from "playing" to "a video at all" so
         // the chip beside it can simply not be there for films.
         if (!_settings.ViewerNavigator ||
+            // Away while a show runs, with the strip - see ApplySlideshowChrome.
+            // Nothing to navigate: the picture arrives fitted and leaves a few
+            // seconds later, and a map of it is a plate over a photograph.
+            _slideshowDriving ||
             IsViewerShowingVideo ||
             _viewerPixelWidth <= 0 ||
             ViewerImage.Source is null ||
@@ -24478,7 +24482,10 @@ public partial class MainWindow : Window
     // move the highlight.
     private void UpdateFilmstrip(List<FileSystemItem>? items)
     {
-        bool show = _settings.ViewerFilmstrip && items is { Count: > 0 };
+        // Away while a show runs - see ApplySlideshowChrome. The CHIP is not
+        // touched: the setting is still on, the show is just borrowing the
+        // room, and unchecking it here would mean the strip never came back.
+        bool show = _settings.ViewerFilmstrip && items is { Count: > 0 } && !_slideshowDriving;
         ViewerFilmstripHost.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         ViewerFilmstripChip.IsChecked = _settings.ViewerFilmstrip;
         if (!show)
@@ -26110,9 +26117,56 @@ public partial class MainWindow : Window
             ShowViewerItemWithoutTree(images[0]);
         }
 
+        // THE SHOW RUNS AT 자름맞춤. A show fills the panel with the picture -
+        // 맞춤 leaves a band of background above and below every portrait, and
+        // a run of mixed shapes then reads as the panel resizing itself rather
+        // than as one picture after another. The REST state is what to set, not
+        // this one picture's zoom: every slide arrives at the rest, so setting
+        // the zoom alone would last exactly one tick.
+        //
+        // Put back when the show stops - it is borrowed, like the strip and the
+        // navigator (see ApplySlideshowChrome). Unless a chip is pressed while
+        // the show runs, which is the user overruling it (SetViewerRestByHand).
+        _slideshowRestBefore = _viewerRest;
+        SetViewerRest(ViewerRestMode.Fill);
+
         _slideshowTimer ??= CreateSlideshowTimer();
         _slideshowTimer.Interval = TimeSpan.FromSeconds(SlideshowSeconds);
         _slideshowTimer.Start();
+
+        ApplySlideshowChrome();
+    }
+
+    // The rest state the show found the panel in, held for its return.
+    private ViewerRestMode? _slideshowRestBefore;
+
+    // WHAT THE SHOW PUTS AWAY WHILE IT RUNS, and hands back when it stops
+    // (2026-08-16). The thumbnail bar and the navigator are both about FINDING
+    // a picture - one shows which neighbours there are, the other which part of
+    // this one you are on - and a show is the one time nobody is looking for
+    // anything. They are chrome in front of a photo frame, and the strip is
+    // also the panel's most expensive resident per selection, so a show that
+    // changes picture every few seconds is exactly when not to pay for it.
+    //
+    // Their own switches are untouched: this is the show borrowing the panel,
+    // not a setting being changed under the user. Both chips stay lit and both
+    // come straight back when it stops.
+    //
+    // Called on both crossings rather than left to the next selection change,
+    // because a show can start and stop without one: STARTING while already
+    // standing on a picture moves nothing, and STOPPING lands the tree on the
+    // picture it left off at - which is not a change at all when the show only
+    // ran a tick.
+    private void ApplySlideshowChrome()
+    {
+        // The strip's own gate reads _slideshowDriving (see UpdateFilmstrip);
+        // this is what re-asks it.
+        //
+        // The CLOCK is not here. It answers to F9 alone and stays through both
+        // crossings - a clock that came and went with the show would be a
+        // second switch nobody pressed.
+        UpdateViewerCarousel();
+        UpdateViewerNavigator();
     }
 
     private System.Windows.Threading.DispatcherTimer CreateSlideshowTimer()
@@ -26165,6 +26219,18 @@ public partial class MainWindow : Window
                 SelectVisibleItem(shown);
             }
         }
+
+        // The 자름맞춤 the show borrowed, handed back. Before the chrome, so the
+        // picture is already reframed when the strip comes in under it.
+        if (_slideshowRestBefore is { } restBefore)
+        {
+            _slideshowRestBefore = null;
+            SetViewerRest(restBefore);
+        }
+
+        // After the flags are down, so the strip and the navigator ask their
+        // gates in the stopped state and come back.
+        ApplySlideshowChrome();
 
         if (wasRunning)
         {
@@ -26724,11 +26790,22 @@ public partial class MainWindow : Window
 
     // The three chips are the ONLY things that move the remembered rest
     // state - see _viewerRest.
-    private void ViewerFitChip_Click(object sender, RoutedEventArgs e) => SetViewerRest(ViewerRestMode.Fit);
+    private void ViewerFitChip_Click(object sender, RoutedEventArgs e) => SetViewerRestByHand(ViewerRestMode.Fit);
 
-    private void ViewerActualChip_Click(object sender, RoutedEventArgs e) => SetViewerRest(ViewerRestMode.Actual);
+    private void ViewerActualChip_Click(object sender, RoutedEventArgs e) => SetViewerRestByHand(ViewerRestMode.Actual);
 
-    private void ViewerFillChip_Click(object sender, RoutedEventArgs e) => SetViewerRest(ViewerRestMode.Fill);
+    private void ViewerFillChip_Click(object sender, RoutedEventArgs e) => SetViewerRestByHand(ViewerRestMode.Fill);
+
+    // A chip pressed WHILE A SHOW RUNS is the user overruling the 자름맞춤 the
+    // show set for itself, so the show stops owing them the old one back - it
+    // would otherwise undo their press the moment the show ended. The chips do
+    // not stop the show (nothing on the zoom row does; the hand-arrives rule is
+    // about the picture and the tree), which is what makes this reachable.
+    private void SetViewerRestByHand(ViewerRestMode rest)
+    {
+        _slideshowRestBefore = null;
+        SetViewerRest(rest);
+    }
 
     private void SetViewerRest(ViewerRestMode rest)
     {
