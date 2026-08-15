@@ -228,17 +228,17 @@ version out of the exe it packages, so bumping the csproj is enough.
 
 ### v1.7.1 (2026-08-07)
 
-- Fixed the app closing unexpectedly in rare cases while the sidebar slides
-  open, seen with a shortened sidebar and auto-hide together
+- Fixed the app closing unexpectedly in rare cases while it slides
+  open, seen with a shortened band and auto-hide together
 
 ### v1.7.0 (2026-08-07)
 
-- **A sidebar that need not fill the screen**: drag the docked sidebar's top or
+- **It need not fill the screen**: drag the docked app's top or
   bottom edge to set how much of the screen edge it takes. The top edge moves it
   as well, so where it sits and how tall it is come out of one gesture, and a
   double-click on either edge goes back to the full edge. It is kept as a share
   of the work area rather than in pixels, so a different monitor does not undo
-  it, and the auto-hide handle and bar measure from that band — a sidebar
+  it, and the auto-hide handle and bar measure from that band — a window
   occupying the top third leaves its handle in that third
 - **A first run starts with the handle**: a machine with no settings yet opens
   with the short handle at the middle of the screen edge instead of a bar down
@@ -264,14 +264,14 @@ version out of the exe it packages, so bumping the csproj is enough.
   restore a maximized one
 - **The update mark reaches the tray icon**: a red dot on the icon and a line
   at the top of its menu. The dot on the options button is out of sight while
-  the sidebar is hidden or in the tray, which is exactly when this matters
+  the app is hidden or in the tray, which is exactly when this matters
 - Fixed a new folder being created with a Korean name on an English install,
   and the row you picked up losing its selection mid-drag
 
 ### v1.5.0 (2026-08-04)
 
 - **Colour picker**: clicking a swatch in Color Settings opens the app's own
-  picker, and the sidebar takes each colour as the handle moves
+  picker, and the app takes each colour as the handle moves
 - **Export and import the colours on their own**: the palette travels as one
   file, so another PC can be set up to match
 - **Click a bookmark's ribbon to release it**, at the right edge of the row
@@ -337,7 +337,7 @@ version out of the exe it packages, so bumping the csproj is enough.
   hands the location elsewhere
 - Also: the bookmark list is available from the right-click menu too, and a
   search that finds nothing says how old its index is. Fixed: clicking the first
-  row of the search results, dragging a scrollbar out of an auto-hidden sidebar,
+  row of the search results, dragging a scrollbar out of an auto-hidden window,
   and the Insert key interfering with Korean input
 
 ### v1.3.5 (2026-07-30)
@@ -386,7 +386,7 @@ version out of the exe it packages, so bumping the csproj is enough.
 ### v1.3.2 (2026-07-26)
 
 - **Drag onto the hidden edge to open it**: drag a file from another window,
-  rest it on the thin bar at the screen edge for a moment, and the sidebar
+  rest it on the thin bar at the screen edge for a moment, and the app
   opens so you can drop it on the folder you want. Brushing past leaves it
   closed
 - **Network drives (NAS and the like) hold up**: the window keeps working
@@ -406,7 +406,7 @@ version out of the exe it packages, so bumping the csproj is enough.
 ### v1.3.1 (2026-07-25)
 
 - **Always on top**: now in effect from the moment the app starts, and an
-  auto-hidden sidebar can no longer end up behind another window with its
+  auto-hidden window can no longer end up behind another window with its
   sliver unresponsive
 - **Favorites**: clicking a favorite you are already on brings that folder
   back to the top, however far the tree has been scrolled since

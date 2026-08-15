@@ -119,7 +119,7 @@ export const changelog: ChangelogEntry[] = [
     ],
     en: [
       'Image slideshow (right-click a picture, or F8)',
-      'Set a different wallpaper on each monitor (whichever one the sidebar is on)',
+      'Set a different wallpaper on each monitor (whichever one the app is on)',
       'A row half-clipped at the bottom of the panel now takes one click',
       'Fixed: un-picking one of several selected rows could sometimes clear the whole selection',
       'Fixed: a favorite or bookmark did not always land at the top after the jump',
@@ -253,22 +253,22 @@ export const changelog: ChangelogEntry[] = [
     version: 'v1.7.1',
     ko: [
       'v1.7.0에 이어진 안정성 수정입니다 — 새 기능은 아래 v1.7.0 항목을 봐 주세요',
-      '사이드바가 펼쳐지는 순간 드물게 앱이 종료될 수 있던 문제를 수정했습니다',
+      '앱이 펼쳐지는 순간 드물게 종료될 수 있던 문제를 수정했습니다',
     ],
     en: [
       'A stability follow-up to v1.7.0 — see below for what that release added',
-      'Fixed the app closing unexpectedly in rare cases as the sidebar slides open',
+      'Fixed the app closing unexpectedly in rare cases as it slides open',
     ],
   },
   {
     version: 'v1.7.0',
     ko: [
-      '사이드바가 화면 높이를 다 쓰지 않아도 됩니다 — 위/아래 가장자리를 끌어 조정',
+      '앱이 화면 높이를 다 쓰지 않아도 됩니다 — 위/아래 가장자리를 끌어 조정',
       '처음 설치하면 가장자리 가운데의 손잡이로 시작합니다',
       '버그 수정 및 성능 최적화',
     ],
     en: [
-      'The sidebar no longer has to fill the screen — drag its top or bottom edge',
+      'The app no longer has to fill the screen — drag its top or bottom edge',
       'A fresh install starts with the handle at the middle of the screen edge',
       'Refinements and bug fixes',
     ],
@@ -294,13 +294,13 @@ export const changelog: ChangelogEntry[] = [
   {
     version: 'v1.5.0',
     ko: [
-      '색상 피커 — 선택하는 대로 사이드바에 바로 적용',
+      '색상 피커 — 선택하는 대로 앱에 바로 적용',
       '색상만 따로 내보내고 불러오기 — 다른 PC에서도 같은 색으로',
       '북마크 표시를 눌러 바로 해제',
       '파일 종류나 표시 개수를 바꿔도 보던 자리 그대로',
     ],
     en: [
-      'A colour picker that applies to the sidebar as you drag it',
+      'A colour picker that applies to the app as you drag it',
       'Export and import the colours on their own — same palette on another PC',
       "Click a bookmark's ribbon to release it",
       'Changing the file filter or the row count keeps your place in the tree',

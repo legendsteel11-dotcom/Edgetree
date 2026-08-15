@@ -61,7 +61,11 @@ public static class HelpContent
     public static IReadOnlyList<Section> Build() => new[]
     {
         new Section(
-            T("사이드바", "The sidebar"),
+            // "사이드바"였다가 2026-08-16에 바꿈 - 공식 명칭이 아님. 바로 다음
+            // 절이 창 모드이므로, 이 절은 그 반대편(도킹된 기본 모습)이 아니라
+            // 앱 자체를 다루는 자리로 읽히는 것이 맞음 - 트레이·핀·너비·높이가
+            // 다 여기 있음.
+            T("앱", "The app"),
             new[]
             {
                 new Group(string.Empty, new[]
@@ -76,8 +80,8 @@ public static class HelpContent
                     // stopped working for them. Both of these open the sidebar
                     // fully, not to the handle, which is why the row says 펼치기
                     // rather than 표시.
-                    R("트레이 아이콘 클릭 · 프로그램 다시 실행", "숨은 사이드바 다시 펼치기",
-                      "Click the tray icon, or run the app again", "Opens a hidden sidebar back up"),
+                    R("트레이 아이콘 클릭 · 프로그램 다시 실행", "숨은 앱 다시 펼치기",
+                      "Click the tray icon, or run the app again", "Opens a hidden app back up"),
                     R("핀 클릭", "고정하기 ↔ 자동 숨김",
                       "Click the pin", "Stay open ↔ auto-hide"),
                     // Three answers under one button, so the row is split rather
@@ -91,7 +95,11 @@ public static class HelpContent
                     // and the dash is what says they belong to the row above.
                     R("  - 트레이 옵션 켜짐", "트레이로 최소화",
                       "  - Tray option on", "Minimise to the tray"),
-                    R("  - 트레이 꺼짐 · 사이드바", "숨김",
+                    // NOT 앱 here, unlike the rows around it: this half of the
+                    // row is a CONDITION, and the condition is which mode the
+                    // window is in - the English side has said 도킹 all along
+                    // and only the Korean was calling it 사이드바.
+                    R("  - 트레이 꺼짐 · 도킹 상태", "숨김",
                       "  - Tray off, docked", "Hide it"),
                     R("  - 트레이 꺼짐 · 창 모드", "작업 표시줄로 최소화",
                       "  - Tray off, window mode", "Minimise to the taskbar"),
@@ -302,8 +310,8 @@ public static class HelpContent
                     // lands on is a rule someone has to be told, because
                     // nothing on screen says the sidebar's own display is the
                     // one being set.
-                    R("우클릭 → 배경 설정", "사이드바가 있는 모니터의 배경화면으로 지정",
-                      "Right-click → Set as wallpaper", "Sets it on the monitor the sidebar is on"),
+                    R("우클릭 → 배경 설정", "앱이 위치한 모니터의 배경화면으로 지정",
+                      "Right-click → Set as wallpaper", "Sets it on the monitor the app is on"),
                 }),
 
                 new Group(T("영상", "Film"), new[]

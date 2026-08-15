@@ -317,7 +317,9 @@ public static class Strings
     // those go to the tray, this puts the sidebar away in whichever way the
     // current mode offers (tray, auto-hide, or minimise). It wore the menu's
     // words until 2026-08-11 and so promised the tray in two modes out of three.
-    public static string ToolTipPutAway = "사이드바 치우기";
+    // "사이드바"였다가 2026-08-16에 바꿈 - 공식 명칭이 아니라서. 앱이 스스로를
+    // 부르는 말은 화면에 나오는 모든 자리에서 하나여야 함.
+    public static string ToolTipPutAway = "앱 치우기";
     public static string ToolTipClose = "종료";
     public static string RootPathLabel = "내 PC";
 
@@ -931,7 +933,7 @@ public static class Strings
         ToolTipOptions = "Options";
         ToolTipUpdateAvailable = "Version {0} available for download";
         ToolTipMinimize = "Minimize to Tray";
-        ToolTipPutAway = "Put the sidebar away";
+        ToolTipPutAway = "Put the app away";
         ToolTipClose = "Exit";
         RootPathLabel = "This PC";
         MenuThumbnailMaxSize = "Max thumbnail size";

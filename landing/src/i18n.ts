@@ -253,7 +253,7 @@ const dict = {
         },
         {
           title: 'Docking',
-          desc: 'Anchors to the left or right edge of your screen, always ready — switch sides anytime from the options menu. Hiding leaves either a short handle or a bar down the whole edge, and you can set how tall the docked sidebar is and where it sits.',
+          desc: 'Anchors to the left or right edge of your screen, always ready — switch sides anytime from the options menu. Hiding leaves either a short handle or a bar down the whole edge, and you can set how tall it is when docked, and where it sits.',
         },
         {
           title: 'File type filter',
