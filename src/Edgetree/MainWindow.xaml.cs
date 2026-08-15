@@ -4919,6 +4919,20 @@ public partial class MainWindow : Window
         FavoritesRowDef.Height = new GridLength(contentHeight);
         _settings.FavoritesPanelHeight = contentHeight;
 
+        // AND ASK AGAIN ONCE IT HAS SETTLED, for the reason the startup path
+        // does (see UpdateFavoritesPanelVisibility). This one is called straight
+        // after ApplyLayoutMetrics has swapped the row padding, which is the
+        // worst moment to measure a row: ComputeFavoritesContentHeight forces
+        // the pending layout pass through first, and even so the number it gets
+        // is the one this file has twice found to be a pixel per row short.
+        //
+        // Fitting on a stale measurement leaves the gap it was called to close -
+        // shrinking the font left the panel at very nearly its old height with
+        // the list ending half way up it (reported 2026-08-15). Growing was
+        // fine, which is the tell: too big a number is absorbed by the
+        // Math.Min against the content, and too small a one is not.
+        QueueFavoritesHeightRecheck();
+
         // The fitted height fits every item, so nothing is actually scrolled
         // out of view anymore - but a scroll offset from before the resize
         // (e.g. the list had been scrolled down to reach a later favorite)
