@@ -292,6 +292,7 @@
         <!-- Lifts the LABEL inside the chip, and it is optical rather than
              arithmetic - the box is already centred. See ApplyLayoutMetrics. -->
         <Thickness x:Key="FooterChipTextNudge">0,0,0,2</Thickness>
+        <FontWeight x:Key="FooterChipFontWeight">Normal</FontWeight>
         <system:Double x:Key="ViewerChipGlyphFontSize">11</system:Double>
         <system:Double x:Key="ViewerChipIconSize">11</system:Double>
         <!-- Every button in the viewer's strip draws the same box, whether it
@@ -2871,6 +2872,9 @@
              thing meant to catch the eye. -->
         <Style x:Key="FooterFilterChipStyle"
                 TargetType="ToggleButton">
+            <!-- 전체 굵게 reaches the strip too - see ApplyTreeFontWeight. -->
+            <Setter Property="FontWeight"
+                    Value="{DynamicResource FooterChipFontWeight}"/>
             <!-- Follows Ctrl +/- through the resource, and it is set HERE so
                  that every chip in either strip takes it - the viewer's zoom
                  row used to be the one place left at a fixed 11 (asked
@@ -3097,6 +3101,8 @@
              across two control types. -->
         <Style x:Key="FooterActionChipStyle"
                 TargetType="Button">
+            <Setter Property="FontWeight"
+                    Value="{DynamicResource FooterChipFontWeight}"/>
             <!-- "Match them pixel for pixel" now includes the zoom: same
                  resource as the toggles above. -->
             <Setter Property="FontSize"
