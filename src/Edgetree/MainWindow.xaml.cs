@@ -4752,6 +4752,31 @@ public partial class MainWindow : Window
 
     private void UpdateFavoritesPanelVisibility()
     {
+        ApplyFavoritesRowSizing();
+
+        // ALWAYS, not only when the row could not be measured. The row measures
+        // 21px on the startup pass and 22px once it has settled (panel.log,
+        // 2026-08-15), so "measured" was true and wrong at the same time: the
+        // panel opened 8px short of its own list and the mismatch came out as a
+        // jolt the first time the splitter was touched, part-way down rather
+        // than at either end. Asking again costs one bounded pass at Loaded
+        // priority and puts the settled number on all three of floor, ceiling
+        // and height.
+        if (ActivePanelRowCount > 0)
+        {
+            QueueFavoritesHeightRecheck();
+        }
+
+        FavoritesSplitterRow.Height =
+            ActivePanelRowCount > 0 ? GridLength.Auto : new GridLength(0);
+    }
+
+    // The three numbers that decide the panel's height, in ONE place because
+    // they are cut from ONE measurement - the row's own height. They were split
+    // between here and RecheckFavoritesHeight, which re-measured the height and
+    // left the ceiling at whatever the first pass had said.
+    private void ApplyFavoritesRowSizing()
+    {
         bool hasFavorites = ActivePanelRowCount > 0;
 
         // A floor for the splitter, so dragging it all the way up can't squeeze
@@ -4794,27 +4819,9 @@ public partial class MainWindow : Window
             ? ComputeFavoritesContentHeight() + Math.Ceiling(FavoriteRowHeight)
             : double.PositiveInfinity;
 
-        if (hasFavorites)
-        {
-            bool measured = HasRealizedFavoriteRow;
-            FavoritesRowDef.Height =
-                SafeGridLength(Math.Min(ComputeFavoritesContentHeight(), _settings.FavoritesPanelHeight));
-
-            // Sized off the estimate rather than a real row - startup, or the
-            // very first favorite. The estimate runs short, so the panel came
-            // up one row too small and clipped the last favorite; it survived
-            // as far as it did because it only shows on the launch after
-            // something forced a restart. Ask again once there is a row to ask.
-            if (!measured)
-            {
-                QueueFavoritesHeightRecheck();
-            }
-        }
-        else
-        {
-            FavoritesRowDef.Height = new GridLength(0);
-        }
-        FavoritesSplitterRow.Height = hasFavorites ? GridLength.Auto : new GridLength(0);
+        FavoritesRowDef.Height = hasFavorites
+            ? SafeGridLength(Math.Min(ComputeFavoritesContentHeight(), _settings.FavoritesPanelHeight))
+            : new GridLength(0);
     }
 
     // Re-runs once the list has had a layout pass, which is when its containers
@@ -4837,7 +4844,11 @@ public partial class MainWindow : Window
     {
         _favoritesHeightRecheckPending = false;
 
-        if (_settings.Favorites.Count == 0)
+        // ActivePanelRowCount, not the favorites list by name - the same
+        // correction FavoritesListChrome needed. In bookmark mode this asked a
+        // list that is not on screen and gave up whenever it happened to be
+        // empty, which is the one mode the recheck was most needed in.
+        if (ActivePanelRowCount == 0)
         {
             return;
         }
@@ -4854,8 +4865,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        FavoritesRowDef.Height =
-            SafeGridLength(Math.Min(ComputeFavoritesContentHeight(), _settings.FavoritesPanelHeight));
+        // ALL THREE, not the height alone. The floor and the ceiling are built
+        // from the same row measurement the height is, so re-measuring without
+        // them left a ceiling cut from the startup number while the height moved
+        // on - see UpdateFavoritesPanelVisibility, which is the only other place
+        // they were set.
+        ApplyFavoritesRowSizing();
     }
 
     // GridLength throws on a negative or non-finite length, and this row's
