@@ -7018,8 +7018,16 @@
                          promise the panel can keep. Only up for a video that
                          isn't playing; clicking the picture itself is left
                          alone, since that gesture already means pan. -->
+                    <!-- ABOVE THE CLOCK (2026-08-16). Both sit in this row and
+                         the clock is declared after, so it was drawing over the
+                         disc - and of the two, one is a control and the other
+                         is a wall clock. ZIndex rather than moving either
+                         declaration: the order they are written in is the order
+                         they are explained in, and the overlap is one fact
+                         about one pair. -->
                     <Button x:Name="ViewerPlayOverlay"
                             Grid.Row="0"
+                            Panel.ZIndex="1"
                             Width="64"
                             Height="64"
                             HorizontalAlignment="Center"
@@ -7059,18 +7067,56 @@
                                          a bare triangle floating on nothing
                                          (2026-08-13). Over a photograph the
                                          ring is a pixel of edge the eye reads
-                                         as the button's rim. -->
+                                         as the button's rim.
+
+                                         A DROP SHADOW WAS TRIED HERE AND TAKEN
+                                         BACK OUT, same day (2026-08-16). The
+                                         reasoning was sound - the ring only
+                                         answers a bright flat background, so a
+                                         dark or busy photograph left the disc
+                                         with nothing holding it off - but the
+                                         thing itself did not look right at any
+                                         of the settings it was given (depth 1.5
+                                         to 2, blur 9 to 20, 40 to 50 percent).
+                                         The plate is TRANSLUCENT, which is the
+                                         part that fights a shadow: whatever
+                                         sits behind the disc shows through it,
+                                         so the shadow's own core greys the
+                                         plate from the inside while it is
+                                         supposed to be lifting it off the
+                                         picture.
+
+                                         If this is worth another go, that is
+                                         the thing to solve first - a caster
+                                         that is a RING rather than a disc would
+                                         put the shadow outside the rim only,
+                                         and the plate would stay clean. -->
                                     <Ellipse x:Name="Plate"
                                             Fill="#B0FFFFFF"
                                             Stroke="#2E000000"
                                             StrokeThickness="1"/>
-                                    <Path x:Name="PlayMark"
-                                            Data="M 24,18 L 44,32 L 24,46 Z"
-                                            Fill="#C0000000"/>
-                                    <Path x:Name="PauseMark"
-                                            Data="M24,18 H30 V46 H24 Z M34,18 H40 V46 H34 Z"
-                                            Fill="#C0000000"
-                                            Visibility="Collapsed"/>
+                                    <!-- The marks keep their 64-unit box and a
+                                         Viewbox maps it onto whatever size the
+                                         disc has been given (see
+                                         LayoutViewerPlayOverlay). Scaling them
+                                         individually with Stretch would let
+                                         each fill the disc on its own and lose
+                                         the shared box the two were drawn in -
+                                         which is the whole reason the mark does
+                                         not appear to jump as the state
+                                         changes. -->
+                                    <Viewbox Stretch="Uniform">
+                                        <Grid Width="64"
+                                                Height="64">
+                                            <Path x:Name="PlayMark"
+                                                    Data="M 24,18 L 44,32 L 24,46 Z"
+                                                    Fill="#C0000000"/>
+                                            <Path x:Name="PauseMark"
+                                                    Data="M24,18 H30 V46 H24 Z M34,18 H40 V46 H34 Z"
+                                                    Fill="#C0000000"
+                                                    Visibility="Collapsed"/>
+                                        </Grid>
+                                    </Viewbox>
                                 </Grid>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver"
@@ -7405,50 +7451,25 @@
                                         <Image Source="{Binding Thumbnail}"
                                                 Stretch="Uniform"
                                                 RenderOptions.BitmapScalingMode="HighQuality"/>
-                                        <!-- A film's thumbnail is just a frame
-                                             and a track's is its album art, so
-                                             nothing else in the strip would
-                                             say which ones play. The panel's own
-                                             play button in miniature - same
-                                             light plate, same dark mark - in the
-                                             CENTRE, where that button is, and
-                                             fainter than it: this one is a label
-                                             saying what the frame is, not a
-                                             control asking to be pressed
-                                             (2026-08-10).
+                                        <!-- THE PLAY BADGE IS GONE (2026-08-16).
+                                             It was the panel's own play button
+                                             in miniature, put here as a LABEL
+                                             saying which frames play - and drawn
+                                             as that button it could only read as
+                                             a control. It sat in the centre of
+                                             every cell, never took a click, and
+                                             never changed for the track that was
+                                             actually playing, which is three
+                                             promises a play button makes and
+                                             this one kept none of.
 
-                                             Moving it out of the corner also
-                                             left the corner free, which is where
-                                             the bookmark ribbon went.
-
-                                             Sized from the cell rather than
-                                             fixed: the strip is resizable, and a
-                                             14px disc that reads right on a 64px
-                                             frame is a speck on a 200px one and
-                                             most of a 40px one. The Path scales
-                                             with Stretch, so the triangle keeps
-                                             its shape at every size. -->
-                                        <Border Width="{DynamicResource FilmstripBadgeSize}"
-                                                Height="{DynamicResource FilmstripBadgeSize}"
-                                                CornerRadius="{DynamicResource FilmstripBadgeRadius}"
-                                                Background="#66FFFFFF"
-                                                HorizontalAlignment="Center"
-                                                VerticalAlignment="Center">
-                                            <Border.Style>
-                                                <Style TargetType="Border">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsPlayable}" Value="True">
-                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Border.Style>
-                                            <Path Data="M 5,3.5 L 10,7 L 5,10.5 Z"
-                                                    Fill="#8A000000"
-                                                    Stretch="Uniform"
-                                                    Margin="{DynamicResource FilmstripBadgeInset}"/>
-                                        </Border>
+                                             What goes with it: the strip no
+                                             longer says which cells are sound or
+                                             film. A quieter mark could - but a
+                                             mark that is not a button has to
+                                             look like nothing else in the app
+                                             that is one, and the disc was the
+                                             proof of how easily that goes wrong. -->
                                         <!-- The bookmark, in the strip because it
                                              is in the tree: a marked file has to
                                              be recognisable in every place the
@@ -7671,6 +7692,10 @@
                                     VerticalAlignment="Center"
                                     Visibility="Collapsed"/>
                         </StackPanel>
+                        <!-- Weight and ink are BOTH written in code and switch
+                             on one fact - whether the transport is holding the
+                             file this line names. See ApplyViewerCaptionEmphasis;
+                             the values here are the resting pair. -->
                         <TextBlock x:Name="ViewerFileName"
                                 Foreground="{DynamicResource FileNameForeground}"
                                 FontSize="{DynamicResource MenuFontSize}"
@@ -7932,28 +7957,90 @@
                                  here is derived against whatever the panel's
                                  background happens to be, and an underline reads
                                  on any of them. -->
-                            <TextBlock x:Name="ViewerNowPlaying"
+                            <!-- The row carries the three states now (see
+                                 UpdateViewerNowPlaying); the text inside it just
+                                 holds the words. -->
+                            <DockPanel x:Name="ViewerNowPlayingRow"
                                     Visibility="Collapsed"
-                                    Background="Transparent"
-                                    Cursor="Hand"
-                                    FontSize="{DynamicResource FooterChipFontSize}"
-                                    Foreground="{DynamicResource ForegroundText}"
-                                    TextAlignment="Center"
-                                    TextTrimming="CharacterEllipsis"
-                                    Margin="{DynamicResource ViewerCaptionRowGap}"
-                                    ToolTip="{x:Static services:Strings.MenuRevealInTree}"
-                                    MouseLeftButtonUp="ViewerNowPlaying_Click">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="TextDecorations"
-                                                        Value="Underline"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                                    Margin="{DynamicResource ViewerCaptionRowGap}">
+                                <!-- THE JUMP, next to the name it jumps to
+                                     (2026-08-16). It used to be a folder button
+                                     at the far end of the transport, which is
+                                     where it was least likely to be seen and
+                                     furthest from the question - the name is
+                                     what raises "where IS that", so the answer
+                                     belongs beside the name. Only while the two
+                                     files differ: attached, there is nowhere to
+                                     go, which is the same rule that takes the
+                                     click off the name itself.
+
+                                     Material Symbols "keyboard_return". Not the
+                                     folder it replaces: a folder says "a
+                                     container", and this goes to the FILE - the
+                                     row itself, which is also what hands the
+                                     panel back. -->
+                                <!-- HIDDEN, NEVER COLLAPSED, when there is
+                                     nowhere to go (2026-08-16). The button is
+                                     taller than the line of text it sits beside
+                                     and wider than nothing, so collapsing it
+                                     changed the strip's height AND re-centred
+                                     the name - the whole band moved every time
+                                     the panel attached or detached. It keeps
+                                     its slot instead, and Hidden takes it out
+                                     of hit-testing just as well.
+
+                                     Same rule the line itself already follows
+                                     one level up (see UpdateViewerNowPlaying):
+                                     this band holds ONE height in every state a
+                                     track can be in. -->
+                                <Button x:Name="ViewerNowPlayingJump"
+                                        DockPanel.Dock="Right"
+                                        Visibility="Hidden"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource FooterActionGlyphChipStyle}"
+                                        Click="ViewerMediaRevealInTree_Click"
+                                        ToolTip="{x:Static services:Strings.ViewerBackToPlaying}">
+                                    <Path Data="M354-270 144-480l210-210 51 51-123 123h462v-108h72v180H282l123 123-51 51Z"
+                                            Stretch="Uniform"
+                                            Width="{DynamicResource ViewerChipIconSize}"
+                                            Height="{DynamicResource ViewerChipIconSize}"
+                                            Fill="{Binding Foreground,
+                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Button>
+                                <!-- The hidden twin, so the name stays CENTRED
+                                     with a button on one side of it - the same
+                                     trick the carousel counter and the time
+                                     readout use. It mirrors the button's width
+                                     and its visibility, so it is nothing at all
+                                     while the button is away. -->
+                                <Border x:Name="ViewerNowPlayingJumpSpacer"
+                                        DockPanel.Dock="Left"
+                                        Width="{Binding ActualWidth,
+                                            ElementName=ViewerNowPlayingJump}"
+                                        Visibility="{Binding Visibility,
+                                            ElementName=ViewerNowPlayingJump}"/>
+                                <TextBlock x:Name="ViewerNowPlaying"
+                                        Background="Transparent"
+                                        Cursor="Hand"
+                                        FontSize="{DynamicResource FooterChipFontSize}"
+                                        Foreground="{DynamicResource ForegroundText}"
+                                        TextAlignment="Center"
+                                        TextTrimming="CharacterEllipsis"
+                                        VerticalAlignment="Center"
+                                        ToolTip="{x:Static services:Strings.ViewerBackToPlaying}"
+                                        MouseLeftButtonUp="ViewerNowPlaying_Click">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="TextDecorations"
+                                                            Value="Underline"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DockPanel>
                             <!-- The marks ride WITH the bar rather than beside
                                  it: a tick is only meaningful against the
                                  position it points at. Underneath rather than
@@ -8235,78 +8322,22 @@
                                         PreviewMouseMove="ViewerMediaVolume_PreviewMouseMove"
                                         PreviewMouseLeftButtonUp="ViewerMediaVolume_PreviewMouseLeftButtonUp"
                                         ValueChanged="ViewerMediaVolume_ValueChanged"/>
-                                <!-- WHERE THE SOUND IS COMING FROM, in the tree
-                                     (2026-08-11). It answers a question only
-                                     this row can raise: background play and the
-                                     search results both let the transport hold a
-                                     file the tree is nowhere near, and the file
-                                     name above it names the track without saying
-                                     where it lives.
+                                <!-- 트리에서 보기 AND 기본 프로그램에서 열기 BOTH
+                                     LEFT THIS ROW (2026-08-16). They were the
+                                     first two out of the drop order because
+                                     they are the two that leave the row for
+                                     somewhere else - and being first out is a
+                                     fair description of how little the row
+                                     needed them. The jump is the one worth
+                                     keeping and it now has a better address:
+                                     beside the name of the track it jumps to,
+                                     where the question is actually asked (see
+                                     ViewerNowPlayingJump). The row that is left
+                                     is transport and nothing else.
 
-                                     It goes to the FILE, not to its folder - the
-                                     folder is where the file is, and landing on
-                                     the row itself also hands the panel back, so
-                                     the transport is attached again afterwards.
-
-                                     Grouped with 기본 프로그램에서 열기 because the
-                                     two are the same kind of thing: both leave
-                                     this row for somewhere else. First two out
-                                     when the panel narrows, for the same reason.
-
-                                     Material Symbols "folder" - the SAME path
-                                     the search box's folder button draws, minus
-                                     the box tail that one carries because its
-                                     whole set does. Its own width, not the
-                                     square icon size: see ViewerChipWideIconSize
-                                     for why a wide mark in a square box came out
-                                     short. -->
-                                <Button x:Name="ViewerMediaRevealInTree"
-                                        Style="{StaticResource FooterActionGlyphChipStyle}"
-                                        Margin="{DynamicResource ViewerChipGroupMargin}"
-                                        Click="ViewerMediaRevealInTree_Click"
-                                        ToolTip="{x:Static services:Strings.MenuRevealInTree}">
-                                    <Path Data="M168-192q-29 0-50.5-21.5T96-264v-432q0-29.7 21.5-50.85Q139-768 168-768h216l96 96h312q29.7 0 50.85 21.15Q864-629.7 864-600v336q0 29-21.15 50.5T792-192H168Zm0-72h624v-336H450l-96-96H168v432Z"
-                                            Stretch="Uniform"
-                                            Width="{DynamicResource ViewerChipWideIconSize}"
-                                            Height="{DynamicResource ViewerChipIconSize}"
-                                            Fill="{Binding Foreground,
-                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
-                                </Button>
-                                <!-- The way out, at the end of the strip the
-                                     hand is already on while a video is up.
-                                     This panel previews; a codec it hasn't got
-                                     (AV1) or a sound track Windows can't decode
-                                     (DTS, TrueHD) both end the same way, in the
-                                     player the file is associated with. Enter
-                                     has always done this from the tree - the
-                                     button is for the moment you are looking at
-                                     a silent picture wondering what to do about
-                                     it, which is not a moment for remembering a
-                                     key.
-                                     An arrow leaving a box, the same glyph
-                                     every app uses for "opens elsewhere". -->
-                                <!-- No group margin of its own any more: the
-                                     jump button beside it opens this group now,
-                                     and two group gaps in a row would read as
-                                     two groups of one. -->
-                                <Button x:Name="ViewerMediaOpenExternal"
-                                        Style="{StaticResource FooterActionGlyphChipStyle}"
-                                        Click="ViewerMediaOpenExternal_Click"
-                                        ToolTip="{x:Static services:Strings.ViewerOpenExternally}">
-                                    <!-- Material Symbols "open_in_new"
-                                         (2026-08-10), replacing
-                                         a hand-drawn pair of stroked lines.
-                                         Same glyph, drawn by the family the
-                                         rest of the row comes from - stroke
-                                         weight included, which is the part a
-                                         drawn one never quite matches. -->
-                                    <Path Data="M216-144q-29.7 0-50.85-21.15Q144-186.3 144-216v-528q0-29.7 21.15-50.85Q186.3-816 216-816h264v72H216v528h528v-264h72v264q0 29.7-21.15 50.85Q773.7-144 744-144H216Zm171-192-51-51 357-357H576v-72h240v240h-72v-117L387-336Z"
-                                            Stretch="Uniform"
-                                            Width="{DynamicResource ViewerChipIconSize}"
-                                            Height="{DynamicResource ViewerChipIconSize}"
-                                            Fill="{Binding Foreground,
-                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
-                                </Button>
+                                     기본 프로그램에서 열기 is in the picture's own
+                                     right-click menu and on Enter from the
+                                     tree. -->
                             </StackPanel>
                         </StackPanel>
                         </Grid>

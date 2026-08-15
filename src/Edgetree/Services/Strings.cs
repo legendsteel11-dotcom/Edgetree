@@ -350,6 +350,15 @@ public static class Strings
     // The footer's now-playing row, which only exists while the viewer is shut
     // and 배경 재생 is holding a track.
     public static string FooterNowPlayingOpen = "멀티미디어 패널에서 열기";
+    // 트랜스포트 위 줄의 머리표. 이름 앞에 붙어 그 이름이 "화면에 있는 파일"이
+    // 아니라 "재생 중인 파일"임을 말함 - 둘이 같을 때도 붙는다. 같을 때만 빼면
+    // 머리표가 있고 없고가 또 하나의 신호가 되어, 읽는 사람이 그 규칙까지
+    // 알아야 함.
+    public static string ViewerNowPlayingLabel = "지금 재생 중";
+    // 같은 동작이 트리 메뉴에서는 "트리에서 보기"지만, 여기서는 그 말이 무엇을
+    // 보러 가는지 안 말함 - 이 줄에 서 있는 사람은 트리가 아니라 *그 곡*을 찾는
+    // 중임. 목적지를 이름으로 부름(2026-08-16).
+    public static string ViewerBackToPlaying = "재생 중인 곡으로 돌아가기";
     // Explorer's own wording for the same action, so it reads as the familiar
     // thing rather than a new feature.
     public static string MenuSetWallpaper = "바탕 화면 배경으로 설정";
@@ -937,6 +946,8 @@ public static class Strings
         ViewerNavigator = "Navigator";
         ViewerClose = "Close the multimedia panel";
         FooterNowPlayingOpen = "Open in the multimedia panel";
+        ViewerNowPlayingLabel = "Now playing";
+        ViewerBackToPlaying = "Back to the playing track";
         MenuSetWallpaper = "Set as desktop background";
         TreeHistoryBack = "Back  (Ctrl+←)";
         TreeHistoryForward = "Forward  (Ctrl+→)";

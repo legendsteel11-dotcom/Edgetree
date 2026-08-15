@@ -1081,8 +1081,21 @@ public partial class MainWindow : Window
         // carries the chips' 0.65, so at these values the name lands roughly 40
         // levels clear of it - present as the heading of the caption, quiet
         // enough that the four rows read as one block instead of four.
+        //
+        // Note this is NOT the palette's 파일 이름 colour despite the key: the
+        // panel has its own background, so the caption derives its inks against
+        // that (see the method's own note). Anyone looking for why the caption
+        // is not the tree's red ends up here.
         SetLocalBrush(resources, "FileNameForeground",
             useLightInk ? Color.FromRgb(0xAE, 0xB1, 0xB8) : Color.FromRgb(0x63, 0x66, 0x6D));
+        // THE SAME NAME, WHILE THE TRANSPORT IS HOLDING THAT FILE (2026-08-16).
+        // The full ink this method starts from, given to one row in one state -
+        // which is the whole of the difference: the caption always names what
+        // the panel is SHOWING, and this says that what it is showing is also
+        // what you are hearing. Raising the row unconditionally was the first
+        // cut and it said nothing, because a heading that is always loud is
+        // just a heading.
+        SetLocalBrush(resources, "FileNamePlayingForeground", useLightInk ? lightInk : darkInk);
         var hoverFill = useLightInk
             ? Color.FromArgb(0x2E, 0xFF, 0xFF, 0xFF)
             : Color.FromArgb(0x24, 0x00, 0x00, 0x00);
@@ -18853,6 +18866,10 @@ public partial class MainWindow : Window
         ViewerPlayOverlay.Visibility = Visibility.Collapsed;
 
         ViewerFileName.Text = item.Name;
+        // A NEW name is a new answer to "am I hearing this one", and this path
+        // does not always end in UpdateViewerNowPlaying - browsing to a picture
+        // while a track plays changes nothing about the transport.
+        ApplyViewerCaptionEmphasis();
         SetViewerCaption(string.Empty);
         UpdateViewerCarousel();
 
@@ -20229,7 +20246,46 @@ public partial class MainWindow : Window
         // Read by the template's own trigger - see the two marks there.
         ViewerPlayOverlay.Tag = playingThis ? "pause" : "play";
         ViewerPlayOverlay.ToolTip = playingThis ? Strings.ViewerPause : Strings.ViewerPlay;
+        LayoutViewerPlayOverlay();
         ViewerPlayOverlay.Visibility = Visibility.Visible;
+    }
+
+    // THE DISC FOLLOWS THE PANEL (2026-08-16). It was a flat 64 at every size,
+    // which is two different mistakes at the two ends of this panel's range: on
+    // a 240-wide sidebar column it is a quarter of the width, and on a full 4K
+    // cover it is a speck in the middle of a wall.
+    //
+    // Ceiling at 128 - twice what it was - because past that it stops being a
+    // control on the picture and becomes the picture's centrepiece. The floor
+    // is what keeps it a target you can hit at all.
+    //
+    // Shorter side, like the clock and the navigator: width alone lets a tall
+    // narrow panel wear a disc that fills it, and height alone the reverse.
+    private const double ViewerPlayOverlayShare = 0.11;
+    private const double ViewerPlayOverlayMinSize = 40;
+    private const double ViewerPlayOverlayMaxSize = 128;
+
+    private void LayoutViewerPlayOverlay()
+    {
+        double shorter = Math.Min(ViewerImageHost.ActualWidth, ViewerImageHost.ActualHeight);
+        if (shorter <= 0)
+        {
+            return;
+        }
+
+        double size = Math.Clamp(
+            Math.Round(shorter * ViewerPlayOverlayShare),
+            ViewerPlayOverlayMinSize,
+            ViewerPlayOverlayMaxSize);
+        // A resize raises this every frame and Width/Height are layout writes,
+        // so nothing is written until the number has actually moved.
+        if (Math.Abs(size - ViewerPlayOverlay.Width) < 0.5)
+        {
+            return;
+        }
+
+        ViewerPlayOverlay.Width = size;
+        ViewerPlayOverlay.Height = size;
     }
 
     // ----- 백그라운드 재생 ---------------------------------------------------
@@ -20300,15 +20356,78 @@ public partial class MainWindow : Window
         // this line exists for: background play is sound only, so the transport
         // and the picture cannot come apart. Reserving it there would be a line
         // of the picture given up for something that cannot happen.
-        ViewerNowPlaying.Visibility = detached
+        // TWO INDEPENDENT PARTS, each with its own question (2026-08-16, after a
+        // detour that put them on one switch and got both wrong).
+        //
+        // 지금 재생 중 is only ever about THIS file - it confirms that the one
+        // the caption names is the one you are hearing, so it belongs in the
+        // attached state and nowhere else. Under a different file it was saying
+        // "now playing" over a name that is not the caption's subject, which
+        // reads as a claim about the wrong file.
+        //
+        // The NAME is the other question: is the track's name already on
+        // screen? Detached the caption names a different file, so this line has
+        // to carry it; attached the caption has it; in full cover there is no
+        // caption at all, which is the case that keeps this line from letting a
+        // bar of position and length sit there unnamed.
+        //
+        // The Hidden branch survives for a track that is SHOWING but not
+        // playing - neither part has anything to say then, and the strip still
+        // has to hold its height (see below).
+        bool captionNames = ViewerFileName.Visibility == Visibility.Visible;
+        bool sayPlaying = ViewerMediaIsSelection;
+        bool sayName = _viewerVideoPath is not null && (detached || !captionNames);
+        bool naming = sayPlaying || sayName;
+        ViewerNowPlayingRow.Visibility = naming
             ? Visibility.Visible
             : _pendingViewerPath is { } shown && IsViewerAudio(shown)
                 ? Visibility.Hidden
                 : Visibility.Collapsed;
-        if (detached && _viewerVideoPath is { } path)
+        if (naming && _viewerVideoPath is { } path)
         {
-            ViewerNowPlaying.Text = Path.GetFileName(path);
+            // The label BOLD and in its own run: it is a heading, not part of
+            // the name, and where both appear the name has to stay the thing
+            // that gets read. Weight rather than a colour - the ink here is
+            // derived against whatever the panel's background happens to be,
+            // and in full cover against the plate's, so a second colour would
+            // have to survive both.
+            ViewerNowPlaying.Inlines.Clear();
+            if (sayPlaying)
+            {
+                ViewerNowPlaying.Inlines.Add(
+                    new System.Windows.Documents.Run(Strings.ViewerNowPlayingLabel)
+                    {
+                        FontWeight = FontWeights.Bold,
+                    });
+            }
+
+            if (sayName)
+            {
+                // The separator only when there is something to separate. The
+                // two meet on one line in exactly one state - full cover with
+                // the transport attached - where the caption is gone and the
+                // label would otherwise stand over an unnamed bar.
+                ViewerNowPlaying.Inlines.Add(new System.Windows.Documents.Run(
+                    sayPlaying
+                        ? $"  ·  {Path.GetFileName(path)}"
+                        : Path.GetFileName(path)));
+            }
         }
+
+        // THE JUMP GOES WITH THE DETACHMENT, name and icon together. This line
+        // is a way BACK to a track playing somewhere else; when the track is
+        // the selection there is nowhere to go, and a hand cursor over a name
+        // that answers nothing is a promise the app cannot keep.
+        // IsHitTestVisible takes the hover underline with it, so the name stops
+        // offering itself as well; the icon simply is not there.
+        // Hidden, not Collapsed - see the button's own note. Collapsing it moved
+        // the band's height and the name's centre on every attach/detach.
+        ViewerNowPlayingJump.Visibility = detached ? Visibility.Visible : Visibility.Hidden;
+
+        ApplyViewerCaptionEmphasis();
+        ViewerNowPlaying.IsHitTestVisible = detached;
+        ViewerNowPlaying.Cursor = detached ? System.Windows.Input.Cursors.Hand : null;
+        ViewerNowPlaying.ToolTip = detached ? Strings.ViewerBackToPlaying : null;
 
         // AND THE PLATE UNDER IT LIFTS. Once the band stops belonging to the
         // picture above it, the name alone was carrying that on its own, and a
@@ -20334,6 +20453,30 @@ public partial class MainWindow : Window
         // And for the parked state: whether the transport is standing empty or
         // holding a file follows from exactly the same fact.
         UpdateViewerParkedTransport();
+    }
+
+    // THE CAPTION'S NAME SAYS WHETHER YOU ARE HEARING IT (2026-08-16).
+    //
+    // Bold and at the panel's full ink while the transport is holding the very
+    // file the caption names; back to the ordinary caption ink and weight for
+    // anything else. The first cut raised the row unconditionally and the two
+    // states came out identical, which is the same thing as saying nothing.
+    //
+    // ViewerMediaIsSelection, not "something is playing": the question is
+    // whether THIS file is the one loaded, and that is what makes browsing away
+    // from a playing track drop the name back to grey while the 지금 재생 중 line
+    // below picks the track up by name.
+    //
+    // SetResourceReference rather than a brush: the pair is derived from the
+    // panel's own background and re-derived on every theme and colour change,
+    // so the row has to keep asking rather than hold an answer.
+    private void ApplyViewerCaptionEmphasis()
+    {
+        bool hearingThisOne = ViewerMediaIsSelection;
+        ViewerFileName.FontWeight = hearingThisOne ? FontWeights.Bold : FontWeights.Normal;
+        ViewerFileName.SetResourceReference(
+            TextBlock.ForegroundProperty,
+            hearingThisOne ? "FileNamePlayingForeground" : "FileNameForeground");
     }
 
     // "The panel can show this" - pictures and films together. Films arrived in
@@ -21601,21 +21744,22 @@ public partial class MainWindow : Window
     // and a clock, with play gone off the edge (2026-08-11).
     //
     // So the row is measured and thinned instead, in an order the user set:
-    // the two that leave this row for somewhere else first, then the clock,
-    // then the transport button the seek bar already duplicates, then the
-    // volume. WHAT SURVIVES AT ANY WIDTH: background play, repeat, and the
-    // three that move sound - 이전 곡, 재생/일시정지, 다음 곡.
+    // the clock, then the transport button the seek bar already duplicates,
+    // then the volume. WHAT SURVIVES AT ANY WIDTH: background play, repeat, and
+    // the three that move sound - 이전 곡, 재생/일시정지, 다음 곡.
     //
     // 이전 곡/다음 곡 outrank the clock and 정지 because nothing else in the row
     // can do what they do, where the seek bar carries both position and a way
     // back to the start (2026-08-11).
     //
+    // THE FIRST TWO OUT ARE GONE ALTOGETHER (2026-08-16): 기본 프로그램에서 열기
+    // and 트리에서 보기 both left this row - see the note where they used to
+    // stand. Being first out was already the row's own verdict on them.
+    //
     // Measured rather than stepped at fixed widths, because the row's own size
     // moves with Ctrl +/- and with the strings in it.
     private UIElement[] ViewerMediaRowDropOrder => new UIElement[]
     {
-        ViewerMediaOpenExternal,
-        ViewerMediaRevealInTree,
         ViewerMediaTimeBox,
         ViewerMediaStop,
         ViewerMediaVolume,
@@ -21702,7 +21846,14 @@ public partial class MainWindow : Window
     // A difference that is only ever there when it means something is easier to
     // notice than one that is always there and merely changes strength.
     private const double ViewerMediaPlateOpacity = 0.0;
-    private const double ViewerMediaPlateDetachedOpacity = 0.7;
+    // 0.7 -> 0.45 -> 0.32 (2026-08-16, two passes by eye). The plate is a
+    // SIGNAL, not a surface: it only has to be enough that the band reads as set
+    // apart, and heavier than that it becomes a control of its own laid over the
+    // picture. The floor is what it hides - at 0.45 it swallowed the seek bar's
+    // own track and the volume bar's, so the two sliders lost the grooves that
+    // say how far along they are. Light enough for those to come back through is
+    // the right strength for a wash.
+    private const double ViewerMediaPlateDetachedOpacity = 0.32;
 
     private void FitViewerMediaRow()
     {
@@ -22723,25 +22874,6 @@ public partial class MainWindow : Window
         ViewerMediaVolume.Value = Math.Round(next / ViewerVolumeStep) * ViewerVolumeStep;
     }
 
-    // Hands the file to whatever it is associated with, and pauses first: two
-    // copies of the same video playing over each other is the one thing this
-    // button must not cause.
-    private void ViewerMediaOpenExternal_Click(object sender, RoutedEventArgs e)
-    {
-        if (_viewerVideoPath is not { } path)
-        {
-            return;
-        }
-
-        if (_viewerVideoPlaying)
-        {
-            ViewerMedia.Pause();
-            SetViewerVideoPlaying(false);
-        }
-
-        ShellFileService.OpenWithDefaultApp(path);
-    }
-
     // The slider keeps its own position while muted rather than dropping to
     // zero, so un-muting returns to the level that was set - which is what
     // makes it a toggle rather than a second volume control.
@@ -23026,10 +23158,12 @@ public partial class MainWindow : Window
     // That part is two doubles. Everything else waits for the size to settle.
     private void ViewerImageHost_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        // Before the picture's own guard: the clock is sized from the PANEL, so
-        // it follows a width drag and the full-cover toggle whatever the picture
-        // behind it is doing. It returns on its own when not showing.
+        // Before the picture's own guard: both of these are sized from the
+        // PANEL, so they follow a width drag and the full-cover toggle whatever
+        // the picture behind them is doing. Each returns on its own when it has
+        // nothing to do.
         LayoutViewerClock();
+        LayoutViewerPlayOverlay();
 
         if (!_viewerOpen || _viewerPixelWidth <= 0)
         {
@@ -24404,7 +24538,16 @@ public partial class MainWindow : Window
             return;
         }
 
-        ViewerCarouselBar.Visibility = Visibility.Visible;
+        // NOT while the full-screen transport is up. That state deliberately
+        // takes the counter away (see ShowFullScreenTransport), and this line
+        // handed it straight back on the next selection change - so picking
+        // another track from the strip put the counter and the strip's own chip
+        // INSIDE the plate, which then stood taller than the band that shows it
+        // (reported 2026-08-16). The plate is a mode; a selection change is not
+        // a reason to leave it.
+        ViewerCarouselBar.Visibility = _fullScreenTransportShown
+            ? Visibility.Collapsed
+            : Visibility.Visible;
         ViewerCarouselText.Text = $"{index + 1} / {images.Count}";
         // The invisible twin reserves the folder's widest possible string so
         // the chevron buttons hold still while the number walks.
@@ -25625,29 +25768,18 @@ public partial class MainWindow : Window
         Resources["FilmstripCellHeight"] = height;
         Resources["FilmstripCellWidth"] = width;
 
-        // The two marks are sized from the cell, not fixed: the strip is
-        // resizable, and a badge that reads right on a 64px frame is a speck on
-        // a 200px one and swallows a 40px one (2026-08-10). Floors and
-        // ceilings on both, because proportion alone stops being readable at
-        // the ends of the range - a 6px play triangle says nothing, and a 60px
-        // one is no longer a label on the picture.
-        double badge = Math.Clamp(Math.Round(height * 0.34), 14, 34);
-        Resources["FilmstripBadgeSize"] = badge;
-        Resources["FilmstripBadgeRadius"] = new CornerRadius(badge / 2);
-        // Off-centre on purpose: a triangle centred on its own bounding box
-        // looks left-heavy inside a circle, so the inset gives the flat edge
-        // more room than the point. Proportional like the rest.
-        double inset = Math.Max(2, Math.Round(badge * 0.26));
-        Resources["FilmstripBadgeInset"] = new Thickness(
-            inset + Math.Max(1, Math.Round(badge * 0.05)), inset, inset, inset);
-        // The ribbon grows far more slowly than the play badge and stops much
-        // sooner, because the two are not the same kind of thing. The badge
-        // labels the PICTURE and should stay in proportion to it; the ribbon is
-        // the tree's own mark, and a mark is only recognisable as the same mark
-        // if it stays about the same size wherever it is drawn (2026-08-10
-        // - it should match the size the tree draws). The tree draws it at 9px, so the
-        // range here starts just above that and tops out before it could read
-        // as a label on the frame rather than a mark on the file.
+        // The play badge's three keys were computed here as well, and went with
+        // it on 2026-08-16 - see the cell template.
+        //
+        // The ribbon is sized from the cell, not fixed, but it grows far more
+        // slowly than the badge did and stops much sooner, because the two were
+        // not the same kind of thing. The badge labelled the PICTURE and stayed
+        // in proportion to it; the ribbon is the tree's own mark, and a mark is
+        // only recognisable as the same mark if it stays about the same size
+        // wherever it is drawn (2026-08-10 - it should match the size the tree
+        // draws). The tree draws it at 9px, so the range here starts just above
+        // that and tops out before it could read as a label on the frame rather
+        // than a mark on the file.
         Resources["FilmstripRibbonSize"] = Math.Clamp(Math.Round(height * 0.18), 10, 15);
     }
 
@@ -26664,8 +26796,13 @@ public partial class MainWindow : Window
     // grid row and aligned to the bottom, which is the same trick the subtitle
     // plate has always used, and it means the one instance keeps its handlers,
     // its capture and its bindings. Grid.Row goes back on the way out.
+    // The FLOOR of the reach, and the whole of it until the plate has been up
+    // once and could be measured. See ViewerPanel_PreviewMouseMove.
     private const double FullScreenTransportBandHeight = 140;
     private bool _fullScreenTransportShown;
+    // How far up from the panel's floor the plate reaches, learned from the
+    // plate itself. Zero until it has been shown once.
+    private double _fullScreenTransportReach;
 
     // What the plate reads as, for the purpose of picking an ink. Not the plate's
     // own #B4000000, which is translucent: a bright frame showing through lifts
@@ -26682,6 +26819,7 @@ public partial class MainWindow : Window
     {
         "ForegroundText",
         "FileNameForeground",
+        "FileNamePlayingForeground",
         "TreeRowHoverBackground",
         "HoverBackground",
         "TreeGuideLineBrush",
@@ -26695,7 +26833,49 @@ public partial class MainWindow : Window
         }
 
         double y = e.GetPosition(ViewerPanel).Y;
-        if (y >= ViewerPanel.ActualHeight - FullScreenTransportBandHeight)
+
+        // ONE LINE FOR BOTH DIRECTIONS, and the plate's own top edge is where it
+        // goes (2026-08-16, three cuts).
+        //
+        // ㉮ A flat 140 from the panel's floor decided both, so a plate taller
+        //    than 140 hid itself the moment the pointer reached its own upper
+        //    half - the seek bar and the name, which is everything anyone goes
+        //    there for.
+        // ㉯ Growing the dismiss line to the plate's HEIGHT still missed,
+        //    because the plate is not against the panel's floor: the thumbnail
+        //    bar sits under it, so 140 up from the floor lands inside the
+        //    plate's title row whenever the strip is showing.
+        // ㉰ Asking the plate where its top is fixed the dismiss side but left
+        //    the two lines APART - the pointer had to reach the controls to
+        //    call the plate, then could rise above them before it went away.
+        //    Two rules for one edge is a thing to be learned rather than seen,
+        //    and it read as the app changing its mind.
+        //
+        // So: one reach, measured from the plate itself, used both ways. Never
+        // shorter than 140 - that is the call zone's floor for the case where
+        // the plate sits right on the panel's floor with no strip under it.
+        // The rule the first cut got wrong survives all three: POINTING AT A
+        // THING MUST NEVER BE WHAT DISMISSES IT.
+        if (_fullScreenTransportShown && ViewerCaptionPanel.ActualHeight > 0)
+        {
+            double plateTop = ViewerCaptionPanel
+                .TransformToAncestor(ViewerPanel)
+                .Transform(new System.Windows.Point(0, 0)).Y;
+            // Held as a distance from the BOTTOM, not as a coordinate: the panel
+            // resizes and this has to answer for the next window as well. It is
+            // measured while the plate is up because that is the only time it
+            // has a position - collapsed, it is nowhere - and the position does
+            // not move between showings, so the remembered one is the same line
+            // the pointer will find the plate on.
+            _fullScreenTransportReach = Math.Max(
+                FullScreenTransportBandHeight, ViewerPanel.ActualHeight - plateTop);
+        }
+
+        double reach = _fullScreenTransportReach > 0
+            ? _fullScreenTransportReach
+            : FullScreenTransportBandHeight;
+
+        if (y >= ViewerPanel.ActualHeight - reach)
         {
             ShowFullScreenTransport();
         }
@@ -26762,6 +26942,11 @@ public partial class MainWindow : Window
         ViewerFileName.Visibility = Visibility.Collapsed;
         ViewerFileInfo.Visibility = Visibility.Collapsed;
 
+        // With the caption gone, the 지금 재생 중 line is the only thing left
+        // that can name the track - and it drops the name when the caption is
+        // carrying it, so it has to be told the caption just left.
+        UpdateViewerNowPlaying();
+
         // The subtitle line lives at the bottom too, so it steps up out of the
         // way rather than being covered by what just arrived.
         ViewerSubtitlePlate.Margin = new Thickness(16, 0, 16, 18 + FullScreenSubtitleLift);
@@ -26795,12 +26980,19 @@ public partial class MainWindow : Window
             ? Visibility.Collapsed
             : Visibility.Visible;
 
-        // Put back for the panel, where UpdateViewerCarousel and the caption
-        // builder own them again.
-        ViewerCarouselBar.Visibility = Visibility.Visible;
+        // Put back for the panel, where the caption builder owns them again.
         ViewerFileName.Visibility = Visibility.Visible;
         ViewerFileInfo.Visibility = Visibility.Visible;
         ViewerSubtitlePlate.Margin = new Thickness(16, 0, 16, 18);
+
+        // The caption is back to naming the track, so the line below stops.
+        UpdateViewerNowPlaying();
+
+        // The COUNTER is asked for rather than assumed. Forcing it Visible here
+        // was a second answer to a question UpdateViewerCarousel had already
+        // answered - a folder, or a file outside the walked set, has no counter
+        // at all, and leaving the plate would have put one back.
+        UpdateViewerCarousel();
     }
 
     // Drag across a fitted picture to walk the folder.
