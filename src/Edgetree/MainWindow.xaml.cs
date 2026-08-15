@@ -13993,7 +13993,41 @@ public partial class MainWindow : Window
     private static readonly HashSet<string> ThumbnailExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".jpg", ".jpeg", ".jfif", ".png", ".gif", ".bmp", ".webp",
-        ".ico", ".tif", ".tiff", ".heic", ".heif", ".avif"
+        ".ico", ".tif", ".tiff", ".heic", ".heif", ".avif",
+        // SVG (2026-08-15). The panel could already DRAW one - it cannot decode
+        // the format itself, so it falls through to the shell preview like a PSD
+        // - but this set is what HasViewerPreview asks, and every door into the
+        // panel asks HasViewerPreview. So the expand switch never appeared on an
+        // svg, nor did the row menu's 보기, nor the thumbnail slot, while the
+        // panel behind them was perfectly able to show it (reported 2026-08-15).
+        //
+        // Depending on a shell handler is not new here and not a reason to hold
+        // it back: whether a thumbnail EXISTS has always been the shell's call,
+        // and a machine without an SVG handler falls through to the file-type
+        // icon exactly as one without an HEIC or a FLAC codec does.
+        ".svg",
+
+        // THE REST OF WHAT THE SHELL WILL DRAW, added 2026-08-15 after a PSD
+        // was reported not offering the panel at all. The list is not guessed:
+        // Windows records an IThumbnailProvider per extension, and reading that
+        // registry key back gave 144 of them on the development machine - these
+        // are the ones on it that are pictures and were not here already.
+        //
+        // The set had been the formats this app can DECODE, and the mismatch is
+        // the bug: nothing here is decoded by the app anyway. Every one goes to
+        // the shell exactly as a PSD does - which the comment above the video
+        // list has said all along, while the PSD itself was not in the set.
+        ".psd",
+        // JPEG XL and the JPEG XR pair. Store extensions on Windows 11.
+        ".jxl", ".jxr", ".wdp",
+        ".dds", ".qoi", ".tga",
+        // CAMERA RAW, and it is one format per maker rather than a family with
+        // one extension - Windows' own Raw Image Extension covers the lot, and a
+        // machine without it falls through to the icon like any other.
+        ".dng", ".cr2", ".cr3", ".crw", ".nef", ".nrw", ".arw", ".sr2", ".srf",
+        ".orf", ".ori", ".raf", ".rw2", ".rwl", ".pef", ".ptx", ".srw", ".x3f",
+        ".raw", ".mrw", ".dcr", ".dcs", ".kdc", ".k25", ".erf", ".mef", ".mos",
+        ".3fr", ".ari", ".bay", ".cap", ".drf", ".eip", ".fff", ".iiq", ".pxn"
     };
 
     // The path the currently open menu requested a thumbnail for - compared on
@@ -19846,7 +19880,19 @@ public partial class MainWindow : Window
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".mp4", ".m4v", ".mov", ".avi", ".wmv", ".mkv", ".webm",
-        ".mpg", ".mpeg", ".m2ts", ".mts", ".ts", ".flv", ".3gp"
+        ".mpg", ".mpeg", ".m2ts", ".mts", ".ts", ".flv", ".3gp",
+        // ALIASES OF WHAT IS ALREADY ABOVE, added 2026-08-15. Every one of the
+        // five carries the same codecs as a neighbour on this line and differs
+        // only in the extension it wears: .asf/.wm are the WMV container, .qt is
+        // MOV, .3g2 is 3GP, .m2t is MTS. So nothing new has to decode - which is
+        // the whole test a video extension has to pass here, since a format the
+        // engine cannot play opens the panel and then fails in it.
+        //
+        // The wider list was measured, not guessed - Windows registers a
+        // thumbnail handler per extension and this machine had 40 more video
+        // ones - but most of those (.divx, .xvid, .ogv, .rm, .mka) need a codec
+        // that is not on a stock install, and those stay out until asked for.
+        ".asf", ".wm", ".qt", ".3g2", ".m2t"
     };
 
     // Sound, added 2026-08-11 for a reason worth writing down: the panel could
@@ -19860,7 +19906,17 @@ public partial class MainWindow : Window
     // on the PC, and FLAC in particular is not guaranteed on the old pipeline.
     private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".mp3", ".wav", ".flac"
+        ".mp3", ".wav", ".flac",
+        // 2026-08-15. These four are what a stock Windows plays without help:
+        // .m4a and .m4b are AAC in an MP4 box, .aac the same codec bare, .wma
+        // Microsoft's own. FLAC above is the one on this line that ISN'T
+        // guaranteed, which is the measure of how safe these are.
+        //
+        // Left out on purpose, though the machine has thumbnail handlers for
+        // them: .ogg/.opus/.oga rely on Web Media Extensions, and .mka/.ape/
+        // .tak/.wv on codecs nobody has by default. A file that opens the panel
+        // and then cannot play is worse than one the panel never offered.
+        ".m4a", ".m4b", ".aac", ".wma"
     };
 
     private static bool IsViewerVideo(string path)
