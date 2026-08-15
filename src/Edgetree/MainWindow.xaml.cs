@@ -7777,17 +7777,6 @@ public partial class MainWindow : Window
 
         Resources["FolderNameFontWeight"] = bold || foldersOnly ? FontWeights.Bold : FontWeights.Normal;
         Resources["FileNameFontWeight"] = bold || filesOnly ? FontWeights.Bold : FontWeights.Normal;
-
-        // The footer's chips follow 전체 굵게 ONLY, not the two half-settings.
-        // 폴더만/파일만 are answers about rows in a tree, and a chip is neither -
-        // it names a kind of file rather than a file - so the only reading of
-        // this setting a chip can honestly take is the one that means "all of
-        // it". Under either half-setting the strip stays as it is.
-        //
-        // Through the existing option rather than a new one: the request was to
-        // SEE the strip bold before deciding anything about it, and this is the
-        // switch already on the menu (2026-08-15).
-        Resources["FooterChipFontWeight"] = bold ? FontWeights.Bold : FontWeights.Normal;
     }
 
     // Shows the chevron for whichever direction still has menu rows in it.

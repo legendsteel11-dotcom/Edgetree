@@ -292,7 +292,17 @@
         <!-- Lifts the LABEL inside the chip, and it is optical rather than
              arithmetic - the box is already centred. See ApplyLayoutMetrics. -->
         <Thickness x:Key="FooterChipTextNudge">0,0,0,2</Thickness>
-        <FontWeight x:Key="FooterChipFontWeight">Normal</FontWeight>
+        <!-- ALWAYS BOLD, and not a setting. It was hung off 전체 굵게 for one
+             round so the strip could be looked at either way, and looking
+             settled it: the chips are the smallest text in the window and the
+             only text there that has to be read at a glance rather than
+             actually read. Weight is what buys that at three points below the
+             tree's own size.
+             Outside 글꼴 굵기 because that option is about the TREE - it offers
+             폴더만 and 파일만, which a chip cannot answer at all - and a strip
+             that came and went with it would be an accident of where someone
+             left a setting about something else. -->
+        <FontWeight x:Key="FooterChipFontWeight">Bold</FontWeight>
         <system:Double x:Key="ViewerChipGlyphFontSize">11</system:Double>
         <system:Double x:Key="ViewerChipIconSize">11</system:Double>
         <!-- Every button in the viewer's strip draws the same box, whether it
@@ -2872,7 +2882,9 @@
              thing meant to catch the eye. -->
         <Style x:Key="FooterFilterChipStyle"
                 TargetType="ToggleButton">
-            <!-- 전체 굵게 reaches the strip too - see ApplyTreeFontWeight. -->
+            <!-- Set here so BOTH strips take it - the footer's filters and the
+                 viewer's row, the same reasoning as the font size below. See
+                 the resource for why it is fixed rather than an option. -->
             <Setter Property="FontWeight"
                     Value="{DynamicResource FooterChipFontWeight}"/>
             <!-- Follows Ctrl +/- through the resource, and it is set HERE so
