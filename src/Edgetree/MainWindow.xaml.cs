@@ -928,8 +928,17 @@ public partial class MainWindow : Window
         // as a mark rather than a block. Keeping it the SAME blue the app
         // already draws with is the part worth holding on to - one accent, used
         // in both places, rather than a second one invented for this strip.
-        SetBrushColor("FooterChipCheckedBackground", light ? "#4A90E2" : "#5A5A5A");
-        SetBrushColor("FooterChipCheckedForeground", "#FFFFFF");
+        //
+        // ON THE PALETTE since 2026-08-15, which does not overturn any of the
+        // above: what that reasoning ruled out was DERIVING these from the
+        // selection colour, and every default below is exactly the value it
+        // argued its way to. A row of their own only lets someone say otherwise.
+        SetBrushColor("FooterChipCheckedBackground", light
+            ? _settings.LightFilterChipCheckedBackgroundColorHex
+            : _settings.FilterChipCheckedBackgroundColorHex);
+        SetBrushColor("FooterChipCheckedForeground", light
+            ? _settings.LightFilterChipCheckedForegroundColorHex
+            : _settings.FilterChipCheckedForegroundColorHex);
 
         // The exclusion chip's own ink. Warm rather than the app's blue accent
         // because it is the one control in the strip that REMOVES, and reusing
@@ -939,15 +948,20 @@ public partial class MainWindow : Window
         // dark for the same reason every other pair here splits: each has to
         // clear its own ground. The lit state washes the same hue behind it
         // instead of the grey/blue fill, so the chip never trades its ink away.
-        SetBrushColor("FooterChipExcludeForeground", light ? "#B3453B" : "#E08C82");
+        SetBrushColor("FooterChipExcludeForeground", light
+            ? _settings.LightFilterChipExcludeColorHex
+            : _settings.FilterChipExcludeColorHex);
         // Solid, at the same weight as the other chips' lit fill on each theme -
         // this is what says on or off, and a tint was not enough to tell them
         // apart (2026-08-10). Dark gets the muted one for the same reason
         // the grey/blue pair above splits: it sits on a dark ground already.
-        SetBrushColor("FooterChipExcludeCheckedBackground", light ? "#B3453B" : "#8A423A");
+        SetBrushColor("FooterChipExcludeCheckedBackground", light
+            ? _settings.LightFilterChipExcludeCheckedBackgroundColorHex
+            : _settings.FilterChipExcludeCheckedBackgroundColorHex);
         SetBrushColor("FolderNameHoverForeground", light ? _settings.LightFolderNameHoverColorHex : _settings.FolderNameHoverColorHex);
         SetBrushColor("FileNameHoverForeground", light ? _settings.LightFileNameHoverColorHex : _settings.FileNameHoverColorHex);
         SetBrushColor("ShowMoreForeground", light ? _settings.LightShowMoreColorHex : _settings.ShowMoreColorHex);
+        SetBrushColor("ExpanderArrowBrush", light ? _settings.LightExpanderColorHex : _settings.ExpanderColorHex);
         SetBrushColor("TreeGuideLineBrush", light ? _settings.LightGuideLineColorHex : _settings.GuideLineColorHex);
         SetBrushColor("TreeGuideLineActiveBrush", light ? _settings.LightGuideLineActiveColorHex : _settings.GuideLineActiveColorHex);
         // 영역 구분선 표시, through the brush rather than through the lines. Every

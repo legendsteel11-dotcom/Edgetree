@@ -371,6 +371,29 @@ public class AppSettings
     public string GuideLineColorHex { get; set; } = "#FF323438";
     public string GuideLineActiveColorHex { get; set; } = "#FF5C5E62";
 
+    // 펼침기호 - the chevron in front of every folder. It was a literal on the
+    // toggle's own template and so had no theme at all: dark and light drew the
+    // same grey, which is the only colour in the app that did (2026-08-15).
+    // Its HOVER state is not stored - that has always been ForegroundText, i.e.
+    // already the user's, and a second row would only let the two come apart.
+    public string ExpanderColorHex { get; set; } = "#FF8A8A8A";
+
+    // The footer's file-kind chips. Fixed per theme until 2026-08-15, and the
+    // reason recorded then still holds for what it actually said: these must not
+    // be DERIVED from the tree's selection colour, which is often a strong blue
+    // and put a shout in a strip meant to be read at a glance. A row of their
+    // own is a different thing - it is the user saying what the strip should
+    // look like, not the app guessing from somewhere else.
+    //
+    // Only the LIT states are stored. An unlit chip draws in ForegroundText at
+    // the strip's own 0.65, which is already the user's colour.
+    public string FilterChipCheckedBackgroundColorHex { get; set; } = "#FF5A5A5A";
+    public string FilterChipCheckedForegroundColorHex { get; set; } = "#FFFFFFFF";
+    // 제외 칩 - the one control in the strip that REMOVES, which is why it
+    // carries a warm hue instead of the app's blue accent.
+    public string FilterChipExcludeColorHex { get; set; } = "#FFE08C82";
+    public string FilterChipExcludeCheckedBackgroundColorHex { get; set; } = "#FF8A423A";
+
     // The header/favorites/tree panel-separator lines - previously just
     // reused GuideLineColorHex (see MainWindow.xaml's history), which meant
     // changing the tree's own indent guide line color also silently changed
@@ -466,6 +489,23 @@ public class AppSettings
     public string LightShowMoreColorHex { get; set; } = "#FF6E6E6E";
     public string LightGuideLineColorHex { get; set; } = "#FFD9D9D9";
     public string LightGuideLineActiveColorHex { get; set; } = "#FFA0A0A0";
+    // A shade darker than the dark theme's, because it now has white to clear
+    // rather than a dark ground - and it keeps the same relationship the dark
+    // theme has, a quiet step away from the row's own text (#3B3B3B).
+    public string LightExpanderColorHex { get; set; } = "#FF7A7A7A";
+    // The lit chip takes a BLUE on light where dark takes a grey, and the split
+    // is the point: on dark, grey with white on it is enough to lift the chip
+    // off the seven quiet ones, while on light grey had nothing to push against
+    // - the whole strip is already pale. The blue is the bookmark ribbon's own
+    // #4A90E2, and reusing the accent the app already draws with is the part
+    // worth keeping: one accent in two places rather than a second one invented
+    // for this strip.
+    public string LightFilterChipCheckedBackgroundColorHex { get; set; } = "#FF4A90E2";
+    public string LightFilterChipCheckedForegroundColorHex { get; set; } = "#FFFFFFFF";
+    // Darker on light and lighter on dark, the same way every other pair here
+    // splits: each has to clear its own ground.
+    public string LightFilterChipExcludeColorHex { get; set; } = "#FFB3453B";
+    public string LightFilterChipExcludeCheckedBackgroundColorHex { get; set; } = "#FFB3453B";
     public string LightPanelDividerColorHex { get; set; } = "#FFD9D9D9";
     public string LightViewerBackgroundColorHex { get; set; } = "#FFFFFFFF";
     public string LightHeaderBackgroundColorHex { get; set; } = "#FFF3F3F3";

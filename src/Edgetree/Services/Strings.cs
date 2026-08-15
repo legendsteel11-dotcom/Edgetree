@@ -572,6 +572,14 @@ public static class Strings
     public static string ColorLabelShowMore = "더 보기";
     public static string ColorLabelGuideLine = "들여쓰기 안내선";
     public static string ColorLabelGuideLineActive = "들여쓰기 안내선 강조";
+    // 화살표가 아니라 기호 - 사용자가 부르는 이름 그대로.
+    public static string ColorLabelExpander = "펼침기호";
+    // 켜진 칩의 글자는 두 칩이 공유하는 색 하나라 "필터"를 뺐음 - 붙여 두었더니
+    // 제외 칩 글자 행이 안 듣는 것처럼 읽혔음(2026-08-15). 배경은 칩마다 따로다.
+    public static string ColorLabelFilterChipChecked = "필터 칩 켜짐";
+    public static string ColorLabelFilterChipCheckedFont = "칩 켜짐 글자";
+    public static string ColorLabelFilterChipExclude = "제외 칩 꺼짐 글자";
+    public static string ColorLabelFilterChipExcludeChecked = "제외 칩 켜짐";
     public static string ColorLabelHeader = "제목 표시줄 배경";
     public static string ColorLabelPanelDivider = "영역 구분선";
     public static string ColorLabelViewerBackground = "멀티미디어 패널 배경";
@@ -1010,6 +1018,11 @@ public static class Strings
         ColorLabelShowMore = "Show More";
         ColorLabelGuideLine = "Guide Line";
         ColorLabelGuideLineActive = "Guide Line Highlight";
+        ColorLabelExpander = "Expand Arrow";
+        ColorLabelFilterChipChecked = "Filter Chip On";
+        ColorLabelFilterChipCheckedFont = "Chip On Text";
+        ColorLabelFilterChipExclude = "Exclude Chip Off Text";
+        ColorLabelFilterChipExcludeChecked = "Exclude Chip On";
         ColorLabelHeader = "Title Bar Background";
         ColorLabelPanelDivider = "Panel Divider";
         ColorLabelViewerBackground = "Multimedia Panel Background";

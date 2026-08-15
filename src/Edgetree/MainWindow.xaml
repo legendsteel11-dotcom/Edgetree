@@ -179,6 +179,11 @@
                 Color="#FFA8AAAE"/>
         <SolidColorBrush x:Key="TreeRowSelectedActiveBackground"
                 Color="#FF323438"/>
+        <!-- 펼침기호. A literal on the toggle's own template until 2026-08-15,
+             which made it the only colour in the app with no light/dark pair -
+             both themes drew this same grey. ApplyColorSettings replaces it. -->
+        <SolidColorBrush x:Key="ExpanderArrowBrush"
+                Color="#FF8A8A8A"/>
         <SolidColorBrush x:Key="TreeGuideLineBrush"
                 Color="#FF323438"/>
         <SolidColorBrush x:Key="TreeGuideLineActiveBrush"
@@ -2268,7 +2273,7 @@
                                  reads as a plain "›" rather than a filled flag shape. -->
                             <Path x:Name="Arrow"
                                     Data="M5,3 L9.5,6.5 L5,10"
-                                    Stroke="#FF8A8A8A"
+                                    Stroke="{DynamicResource ExpanderArrowBrush}"
                                     StrokeThickness="1.4"
                                     StrokeLineJoin="Round"
                                     StrokeStartLineCap="Round"
@@ -2994,9 +2999,11 @@
              (see the 흐리게 rule) and a filter that hides files has to be the
              most legible thing in the footer, not the least.
 
-             The two inks are theme-fixed like FooterChipChecked* above, NOT a
-             new row in 색상 설정 - one more colour to pick is a cost every
-             user pays for a strip most of them will never turn on. -->
+             Both inks ARE rows in 색상 설정 as of 2026-08-15. What stood here
+             said they should not be - "one more colour to pick is a cost every
+             user pays for a strip most of them will never turn on" - and the
+             chain is what answered it: rows became cheap to keep in step, so
+             the reason for holding these back went with it. -->
         <Style x:Key="FooterExcludeChipStyle"
                 TargetType="ToggleButton"
                 BasedOn="{StaticResource FooterFilterChipStyle}">
@@ -3022,14 +3029,26 @@
                                 <Setter Property="Opacity"
                                         Value="1"/>
                             </Trigger>
-                            <!-- Lit exactly the way the seven kind chips are -
-                                 a solid fill with white on it - just in this
-                                 chip's own hue instead of theirs. A tinted
-                                 wash was tried first, so that the coloured ink
-                                 could stay in both states, and the on/off
-                                 difference was too quiet to read (
-                                 2026-08-10). The hue alone already says which
-                                 chip this is; the fill has the other job. -->
+                            <!-- Lit the way the seven kind chips are - a solid
+                                 fill rather than a tinted wash. That much is
+                                 settled: the wash was tried first so the
+                                 coloured ink could stay in both states, and the
+                                 on/off difference was too quiet to read
+                                 (2026-08-10).
+                                 THE LIT TEXT IS THE ONE BOTH CHIPS SHARE, and it
+                                 was briefly changed to this chip's own ink on
+                                 2026-08-15 - the row named 제외 칩 글자 looked
+                                 broken because it only did anything while the
+                                 chip was OFF, so it was pointed at both states.
+                                 That put the light theme's own two defaults on
+                                 top of each other (#B3453B on #B3453B) and the
+                                 word vanished, which is the shape of the answer:
+                                 this chip's hue is chosen to be READ AGAINST the
+                                 footer, not to be read against ITSELF. Reverted
+                                 within the hour. The row was misnamed rather than
+                                 misused - it is the ink at rest, and the lit text
+                                 belongs to 칩 켜짐 글자 for every chip in the
+                                 strip. -->
                             <Trigger Property="IsChecked"
                                     Value="True">
                                 <Setter TargetName="Bd"

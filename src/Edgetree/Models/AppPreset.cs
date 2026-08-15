@@ -128,6 +128,11 @@ public class AppPreset
         nameof(AppSettings.ShowMoreColorHex),
         nameof(AppSettings.GuideLineColorHex),
         nameof(AppSettings.GuideLineActiveColorHex),
+        nameof(AppSettings.ExpanderColorHex),
+        nameof(AppSettings.FilterChipCheckedBackgroundColorHex),
+        nameof(AppSettings.FilterChipCheckedForegroundColorHex),
+        nameof(AppSettings.FilterChipExcludeColorHex),
+        nameof(AppSettings.FilterChipExcludeCheckedBackgroundColorHex),
         nameof(AppSettings.PanelDividerColorHex),
         // In the COLOUR group, not the look one: it is applied by the same pass
         // that repaints the palette (LookFields' apply path never calls
@@ -150,6 +155,11 @@ public class AppPreset
         nameof(AppSettings.LightShowMoreColorHex),
         nameof(AppSettings.LightGuideLineColorHex),
         nameof(AppSettings.LightGuideLineActiveColorHex),
+        nameof(AppSettings.LightExpanderColorHex),
+        nameof(AppSettings.LightFilterChipCheckedBackgroundColorHex),
+        nameof(AppSettings.LightFilterChipCheckedForegroundColorHex),
+        nameof(AppSettings.LightFilterChipExcludeColorHex),
+        nameof(AppSettings.LightFilterChipExcludeCheckedBackgroundColorHex),
         nameof(AppSettings.LightPanelDividerColorHex),
         nameof(AppSettings.LightViewerBackgroundColorHex),
         nameof(AppSettings.LightHeaderBackgroundColorHex),

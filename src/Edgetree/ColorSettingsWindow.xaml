@@ -497,6 +497,15 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <!-- 16 펼침기호, 18~21 필터 칩 넷 (2026-08-15). The chips sit
+                         below 영역 구분선 rather than beside the tree's own marks,
+                         which is where they are on screen; 숨김 시 손잡이/막대 stays
+                         last for the reason its own comment gives. -->
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -826,10 +835,32 @@
 
                 <TextBlock Grid.Row="16"
                         Grid.Column="0"
-                        Text="{x:Static services:Strings.ColorLabelPanelDivider}"
+                        Text="{x:Static services:Strings.ColorLabelExpander}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
                 <StackPanel Grid.Row="16"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="ExpanderSwatchChain"
+                            Tag="ExpanderSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
+                    <TextBox Tag="ExpanderSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="ExpanderSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="ExpanderSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="17"
+                        Grid.Column="0"
+                        Text="{x:Static services:Strings.ColorLabelPanelDivider}"
+                        Style="{StaticResource ColorRowLabelStyle}"
+                        Margin="{DynamicResource DialogRowSpacing}"/>
+                <StackPanel Grid.Row="17"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -871,16 +902,118 @@
                             MouseLeftButtonUp="ViewerBackgroundSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
+                <!-- ORDER IS 배경·글자 · 배경·글자, one pair per chip, not both
+                     backgrounds and then both texts (2026-08-15). The rows are
+                     declared here in the order they were written and carry their
+                     place in Grid.Row - so moving one means moving its number,
+                     not its block.
+                     하단 필터 칩 넷. Only the LIT states are here: an unlit chip
+                     draws in the row's own text colour, which is already on this
+                     page. 제외 칩 글자 is the one exception and it is deliberate -
+                     that chip carries its hue at rest, because it is the one
+                     control in the strip that REMOVES.
+                     A NOTE FOR WHOEVER READS A COMPLAINT ABOUT IT: the unlit
+                     strip draws at Opacity 0.65, so the colour picked for 제외 칩
+                     글자 appears lighter than the swatch. The lit rows do not -
+                     their trigger takes the opacity back to 1. -->
+                <TextBlock Grid.Row="18"
+                        Grid.Column="0"
+                        Text="{x:Static services:Strings.ColorLabelFilterChipChecked}"
+                        Style="{StaticResource ColorRowLabelStyle}"
+                        Margin="{DynamicResource DialogRowSpacing}"/>
+                <StackPanel Grid.Row="18"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="FilterChipCheckedSwatchChain"
+                            Tag="FilterChipCheckedSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
+                    <TextBox Tag="FilterChipCheckedSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="FilterChipCheckedSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="FilterChipCheckedSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="19"
+                        Grid.Column="0"
+                        Text="{x:Static services:Strings.ColorLabelFilterChipCheckedFont}"
+                        Style="{StaticResource ColorRowLabelStyle}"
+                        Margin="{DynamicResource DialogRowSpacing}"/>
+                <StackPanel Grid.Row="19"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="FilterChipCheckedFontSwatchChain"
+                            Tag="FilterChipCheckedFontSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
+                    <TextBox Tag="FilterChipCheckedFontSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="FilterChipCheckedFontSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="FilterChipCheckedFontSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="21"
+                        Grid.Column="0"
+                        Text="{x:Static services:Strings.ColorLabelFilterChipExclude}"
+                        Style="{StaticResource ColorRowLabelStyle}"
+                        Margin="{DynamicResource DialogRowSpacing}"/>
+                <StackPanel Grid.Row="21"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="FilterChipExcludeSwatchChain"
+                            Tag="FilterChipExcludeSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
+                    <TextBox Tag="FilterChipExcludeSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="FilterChipExcludeSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="FilterChipExcludeSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="20"
+                        Grid.Column="0"
+                        Text="{x:Static services:Strings.ColorLabelFilterChipExcludeChecked}"
+                        Style="{StaticResource ColorRowLabelStyle}"
+                        Margin="{DynamicResource DialogRowSpacing}"/>
+                <StackPanel Grid.Row="20"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="FilterChipExcludeCheckedSwatchChain"
+                            Tag="FilterChipExcludeCheckedSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
+                    <TextBox Tag="FilterChipExcludeCheckedSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="FilterChipExcludeCheckedSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="FilterChipExcludeCheckedSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
+
                 <!-- Last, and on its own: it is the one colour on this page
                      that is not seen against the app at all - the sidebar has
                      to be hidden first, so there is nothing to compare it with
                      while it is being set. -->
-                <TextBlock Grid.Row="17"
+                <TextBlock Grid.Row="22"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelAutoHideHandle}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="17"
+                <StackPanel Grid.Row="22"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -903,7 +1036,7 @@
                      whole palette. Opposite ends of the row is the usual place
                      for a discard action, and the confirm prompt stays either
                      way. -->
-                <Grid Grid.Row="18"
+                <Grid Grid.Row="23"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0">

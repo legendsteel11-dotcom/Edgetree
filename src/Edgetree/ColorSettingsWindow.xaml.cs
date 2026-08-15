@@ -127,6 +127,11 @@ public partial class ColorSettingsWindow : Window
         FileNameHoverFontSwatch.Background = ParseBrush(CurrentFileNameHoverColorHex);
         ShowMoreFontSwatch.Background = ParseBrush(CurrentShowMoreColorHex);
         GuideLineSwatch.Background = ParseBrush(CurrentGuideLineColorHex);
+        ExpanderSwatch.Background = ParseBrush(CurrentExpanderColorHex);
+        FilterChipCheckedSwatch.Background = ParseBrush(CurrentFilterChipCheckedColorHex);
+        FilterChipCheckedFontSwatch.Background = ParseBrush(CurrentFilterChipCheckedFontColorHex);
+        FilterChipExcludeSwatch.Background = ParseBrush(CurrentFilterChipExcludeColorHex);
+        FilterChipExcludeCheckedSwatch.Background = ParseBrush(CurrentFilterChipExcludeCheckedColorHex);
         GuideLineActiveSwatch.Background = ParseBrush(CurrentGuideLineActiveColorHex);
         HeaderSwatch.Background = ParseBrush(CurrentHeaderBackgroundColorHex);
         PanelDividerSwatch.Background = ParseBrush(CurrentPanelDividerColorHex);
@@ -305,6 +310,31 @@ public partial class ColorSettingsWindow : Window
         get => _settings.IsLightMode ? _settings.LightGuideLineColorHex : _settings.GuideLineColorHex;
         set { if (_settings.IsLightMode) _settings.LightGuideLineColorHex = value; else _settings.GuideLineColorHex = value; }
     }
+    private string CurrentExpanderColorHex
+    {
+        get => _settings.IsLightMode ? _settings.LightExpanderColorHex : _settings.ExpanderColorHex;
+        set { if (_settings.IsLightMode) _settings.LightExpanderColorHex = value; else _settings.ExpanderColorHex = value; }
+    }
+    private string CurrentFilterChipCheckedColorHex
+    {
+        get => _settings.IsLightMode ? _settings.LightFilterChipCheckedBackgroundColorHex : _settings.FilterChipCheckedBackgroundColorHex;
+        set { if (_settings.IsLightMode) _settings.LightFilterChipCheckedBackgroundColorHex = value; else _settings.FilterChipCheckedBackgroundColorHex = value; }
+    }
+    private string CurrentFilterChipCheckedFontColorHex
+    {
+        get => _settings.IsLightMode ? _settings.LightFilterChipCheckedForegroundColorHex : _settings.FilterChipCheckedForegroundColorHex;
+        set { if (_settings.IsLightMode) _settings.LightFilterChipCheckedForegroundColorHex = value; else _settings.FilterChipCheckedForegroundColorHex = value; }
+    }
+    private string CurrentFilterChipExcludeColorHex
+    {
+        get => _settings.IsLightMode ? _settings.LightFilterChipExcludeColorHex : _settings.FilterChipExcludeColorHex;
+        set { if (_settings.IsLightMode) _settings.LightFilterChipExcludeColorHex = value; else _settings.FilterChipExcludeColorHex = value; }
+    }
+    private string CurrentFilterChipExcludeCheckedColorHex
+    {
+        get => _settings.IsLightMode ? _settings.LightFilterChipExcludeCheckedBackgroundColorHex : _settings.FilterChipExcludeCheckedBackgroundColorHex;
+        set { if (_settings.IsLightMode) _settings.LightFilterChipExcludeCheckedBackgroundColorHex = value; else _settings.FilterChipExcludeCheckedBackgroundColorHex = value; }
+    }
     private string CurrentGuideLineActiveColorHex
     {
         get => _settings.IsLightMode ? _settings.LightGuideLineActiveColorHex : _settings.GuideLineActiveColorHex;
@@ -462,6 +492,11 @@ public partial class ColorSettingsWindow : Window
             && CurrentShowMoreColorHex == GetDefault(defaults, s => s.ShowMoreColorHex, s => s.LightShowMoreColorHex)
             && CurrentGuideLineColorHex == GetDefault(defaults, s => s.GuideLineColorHex, s => s.LightGuideLineColorHex)
             && CurrentGuideLineActiveColorHex == GetDefault(defaults, s => s.GuideLineActiveColorHex, s => s.LightGuideLineActiveColorHex)
+            && CurrentExpanderColorHex == GetDefault(defaults, s => s.ExpanderColorHex, s => s.LightExpanderColorHex)
+            && CurrentFilterChipCheckedColorHex == GetDefault(defaults, s => s.FilterChipCheckedBackgroundColorHex, s => s.LightFilterChipCheckedBackgroundColorHex)
+            && CurrentFilterChipCheckedFontColorHex == GetDefault(defaults, s => s.FilterChipCheckedForegroundColorHex, s => s.LightFilterChipCheckedForegroundColorHex)
+            && CurrentFilterChipExcludeColorHex == GetDefault(defaults, s => s.FilterChipExcludeColorHex, s => s.LightFilterChipExcludeColorHex)
+            && CurrentFilterChipExcludeCheckedColorHex == GetDefault(defaults, s => s.FilterChipExcludeCheckedBackgroundColorHex, s => s.LightFilterChipExcludeCheckedBackgroundColorHex)
             && CurrentPanelDividerColorHex == GetDefault(defaults, s => s.PanelDividerColorHex, s => s.LightPanelDividerColorHex)
             && CurrentViewerBackgroundColorHex == GetDefault(defaults, s => s.ViewerBackgroundColorHex, s => s.LightViewerBackgroundColorHex)
             && CurrentHeaderBackgroundColorHex == GetDefault(defaults, s => s.HeaderBackgroundColorHex, s => s.LightHeaderBackgroundColorHex)
@@ -776,6 +811,25 @@ public partial class ColorSettingsWindow : Window
         CurrentFolderNameHighlightColorHex = Write(palette.Highlight);
         CurrentFileNameHighlightColorHex = Write(palette.Highlight);
         CurrentShowMoreColorHex = Write(palette.ShowMore);
+        // 펼침기호 takes the ACTIVE guide line, not the resting one: both are
+        // marks the tree draws for structure rather than content, and the arrow
+        // is the one of the pair the eye is meant to find - the same step up the
+        // active guide already is.
+        CurrentExpanderColorHex = Write(palette.GuideActive);
+        // The lit chips ride the roll's SELECTION colour, which is what this
+        // palette already means by "the lit one". Their text takes the same
+        // highlight the tree's own highlighted names do, so a roll that lands on
+        // a dark selection gets light text and the other way round - the roll
+        // already worked that pair out and the strip should not disagree with
+        // the tree three inches above it.
+        CurrentFilterChipCheckedColorHex = Write(palette.Selection);
+        CurrentFilterChipCheckedFontColorHex = Write(palette.Highlight);
+        // The exclude chip is NOT rolled. It is the one control in the strip
+        // that removes, and it says so with a warm hue - a roll landing on a
+        // green or a blue would take the only thing that distinguishes it and
+        // leave two chips that look alike and do opposite things. It keeps
+        // whatever the user (or the theme's default) has, through every roll,
+        // mono included.
         // The handle is the roll's one loud voice - see RollHandle for why it
         // is no longer just the rolled background.
         CurrentAutoHideHandleColorHex = Write(palette.Handle);
@@ -1125,6 +1179,11 @@ public partial class ColorSettingsWindow : Window
         CurrentShowMoreColorHex = defaults.IsLightMode ? defaults.LightShowMoreColorHex : defaults.ShowMoreColorHex;
         CurrentGuideLineColorHex = defaults.IsLightMode ? defaults.LightGuideLineColorHex : defaults.GuideLineColorHex;
         CurrentGuideLineActiveColorHex = defaults.IsLightMode ? defaults.LightGuideLineActiveColorHex : defaults.GuideLineActiveColorHex;
+        CurrentExpanderColorHex = defaults.IsLightMode ? defaults.LightExpanderColorHex : defaults.ExpanderColorHex;
+        CurrentFilterChipCheckedColorHex = defaults.IsLightMode ? defaults.LightFilterChipCheckedBackgroundColorHex : defaults.FilterChipCheckedBackgroundColorHex;
+        CurrentFilterChipCheckedFontColorHex = defaults.IsLightMode ? defaults.LightFilterChipCheckedForegroundColorHex : defaults.FilterChipCheckedForegroundColorHex;
+        CurrentFilterChipExcludeColorHex = defaults.IsLightMode ? defaults.LightFilterChipExcludeColorHex : defaults.FilterChipExcludeColorHex;
+        CurrentFilterChipExcludeCheckedColorHex = defaults.IsLightMode ? defaults.LightFilterChipExcludeCheckedBackgroundColorHex : defaults.FilterChipExcludeCheckedBackgroundColorHex;
         CurrentHeaderBackgroundColorHex = defaults.IsLightMode ? defaults.LightHeaderBackgroundColorHex : defaults.HeaderBackgroundColorHex;
         CurrentPanelDividerColorHex = defaults.IsLightMode ? defaults.LightPanelDividerColorHex : defaults.PanelDividerColorHex;
         CurrentViewerBackgroundColorHex = defaults.IsLightMode ? defaults.LightViewerBackgroundColorHex : defaults.ViewerBackgroundColorHex;
@@ -1174,6 +1233,21 @@ public partial class ColorSettingsWindow : Window
 
     private void GuideLineSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(GuideLineSwatch, () => CurrentGuideLineColorHex, hex => CurrentGuideLineColorHex = hex);
+
+    private void ExpanderSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => PickColor(ExpanderSwatch, () => CurrentExpanderColorHex, hex => CurrentExpanderColorHex = hex);
+
+    private void FilterChipCheckedSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => PickColor(FilterChipCheckedSwatch, () => CurrentFilterChipCheckedColorHex, hex => CurrentFilterChipCheckedColorHex = hex);
+
+    private void FilterChipCheckedFontSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => PickColor(FilterChipCheckedFontSwatch, () => CurrentFilterChipCheckedFontColorHex, hex => CurrentFilterChipCheckedFontColorHex = hex);
+
+    private void FilterChipExcludeSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => PickColor(FilterChipExcludeSwatch, () => CurrentFilterChipExcludeColorHex, hex => CurrentFilterChipExcludeColorHex = hex);
+
+    private void FilterChipExcludeCheckedSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => PickColor(FilterChipExcludeCheckedSwatch, () => CurrentFilterChipExcludeCheckedColorHex, hex => CurrentFilterChipExcludeCheckedColorHex = hex);
 
     private void GuideLineActiveSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(GuideLineActiveSwatch, () => CurrentGuideLineActiveColorHex, hex => CurrentGuideLineActiveColorHex = hex);
@@ -1338,6 +1412,16 @@ public partial class ColorSettingsWindow : Window
             return (() => CurrentGuideLineColorHex, hex => CurrentGuideLineColorHex = hex);
         if (ReferenceEquals(swatch, GuideLineActiveSwatch))
             return (() => CurrentGuideLineActiveColorHex, hex => CurrentGuideLineActiveColorHex = hex);
+        if (ReferenceEquals(swatch, ExpanderSwatch))
+            return (() => CurrentExpanderColorHex, hex => CurrentExpanderColorHex = hex);
+        if (ReferenceEquals(swatch, FilterChipCheckedSwatch))
+            return (() => CurrentFilterChipCheckedColorHex, hex => CurrentFilterChipCheckedColorHex = hex);
+        if (ReferenceEquals(swatch, FilterChipCheckedFontSwatch))
+            return (() => CurrentFilterChipCheckedFontColorHex, hex => CurrentFilterChipCheckedFontColorHex = hex);
+        if (ReferenceEquals(swatch, FilterChipExcludeSwatch))
+            return (() => CurrentFilterChipExcludeColorHex, hex => CurrentFilterChipExcludeColorHex = hex);
+        if (ReferenceEquals(swatch, FilterChipExcludeCheckedSwatch))
+            return (() => CurrentFilterChipExcludeCheckedColorHex, hex => CurrentFilterChipExcludeCheckedColorHex = hex);
         if (ReferenceEquals(swatch, HeaderSwatch))
             return (() => CurrentHeaderBackgroundColorHex, hex => CurrentHeaderBackgroundColorHex = hex);
         if (ReferenceEquals(swatch, PanelDividerSwatch))
