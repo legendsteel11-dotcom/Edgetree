@@ -274,7 +274,16 @@
              open with a relative "m", which would then start from wherever the
              box left the pen (measured: it moved the pin 624 units sideways). -->
         <system:Double x:Key="HeaderGlyphBox">18</system:Double>
+        <GridLength x:Key="HeaderRowHeight">36</GridLength>
         <system:Double x:Key="FooterChipFontSize">9</system:Double>
+        <!-- The chip's own box and the gap to its neighbour. Literals on the
+             three chip templates until 2026-08-15, which left the strip's text
+             following Ctrl +/- while the padding around it did not - so at a
+             small font the chips stayed the width they were and went on wrapping
+             to four lines on a narrow sidebar. Default-font values here; see
+             CompactScale in ApplyLayoutMetrics for the curve. -->
+        <Thickness x:Key="FooterChipPadding">5,1</Thickness>
+        <Thickness x:Key="FooterChipMargin">0,0,2,0</Thickness>
         <system:Double x:Key="ViewerChipGlyphFontSize">11</system:Double>
         <system:Double x:Key="ViewerChipIconSize">11</system:Double>
         <!-- Every button in the viewer's strip draws the same box, whether it
@@ -2864,14 +2873,14 @@
             <Setter Property="Focusable"
                     Value="False"/>
             <Setter Property="Margin"
-                    Value="0,0,2,0"/>
+                    Value="{DynamicResource FooterChipMargin}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
                         <Border x:Name="Bd"
                                 Background="Transparent"
                                 CornerRadius="3"
-                                Padding="5,1"
+                                Padding="{DynamicResource FooterChipPadding}"
                                 SnapsToDevicePixels="True">
                             <TextBlock Text="{TemplateBinding Content}"
                                     VerticalAlignment="Center"/>
@@ -2999,7 +3008,7 @@
                         <Border x:Name="Bd"
                                 Background="Transparent"
                                 CornerRadius="3"
-                                Padding="5,1"
+                                Padding="{DynamicResource FooterChipPadding}"
                                 SnapsToDevicePixels="True">
                             <TextBlock Text="{TemplateBinding Content}"
                                     VerticalAlignment="Center"/>
@@ -3074,7 +3083,7 @@
             <Setter Property="Focusable"
                     Value="False"/>
             <Setter Property="Margin"
-                    Value="0,0,2,0"/>
+                    Value="{DynamicResource FooterChipMargin}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -3083,7 +3092,7 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="3"
-                                Padding="5,1"
+                                Padding="{DynamicResource FooterChipPadding}"
                                 SnapsToDevicePixels="True">
                             <TextBlock Text="{TemplateBinding Content}"
                                     VerticalAlignment="Center"
@@ -4479,8 +4488,12 @@
                      behind as a 36px band of background at the top of the
                      window. The viewer's full cover zeroes this height itself
                      (SetViewerFullscreen) and puts it back on the way out. -->
+                <!-- Follows Ctrl +/- within bounds - see HeaderHeight in
+                     MainWindow.xaml.cs for the range and why it is clamped
+                     rather than proportional. The value here is the default
+                     font's, held until ApplyLayoutMetrics first runs. -->
                 <RowDefinition x:Name="HeaderRow"
-                        Height="36"/>
+                        Height="{DynamicResource HeaderRowHeight}"/>
                 <RowDefinition x:Name="Row1"
                         Height="0"/>
                 <RowDefinition x:Name="FavoritesSplitterRow"

@@ -62,7 +62,32 @@ public partial class MainWindow : Window
     //    small end read as airy rather than compact. See CompactScale.
     private static readonly double[] TreeFontSizeSteps = { 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
     private const double DefaultTreeFontSize = 12;
-    private const double HeaderHeight = 36;
+    // The header at the default font. Everything below is a multiple of it, and
+    // HeaderHeight is what the rest of the app asks for.
+    private const double DefaultHeaderHeight = 36;
+
+    // FOLLOWS THE FONT, WITHIN BOUNDS (2026-08-15). It was a flat 36 - and the
+    // header glyphs a flat 18 - which made the header the one part of the window
+    // that answered Ctrl +/- not at all. That is invisible on a 4K panel where
+    // the sidebar is wide and 36px is a thin strip; on a 1920-wide screen, where
+    // the font is turned down to fit the sidebar into a quarter of the width, the
+    // header ends up the tallest thing on it.
+    //
+    // SHRINKS WITH THE FONT BUT NEVER GROWS PAST THE DEFAULT - the same shape as
+    // the context menu's thumbnail cap (2026-07-25, Math.Min(1.0, scale)) and for
+    // the same reason it gives there: the thing being sized is not text. The
+    // header is a fixed row of six icons, and a larger tree font gives them
+    // nothing to say that a taller bar would help with - it only takes rows off
+    // the list below. Downward is different: someone at 8pt is buying space, and
+    // the bar should hand some back. Tried both ways up to 44 and settled here
+    // (2026-08-15): "12pt 기준으로 더 안커져도 될거 같습니다."
+    //
+    // The floor is what still holds six buttons and, while floating, still leaves
+    // a caption strip worth grabbing. Between it and the default the bar moves a
+    // step at a time - 26 / 27 / 30 / 33 / 36 - which is what was asked for.
+    private double HeaderHeight => Math.Clamp(
+        Math.Round(DefaultHeaderHeight * Math.Min(1.0, TreeFontScale)),
+        26.0, DefaultHeaderHeight);
     private const double FloatingResizeBorder = 6;
     private const double DefaultFloatingHeight = 600;
     private const double UndockCornerOffset = 40;
@@ -3936,6 +3961,19 @@ public partial class MainWindow : Window
             >= 217 => (28.0, 1.0, 4.0),
             _ => (24.0, 0.0, 2.0),
         };
+
+        // AND NEVER TALLER THAN THE BAR THEY SIT IN (2026-08-15). The step above
+        // answers WIDTH alone, which was the whole story while the header was a
+        // fixed 36: the widest step is 32 plus 2 of margin either side, i.e.
+        // exactly 36, so it filled the bar and never overflowed it. Now that the
+        // bar follows the font (see HeaderHeight) a wide window at a small font
+        // asks for 32px buttons in a 26px bar - the buttons would simply be cut.
+        //
+        // Shrinking them is the right give: they already shrink for width, so
+        // this is the same control answering a second constraint rather than a
+        // new behaviour. Identity at the default font, where the subtraction
+        // returns the 32 the step already chose.
+        size = Math.Min(size, Math.Max(16.0, HeaderHeight - 2 * gap));
 
         // Written ONLY when the step actually changes, which is three times
         // across the whole width range - it used to be written on every
@@ -10904,6 +10942,42 @@ public partial class MainWindow : Window
         double rowGlyphBox = Math.Max(8.0, Math.Round(16.0 * scale - rowSqueeze));
         Resources["IconSize"] = rowGlyphBox;
 
+        // The header, and the glyph box inside it. DERIVED FROM THE HEADER, not
+        // from the font a second time: the two were 36 and 18 independently, and
+        // two independent clamps would have let a glyph outgrow the bar it sits
+        // in at the ends of the range. This way the ratio is fixed and the bar
+        // is the only thing that decides.
+        double headerHeight = HeaderHeight;
+        Resources["HeaderRowHeight"] = new GridLength(headerHeight);
+        Resources["HeaderGlyphBox"] = Math.Round(18.0 * headerHeight / DefaultHeaderHeight);
+
+        // The row itself, which holds a literal at parse time and is set from
+        // code whenever the full cover comes and goes. Only while the header is
+        // actually showing - zeroed for the full cover, and writing a height here
+        // would put the bar back over the picture.
+        if (HeaderRow is { Height.Value: > 0 })
+        {
+            HeaderRow.Height = new GridLength(headerHeight);
+        }
+
+        // While FLOATING the header is also the window's caption - the strip
+        // WindowChrome lets the user drag and double-click. It is set once on
+        // undock, so without this a font change would move the header and leave
+        // the caption behind at the old height: a bar that no longer drags along
+        // its whole depth, or drags a few pixels below itself. Docked it is 0 by
+        // design (the whole window is client area and the header's own handlers
+        // do the dragging), so it must not be written there.
+        if (!_isDocked && ChromeSettings is not null)
+        {
+            ChromeSettings.CaptionHeight = headerHeight;
+        }
+
+        // The header buttons now take their size from the bar as well as from
+        // the window's width, and only this method knows the bar just moved -
+        // ApplyHeaderMetrics is otherwise driven by resize alone and would keep
+        // the step it cached until the next drag.
+        ApplyHeaderMetrics();
+
         // THE EXPAND ARROW, and it is the same number as the icon on purpose.
         //
         // It was a hard 16 - on the style AND on the Grid inside its template -
@@ -11235,6 +11309,20 @@ public partial class MainWindow : Window
         double chipFontSize =
             SecondaryFontSize(ExplorerTree.FontSize, stepsDown: 3, floor: 9.0);
         Resources["FooterChipFontSize"] = chipFontSize;
+
+        // The box AROUND the label, on the compact curve. The label followed the
+        // zoom and its padding did not, so on a narrow sidebar at a small font
+        // the chips kept their old width and went on wrapping to four lines -
+        // which is the same strip that made the footer tall enough to matter on
+        // a 1920-wide screen (2026-08-15). Floored at a pixel each way: the chip
+        // has to stay a shape with a word inside it, not the word itself.
+        Resources["FooterChipPadding"] = new Thickness(
+            Math.Max(1.0, Math.Round(5.0 * compact)),
+            Math.Max(1.0, Math.Round(1.0 * compact)),
+            Math.Max(1.0, Math.Round(5.0 * compact)),
+            Math.Max(1.0, Math.Round(1.0 * compact)));
+        Resources["FooterChipMargin"] =
+            new Thickness(0, 0, Math.Max(1.0, Math.Round(2.0 * compact)), 0);
         // One step back UP, for the two things in the viewer that were drawn
         // deliberately larger than the strip around them: the carousel counter
         // with its chevrons (the caption's primary control) and the transport
@@ -23356,7 +23444,7 @@ public partial class MainWindow : Window
         // The row is a FIXED 36, not Auto, so hiding its contents left a 36px
         // band of background across the top of the picture (reported with a
         // screenshot, 2026-08-08). The height has to go too.
-        HeaderRow.Height = on ? new GridLength(0) : new GridLength(36);
+        HeaderRow.Height = on ? new GridLength(0) : new GridLength(HeaderHeight);
         // Leaving full screen takes the overlay with it - otherwise the caption
         // would come back still wearing its overlay row and plate.
         if (!on)
