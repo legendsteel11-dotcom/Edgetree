@@ -33,6 +33,46 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // THE FIRST LINE IS THE RELEASE (author's call): the landing that had been
+    // fought over four rounds finally holds, and everything else here is beside
+    // it. Named by the SYMPTOM for the reason this file already states - whoever
+    // hit it knows it as "the tree was at the bottom", not as a calculation.
+    //
+    // The second line carries its CONDITION rather than the bare symptom. Said
+    // plainly it read as the app folding itself shut at random, which is the
+    // shape this file warns about; with the situation attached it is
+    // recognisable to whoever saw it and unalarming to whoever did not. What
+    // came out with it: the selection moving to a drive, which was the frightening
+    // half and is only a consequence of the fold.
+    //
+    // The right-dock resize wobble is NOT here, and that is the author's own
+    // call: it is better, not gone, and a card sitting above a download button
+    // is the wrong place to claim a fix someone can still see happening.
+    version: 'v2.2.0',
+    ko: [
+      '북마크·즐겨찾기로 이동하면 트리 맨 아래에 붙던 것',
+      '멀티미디어 패널을 열고 창 크기를 조절할 때 트리가 저절로 접히던 것',
+      '자름맞춤 — 그림을 패널에 꽉 채워 보기',
+      '그림을 볼 때 Ctrl·Shift+휠로 정밀 확대·축소',
+      '폴더를 우클릭해 그 안의 음악·영상 이어 재생',
+      '경로 표시줄에 방문한 폴더 목록',
+      '멀티미디어 패널과 트리 위치를 서로 바꿀 수 있음(옵션)',
+      '앱 크기를 더 작게 축소할 수 있음',
+      '색상 설정에 체인·모노, 목록 끝의 옅은 그림자',
+    ],
+    en: [
+      'Jumping to a bookmark or favourite left the tree at the bottom',
+      'The tree folding itself shut while the window was resized',
+      'Fill — crop a picture to the panel',
+      'Fine zoom on a picture with Ctrl or Shift and the wheel',
+      'Right-click a folder to play the music and video in it',
+      'The folders you have been in, listed on the path bar',
+      'Swap the multimedia panel and the tree (option)',
+      'The app can be made smaller',
+      'Colour chains, a greyscale roll, and a soft shade at the ends of a list',
+    ],
+  },
+  {
     // FIXES GET NAMED FROM HERE ON (author's call, 2026-08-14). Every entry
     // above closes with "버그 수정 및 안정성 개선", which says a round happened
     // and nothing about it. What changed the mind was the reply thread on the

@@ -277,6 +277,11 @@ public static class HelpContent
                       "The navigator", "Bottom right, once zoomed in"),
                     R("좌우로 길게 드래그", "이전 · 다음 이미지", "Drag sideways, a good push", "Previous · next image"),
                     R("더블클릭", "맞춤 ↔ 1:1 전환", "Double-click", "Fit ↔ actual size"),
+                    // Says what it gives up, because that is the whole choice
+                    // between it and 맞춤: one shows all of the picture, the
+                    // other fills the panel.
+                    R("자름맞춤", "패널을 꽉 채우고 넘치는 부분은 자름 (다음 그림에도 이어짐)",
+                      "Fill", "Fills the panel and crops the overflow - and stays on for the next picture"),
                     R("가운데 클릭 · Enter", "전체 화면", "Middle-click · Enter", "Full screen"),
                     R("Esc", "전체 화면 종료", "Esc", "Leave full screen"),
                     R("↑ ↓", "이전 · 다음 항목", "↑ ↓", "Previous · next item"),
@@ -370,6 +375,11 @@ public static class HelpContent
                       "Right-click the keep-playing chip", "Repeat folder · repeat one · shuffle"),
                     R("음악 폴더 선택", "▶ 폴더 전체 재생 · 셔플 재생",
                       "Select a folder of music", "▶ play the folder, or shuffle it"),
+                    // The condition is the row's reason for existing: without
+                    // it, right-clicking a folder that has never been opened
+                    // shows nothing and reads as the feature being missing.
+                    R("폴더 우클릭 → 재생", "한 번이라도 펼쳐 본 폴더에 나타남",
+                      "Right-click a folder → Play", "Appears for folders you have opened at least once"),
                     R("재생 위치", "저장 안 됨 (이어보기는 영상만 지원)",
                       "Where you stopped", "Not remembered - only film carries on from where it was"),
                 }),
