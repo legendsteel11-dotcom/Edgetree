@@ -8,9 +8,15 @@ const EMAIL = 'pjh85336@gmail.com'
   <footer class="footer">
     <div class="container">
       <div class="row">
+        <!-- GitHub sits WITH THE NAME, not on a line of its own further down.
+             Below, it landed next to the TabStick pill and read as TabStick's
+             repository - two outbound links side by side, and the nearer label
+             wins (2026-08-15). Beside "Edgetree" there is nothing else it could
+             belong to. -->
         <div class="brand">
           <img src="/icon.png" alt="" width="20" height="20" />
           <span>Edgetree</span>
+          <a class="repo" href="https://github.com/legendsteel11/Edgetree" target="_blank" rel="noopener">{{ t.nav.github }}</a>
         </div>
         <a class="contact" :href="`mailto:${EMAIL}`">{{ t.footer.contact }}: {{ EMAIL }}</a>
       </div>
@@ -48,6 +54,21 @@ const EMAIL = 'pjh85336@gmail.com'
   font-weight: 600;
   color: var(--text-strong);
   font-size: 14px;
+}
+
+/* A plain link, not the pill the TabStick line wears: the pill is what made it
+   read as one of a pair of equal outbound links. Here it is a note attached to
+   the name beside it. */
+.repo {
+  margin-left: 6px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.repo:hover {
+  color: var(--accent-strong);
 }
 
 .contact {

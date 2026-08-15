@@ -14,6 +14,10 @@ const dict = {
       howto: '사용방법',
       screenshots: '주요기능',
       features: '기타기능',
+      // AFTER 사용방법 in the bar, which is also where the section sits: the
+      // whole-screen shots answer "what does that look like", and that is not a
+      // question anyone has until the page has said what the app does.
+      shots: '스크린샷',
       download: '다운로드',
       github: 'GitHub',
     },
@@ -188,6 +192,12 @@ const dict = {
       virustotalNote:
         'VirusTotal 등에서 일부 백신이 휴리스틱(패턴 기반) 오탐을 표시할 수 있습니다. 서명되지 않은 소규모 개인 개발 프로그램에서 흔히 나타나는 현상이며, 소스 코드가 GitHub에 전부 공개되어 있어 언제든 직접 확인하실 수 있습니다.',
     },
+    // The screenshot section - ONE string, which is the whole of the rule it
+    // was built to: 말보다 화면. See the component for the line that was tried
+    // under the title and cut.
+    gallery: {
+      title: '스크린샷',
+    },
     footer: {
       contact: '요청·버그 신고',
       otherTool: '같은 개발자의 다른 도구',
@@ -200,6 +210,7 @@ const dict = {
       howto: 'How to Use',
       screenshots: 'Key Features',
       features: 'More Features',
+      shots: 'Screenshots',
       download: 'Download',
       github: 'GitHub',
     },
@@ -339,6 +350,9 @@ const dict = {
         "There's no paid code-signing certificate on the exe, so Windows may show an \"Unknown publisher\" SmartScreen warning —\nclick \"More info\" then \"Run anyway\" to proceed.",
       virustotalNote:
         'A few antivirus engines on VirusTotal and similar sites may flag it with a generic heuristic detection - common for small, unsigned indie apps. The full source is public on GitHub, so you’re welcome to check it yourself.',
+    },
+    gallery: {
+      title: 'Screenshots',
     },
     footer: {
       contact: 'Requests & bug reports',
