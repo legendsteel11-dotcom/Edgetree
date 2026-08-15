@@ -239,6 +239,15 @@
              icons off) where RowIcon is Collapsed and so can't carry the
              alignment shift itself. -->
         <system:Double x:Key="IconSize">16</system:Double>
+        <!-- Identity until ApplyLayoutMetrics first runs, i.e. the 16x16 the
+             arrow's template is drawn at. -->
+        <ScaleTransform x:Key="ExpanderArrowScale"
+                ScaleX="1"
+                ScaleY="1"/>
+        <!-- Auto, i.e. the font's own line spacing - see ApplyLayoutMetrics,
+             which replaces this with a real number only at the bottom of the
+             행 간격 range. -->
+        <system:Double x:Key="RowLineHeight">NaN</system:Double>
         <!-- Both replaced from ApplyLayoutMetrics; these are the values they
              hold until it first runs, and match AppSettings' own defaults. -->
         <system:Double x:Key="ScrollBarThickness">12</system:Double>
@@ -2396,11 +2405,20 @@
                                                 Width="{DynamicResource TabSpacingWidth}"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
+                                    <!-- LayoutTransform, not Width/Height: the
+                                         arrow inside is a stroked Path drawn
+                                         against a 16-unit box, so a smaller box
+                                         would clip it instead of shrinking it.
+                                         See ApplyLayoutMetrics' ExpanderArrowScale
+                                         for why this needed to move at all -
+                                         it was the one thing in a row that had
+                                         never followed the font. -->
                                     <ToggleButton x:Name="Expander"
                                             Grid.Column="0"
                                                   Style="{StaticResource ExpanderToggleButtonStyle}"
                                                   ClickMode="Press"
                                                   HorizontalAlignment="Center"
+                                                  LayoutTransform="{DynamicResource ExpanderArrowScale}"
                                                   IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
                                     <ContentPresenter x:Name="PART_Header"
                                             Grid.Column="1"
@@ -3336,10 +3354,20 @@
                 <!-- Foreground and FontSize intentionally not set here - both inherit
                      (Foreground from the TreeViewItem for selection-driven white text,
                      FontSize from the TreeView so Ctrl+/- zoom can rescale every row). -->
+                <!-- LineHeight is Auto (NaN) at every setting except the bottom
+                     of 행 간격, where the row has run its padding out and the
+                     line box is one of the two things still holding the row
+                     open - see RowContentSqueeze in ApplyLayoutMetrics.
+                     BlockLineHeight is what makes the number mean the line's
+                     whole height rather than a minimum; with LineHeight left at
+                     Auto the strategy is not consulted at all, so it is safe to
+                     state here once and drive the height from one place. -->
                 <TextBlock x:Name="NameText"
                            Grid.Column="1"
                            Text="{Binding Name}"
                            VerticalAlignment="Center"
+                        LineHeight="{DynamicResource RowLineHeight}"
+                        LineStackingStrategy="BlockLineHeight"
                         Style="{StaticResource RowPathTooltip}"
                         TextTrimming="CharacterEllipsis"/>
                 <!-- VS Code-style inline rename: swapped in for NameText while
@@ -3877,6 +3905,8 @@
                                         Foreground="{DynamicResource FolderNameForeground}"
                                         FontWeight="{DynamicResource FolderNameFontWeight}"
                                         VerticalAlignment="Center"
+                                        LineHeight="{DynamicResource RowLineHeight}"
+                                        LineStackingStrategy="BlockLineHeight"
                                         TextTrimming="CharacterEllipsis"/>
                             </Grid>
                         </Border>
@@ -4036,6 +4066,8 @@
                                         Text="{Binding Name}"
                                         FontWeight="{DynamicResource FolderNameFontWeight}"
                                         VerticalAlignment="Center"
+                                        LineHeight="{DynamicResource RowLineHeight}"
+                                        LineStackingStrategy="BlockLineHeight"
                                         TextTrimming="CharacterEllipsis">
                                     <!-- The name's COLOUR is decided here, on
                                          the element itself, rather than in the

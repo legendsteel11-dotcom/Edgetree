@@ -4526,7 +4526,9 @@ public partial class MainWindow : Window
             {
                 return firstRow.ActualHeight;
             }
-            return FavoriteRowContentHeight * TreeFontScale + 2 * RowVerticalPadding;
+            return Math.Max(
+                FavoriteRowContentHeight * TreeFontScale - RowContentSqueeze, 8.0)
+                + 2 * RowVerticalPadding;
         }
     }
 
@@ -10844,8 +10846,26 @@ public partial class MainWindow : Window
     // inline in ApplyLayoutMetrics because FavoriteRowHeight has to predict the
     // very same number - see its own comment for what went wrong when the two
     // were worked out separately.
-    private double RowVerticalPadding
-        => Math.Max(0, TreeFontScale * 3.0 + _settings.RowSpacing);
+    private double RowVerticalPadding => Math.Max(0, WantedRowPadding);
+
+    // What the padding WOULD be if it could go negative. Positive numbers are
+    // the padding itself; the negative part is what RowVerticalPadding's clamp
+    // throws away, and RowContentSqueeze is where it goes instead.
+    private double WantedRowPadding => TreeFontScale * 3.0 + _settings.RowSpacing;
+
+    // 행 간격의 음수 쪽은 바닥에 닿아 있었다 (2026-08-15 신고: "-3 -4는 먹질
+    // 않네요"). 12pt에서 기반이 3.0이라 -3이 이미 패딩 0이고 -4도 0 - 같은 값을
+    // 두 번 제공하고 있었던 것이고, 폰트를 내릴수록 더 일찍 죽는다 (9pt는 -2,
+    // 8pt는 -2부터).
+    //
+    // 패딩이 0이면 행 높이는 내용이 정한다 - 아이콘(IconSize)과 이름의 줄상자,
+    // 둘 다 폰트에 비례해서 서로 비슷하게 따라간다. 그래서 남은 음수 단계는
+    // "가져갈 것이 없어서" 멈춘 것이지 고장난 것이 아니었다. 진짜로 더 촘촘하게
+    // 하려면 그 둘을 줄이는 수밖에 없고, 사용자가 그쪽을 택했다.
+    //
+    // 패딩은 위아래 두 번 들어가므로 여기서도 두 배로 가져간다 - 그래야 0을
+    // 지나도 한 단계가 행 높이에서 뜻하는 바가 안 바뀐다.
+    private double RowContentSqueeze => Math.Max(0, -WantedRowPadding) * 2.0;
 
     // The viewer strip's two gaps. Between neighbours, and between the three
     // things the row does (set the zoom / step it / switch a panel on). Written
@@ -10876,7 +10896,37 @@ public partial class MainWindow : Window
         // icon goes soft. Whole numbers also keep the row's other metrics on
         // the pixel grid that UseLayoutRounding is trying to hold (see
         // MainWindow.xaml's header comment).
-        Resources["IconSize"] = Math.Round(16.0 * scale);
+        // Squeezed only once 행 간격 has run the padding out - see
+        // RowContentSqueeze. Floored at 8: below that a folder icon stops being
+        // a folder and becomes a smudge, and the row would be buying its
+        // density by making itself unreadable.
+        double rowSqueeze = RowContentSqueeze;
+        double rowGlyphBox = Math.Max(8.0, Math.Round(16.0 * scale - rowSqueeze));
+        Resources["IconSize"] = rowGlyphBox;
+
+        // THE EXPAND ARROW, and it is the same number as the icon on purpose.
+        //
+        // It was a hard 16 - on the style AND on the Grid inside its template -
+        // and so was the only thing in a row that had never answered Ctrl +/-
+        // at all. At the default font nobody could see it: the icon is 16 there
+        // too, so the two floors sat on top of each other. Below the default
+        // they came apart, and the arrow was left holding every row open on its
+        // own - at 8pt the icon is 11 and the name's line box 10.6 while the
+        // arrow stayed 16 (2026-08-15, from a 24" FHD panel: "행간격이 줄어드는게
+        // 아니고 아이콘크기만 줄어드네요").
+        //
+        // So this is not only a 행 간격 fix. Every font step below 12 has been
+        // buying less density than its numbers promised, which is exactly the
+        // complaint that started this round.
+        //
+        // Scaled rather than resized: the arrow is a stroked Path drawn against
+        // that 16-unit box, and a smaller box would clip it rather than shrink
+        // it. A LayoutTransform takes the whole button - hit area, stroke and
+        // all - so the geometry inside needs no changes and the two-segment
+        // chevron keeps its shape at every size.
+        var expanderScale = new ScaleTransform(rowGlyphBox / 16.0, rowGlyphBox / 16.0);
+        expanderScale.Freeze();
+        Resources["ExpanderArrowScale"] = expanderScale;
 
         // The bookmark panel row's leading number. A step below the row's own
         // font, which is how this app marks something as secondary - fading it
@@ -10961,6 +11011,26 @@ public partial class MainWindow : Window
         // their own comments) so the tree and favorites rows always match.
         double verticalPadding = RowVerticalPadding;
         Resources["RowPadding"] = new Thickness(4, verticalPadding, 4, verticalPadding);
+
+        // The other half of the squeeze: the NAME's line box. The icon alone
+        // buys nothing, because at every font step the two land within a pixel
+        // of each other (16 and ~16 at 12pt) - shrink one and the other still
+        // holds the row open.
+        //
+        // NaN means "Auto", which is the font's own designed line spacing and
+        // the ONLY value that can be the default here: writing out 1.33 x the
+        // font would be this code's guess at a number the font already knows,
+        // and any disagreement would show as every row in the app moving for a
+        // setting nobody touched. So the explicit line height exists only while
+        // there is a squeeze to apply.
+        //
+        // Floored at 1.15 x the font: the line box has to keep the room a
+        // 받침 and a descender actually draw into, and this is the point below
+        // which they start being cut rather than merely tight.
+        Resources["RowLineHeight"] = rowSqueeze <= 0
+            ? double.NaN
+            : Math.Max(ExplorerTree.FontSize * 1.15,
+                       ExplorerTree.FontSize * 1.33 - rowSqueeze);
 
         // The viewer caption's three lines - name, metadata, chips - now take
         // the SAME number the tree's rows do, instead of a hard-coded 4 each
