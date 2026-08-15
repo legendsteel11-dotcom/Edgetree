@@ -294,6 +294,8 @@ public static class HelpContent
                       "F8 · Right-click → Slideshow", "Turn the folder's images over, one by one (needs two or more)"),
                     R("슬라이드 쇼 중 클릭 · ↑ ↓ · 트리 선택", "쇼 종료 — 보고 있던 사진에서 멈춤",
                       "Click, ↑ ↓, or pick a row while it runs", "Ends the show, staying on the picture you were looking at"),
+                    R("F9 · ⋯ → 멀티미디어 패널 → 시계와 날짜", "패널 위에 시각·날짜·요일을 표시",
+                      "F9 · ⋯ → Multimedia panel → Clock and date", "Puts the time, date and day over the panel"),
                     // The wallpaper item had NO row at all until now - it has
                     // been in the picture's menu for weeks. Worth a line on its
                     // own account, and more so since 2.1.0: which monitor it

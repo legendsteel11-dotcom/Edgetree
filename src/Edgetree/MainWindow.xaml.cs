@@ -1434,6 +1434,23 @@ public partial class MainWindow : Window
             return;
         }
 
+        // F9 toggles the clock, next to F8 for the same reason it is next to it
+        // in the head: the show is when it is most wanted. It needs its own key
+        // rather than only a menu row because during a show the picture's menu
+        // shows the show's rows and nothing else - and full cover has no menus
+        // at all, which is the state a clock over a picture is FOR.
+        //
+        // Same gate as F8: dead with the panel shut, so it is never a key that
+        // silently does nothing in a window with no picture in it.
+        if (e.Key == Key.F9 && Keyboard.Modifiers == ModifierKeys.None &&
+            _viewerOpen &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            SetViewerClock(!_settings.ViewerClock);
+            e.Handled = true;
+            return;
+        }
+
         // The two transport actions that had no key, both gated on a film
         // actually being loaded so the tree keeps these keys everywhere else -
         // Home is "first row" in a TreeView and P starts its type-ahead.
@@ -7592,6 +7609,14 @@ public partial class MainWindow : Window
                 // alone rather than cleared, so it applies the moment the
                 // panel is opened again.
                 viewerSideSwapped.IsEnabled = _viewerOpen;
+            }
+
+            if (FindMenuItem(imageViewer, "viewerClock") is { } viewerClock)
+            {
+                viewerClock.IsChecked = _settings.ViewerClock;
+                // Same rule as the row above: nothing to draw on with the panel
+                // shut, and the setting keeps its answer for when it opens.
+                viewerClock.IsEnabled = _viewerOpen;
             }
 
 
@@ -18456,6 +18481,9 @@ public partial class MainWindow : Window
         }
 
         UpdateViewerPreview();
+        // The clock is the panel's, not the slideshow's - so it comes up with
+        // the panel if it was left on.
+        UpdateViewerClock();
         // The transport is back, so the footer's stand-in goes.
         UpdateFooterNowPlaying();
     }
@@ -18526,6 +18554,10 @@ public partial class MainWindow : Window
 
         _appliedClip = (ClipUnknown, 0, 0);
         ApplyWindowClipRegion();
+
+        // Nothing left to draw on; the setting keeps its answer for the next
+        // time the panel opens.
+        UpdateViewerClock();
 
         if (_settings.ViewerOpen)
         {
@@ -22994,6 +23026,11 @@ public partial class MainWindow : Window
     // That part is two doubles. Everything else waits for the size to settle.
     private void ViewerImageHost_SizeChanged(object sender, SizeChangedEventArgs e)
     {
+        // Before the picture's own guard: the clock is sized from the PANEL, so
+        // it follows a width drag and the full-cover toggle whatever the picture
+        // behind it is doing. It returns on its own when not showing.
+        LayoutViewerClock();
+
         if (!_viewerOpen || _viewerPixelWidth <= 0)
         {
             return;
@@ -26167,6 +26204,167 @@ public partial class MainWindow : Window
         // second switch nobody pressed.
         UpdateViewerCarousel();
         UpdateViewerNavigator();
+    }
+
+    // ----- 패널 위의 시계 (F9) ------------------------------------------------
+    //
+    // The proportions are the whole of this: a lock screen's clock is not a
+    // font size, it is a share of the surface. The panel here runs from a 240px
+    // column to a 4K screen, so a number picked against either end is wrong at
+    // the other.
+    //
+    // BOTH axes, and the smaller wins. Width alone lets a tall narrow panel
+    // wear a clock that fills it top to bottom; height alone lets a wide short
+    // one run the time off both sides.
+    //
+    // Set by eye across three passes on 2026-08-16 - raised past the first
+    // cautious numbers, taken back to four fifths of that, then the CEILING
+    // pulled down on its own. The shares and the ceiling answer different
+    // questions: the shares are how big it is in a panel, the ceiling is how
+    // big it is allowed to get once full cover hands it a whole 4K screen, and
+    // that is the size at which a clock stops being on the picture and the
+    // picture starts being behind the clock.
+    private const double ViewerClockWidthShare = 0.224;
+    private const double ViewerClockHeightShare = 0.216;
+    private const double ViewerClockMinSize = 22;
+    private const double ViewerClockMaxSize = 150;
+    // The date line against the time above it. Windows sets these far apart -
+    // the time is the thing being read and the date is the answer to a second,
+    // quieter question.
+    private const double ViewerClockDateShare = 0.28;
+    // 오전/오후 over the hour, and the smallest of the three: the date is read,
+    // this is only glanced at, and it is the line that says least.
+    private const double ViewerClockMeridiemShare = 0.18;
+    // How far down the panel the block starts. Not centred - see the XAML.
+    private const double ViewerClockTopShare = 0.12;
+    // The time's line box, shorter than the font's own so the date sits close
+    // under the numerals rather than under their empty descender space.
+    private const double ViewerClockTimeLineShare = 1.02;
+
+    private System.Windows.Threading.DispatcherTimer? _viewerClockTimer;
+
+    // The app's own language, not the machine's: everything else the user reads
+    // here follows the switch in the options menu, and a Korean app writing
+    // "Sunday, August 16" over its own panel would be the one line that did
+    // not.
+    private static System.Globalization.CultureInfo ViewerClockCulture
+        => Strings.IsEnglish
+            ? System.Globalization.CultureInfo.GetCultureInfo("en-US")
+            : System.Globalization.CultureInfo.GetCultureInfo("ko-KR");
+
+    // NOT gated on the slideshow (2026-08-16, the same day it was first built
+    // that way). It draws on whatever the panel is showing, so the only thing
+    // it needs is a panel to draw on - and tying it to the show meant a clock
+    // over one picture was not something the app could do at all.
+    private void UpdateViewerClock()
+    {
+        if (!_viewerOpen || !_settings.ViewerClock)
+        {
+            ViewerClock.Visibility = Visibility.Collapsed;
+            _viewerClockTimer?.Stop();
+            return;
+        }
+
+        ViewerClock.Visibility = Visibility.Visible;
+        WriteViewerClock();
+        LayoutViewerClock();
+    }
+
+    // Writes the two lines and RE-ARMS to the next minute. Not a fixed
+    // interval: nothing here shows seconds, so any other schedule either drifts
+    // off the minute it is displaying or wakes up sixty times for one change.
+    private void WriteViewerClock()
+    {
+        var now = DateTime.Now;
+        var culture = ViewerClockCulture;
+
+        ViewerClockMeridiem.Text = now.ToString("tt", culture);
+        ViewerClockTime.Text = now.ToString(Strings.ViewerClockTimeFormat, culture);
+        ViewerClockDate.Text = now.ToString(Strings.ViewerClockDateFormat, culture);
+
+        _viewerClockTimer ??= CreateViewerClockTimer();
+        // A quarter-second past the boundary, because a timer that fires a hair
+        // early would read the same minute again and then wait a whole one to
+        // catch up - the clock would sit a minute behind for as long as it was
+        // up.
+        double toNextMinute = 60_000 - (now.Second * 1000 + now.Millisecond) + 250;
+        _viewerClockTimer.Stop();
+        _viewerClockTimer.Interval = TimeSpan.FromMilliseconds(toNextMinute);
+        _viewerClockTimer.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateViewerClockTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer();
+        timer.Tick += (_, _) =>
+        {
+            if (ViewerClock.Visibility != Visibility.Visible)
+            {
+                _viewerClockTimer?.Stop();
+                return;
+            }
+
+            WriteViewerClock();
+        };
+        return timer;
+    }
+
+    // Called from the panel's own SizeChanged as well as from the switch, so
+    // the clock follows a width drag and the full-cover toggle the way the
+    // picture does.
+    private void LayoutViewerClock()
+    {
+        if (ViewerClock.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        double width = ViewerImageHost.ActualWidth;
+        double height = ViewerImageHost.ActualHeight;
+        if (width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        // Ahead of the guard below, because it follows the HEIGHT alone: at the
+        // size ceiling, or on a panel whose width is the binding axis, the font
+        // stops moving while the drop still has to.
+        ViewerClock.Margin = new Thickness(0, height * ViewerClockTopShare, 0, 0);
+
+        double size = Math.Clamp(
+            Math.Min(width * ViewerClockWidthShare, height * ViewerClockHeightShare),
+            ViewerClockMinSize,
+            ViewerClockMaxSize);
+        // A resize raises this every frame and a FontSize write is a full
+        // measure of the text - so nothing is written until the number has
+        // actually moved a pixel's worth.
+        if (Math.Abs(size - ViewerClockTime.FontSize) < 0.5)
+        {
+            return;
+        }
+
+        ViewerClockTime.FontSize = size;
+        ViewerClockTime.LineHeight = size * ViewerClockTimeLineShare;
+        ViewerClockMeridiem.FontSize = Math.Max(9, size * ViewerClockMeridiemShare);
+        ViewerClockDate.FontSize = Math.Max(10, size * ViewerClockDateShare);
+        ViewerClockShadow.BlurRadius = Math.Max(6, size * 0.14);
+    }
+
+    private void ViewerClockMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem)
+        {
+            return;
+        }
+
+        SetViewerClock(menuItem.IsChecked);
+    }
+
+    private void SetViewerClock(bool on)
+    {
+        _settings.ViewerClock = on;
+        _settingsService.Save(_settings);
+        UpdateViewerClock();
     }
 
     private System.Windows.Threading.DispatcherTimer CreateSlideshowTimer()

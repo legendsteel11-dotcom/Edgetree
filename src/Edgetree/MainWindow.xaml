@@ -1785,6 +1785,20 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="viewerSideSwapped"
                         Click="ViewerSideSwappedMenuItem_Click"/>
+                <!-- 잠금 화면's clock, drawn over whatever the panel is showing.
+                     It spent an afternoon as a third row inside the slideshow
+                     group on the picture's own menu, and came out again the
+                     same day (2026-08-16): the show is when it is most wanted,
+                     but it is not ABOUT the show, and a row in that fence could
+                     not be reached to put a clock over one picture.
+                     Here it sits with the panel's other display switches, and
+                     the key beside it is how it gets pressed during a show -
+                     that menu shows the show's own rows and nothing else. -->
+                <MenuItem Header="{x:Static services:Strings.MenuViewerClock}"
+                        IsCheckable="True"
+                        InputGestureText="F9"
+                        AutomationProperties.AutomationId="viewerClock"
+                        Click="ViewerClockMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="{x:Static services:Strings.MenuPrecacheThumbnails}"
                         IsCheckable="True"
@@ -7088,6 +7102,74 @@
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
                             Visibility="Collapsed"/>
+                    <!-- 잠금 화면의 시계, over whatever the panel is showing (F9).
+                         Sized in code from the panel rather than the app's font:
+                         it is not text the app is telling you, it is the shape
+                         Windows puts on a screen nobody is working at, and that
+                         shape is a proportion of the surface it sits on.
+
+                         A SIBLING of the picture, not a child, so the fade
+                         between slides runs underneath it - the clock stays
+                         still while the pictures change, which is what a lock
+                         screen does.
+
+                         Fixed white, the second place in this app to ignore the
+                         theme (the navigator plate is the first): what shows
+                         through behind it is the PHOTO, and the theme has no
+                         opinion about that. The shadow is what carries it over
+                         a bright one - a filled plate is what the subtitle line
+                         uses and it is right there, because a subtitle is a
+                         line of words on a film; this is a face on a wall, and
+                         a box around it would be neither.
+
+                         Never hit-testable: the picture underneath takes the
+                         click, and that click is what ends the show. -->
+                    <!-- TOP-aligned, with the gap set in code as a share of the
+                         panel's height: sitting it dead centre put it over the
+                         middle of every photograph, which is where the subject
+                         of a photograph usually is. The lock screen holds its
+                         clock high for the same reason. -->
+                    <StackPanel x:Name="ViewerClock"
+                            Grid.Row="0"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top"
+                            IsHitTestVisible="False"
+                            Visibility="Collapsed">
+                        <StackPanel.Effect>
+                            <DropShadowEffect x:Name="ViewerClockShadow"
+                                    Color="#FF000000"
+                                    Direction="270"
+                                    ShadowDepth="1"
+                                    BlurRadius="18"
+                                    Opacity="0.7"/>
+                        </StackPanel.Effect>
+                        <!-- 오전/오후 on its own line ABOVE the hour, centred
+                             (2026-08-16). It began as a small run beside the
+                             digits, which is how a clock face writes it - but
+                             the block here is three centred lines and a fourth
+                             thing hanging off one side made the whole of it
+                             read as off-centre. Above, it is one more line in
+                             a stack, and it takes no side. It is also the same
+                             either way now: 오전 leads in Korean and AM trails
+                             in English only when the two share a line. -->
+                        <TextBlock x:Name="ViewerClockMeridiem"
+                                Foreground="#FFFFFFFF"
+                                TextAlignment="Center"/>
+                        <!-- BlockLineHeight with a line shorter than the font's
+                             own: a numeral this size carries a descender's
+                             worth of empty box under it, and that gap is what
+                             pushed the date away from the time. Digits have no
+                             descenders, so the space cut here is space nothing
+                             was drawn in. -->
+                        <TextBlock x:Name="ViewerClockTime"
+                                Foreground="#FFFFFFFF"
+                                FontWeight="Bold"
+                                TextAlignment="Center"
+                                LineStackingStrategy="BlockLineHeight"/>
+                        <TextBlock x:Name="ViewerClockDate"
+                                Foreground="#FFFFFFFF"
+                                TextAlignment="Center"/>
+                    </StackPanel>
                     <!-- Name, a wide gap, then ONE metadata line (resolution ·
                          size · date) - briefly three lines, folded back the
                          same day: nothing more is coming to this caption

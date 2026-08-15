@@ -398,6 +398,13 @@ public static class Strings
     // menu carries a bare number.
     public static string MenuSlideshow = "슬라이드 쇼";
     public static string MenuSlideshowSeconds = "슬라이드 간격 (초)";
+    // 패널 위의 시계. "슬라이드 쇼 시계"가 아님 - 쇼와 무관하게 켜고 끄는
+    // 것이라, 이름에 쇼가 들어가면 쇼를 켜야 나오는 것으로 읽힘.
+    public static string MenuViewerClock = "시계와 날짜";
+    // 잠금 화면이 쓰는 꼴 그대로. 시각에 초는 없음 - 그 자리에서 읽히는 것은
+    // 몇 시 몇 분 하나뿐임. 오전/오후는 위에 따로 한 줄.
+    public static string ViewerClockTimeFormat = "H:mm";
+    public static string ViewerClockDateFormat = "M월 d일 dddd";
     // The size rides in the row itself, because the only reason to press it is
     // that the number has grown - and a row that has to be pressed to find out
     // is a row that gets pressed for no reason.
@@ -943,6 +950,11 @@ public static class Strings
         MenuViewerFollowsSelection = "Expand on selection";
         MenuSlideshow = "Slideshow";
         MenuSlideshowSeconds = "Seconds per picture";
+        MenuViewerClock = "Clock and date";
+        // 12-hour with no meridiem, which is what the lock screen itself
+        // shows - the date underneath already says which day it is.
+        ViewerClockTimeFormat = "h:mm";
+        ViewerClockDateFormat = "dddd, MMMM d";
         MenuClearThumbnailCache = "Clean up thumbnail files";
         MenuClearThumbnailCacheSized = "Clean up thumbnail files ({0})";
         ViewerPrecaching = "Preloading {0}";

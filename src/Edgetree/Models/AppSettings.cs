@@ -325,6 +325,15 @@ public class AppSettings
     // pictures by itself on launch would be answering a question nobody asked
     // this session. Turning it on is one menu row away.
     public int SlideshowSeconds { get; set; } = 5;
+    // 잠금 화면's clock over the panel. It was a slideshow row for an afternoon
+    // and came out again the same day (2026-08-16): the show is when it is most
+    // wanted, but it is not ABOUT the show - it draws on whatever the panel is
+    // showing, and tying it to one mode meant it could not be turned on to look
+    // at a single picture. F9 is the switch; this is where the answer lives.
+    //
+    // OFF by default: it covers part of the picture, and someone opening a
+    // picture opened it to see the picture.
+    public bool ViewerClock { get; set; } = false;
 
     public bool StartWithWindows { get; set; } = false;
 
