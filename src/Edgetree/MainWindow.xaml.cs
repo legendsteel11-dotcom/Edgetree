@@ -23791,6 +23791,57 @@ public partial class MainWindow : Window
         ViewerZoomPan.X = 0;
         ViewerZoomPan.Y = 0;
 
+        // LEAVING GIVES THE WINDOW BACK THE ROOM THE SPLIT NEEDS (2026-08-16).
+        // Full cover reserves no tree share (see SetExpandedWidthAnchored), so
+        // a window narrowed to the panel floor there comes back out too small
+        // to seat the split at all - and the NEXT width drag, reading the
+        // remembered share again, opened it to `share + 240` in one frame,
+        // long after the mode was left and with nothing on screen to explain
+        // it. The travel is unavoidable: the tree is back and it needs a
+        // column. Doing it here makes it part of the mode change, where the
+        // tree reappearing is the reason for it.
+        //
+        // Both standing rules survive: the squeeze still never rewrites the
+        // remembered share, and the tree still moves only by the middle
+        // divider - this hands the share the room it already had.
+        //
+        // Docked only. Floating, entering the mode maximizes the window, so it
+        // cannot be narrowed while in it and leaving restores the bounds it
+        // had - there is nothing to give back.
+        if (!on && _isDocked)
+        {
+            double windowWidth = ActualWidth > 0 ? ActualWidth : Width;
+            double treeShare = _viewerTreeShare
+                ?? Math.Max(MinTreeSplitWidth, windowWidth - ViewerPanelWidth);
+            // Capped to the work area for the reason Dock() is: this is a sum
+            // of two remembered numbers, and one of them may have been chosen
+            // on a roomier screen. The panel column yields the difference and
+            // keeps its remembered width (ClampViewerColumnToWindow, below).
+            double target = Math.Min(
+                treeShare + ViewerPanelWidth, GetCurrentMonitorWorkArea().Width);
+            if (windowWidth - treeShare < MinViewerWidth && target > windowWidth)
+            {
+                if (ViewerGrowsLeftward)
+                {
+                    // One SetWindowPos, not Left then Width - the same
+                    // composed-frame trap the width drag paid for on
+                    // 2026-08-15.
+                    SetDockedRightGeometry(target);
+                }
+                else
+                {
+                    Width = target;
+                }
+
+                // The band clip's state tuple carries no width (see
+                // _appliedClip), so force the next pass to re-derive it -
+                // exactly as OpenViewer and CloseViewer do after their own
+                // width writes.
+                _appliedClip = (ClipUnknown, 0, 0);
+                ApplyWindowClipRegion();
+            }
+        }
+
         ClampViewerColumnToWindow();
         // The clamp usually resizes the column and the layout pass that
         // follows re-applies this - but not when the column was already the
