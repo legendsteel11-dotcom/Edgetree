@@ -2948,6 +2948,16 @@
         <Style x:Key="FooterFilterGlyphChipStyle"
                 TargetType="ToggleButton"
                 BasedOn="{StaticResource FooterFilterChipStyle}">
+            <!-- NO OUTLINE. The ToggleButton's own default border was showing
+                 through here, and since the checked trigger takes Opacity from
+                 0.65 to 1 it BRIGHTENED whenever the chip came on - a second,
+                 accidental "on" mark beside the fill that already says it
+                 (reported 2026-08-15 on 자름맞춤). The outline belongs to the
+                 bare-glyph chips next door and has a reason there: a "1:1" or a
+                 "−" reads as text until something draws a box round it. These
+                 carry a SHAPE, so they read as controls without one. -->
+            <Setter Property="BorderThickness"
+                    Value="0"/>
             <!-- The box every button in the viewer strip shares. Only used by
                  the viewer, so the footer's filter chips - which size
                  themselves to their words - are untouched by it. -->
