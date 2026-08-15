@@ -4594,9 +4594,21 @@ public partial class MainWindow : Window
     // full row to reveal it the moment that row is clicked, i.e. the list
     // visibly jumps by one line. The old row-height over-estimate happened to
     // absorb this; measuring rows exactly is what exposed it.
+    // THE ACTIVE LIST, like everything else that measures this panel. It named
+    // FavoritesList outright while the count beside it (ActivePanelRowCount) and
+    // the row height (FavoriteRowHeight) both asked which list is on screen - so
+    // in bookmark mode the height was built from the bookmark list's rows and
+    // the favorites list's padding, and came out short by the difference. The
+    // last bookmark was clipped and the splitter would not travel far enough to
+    // reveal it (reported with a screenshot, 2026-08-15).
+    //
+    // FavoriteRowHeight was corrected for exactly this on 2026-08-02 and this
+    // line was missed, which is the argument for the ActivePanelList property
+    // existing at all: the two lists differ, and any measurement that names one
+    // of them by hand is a bug waiting for the other mode.
     private double FavoritesListChrome
-        => FavoritesList.Padding.Top + FavoritesList.Padding.Bottom
-           + FavoritesList.BorderThickness.Top + FavoritesList.BorderThickness.Bottom;
+        => ActivePanelList.Padding.Top + ActivePanelList.Padding.Bottom
+           + ActivePanelList.BorderThickness.Top + ActivePanelList.BorderThickness.Bottom;
 
     // Row1 and Row3 (see the XAML comment on Grid.RowDefinitions) are neutral
     // top/bottom slots - whichever one currently holds the favorites panel is
@@ -4750,6 +4762,37 @@ public partial class MainWindow : Window
         FavoritesRowDef.MinHeight = hasFavorites
             ? Math.Ceiling(FavoriteRowHeight + FavoritesListChrome)
             : 0;
+
+        // AND A CEILING AT THE CONTENT, so the panel can never be taller than
+        // the list inside it. Height was already Math.Min(content, remembered),
+        // but the splitter answers to the RowDefinition rather than to that -
+        // so a drag past the last bookmark set a remembered height with empty
+        // space baked into it, and the panel kept the gap from then on
+        // (reported with a screenshot, 2026-08-15: eight bookmarks, and the
+        // panel going on for another half of itself below them).
+        //
+        // On the RowDefinition rather than in DragCompleted because that is
+        // where it holds DURING the drag: the splitter simply stops at the last
+        // row instead of travelling on and being corrected afterwards, which is
+        // the difference between a limit and a snap-back.
+        //
+        // WITH A ROW OF SLACK, and the slack is the whole reason this works.
+        // Nailed to the content exactly, it locked the panel BELOW its own list:
+        // the row measures 21px at one layout pass and 22px at the next - a
+        // rounding wobble this file already knows about, which is what
+        // RecheckFavoritesHeight exists for - so a ceiling taken at 21 (8 rows =
+        // 178) clamped a list that had settled at 22 (186). The last bookmark
+        // clipped and the splitter hit a wall eight pixels short of it, which is
+        // what it felt like (measured 2026-08-15, panel.log:
+        // `rowH=22.00 content=186.0 max=178.0 actual=178.0`).
+        //
+        // One row is the right size for that slack twice over: it is more than
+        // any per-row wobble can accumulate to, and it is small enough that the
+        // gap it permits is a gap nobody reports - which is the whole complaint
+        // this ceiling was added for.
+        FavoritesRowDef.MaxHeight = hasFavorites
+            ? ComputeFavoritesContentHeight() + Math.Ceiling(FavoriteRowHeight)
+            : double.PositiveInfinity;
 
         if (hasFavorites)
         {
