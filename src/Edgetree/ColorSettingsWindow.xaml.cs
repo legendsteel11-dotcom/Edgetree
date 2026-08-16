@@ -703,6 +703,26 @@ public partial class ColorSettingsWindow : Window
     // The inverse of the sRGB transfer curve, because averaging the bytes
     // instead ("(R+G+B)/3") is a different number - it would move the contrast
     // it is supposed to preserve, most visibly on saturated blues.
+    // A stored hex, drained. Guarded because these strings can have been hand
+    // edited - AppSettings.Normalize repairs what it can on the way in, but a
+    // colour that arrived after that is not its business, and a mono press is
+    // the wrong place to learn about it.
+    private static string GreyOf(string hex)
+    {
+        try
+        {
+            return Hex(ToGrey((Color)ColorConverter.ConvertFromString(hex)));
+        }
+        catch (FormatException)
+        {
+            return hex;
+        }
+        catch (InvalidOperationException)
+        {
+            return hex;
+        }
+    }
+
     private static Color ToGrey(Color c)
     {
         double linear = Luminance(c);
@@ -823,13 +843,47 @@ public partial class ColorSettingsWindow : Window
         // already worked that pair out and the strip should not disagree with
         // the tree three inches above it.
         CurrentFilterChipCheckedColorHex = Write(palette.Selection);
-        CurrentFilterChipCheckedFontColorHex = Write(palette.Highlight);
+        // CHOSEN AGAINST THE CHIP, not inherited from the tree (2026-08-16,
+        // reported on a mono roll in the light theme: a lit chip came out dark
+        // grey with dark letters on it).
+        //
+        // It used to take palette.Highlight on the reasoning that the strip
+        // should not disagree with the tree three inches above it. The flaw is
+        // in what each of those inks was worked out against: the tree's
+        // highlight is readable over the tree's BACKGROUND, while this one has
+        // to be readable over the SELECTION colour, and a roll is free to land
+        // those two far apart. In a light theme especially - the background is
+        // light, so the highlight is dark, and a selection that rolls dark puts
+        // dark on dark.
+        //
+        // Picking by contrast keeps the original intent where it holds: when
+        // the highlight does read over the chip, it wins and the strip matches
+        // the tree exactly as before. It only gives way when it cannot be read,
+        // which is the case that was reported.
+        CurrentFilterChipCheckedFontColorHex = Write(
+            InkOver(palette.Selection, palette.Highlight, palette.Text, palette.Background));
         // The exclude chip is NOT rolled. It is the one control in the strip
         // that removes, and it says so with a warm hue - a roll landing on a
         // green or a blue would take the only thing that distinguishes it and
         // leave two chips that look alike and do opposite things. It keeps
-        // whatever the user (or the theme's default) has, through every roll,
-        // mono included.
+        // whatever the user (or the theme's default) has through every roll.
+        //
+        // MONO IS THE EXCEPTION, and adding it (2026-08-16, reported) is what
+        // showed the reason above is about a HUE rather than about the chip.
+        // Nothing is being taken from it here: with the whole strip grey there
+        // is no hue left for a warm one to stand out from, and the two rows
+        // that ignored the button were simply the only colour left on a
+        // palette the user had asked to be greyscale.
+        //
+        // Drained from what they ARE rather than from a roll, since these two
+        // are the ones the roll never produced. And it costs no contrast: the
+        // grey holds the luminance the colour had (see ToGrey), so every pair
+        // these take part in reads exactly as well as it did in red.
+        if (mono)
+        {
+            CurrentFilterChipExcludeColorHex = GreyOf(CurrentFilterChipExcludeColorHex);
+            CurrentFilterChipExcludeCheckedColorHex = GreyOf(CurrentFilterChipExcludeCheckedColorHex);
+        }
         // The handle is the roll's one loud voice - see RollHandle for why it
         // is no longer just the rolled background.
         CurrentAutoHideHandleColorHex = Write(palette.Handle);
@@ -1144,6 +1198,40 @@ public partial class ColorSettingsWindow : Window
             double s = value / 255.0;
             return s <= 0.03928 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4);
         }
+    }
+
+    // Which of the palette's own inks to lay on `over`, preferred first.
+    //
+    // 4.5 is the ratio the rest of this file builds to, so the first candidate
+    // that reaches it wins and the order is the preference: the tree's
+    // highlight, then its plain text, then - only if a roll has put the chip
+    // somewhere neither can be read - the BACKGROUND colour, which is the one
+    // ink in the palette guaranteed to be far from the selection, since the
+    // roll builds the selection to contrast with it.
+    //
+    // Drawn from the palette rather than reaching for white or black: a roll
+    // is a set of colours that go together, and a pure white dropped into it
+    // is the one thing in the strip that did not come from the roll.
+    private static Color InkOver(Color over, params Color[] preferred)
+    {
+        foreach (var ink in preferred)
+        {
+            if (ContrastRatio(ink, over) >= 4.5)
+            {
+                return ink;
+            }
+        }
+
+        // Nothing reached it - take the best of them rather than the last.
+        var best = preferred[0];
+        foreach (var ink in preferred)
+        {
+            if (ContrastRatio(ink, over) > ContrastRatio(best, over))
+            {
+                best = ink;
+            }
+        }
+        return best;
     }
 
     private static double ContrastRatio(Color a, Color b)
