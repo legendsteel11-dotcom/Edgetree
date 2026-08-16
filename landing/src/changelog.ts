@@ -33,6 +33,79 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // THE FONT STEP LEADS, because this round's theme is a smaller screen and a
+    // smaller font, and that line is the one a person recognises themselves in.
+    // It carries its CONSEQUENCE rather than the number alone: an 8pt step on
+    // its own is a setting, while "more fits on screen" is the reason anyone
+    // would want it - and it was not true before, since the expand arrow was
+    // fixed at 16px and held every row open by itself.
+    //
+    // THE SEARCH FREEZE SHOWED THERE IS A THIRD WAY OUT, and it is worth
+    // stating as a rule (author, 2026-08-16). This file's header sets up what
+    // looked like a closed bind: a symptom that frightens whoever never hit it
+    // stays out, and softening it into vagueness ("반응이 느려지던") is equally
+    // forbidden. The freeze is the round's most valuable fix and both doors
+    // were shut on it.
+    //
+    // The way through is to QUALIFY THE SCOPE at the front of the line - 일부,
+    // 부분적으로, 특정 경우. It is not a softener: the sentence still says the
+    // app stopped responding, in the reader's own words. What it removes is the
+    // implication that this is what the app does, which was the frightening
+    // part all along. The precedent was already in the entry below - "일부
+    // 북마크 즐겨찾기 이동 시" - written by the author for exactly this reason.
+    //
+    // Reach for it whenever a true line would read as a general property of the
+    // app rather than as a case someone ran into.
+    //
+    // The 더 보기 lines are a pair on purpose - one is the drift someone SAW,
+    // the other is the confusion underneath it (which of two identically named
+    // folders is opening). Both are recognisable from outside, which is the
+    // test for being in the card at all.
+    //
+    // A LONGER LIST THAN USUAL, and named fixes are welcome in it (author,
+    // 2026-08-16) - what is not welcome is the trivia. Two renames came out on
+    // that instruction: 셔플 → 셔플 반복, and the app calling itself 앱 rather
+    // than 사이드바. Both are real edits and neither changes anything a person
+    // can do, which is the line between this card and the release notes.
+    version: 'v2.3.0',
+    ko: [
+      '글꼴 크기 8pt 추가 — 작게 할수록 한 화면에 더 많이 보임',
+      'PSD·RAW·JXL 등 패널에서 볼 수 있는 그림 형식 대폭 추가',
+      '패널 위에 시계 표시(F9)',
+      '파일을 선택하면 멀티미디어 패널이 자동으로 열림(옵션)',
+      '슬라이드 쇼가 패널을 꽉 채워 재생',
+      '색상 설정에 펼침 화살표와 하단 칩 색 추가',
+      '일부 대용량 폴더에서 검색 도중 검색어를 고칠 때 멈추던 문제 수정',
+      '더 보기·접기를 반복할 때 트리가 조금씩 위로 밀리던 문제 수정',
+      '더 보기·접기를 누르면 그 폴더가 선택되어 어느 목록인지 보임',
+      '펼침 화살표를 직각 모양으로, 들여쓰기 안내선을 화살표 중앙에',
+      '들여쓰기 간격을 좁혀도 펼침 화살표와 폴더 이름이 붙지 않음',
+      '전체 덮기에서 나온 뒤 창 크기를 조절하면 창이 한 번 벌어지던 문제 수정',
+      '북마크·즐겨찾기 패널이 목록보다 짧게 열려 첫 조절에서 덜컹이던 문제 수정',
+      '썸네일 바가 PSD·RAW처럼 무거운 그림까지 미리 읽어 느려지던 문제 수정',
+      '음악 재생 중 전체 덮기에서 조작 막대가 가리키는 동안 사라지던 문제 수정',
+      '하단 확장자 칩의 글자를 항상 굵게, 위치도 상자 가운데로',
+    ],
+    en: [
+      'Font size down to 8pt - and the rows come down with it',
+      'PSD, RAW, JXL and many more picture formats in the panel',
+      'A clock over the panel (F9)',
+      'The multimedia panel opens when you select a file (option)',
+      'Slideshows fill the panel',
+      'Colour settings for the expand arrow and the footer chips',
+      'Fixed: in some large folders, editing the search box mid-scan left the app unresponsive',
+      'Fixed: repeated Show more / Show less crept the tree upward',
+      'Show more / Show less selects the folder it belongs to',
+      'The expand arrow at a right angle, and the indent guide through its centre',
+      'A narrow indent no longer pushes the arrow against the folder name',
+      'Fixed: the window jumped wider on the first resize after a full cover',
+      'Fixed: the bookmarks and favorites panel opened shorter than its own list',
+      'Fixed: the thumbnail bar read ahead into heavy formats like PSD and RAW',
+      'Fixed: in full cover, the transport hid itself while being pointed at',
+      'The footer file-type chips: bold, and their labels centred',
+    ],
+  },
+  {
     // THE SWAP LEADS THE CARD, the landing fix leads the release NOTES - the
     // author's own ordering, and the two are doing different jobs. A glance
     // above a download button opens with what the app can now DO; the notes
