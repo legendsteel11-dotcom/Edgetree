@@ -11144,6 +11144,26 @@ public partial class MainWindow : Window
             ApplyPathBarVisibility();
             ApplyFavoritesPosition();
             ApplySidePanelMode();
+
+            // THE SIDE PANEL'S HEIGHT, PUT BACK (2026-08-16, reported as "the
+            // preset does not save it" - it saves it fine and then throws it
+            // away here).
+            //
+            // SetTreeFontSize at the top of this block ends in FitFavoritesPanel,
+            // which measures the list and writes THAT into the very field the
+            // preset had just restored. It is right to do so on a font change -
+            // the rows changed height, so a panel fitted to them has to be
+            // refitted - and wrong during an apply, where the number it
+            // overwrites was chosen deliberately and stored.
+            //
+            // Read from the PRESET rather than saved off before the block: the
+            // settings object is what the fit scribbles on, so anything held
+            // from it is a copy of a value that was about to be replaced. A
+            // preset too old to carry the field keeps whatever the fit decided,
+            // which is the same answer it would have given before this existed.
+            _settings.FavoritesPanelHeight = preset.ValueOr(
+                nameof(AppSettings.FavoritesPanelHeight), _settings.FavoritesPanelHeight);
+            UpdateFavoritesPanelVisibility();
         }
 
         // Cheap and it is a window-manager state rather than a repaint, so it is

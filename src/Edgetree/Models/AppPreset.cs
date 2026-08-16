@@ -325,6 +325,17 @@ public class AppPreset
             ? value.GetBoolean()
             : fallback;
 
+    // The same question for a number. Asked for the side panel's height, which
+    // the apply path has to read back AFTER the look pass rather than before -
+    // see ApplyPreset, where the font size overwrites it on the way through.
+    public double ValueOr(string field, double fallback)
+        => Values.TryGetValue(field, out var value)
+            && value.ValueKind is JsonValueKind.Number
+            && value.TryGetDouble(out double number)
+            && double.IsFinite(number)
+            ? number
+            : fallback;
+
     // Copies this preset's values onto the live settings. Anything the preset
     // does not carry is LEFT ALONE rather than reset to a default: a preset
     // written by an older build is missing whatever was added since, and
