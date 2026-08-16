@@ -2305,15 +2305,37 @@
                         <Grid Background="Transparent"
                                 Width="16"
                                 Height="16">
-                            <!-- Open two-segment chevron (no closing/flat edge), so it
-                                 reads as a plain "›" rather than a filled flag shape. -->
+                            <!-- Material Symbols "keyboard_arrow_right"
+                                 (2026-08-16), replacing a hand-drawn stroked
+                                 chevron. The complaint was the ANGLE and the
+                                 numbers agree: the drawn one ran 4.5 across
+                                 against 3.5 up and down, which is about 76
+                                 degrees, where this family - and VS Code's own
+                                 - runs 189 against 189, exactly 90. An acute
+                                 chevron reads as a different mark, not as the
+                                 same mark drawn differently.
+
+                                 ONE GLYPH, still rotated. The family draws
+                                 keyboard_arrow_down as its own shape, but this
+                                 one turned 90 degrees IS that shape - the two
+                                 are the same geometry - so the animation below
+                                 keeps working and there is only one path to
+                                 keep in step.
+
+                                 The trailing M0-960H960M0 0H960 is this app's
+                                 standing rule for Material geometry: it pins
+                                 the full 960 box so Stretch measures the BOX
+                                 rather than the ink, which is what keeps a
+                                 glyph the size its neighbours are. Fill, not
+                                 Stroke - the family's marks are shapes, and
+                                 the round caps the drawn one needed were there
+                                 to soften a line. -->
                             <Path x:Name="Arrow"
-                                    Data="M5,3 L9.5,6.5 L5,10"
-                                    Stroke="{DynamicResource ExpanderArrowBrush}"
-                                    StrokeThickness="1.4"
-                                    StrokeLineJoin="Round"
-                                    StrokeStartLineCap="Round"
-                                    StrokeEndLineCap="Round"
+                                    Data="M522-480 333-669l51-51 240 240-240 240-51-51 189-189Z M0-960H960M0 0H960"
+                                    Fill="{DynamicResource ExpanderArrowBrush}"
+                                    Stretch="Uniform"
+                                    Width="16"
+                                    Height="16"
                                   HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
                                   RenderTransformOrigin="0.5,0.5">
