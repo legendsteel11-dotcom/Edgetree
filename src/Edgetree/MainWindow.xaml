@@ -7151,6 +7151,50 @@
                                 TextAlignment="Center"
                                 TextWrapping="Wrap"/>
                     </Border>
+                    <!-- WHAT IS ON SCREEN AND HOW TO LEAVE IT, on a mouse move
+                         while the cover is up (2026-08-16).
+                         The full cover takes the header away and with it the
+                         caption, so it is the one state where the app shows a
+                         file and never names it. The keys have the same
+                         problem from the other end: F9 and F8 are the only way
+                         to reach the clock and the show in there, and nothing
+                         on screen says so.
+                         A LINE THAT COMES TO YOU rather than a tooltip. A
+                         tooltip has to be aimed at the thing it explains, and
+                         anyone who knows where to aim already knows the key -
+                         which is the half of the audience that does not need
+                         telling. This is the shape every full-screen viewer
+                         uses for the same reason.
+                         The subtitle plate's own treatment, deliberately: this
+                         is a line of words over a picture, which is exactly
+                         what that plate was built for and what the clock's
+                         comment says a plate is right for. The clock keeps its
+                         shadow because a clock is a face on a wall.
+                         Two sizes, not two opacities - this app marks
+                         something secondary by making it smaller, never by
+                         fading it. Sizes and the fade are set in code. -->
+                    <Border x:Name="ViewerInfoPlate"
+                            Grid.Row="0"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Bottom"
+                            Margin="16,0,16,18"
+                            Padding="12,6"
+                            CornerRadius="3"
+                            Background="#A6000000"
+                            IsHitTestVisible="False"
+                            Opacity="0"
+                            Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock x:Name="ViewerInfoName"
+                                    Foreground="#FFFFFFFF"
+                                    TextAlignment="Center"
+                                    TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="ViewerInfoKeys"
+                                    Foreground="#FFFFFFFF"
+                                    TextAlignment="Center"
+                                    Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Border>
                     <!-- The one affordance that turns a still frame into a
                          promise the panel can keep. Only up for a video that
                          isn't playing; clicking the picture itself is left

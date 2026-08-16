@@ -632,6 +632,14 @@ public static class Strings
     // 그래서 무엇을 잃게 되는지, 어디를 보면 되는지. 원인을 추측해서 적지 않는다 -
     // 읽기 전용일 수도, 다른 프로그램이 잡고 있을 수도, 동기화 폴더일 수도 있고
     // 앱은 그중 무엇인지 모른다. 경로가 그 자리에서 유일하게 확인 가능한 것이다.
+    // 전체 덮기에서 마우스를 움직이면 아래에 잠깐 뜨는 줄의 둘째 행. 첫 행은 파일
+    // 이름이라 문자열이 없다.
+    //
+    // F8은 쇼를 시작하는 키이면서 멈추는 키라, 한 낱말로 적을 수 없다 - 지금
+    // 무엇을 하는 키인지가 상태마다 다르고, 이 줄은 그 상태를 이미 알고 있다.
+    // 그래서 두 벌이다. F9는 어느 쪽이든 시계를 켜고 끄므로 한 벌이면 된다.
+    public static string ViewerInfoKeysRunning = "F9 시계 · F8 쇼 중지";
+    public static string ViewerInfoKeysIdle = "F9 시계 · F8 슬라이드 쇼";
     public static string SettingsSaveFailedTitle = "설정 저장";
     public static string SettingsSaveFailedBody =
         "설정을 저장하지 못했습니다. 지금 바꾼 것은 앱을 닫으면 사라집니다.\n\n{0}";
@@ -1080,6 +1088,8 @@ public static class Strings
         ColorFileDefaultName = "edgetree-colors.json";
         ColorImportFailedTitle = "Import Colours";
         ColorImportFailedBody = "That file holds no colours.";
+        ViewerInfoKeysRunning = "F9 clock · F8 stop the show";
+        ViewerInfoKeysIdle = "F9 clock · F8 slideshow";
         SettingsSaveFailedTitle = "Settings";
         SettingsSaveFailedBody =
             "Your settings could not be saved. What you have changed will be gone when the app closes.\n\n{0}";
