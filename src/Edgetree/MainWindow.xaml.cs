@@ -13001,16 +13001,6 @@ public partial class MainWindow : Window
         var item = chain[index];
         if (container.ItemContainerGenerator.ContainerFromItem(item) is not TreeViewItem treeViewItem)
         {
-            // Same tolerance as RevealChainStep - a container can genuinely
-            // not exist yet for a level that's mid-realization.
-            if (attempt >= 5)
-            {
-                // Never silently again. Five quiet passes and a return was a
-                // click that did nothing, with nothing anywhere saying why.
-                LogClickLine($"select gave up: {item.Name} (no container after {attempt} tries)");
-                return;
-            }
-
             // AND MAKE THE ROW EXIST, rather than only asking again. A
             // virtualizing panel builds containers around what it is showing,
             // so a row a long way down a revealed folder has none - and no
@@ -13023,6 +13013,42 @@ public partial class MainWindow : Window
             // do on its own - but the user asked for this row by clicking it,
             // and the successful path below scrolls to it anyway.
             int at = container.Items.IndexOf(item);
+
+            // Same tolerance as RevealChainStep - a container can genuinely
+            // not exist yet for a level that's mid-realization.
+            //
+            // TWELVE, NOT FIVE (2026-08-16). A slideshow left running a quarter
+            // of an hour walks a long way from the row that was selected when it
+            // started, and on stop the landing has to realize a row that far
+            // down in one go. Five background passes were not always enough:
+            // click.log 17:13:41 caught the landing giving up, and the cost is
+            // not a missed scroll - the panel and the tree are then pointing at
+            // different files, which is exactly the state the viewer's
+            // right-click gate refuses to open a menu in. The menu stays dead
+            // until some other action moves the selection, and nothing on
+            // screen says why.
+            //
+            // The extra passes are free when the row realizes on the first one,
+            // which is the normal case.
+            if (attempt >= 12)
+            {
+                // Never silently again. Five quiet passes and a return was a
+                // click that did nothing, with nothing anywhere saying why.
+                //
+                // WHAT THE LINE HAS TO SETTLE is which of two failures this is,
+                // because they need different fixes and the old line could not
+                // tell them apart. at >= 0 means the row is in the list and the
+                // passes ran out - more passes would help. at < 0 means the row
+                // is not in the displayed children at all (a collapsed 더 보기
+                // overflow, or past the display cap), and then BringIndexIntoView
+                // is never called and no number of passes can succeed - the fix
+                // there is to reveal the overflow first. Do not guess; read it.
+                LogClickLine(
+                    $"select gave up: {item.Name} (no container after {attempt} tries, " +
+                    $"at={at} of {container.Items.Count})");
+                return;
+            }
+
             if (at >= 0 && FindDescendant<VirtualizingStackPanel>(container) is { } host)
             {
                 host.BringIndexIntoViewPublic(at);
