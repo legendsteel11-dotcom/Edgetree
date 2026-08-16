@@ -1088,6 +1088,11 @@ public static class Strings
         AboutVersionLabel = "Version";
         AboutAuthorLabel = "Author";
         AboutDateLabel = "Date";
+        // Missing outright until 2026-08-16, so the link marks on all seventeen
+        // colour rows carried a Korean tooltip in an English app - a whole
+        // feature explained in the wrong language, and the one feature here
+        // that explains itself nowhere else.
+        ColorChainTip = "Chain · rows lit together share a colour";
         AboutLicenseLabel = "License Summary";
         AboutWebsiteLabel = "Website";
         AboutOtherToolLabel = "Another tool by the same maker";

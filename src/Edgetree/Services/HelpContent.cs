@@ -265,11 +265,43 @@ public static class HelpContent
             T("멀티미디어 패널", "Multimedia Panel"),
             new[]
             {
+                // HOW THE PANEL OPENS AT ALL, which this section did not say
+                // (2026-08-16). Every group under it described what to do once
+                // it is open, and 검색 has had the equivalent row - 제목 표시줄
+                // 돋보기 - since it shipped. The two options below it are here
+                // rather than in 모양과 설정 because they are ways IN, and
+                // someone reading this heading is looking for exactly that.
+                new Group(string.Empty, new[]
+                {
+                    R("제목 표시줄 이미지 아이콘", "멀티미디어 패널 열기 · 닫기",
+                      "The picture icon in the title bar", "Open · close the multimedia panel"),
+                    R("옵션 → 멀티미디어 패널 → 더블클릭으로 열기",
+                      "트리에서 더블클릭한 파일을 기본 프로그램 대신 패널에서 엶",
+                      "Options → Multimedia panel → Open on double-click",
+                      "A double-click in the tree opens the file here instead of in your usual program"),
+                    // The condition is the row, and it is the author's own
+                    // wording: what it does for a folder is nothing, which
+                    // reads as the option being broken unless it is said.
+                    R("옵션 → 멀티미디어 패널 → 자동 펼치기",
+                      "미디어 파일을 선택할 경우에만 패널이 펼쳐짐 (폴더는 동작하지 않음)",
+                      "Options → Multimedia panel → Expand on selection",
+                      "Expands the panel when a media file is selected - folders do nothing"),
+                }),
+
                 new Group(T("이미지", "Images"), new[]
                 {
                     R("휠", "확대 · 축소", "Wheel", "Zoom in · out"),
                     R("Ctrl+휠 · Shift+휠", "정밀 확대 축소 - Shift 조합시 더 세밀하게",
                       "Ctrl+wheel · Shift+wheel", "Precision zoom - finer with Shift"),
+                    // 영상·음악에는 "재생 형식" 줄이 있는데 그림에는 없었다
+                    // (2026-08-16). 목록이 아니라 규칙으로 적는 것은 실제로
+                    // 규칙이기 때문 - 이 앱은 그림을 디코드하지 않고 전부 셸에
+                    // 넘기므로, 볼 수 있는 것과 탐색기가 미리보기를 만드는 것이
+                    // 정확히 같은 집합이다. 바로 아래 SVG 줄이 그 규칙의 뒷면
+                    // (PC마다 다른 이유)을 이미 말하고 있어 둘이 짝이 된다.
+                    R("표시 형식", "Windows가 미리보기를 만들 수 있는 그림 (PSD · RAW · JXL 등 포함)",
+                      "Formats it shows",
+                      "Any picture Windows can make a thumbnail of - PSD, RAW, JXL and the rest"),
                     // SVG has no decoder in Windows at all, so this one is the
                     // shell's answer or nothing - which is why the same file
                     // shows on one PC and not another. Said here rather than
@@ -349,9 +381,9 @@ public static class HelpContent
                     // plays on one machine and not another, and why the honest
                     // row is the one that says so.
                     R("재생 형식",
-                      "mp4 · m4v · mov · avi · wmv · mkv · webm · mpg · mpeg · ts · m2ts · mts · flv · 3gp",
+                      "mp4 · m4v · mov · avi · wmv · mkv · webm · mpg · mpeg · ts · m2ts · mts · flv · 3gp · asf · wm · qt · 3g2 · m2t",
                       "Formats it plays",
-                      "mp4 · m4v · mov · avi · wmv · mkv · webm · mpg · mpeg · ts · m2ts · mts · flv · 3gp"),
+                      "mp4 · m4v · mov · avi · wmv · mkv · webm · mpg · mpeg · ts · m2ts · mts · flv · 3gp · asf · wm · qt · 3g2 · m2t"),
                     R("코덱", "외부 코덱 사용 (필요 시 직접 설치)",
                       "Codecs", "Whatever is installed on the PC - add one if a file needs it"),
                     // AV1 by name, because the row above cannot be searched for.
@@ -375,7 +407,8 @@ public static class HelpContent
                 // does not remember where you stopped.
                 new Group(T("음악", "Music"), new[]
                 {
-                    R("재생 형식", "mp3 · wav · flac", "Formats it plays", "mp3 · wav · flac"),
+                    R("재생 형식", "mp3 · wav · flac · m4a · m4b · aac · wma",
+                      "Formats it plays", "mp3 · wav · flac · m4a · m4b · aac · wma"),
                     R("앨범아트 클릭", "재생 · 정지", "Click the album art", "Play · pause"),
                     R("재생 막대 왼쪽 두 칩", "백그라운드 재생 · 이어서 재생",
                       "The two chips at the left of the transport", "Background play · keep playing"),
@@ -412,6 +445,24 @@ public static class HelpContent
                 new Group(string.Empty, new[]
                 {
                     R("옵션 → 색상 설정", "직접 선택 · 랜덤 지정", "Options → Colours", "Pick them, or roll the dice"),
+                    // THE THREE THINGS IN THAT WINDOW A LABEL CANNOT TEACH
+                    // (2026-08-16). The chain is the clearest case this file's
+                    // own rule has: a small link mark sits on all seventeen
+                    // rows, so it is always on screen and means nothing until
+                    // someone is told - including the half that catches people
+                    // out, that BOTH ends have to be lit.
+                    //
+                    // 그림자 is here for WHERE it is. It is a behaviour toggle
+                    // living in the colour window on purpose (among the
+                    // behaviour toggles the word reads as a shadow around the
+                    // whole app), and the cost of that choice is that anyone
+                    // hunting the options menu for it never finds it.
+                    R("색상 설정 → 행의 고리", "색을 묶어 함께 변경 — 함께 켠 줄끼리 같은 색",
+                      "Colours → the link on a row", "Ties rows together - the ones lit together share a colour"),
+                    R("색상 설정 → 모노", "팔레트 전체를 회색톤으로 한 번에",
+                      "Colours → Mono", "The whole palette to greyscale in one press"),
+                    R("색상 설정 → 그림자", "트리·패널 목록의 위아래 끝을 옅게 덮음",
+                      "Colours → Shading", "Veils the top and bottom ends of the tree and panel lists"),
                     R("옵션 → 기본 설정", "자동 시작 · 트레이 · 아이콘 · 자동 숨김", "Options → General", "Autostart · tray · icons · auto-hide"),
                     R("옵션 → 기본 설정 → 드래그로 이동", "끄면 드래그는 항상 복사, 이동은 Shift",
                       "Options → General → Drag Moves", "Off, a drag always copies and Shift is the way to move"),
