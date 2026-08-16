@@ -347,7 +347,18 @@ public class AppSettings
     // It scales the CEILING with it, which is the point of asking for 150%: the
     // ceiling exists so a full cover does not become a backdrop for a number,
     // and someone turning this up has said that is what they want.
-    public double ViewerClockScale { get; set; } = 1.0;
+    // 75%, not 100% (2026-08-16). The panel's own sizing was tuned before there
+    // was a dial, so what used to be the only size is now the ladder's middle
+    // rung - and on the panel it reads as large rather than as a default.
+    // Anyone who wants the old size is one step up.
+    //
+    // ONE PLACE, because three other spots answer with the default when the
+    // stored value is off the ladder (Sane below, the getter in MainWindow, and
+    // the stepper's starting index). Left as literals they drift apart, and the
+    // symptom of that is a dial that jumps somewhere nobody chose.
+    public const double DefaultViewerClockScale = 0.75;
+
+    public double ViewerClockScale { get; set; } = DefaultViewerClockScale;
 
     public bool StartWithWindows { get; set; } = false;
 
@@ -833,7 +844,7 @@ public class AppSettings
         TreeFontSize = Sane(TreeFontSize, 12, min: 1);
         // 배수라 0이 곧 글자 없음이다 - 0은 FontSize에서 예외이고, 그 앞의
         // Math.Clamp는 NaN을 NaN 그대로 통과시킨다. 범위는 쓰는 자리가 정한다.
-        ViewerClockScale = Sane(ViewerClockScale, 1.0, min: 0.1);
+        ViewerClockScale = Sane(ViewerClockScale, DefaultViewerClockScale, min: 0.1);
         FavoritesPanelHeight = Sane(FavoritesPanelHeight, 100, min: 0);
         DockedHeightRatio = Sane(DockedHeightRatio, 1.0, min: 0, max: 1);
         DockedTopRatio = Sane(DockedTopRatio, 0.0, min: 0, max: 1);

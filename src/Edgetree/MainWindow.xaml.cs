@@ -27526,7 +27526,7 @@ public partial class MainWindow : Window
     private double ViewerClockScale =>
         ViewerClockScaleSteps.Contains(_settings.ViewerClockScale)
             ? _settings.ViewerClockScale
-            : 1.0;
+            : AppSettings.DefaultViewerClockScale;
 
     // Called from the panel's own SizeChanged as well as from the switch, so
     // the clock follows a width drag and the full-cover toggle the way the
@@ -27587,7 +27587,7 @@ public partial class MainWindow : Window
         int index = Array.IndexOf(ViewerClockScaleSteps, ViewerClockScale);
         if (index < 0)
         {
-            index = Array.IndexOf(ViewerClockScaleSteps, 1.0);
+            index = Array.IndexOf(ViewerClockScaleSteps, AppSettings.DefaultViewerClockScale);
         }
 
         double value = ViewerClockScaleSteps[
