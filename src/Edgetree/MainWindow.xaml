@@ -6651,7 +6651,16 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0"
+                                            <!-- The label is written in code
+                                                 because the row serves both
+                                                 media now (2026-08-16): a film
+                                                 wherever it plays, and a
+                                                 picture in the full cover,
+                                                 where the zoom strip that
+                                                 usually carries these is gone
+                                                 with the rest of the chrome. -->
+                                            <TextBlock x:Name="ViewerMediaZoomLabel"
+                                                    Grid.Column="0"
                                                     Text="{x:Static services:Strings.ViewerZoom}"
                                                     Foreground="{DynamicResource MenuForeground}"
                                                     VerticalAlignment="Center"
@@ -6750,6 +6759,30 @@
                                         </Grid>
                                     </MenuItem.Header>
                                 </MenuItem>
+                                <!-- The two things the panel draws AROUND a
+                                     picture, brought here for the cover
+                                     (2026-08-16, on report). Their switches are
+                                     a chip on the zoom strip and a button beside
+                                     the counter, and the cover takes both away
+                                     with the rest of the chrome - so wanting
+                                     either meant leaving the mode, pressing,
+                                     and going back in, which is a round trip
+                                     someone doing it often will feel.
+                                     PICTURES only, and the report says why: a
+                                     film has no navigator, and the strip hides
+                                     itself while one plays. Their rows follow
+                                     the size row above, which is the same kind
+                                     of question about the same surface. -->
+                                <MenuItem x:Name="ViewerNavigatorItem"
+                                        Header="{x:Static services:Strings.ViewerNavigator}"
+                                        IsCheckable="True"
+                                        Visibility="Collapsed"
+                                        Click="ViewerNavigatorMenuItem_Click"/>
+                                <MenuItem x:Name="ViewerFilmstripItem"
+                                        Header="{x:Static services:Strings.ViewerFilmstrip}"
+                                        IsCheckable="True"
+                                        Visibility="Collapsed"
+                                        Click="ViewerFilmstripMenuItem_Click"/>
                                 <!-- Both rows appear only when a subtitle file
                                      was actually found beside the film - there
                                      is nothing to switch on or size otherwise,

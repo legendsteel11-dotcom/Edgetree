@@ -24179,8 +24179,19 @@ public partial class MainWindow : Window
     }
 
     private void ViewerNavigatorChip_Click(object sender, RoutedEventArgs e)
+        => SetViewerNavigator(ViewerNavigatorChip.IsChecked == true);
+
+    private void ViewerNavigatorMenuItem_Click(object sender, RoutedEventArgs e)
+        => SetViewerNavigator(sender is MenuItem { IsChecked: true });
+
+    // Two ways in, one body. The chip is put back in step because the menu can
+    // drive this now and the chip is what the panel shows when the cover comes
+    // down - a switch that disagrees with the thing it switches is worse than
+    // either state.
+    private void SetViewerNavigator(bool on)
     {
-        _settings.ViewerNavigator = ViewerNavigatorChip.IsChecked == true;
+        _settings.ViewerNavigator = on;
+        ViewerNavigatorChip.IsChecked = on;
         _settingsService.Save(_settings);
         UpdateViewerNavigator();
     }
@@ -24892,7 +24903,30 @@ public partial class MainWindow : Window
         ViewerPlayPauseItem.Visibility = playbackRows;
         ViewerPlayPauseItem.Header = _viewerVideoPlaying ? Strings.ViewerPause : Strings.ViewerPlay;
         ViewerRewindItem.Visibility = playbackRows;
-        ViewerMediaZoomItem.Visibility = pictureRows;
+        // THE SIZE ROW SERVES BOTH MEDIA NOW (2026-08-16, on request). A film
+        // wherever it plays - the transport row replaced the zoom strip for it
+        // long ago - and a picture in the FULL COVER, where that strip goes with
+        // the rest of the chrome and leaves the wheel and the keys as the only
+        // way to change the size. The panel keeps its chips, so the row would
+        // be a second copy of them there and stays away.
+        bool coveredPicture = _viewerFullscreen && !ViewerMediaIsSelection;
+        ViewerMediaZoomItem.Visibility = movingPicture || coveredPicture
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        // The subject changes with the medium. Swapped rather than made generic
+        // because this menu also carries 자막 크기, so a bare "크기" would stop
+        // saying which size it means.
+        ViewerMediaZoomLabel.Text = coveredPicture
+            ? Strings.ViewerZoomPicture
+            : Strings.ViewerZoom;
+
+        // The navigator and the strip, on the same terms as the size row: the
+        // cover is the one state where their own switches are not on screen.
+        var coveredPictureRows = coveredPicture ? Visibility.Visible : Visibility.Collapsed;
+        ViewerNavigatorItem.Visibility = coveredPictureRows;
+        ViewerNavigatorItem.IsChecked = _settings.ViewerNavigator;
+        ViewerFilmstripItem.Visibility = coveredPictureRows;
+        ViewerFilmstripItem.IsChecked = _settings.ViewerFilmstrip;
         ViewerMarkAddItem.Visibility = playbackRows;
         // The FILE's bookmark, on every kind of file the panel opens. One row
         // that says which way it goes, the same swap the tree's own menu makes -
@@ -26986,8 +27020,15 @@ public partial class MainWindow : Window
     private int _filmstripFetchStep;
 
     private void ViewerFilmstripChip_Click(object sender, RoutedEventArgs e)
+        => SetViewerFilmstrip(ViewerFilmstripChip.IsChecked == true);
+
+    private void ViewerFilmstripMenuItem_Click(object sender, RoutedEventArgs e)
+        => SetViewerFilmstrip(sender is MenuItem { IsChecked: true });
+
+    private void SetViewerFilmstrip(bool on)
     {
-        _settings.ViewerFilmstrip = ViewerFilmstripChip.IsChecked == true;
+        _settings.ViewerFilmstrip = on;
+        ViewerFilmstripChip.IsChecked = on;
         _settingsService.Save(_settings);
         // Rebuild rather than just show: the cells are only built while the
         // strip is up, so the first switch-on has none yet. Switching OFF goes
@@ -28167,6 +28208,17 @@ public partial class MainWindow : Window
     // the film simply had no way to ask and no reason to be asked.
     private void ViewerMediaFill_Click(object sender, RoutedEventArgs e)
     {
+        // A PICTURE GOES THROUGH THE CHIPS' OWN PATH, because for a picture
+        // this button IS the chip - the same row, reached in the one state
+        // where the strip is not on screen. It has to remember, then, exactly
+        // as pressing 자름맞춤 in the panel does; the film below is the case
+        // that must not.
+        if (!ViewerMediaIsSelection)
+        {
+            SetViewerRestByHand(_viewerFill ? ViewerRestMode.Fit : ViewerRestMode.Fill);
+            return;
+        }
+
         if (_viewerFill)
         {
             // 맞춤으로 되돌리기. Explicitly rather than by toggling into a

@@ -464,6 +464,10 @@ public static class Strings
     // not a magnification - the row is about what SIZE the film is shown at,
     // and one of the three answers is "as big as it fits" (2026-08-10).
     public static string ViewerZoom = "영상 크기";
+    // 같은 행이 그림에도 나오므로(전체 덮기) 주어를 갈아 끼운다. "크기" 하나로
+    // 두 경우를 덮을 수도 있지만, 이 메뉴에는 자막 크기도 있어서 무엇의 크기인지가
+    // 라벨에 남아야 한다.
+    public static string ViewerZoomPicture = "그림 크기";
     public static string ViewerSubtitles = "자막";
     public static string ViewerSubtitleSize = "자막 크기";
     public static string ViewerSubtitleSync = "자막 싱크";
@@ -1018,6 +1022,7 @@ public static class Strings
         ViewerPrevVideo = "Previous video";
         ViewerNextVideo = "Next video";
         ViewerZoom = "Video size";
+        ViewerZoomPicture = "Picture size";
         ViewerSubtitles = "Subtitles";
         ViewerSubtitleSize = "Subtitle size";
         ViewerSubtitleSync = "Subtitle sync";
