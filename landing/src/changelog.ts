@@ -33,6 +33,26 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // THREE LINES, and a patch release is where the rules below are easiest to
+    // keep: there is no room to pad. Each of these changes what a person can do
+    // or removes something they ran into, which is the whole test.
+    //
+    // The help gaining a line about the three icon switches is NOT here. It
+    // changes what the app explains, not what it does - the same cut the
+    // renames took in the entry below.
+    version: 'v2.3.1',
+    ko: [
+      '북마크·즐겨찾기·검색 결과로 이동할 때도 폴더 자동 접기가 적용됨',
+      '트리 빈 곳 우클릭에서 프리셋 사용',
+      '앱 전체화면에서 창을 화면 끝까지 넓힐 수 없던 문제 수정',
+    ],
+    en: [
+      'Folder auto-collapse now applies to bookmark, favourite and search jumps too',
+      'Presets on the tree\'s empty-space right-click menu',
+      'Fixed: the window could not be widened to the screen edge in full screen',
+    ],
+  },
+  {
     // THE AUTHOR CUT THIS LIST FROM 21 LINES TO 13 (2026-08-16), and the
     // reasons given for the cuts are worth more than the list itself, because
     // they name a test this file did not have. Three words did all the work:
