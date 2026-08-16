@@ -5297,7 +5297,7 @@ public partial class MainWindow : Window
             // synchronous call - clearing it here would drop the guard while the
             // walk is still running and let an intermediate selection change
             // clear the favorite we just clicked.
-            NavigateToPath(entry.Path, source: "favorite");
+            NavigateToPath(entry.Path, source: "favorite", collapseOthers: true);
         }
     }
 
@@ -5536,7 +5536,19 @@ public partial class MainWindow : Window
     // rule of its own once every row gained a full-path tooltip, and the
     // exception cost more than it paid in a folder of hundreds, where the
     // parent at the top left the file itself far below the bottom edge.
-    private void NavigateToPath(string targetPath, bool pinToTop = true, string source = "nav")
+    // collapseOthers says this jump is the user PICKING A PLACE - a bookmark, a
+    // favourite, a path typed in, a search hit. Those close the rest of the tree
+    // when 폴더 자동 접기 is on, because opening a folder by pointing at it in the
+    // tree already does and reaching the same folder another way should not
+    // answer differently.
+    //
+    // It defaults to FALSE so the callers that are not that keep today's
+    // behaviour without being listed: the startup restore, F5, the preset's
+    // folder, and stepping to the next file in the same folder. The first three
+    // are restoring a state rather than choosing one, and the fourth would run a
+    // whole-tree collapse on every arrow press.
+    private void NavigateToPath(
+        string targetPath, bool pinToTop = true, string source = "nav", bool collapseOthers = false)
     {
         // A jump moving the tree a long way is CORRECT here - that is what a
         // bookmark/favorite click is for. The scroll-jump instrument has no way
@@ -5602,6 +5614,31 @@ public partial class MainWindow : Window
             }
             chain.Add(next);
             current = next;
+        }
+
+        // BEFORE THE WALK, and that placement is the whole point (2026-08-16).
+        //
+        // The accordion used to reach these jumps only by accident: the walk
+        // expands each level, every expansion raises Expanded, and that handler
+        // applies the collapse if a tree gesture happened within the last
+        // second. So Ctrl+Alt+L onto a bookmark collapsed (the key stamps the
+        // window) while clicking the same bookmark in the panel did not - unless
+        // the tree had been touched a moment earlier, in which case it did. Same
+        // destination, three different answers.
+        //
+        // Collapsing during the walk is also the shape that ended the app on
+        // 2026-08-13 (0a566f4): closing a folder can change the children of one
+        // above it, and the walk was inside that list. Doing it here instead
+        // means the walk and the landing both run on a tree that is already in
+        // its final shape - which matters more than it sounds, because the
+        // landing settles the row by MEASURING pixels, and anything that changes
+        // the tree's height after that measurement is the 08-14 fault coming
+        // back from the other side.
+        //
+        // RecapAllOverflow above is here for the same family of reasons.
+        if (collapseOthers && chain.Count > 0)
+        {
+            ApplyAutoCollapse(chain[^1]);
         }
 
         RevealChain(chain, myToken, pinToTop);
@@ -10166,7 +10203,7 @@ public partial class MainWindow : Window
         // absorbed by the replace branch above instead of being recorded as a
         // new place.
         _treeHistoryIndex = target;
-        NavigateToPath(landOnFolder ? entry.Folder : entry.Path, source: "history");
+        NavigateToPath(landOnFolder ? entry.Folder : entry.Path, source: "history", collapseOthers: true);
         UpdateTreeHistoryButtons();
     }
 
@@ -10640,7 +10677,7 @@ public partial class MainWindow : Window
                 // moves the tree, and leaving the overlay up would hide the one
                 // thing the Enter was for.
                 SetSearchViewActive(false);
-                NavigateToPath(resolved, source: "pathbar");
+                NavigateToPath(resolved, source: "pathbar", collapseOthers: true);
 
                 // The typed text has done its job; the box goes back to
                 // mirroring the tree. The walk is asynchronous, so this first
@@ -12673,6 +12710,21 @@ public partial class MainWindow : Window
         // last stamp came from, so the next repro names the stamp that let
         // it through.
         long sinceInput = Environment.TickCount64 - _lastTreeUserInputTicks;
+
+        // NEVER DURING A JUMP (2026-08-16). A walk expands every level on the
+        // way down, and each of those raised Expanded here - so whether a
+        // bookmark collapsed the tree came down to whether a tree gesture
+        // happened to be less than a second old, which is a coin toss the user
+        // cannot see. NavigateToPath now decides once, up front, for the whole
+        // jump (see its collapseOthers), which is also the placement that keeps
+        // the collapse out of the list the walk is still reading - the crash
+        // this handler caused on 2026-08-13, 0a566f4.
+        if (_isNavigatingFromFavorite)
+        {
+            LogAccordionGate(item.FullPath, sinceInput, applied: false);
+            return;
+        }
+
         if (IsWithinTreeGestureWindow)
         {
             LogAccordionGate(item.FullPath, sinceInput, applied: true);
@@ -12680,10 +12732,8 @@ public partial class MainWindow : Window
         }
         else
         {
-            // Favorites navigation lands here too (RevealChain expands
-            // programmatically) - harmless, it applies its own collapse once
-            // at the end of the walk. Same for startup state restore, which
-            // was never meant to auto-collapse the paths it restores.
+            // Startup state restore lands here too, and was never meant to
+            // auto-collapse the paths it restores.
             LogAccordionGate(item.FullPath, sinceInput, applied: false);
         }
     }
@@ -12707,13 +12757,11 @@ public partial class MainWindow : Window
     }
 
     // Accordion mode: collapse every other open folder, keeping only this one
-    // (and the ancestor chain down to it, so the path stays visible). Called
-    // both from the Expanded handler above (manual clicking) and from
-    // RevealChain (favorites navigation) - the latter drives IsExpanded
-    // programmatically level by level, and relying solely on that to also
-    // raise Expanded correctly for each intermediate level proved unreliable,
-    // so favorites navigation instead calls this directly once at the end for
-    // the final target, rather than depending on it firing per-level.
+    // (and the ancestor chain down to it, so the path stays visible). Two
+    // callers, and they are deliberately the only two: the Expanded handler
+    // above, for a folder opened by hand, and NavigateToPath, once per jump and
+    // BEFORE its walk starts. Nothing calls it per-level any more - see both
+    // sites for why that mattered.
     private void ApplyAutoCollapse(FileSystemItem item)
     {
         if (_settings.AutoCollapseFolders)
@@ -12722,12 +12770,11 @@ public partial class MainWindow : Window
         }
     }
 
-    // The core "keep only this path expanded" logic, split out from
-    // ApplyAutoCollapse so favorites navigation can invoke it unconditionally
-    // (see RevealChain) regardless of the Auto Collapse setting - a folder
-    // with many files left expanded elsewhere in the tree was throwing off
-    // WPF's virtualized scroll-extent estimate badly enough that centering
-    // the target reliably wasn't otherwise possible (see CenterInTreeView).
+    // The core "keep only this path expanded" logic, kept separate from the
+    // setting check in ApplyAutoCollapse. It once had a second caller that ran
+    // it regardless of the setting, to keep WPF's virtualized scroll-extent
+    // estimate honest enough to land a jump; that is no longer needed since the
+    // landing settles on measured pixels rather than on the estimate.
     private void CollapseOtherFolders(FileSystemItem item)
     {
         var keepExpanded = new HashSet<FileSystemItem> { item };
@@ -16929,7 +16976,7 @@ public partial class MainWindow : Window
         }
 
         SetSearchViewActive(false);
-        NavigateToPath(path, source: "bookmark-list");
+        NavigateToPath(path, source: "bookmark-list", collapseOthers: true);
     }
 
     // ----- 가리키는 곳이 사라졌을 때 ---------------------------------------------
@@ -17250,7 +17297,7 @@ public partial class MainWindow : Window
         // Same route a search-result click takes for files (handles rows past
         // a folder's "더 보기" cap); folders take the favorites-style walk with
         // its usual pin-to-top.
-        NavigateToPath(found.Path, source: "bookmark");
+        NavigateToPath(found.Path, source: "bookmark", collapseOthers: true);
     }
 
     private static (string Path, bool IsDirectory)? FindNextReachableBookmark(List<string> paths, int startIndex,
@@ -19361,7 +19408,7 @@ public partial class MainWindow : Window
         // After the panel exists, or there is nothing for the reveal to land in.
         // Through NavigateToPath like every other deliberate jump: the tree
         // moving is what hands the panel its selection.
-        NavigateToPath(playing, source: "nowplaying-footer");
+        NavigateToPath(playing, source: "nowplaying-footer", collapseOthers: true);
     }
 
     // Stop rather than pause, and deliberately: half of what this row is for is
@@ -22433,7 +22480,7 @@ public partial class MainWindow : Window
     {
         if (_viewerVideoPath is { } path)
         {
-            NavigateToPath(path, source: "nowplaying");
+            NavigateToPath(path, source: "nowplaying", collapseOthers: true);
         }
     }
 
@@ -30756,7 +30803,7 @@ public partial class MainWindow : Window
             try
             {
                 SetSearchViewActive(false);
-                NavigateToPath(entry.FullPath, source: "search-result");
+                NavigateToPath(entry.FullPath, source: "search-result", collapseOthers: true);
             }
             finally
             {
