@@ -552,6 +552,14 @@ public static class HelpContent
                     R("색상 설정 → 그림자", "트리·패널 목록의 위아래 끝을 옅게 덮음",
                       "Colours → Shading", "Veils the top and bottom ends of the tree and panel lists"),
                     R("옵션 → 기본 설정", "자동 시작 · 트레이 · 아이콘 · 자동 숨김", "Options → General", "Autostart · tray · icons · auto-hide"),
+                    // "아이콘" in the row above reads as ONE switch, and it is
+                    // three. The drive one arrived last (2026-08-16) and the
+                    // release notes say it is separate from the folder's, so the
+                    // help has to say the same - a reader who took the row above
+                    // at its word would go looking for a switch that is already
+                    // there under a name it does not use.
+                    R("옵션 → 기본 설정 → 아이콘", "폴더 · 파일 · 드라이브를 따로따로 켜고 끔",
+                      "Options → General → Icons", "Folders, files and drives switch on and off separately"),
                     R("옵션 → 기본 설정 → 드래그로 이동", "끄면 드래그는 항상 복사, 이동은 Shift",
                       "Options → General → Drag Moves", "Off, a drag always copies and Shift is the way to move"),
                     // The cost goes on the row, not in a paragraph: it is the
