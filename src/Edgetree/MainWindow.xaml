@@ -6394,13 +6394,30 @@
                                      No "Enter" gesture on it: while a decoded
                                      image is showing, Enter is the full-screen
                                      toggle. -->
+                                <!-- Tag="file" ON EVERY ROW THAT ACTS ON THE FILE,
+                                     here and in the group near the bottom. The
+                                     full cover collapses exactly these and
+                                     nothing else (see ViewerImageHost_Context-
+                                     MenuOpening): what is on screen is being
+                                     watched there, and cutting or renaming it is
+                                     not part of watching - while playing,
+                                     seeking, subtitles and marks are, and that
+                                     menu is the only way to reach them once the
+                                     header has gone.
+                                     A tag rather than a list of names in code:
+                                     the next row added here says for itself
+                                     which side it is on, in the place someone
+                                     adding it is already looking. -->
                                 <MenuItem Header="{x:Static services:Strings.ViewerOpenExternally}"
+                                        Tag="file"
                                         Click="OpenItem_Click"/>
                                 <MenuItem x:Name="ViewerOpenWithItem"
                                         Header="{x:Static services:Strings.MenuOpenWith}"
+                                        Tag="file"
                                         Click="OpenWithPicker_Click"/>
                                 <MenuItem x:Name="ViewerSetWallpaperItem"
                                         Header="{x:Static services:Strings.MenuSetWallpaper}"
+                                        Tag="file"
                                         Click="ViewerSetWallpaper_Click"/>
                                 <!-- 슬라이드 쇼, on the picture rather than in
                                      the options menu (moved 2026-08-14, the
@@ -6831,7 +6848,7 @@
                                         </Grid>
                                     </MenuItem.Header>
                                 </MenuItem>
-                                <Separator/>
+                                <Separator Tag="file"/>
                                 <!-- THE FILE's bookmark, which the panel had no
                                      way to reach: the row it marks is the one the
                                      panel is showing, so a picture worth coming
@@ -6856,6 +6873,7 @@
                                 <MenuItem x:Name="ViewerBookmarkItem"
                                         Header="{x:Static services:Strings.MenuBookmarkAdd}"
                                         InputGestureText="Ctrl+Alt+K"
+                                        Tag="file"
                                         Click="BookmarkMenuItem_Click"/>
                                 <!-- All four are refused while a film is loaded:
                                      a playing MediaElement holds the file OPEN,
@@ -6868,26 +6886,33 @@
                                 <MenuItem x:Name="ViewerCutItem"
                                         Header="{x:Static services:Strings.MenuCut}"
                                         InputGestureText="Ctrl+X"
+                                        Tag="file"
                                         Click="CutItem_Click"/>
                                 <MenuItem x:Name="ViewerCopyItem"
                                         Header="{x:Static services:Strings.MenuCopy}"
                                         InputGestureText="Ctrl+C"
+                                        Tag="file"
                                         Click="CopyItem_Click"/>
                                 <MenuItem x:Name="ViewerRenameItem"
                                         Header="{x:Static services:Strings.MenuRename}"
                                         InputGestureText="F2"
+                                        Tag="file"
                                         Click="RenameItem_Click"/>
                                 <MenuItem x:Name="ViewerDeleteItem"
                                         Header="{x:Static services:Strings.MenuDelete}"
                                         InputGestureText="Del"
+                                        Tag="file"
                                         Click="DeleteItem_Click"/>
-                                <Separator/>
+                                <Separator Tag="file"/>
                                 <MenuItem Header="{x:Static services:Strings.MenuCopyPath}"
                                         InputGestureText="Ctrl+Shift+C"
+                                        Tag="file"
                                         Click="CopyPath_Click"/>
                                 <MenuItem Header="{x:Static services:Strings.MenuRevealInExplorer}"
+                                        Tag="file"
                                         Click="RevealInExplorer_Click"/>
                                 <MenuItem Header="{x:Static services:Strings.MenuProperties}"
+                                        Tag="file"
                                         Click="ShowProperties_Click"/>
                                 <!-- THE HEADER'S OWN MENU, REPEATED HERE WHILE
                                      THE HEADER IS GONE (2026-08-16). Full

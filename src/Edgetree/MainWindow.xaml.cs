@@ -24659,24 +24659,27 @@ public partial class MainWindow : Window
         // file-only verb (same rule the row menu applies).
         ViewerOpenWithItem.IsEnabled = !item.IsDirectory;
 
-        // FULL SCREEN IS THE HEADER'S MENU AND NOTHING ELSE (2026-08-16).
+        // THE FULL COVER DROPS THE FILE ROWS, and only those (2026-08-16).
         //
-        // The file rows were left in when the window verbs were first added and
-        // came straight back out: full screen is the state where the picture is
-        // being WATCHED, and cutting, renaming or deleting the thing on screen
-        // is not part of watching it. Mixing the two also made the point of the
-        // change unreadable - a header menu at the foot of eleven file rows is
-        // not the header's menu, it is a longer version of the picture's.
+        // Cutting, renaming or deleting what is on screen is not part of
+        // watching it, and a header menu at the foot of eleven of those rows
+        // reads as a longer picture menu rather than as the header's.
         //
-        // What survives beside the verbs is the SHOW, and only where the rules
-        // above already put it: the way to stop a show has to stay on the
-        // surface the show is running on. Every other row is the panel's own
-        // and the panel is not what is on screen.
+        // IT WAS EVERYTHING BUT THE SHOW FOR AN HOUR, and that was too wide.
+        // On a film the playback group - subtitles, marks, the media zoom - is
+        // reachable NOWHERE ELSE once the header has gone: the transport comes
+        // back by pointing at the bottom edge, but those three are menu-only.
+        // Taking the menu away in the state that needs it most is the shape of
+        // mistake worth naming here.
+        //
+        // The line between the two is declared where the rows are, as Tag="file"
+        // - so a row added later answers the question in the place it is being
+        // written, instead of in a list here that nobody will think to open.
         if (_viewerFullscreen && ViewerImageHost.ContextMenu is { } coveredMenu)
         {
             foreach (var entry in coveredMenu.Items)
             {
-                if (entry is UIElement row && !IsViewerShowRow(row) && !IsViewerWindowVerbRow(row))
+                if (entry is FrameworkElement { Tag: "file" } row)
                 {
                     row.Visibility = Visibility.Collapsed;
                 }
@@ -24692,24 +24695,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // The show's two ROWS, deliberately not its separator. That separator fences
-    // the show off from the file rows above it, and in full screen there are no
-    // file rows above it - so it is left to the collapse pass and the menu opens
-    // on the show itself instead of on a rule across the top.
-    private bool IsViewerShowRow(UIElement row)
-        => ReferenceEquals(row, ViewerSlideshowItem)
-            || ReferenceEquals(row, ViewerSlideshowSecondsRow);
-
-    private bool IsViewerWindowVerbRow(UIElement row)
-        => ReferenceEquals(row, ViewerWindowSeparator)
-            || ReferenceEquals(row, ViewerWindowPresetSeparator)
-            || ReferenceEquals(row, ViewerHelpItem)
-            || ReferenceEquals(row, ViewerWindowVerbSeparator)
-            || ReferenceEquals(row, ViewerMinimizeItem)
-            || ReferenceEquals(row, ViewerRestartItem)
-            || ReferenceEquals(row, ViewerExitSeparator)
-            || ReferenceEquals(row, ViewerExitItem);
-
     // The header's menu, shown at the foot of the picture's while the header
     // itself is not on screen (2026-08-16). Full screen is the one state that
     // takes the title bar away, and with it 프리셋 추가, 다시 시작 and 종료 -
@@ -24723,14 +24708,30 @@ public partial class MainWindow : Window
     {
         var rows = _viewerFullscreen ? Visibility.Visible : Visibility.Collapsed;
 
-        // The leading fence only when there is something above it to fence off,
-        // which in full screen means the show's own rows and nothing else. A
-        // menu that opens with a rule across the top has drawn a line under
-        // nothing.
-        ViewerWindowSeparator.Visibility =
-            rows == Visibility.Visible && ViewerSlideshowItem.Visibility == Visibility.Visible
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+        // The leading fence only when there is something above it to fence off.
+        // ASKED OF THE MENU rather than of one named row: what survives above it
+        // in the cover depends on the file - a film keeps its playback group, a
+        // picture may or may not keep the show's rows, and a folder's thumbnail
+        // keeps neither. A menu that opens with a rule across the top has drawn
+        // a line under nothing.
+        bool anythingAbove = false;
+        foreach (var entry in menu.Items)
+        {
+            if (ReferenceEquals(entry, ViewerWindowSeparator))
+            {
+                break;
+            }
+
+            if (entry is UIElement above && above.Visibility == Visibility.Visible)
+            {
+                anythingAbove = true;
+                break;
+            }
+        }
+
+        ViewerWindowSeparator.Visibility = rows == Visibility.Visible && anythingAbove
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         ViewerWindowPresetSeparator.Visibility = rows;
         ViewerHelpItem.Visibility = rows;
         ViewerWindowVerbSeparator.Visibility = rows;
