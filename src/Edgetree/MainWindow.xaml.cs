@@ -25048,10 +25048,18 @@ public partial class MainWindow : Window
 
         // The navigator and the strip, on the same terms as the size row: the
         // cover is the one state where their own switches are not on screen.
-        var coveredPictureRows = coveredPicture ? Visibility.Visible : Visibility.Collapsed;
-        ViewerNavigatorItem.Visibility = coveredPictureRows;
+        //
+        // THEY PART COMPANY ON THE MEDIUM (2026-08-16, on report). The navigator
+        // is a picture's own thing and stays with the picture. The strip is not:
+        // it lists the FOLDER, so it is there over a film and a track as well,
+        // and in the cover it is the only chrome left on screen with no way to
+        // send it away. It was withheld from films on the belief that the strip
+        // hides itself during playback - UpdateFilmstrip shows that it does not
+        // (the switch, whether the folder has items, and a running show are the
+        // only three things it asks). A wrong premise, not a judgement call.
+        ViewerNavigatorItem.Visibility = coveredPicture ? Visibility.Visible : Visibility.Collapsed;
         ViewerNavigatorItem.IsChecked = _settings.ViewerNavigator;
-        ViewerFilmstripItem.Visibility = coveredPictureRows;
+        ViewerFilmstripItem.Visibility = _viewerFullscreen ? Visibility.Visible : Visibility.Collapsed;
         ViewerFilmstripItem.IsChecked = _settings.ViewerFilmstrip;
         ViewerMarkAddItem.Visibility = playbackRows;
         // The FILE's bookmark, on every kind of file the panel opens. One row

@@ -6768,11 +6768,15 @@
                                      either meant leaving the mode, pressing,
                                      and going back in, which is a round trip
                                      someone doing it often will feel.
-                                     PICTURES only, and the report says why: a
-                                     film has no navigator, and the strip hides
-                                     itself while one plays. Their rows follow
-                                     the size row above, which is the same kind
-                                     of question about the same surface. -->
+                                     The navigator is a PICTURE's, and stays
+                                     there. The strip lists the FOLDER, so it is
+                                     on screen over a film and a track too - it
+                                     was held back from them on the belief that
+                                     it hides itself during playback, which
+                                     UpdateFilmstrip disproves (2026-08-16).
+                                     Their rows follow the size row above, which
+                                     is the same kind of question about the same
+                                     surface. -->
                                 <MenuItem x:Name="ViewerNavigatorItem"
                                         Header="{x:Static services:Strings.ViewerNavigator}"
                                         IsCheckable="True"
