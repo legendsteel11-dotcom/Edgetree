@@ -123,7 +123,27 @@ public class SettingsService
     // settings.bak on the way through: one save back is recoverable for free.
     // Falls back to the plain write where Replace cannot work (a fresh install
     // has nothing to replace).
-    public void Save(AppSettings settings)
+    // ----- 저장이 실패했을 때 ---------------------------------------------------
+    //
+    // 삼키기만 하던 자리다. 설정은 누를 때마다 저장되므로, 파일이 읽기 전용이거나
+    // 다른 프로그램이 잡고 있으면 화면은 계속 바뀌는데 재시작하면 전부 돌아온다 -
+    // 그 사이 아무 표시도 없어서, 앱이 설정을 안 지키는 것으로 보인다.
+    //
+    // 알리는 쪽은 여기가 아니다. 이 클래스는 창을 모르고, 무엇보다 저장은 클릭마다
+    // 도는 것이라 실패도 클릭마다 난다 - 여기서 상자를 띄우면 상자가 쏟아진다.
+    // 그래서 사실만 알리고, 한 번만 말할지 로그만 남길지는 받는 쪽이 정한다.
+    public event Action<Exception>? SaveFailed;
+
+    // 실패한 뒤 다시 성공한 그 순간에만 오른다. 성공할 때마다 알리면 클릭마다
+    // 도는 이벤트가 하나 더 생기는 것이고, 받는 쪽이 알고 싶은 것은 성공이
+    // 아니라 "막혀 있던 것이 풀렸다"는 전환뿐이다.
+    public event Action? SaveRecovered;
+
+    private bool _lastSaveFailed;
+
+    // true면 디스크까지 갔다. 반환값을 안 받는 호출부가 대부분이고 그래도 되지만,
+    // 저장을 확인해야 하는 자리(내보내기, 종료 직전)를 위해 남겨 둔다.
+    public bool Save(AppSettings settings)
     {
         try
         {
@@ -133,14 +153,43 @@ public class SettingsService
             if (!File.Exists(SettingsPath))
             {
                 File.WriteAllText(SettingsPath, json);
-                return;
+                return NoteSaved();
             }
 
             string temp = SettingsPath + ".tmp";
             File.WriteAllText(temp, json);
             File.Replace(temp, SettingsPath, SettingsPath + ".bak", ignoreMetadataErrors: true);
+            return NoteSaved();
         }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
+        catch (IOException ex)
+        {
+            return NoteFailed(ex);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return NoteFailed(ex);
+        }
     }
+
+    private bool NoteSaved()
+    {
+        if (_lastSaveFailed)
+        {
+            _lastSaveFailed = false;
+            SaveRecovered?.Invoke();
+        }
+
+        return true;
+    }
+
+    private bool NoteFailed(Exception error)
+    {
+        _lastSaveFailed = true;
+        SaveFailed?.Invoke(error);
+        return false;
+    }
+
+    // 어디에 쓰려고 했는지 말해 줄 수 있어야 한다 - 안내문에서 이 경로가 사실상
+    // 유일하게 실행 가능한 정보다(잡고 있는 프로그램을 닫든, 읽기 전용을 풀든).
+    public static string PathForMessages => SettingsPath;
 }

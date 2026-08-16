@@ -276,6 +276,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _settingsService.SaveFailed += OnSettingsSaveFailed;
+        _settingsService.SaveRecovered += OnSettingsSaveRecovered;
         SourceInitialized += MainWindow_SourceInitialized;
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
@@ -1739,8 +1741,69 @@ public partial class MainWindow : Window
         FitFavoritesPanel();
     }
 
+    // ----- 설정이 디스크에 안 써졌을 때 -----------------------------------------
+    //
+    // 삼키고 끝나던 자리였다. 설정은 누를 때마다 저장되므로, 파일이 잠겨 있거나
+    // 읽기 전용이면 화면은 계속 바뀌는데 재시작하면 전부 돌아온다 - 그 사이 아무
+    // 표시가 없어서 앱이 설정을 안 지키는 것으로 보인다.
+    //
+    // 로그는 매번, 말은 한 번. 실패가 클릭마다 나는 것이라 상자를 매번 띄우면
+    // 상자가 쏟아지고, 그건 알리는 게 아니라 못 쓰게 만드는 것이다. 저장이 다시
+    // 성공하면 다시 말할 수 있게 풀린다 - 권한을 고쳤다가 나중에 또 잠기는 것은
+    // 새 소식이므로.
+    //
+    // 창을 닫는 중에는 말하지 않는다. 종료 직전 저장이 실패했을 때 모달을 띄우면
+    // 나가려는 앱을 붙잡아 두게 되고, 그때는 이미 알려 줄 값어치가 없다 - 잃을
+    // 것은 이미 잃은 뒤다. 그 경우에도 로그 줄은 남는다.
+    private bool _settingsSaveFailureTold;
+    private bool _windowIsClosing;
+
+    private void OnSettingsSaveFailed(Exception error)
+    {
+        ExitLog.Record($"settings save failed: {error.GetType().Name}: {error.Message}");
+
+        if (_settingsSaveFailureTold || _windowIsClosing || !IsLoaded)
+        {
+            return;
+        }
+
+        _settingsSaveFailureTold = true;
+
+        // 저장 실패는 클릭 한가운데에서 올라온다. 그 클릭이 아직 처리 중인
+        // 상태에서 모달을 열면 그 자리에서 입력 루프가 멈추므로, 하던 일이
+        // 끝난 뒤로 미룬다.
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (_windowIsClosing)
+                {
+                    return;
+                }
+
+                System.Windows.MessageBox.Show(
+                    this,
+                    string.Format(Strings.SettingsSaveFailedBody, SettingsService.PathForMessages),
+                    Strings.SettingsSaveFailedTitle,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            },
+            System.Windows.Threading.DispatcherPriority.Background);
+    }
+
+    // 막혀 있던 것이 풀렸다는 사실만 로그에 남기고, 말은 안 한다 - 사용자가
+    // 고쳤거나 잡고 있던 프로그램이 닫힌 것이라 이미 알고 있다. 남기는 이유는
+    // 다음에 신고가 왔을 때 로그가 "언제부터 언제까지 안 써졌다"를 답하기
+    // 위해서다. 그리고 다시 말할 수 있게 풀어 준다.
+    private void OnSettingsSaveRecovered()
+    {
+        ExitLog.Record("settings save recovered");
+        _settingsSaveFailureTold = false;
+    }
+
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        _windowIsClosing = true;
+
         // The window itself going away - the tray "exit" path never comes
         // through here, and neither does the header's X any more (it hides to
         // the tray since 2026-08-10). What is left is Alt+F4, a task-manager

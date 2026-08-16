@@ -625,6 +625,16 @@ public static class Strings
     public static string ColorFileDefaultName = "edgetree-colors.json";
     public static string ColorImportFailedTitle = "색상 불러오기";
     public static string ColorImportFailedBody = "이 파일에는 색상이 없습니다.";
+    // 설정이 디스크에 안 써질 때. 한 세션에 한 번만 뜬다 - 저장은 클릭마다 도는
+    // 것이라 실패도 클릭마다 나기 때문이다(MainWindow의 구독부).
+    //
+    // 본문이 말해야 하는 것은 셋이고 그 순서다: 지금 무엇이 안 되고 있는지,
+    // 그래서 무엇을 잃게 되는지, 어디를 보면 되는지. 원인을 추측해서 적지 않는다 -
+    // 읽기 전용일 수도, 다른 프로그램이 잡고 있을 수도, 동기화 폴더일 수도 있고
+    // 앱은 그중 무엇인지 모른다. 경로가 그 자리에서 유일하게 확인 가능한 것이다.
+    public static string SettingsSaveFailedTitle = "설정 저장";
+    public static string SettingsSaveFailedBody =
+        "설정을 저장하지 못했습니다. 지금 바꾼 것은 앱을 닫으면 사라집니다.\n\n{0}";
     // The moon and sun emoji that used to lead these are gone (2026-08-11):
     // they were the only pictures in a window of text buttons, they came from
     // the system's emoji font rather than from the app's own marks, and the
@@ -1070,11 +1080,19 @@ public static class Strings
         ColorFileDefaultName = "edgetree-colors.json";
         ColorImportFailedTitle = "Import Colours";
         ColorImportFailedBody = "That file holds no colours.";
+        SettingsSaveFailedTitle = "Settings";
+        SettingsSaveFailedBody =
+            "Your settings could not be saved. What you have changed will be gone when the app closes.\n\n{0}";
         ColorThemeDarkMode = "Dark";
         ColorThemeLightMode = "Light";
         ButtonRandomColors = "Random";
         ButtonMonoColors = "Mono";
         ButtonMonoColorsTip = "Greyscale in one press";
+        // Missing outright until 2026-08-16, so the link marks on all seventeen
+        // colour rows carried a Korean tooltip in an English app - a whole
+        // feature explained in the wrong language, and the one feature here
+        // that explains itself nowhere else.
+        ColorChainTip = "Chain · rows lit together share a colour";
         ButtonRandomColorsTip = "Combinations that go together";
         ButtonDaringColors = "Bold";
         ButtonDaringColorsTip = "Bolder combinations, starting from a primary hue";
@@ -1088,11 +1106,6 @@ public static class Strings
         AboutVersionLabel = "Version";
         AboutAuthorLabel = "Author";
         AboutDateLabel = "Date";
-        // Missing outright until 2026-08-16, so the link marks on all seventeen
-        // colour rows carried a Korean tooltip in an English app - a whole
-        // feature explained in the wrong language, and the one feature here
-        // that explains itself nowhere else.
-        ColorChainTip = "Chain · rows lit together share a colour";
         AboutLicenseLabel = "License Summary";
         AboutWebsiteLabel = "Website";
         AboutOtherToolLabel = "Another tool by the same maker";
