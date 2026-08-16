@@ -374,11 +374,15 @@
              folder or file, reserves this much space for the arrow/gutter.
              TabSpacingGuideMargin/TabSpacingGuidePadding are the same
              template's ItemsHost Margin/Padding, which together with its
-             fixed 1px BorderThickness produce the cascading per-level indent
-             and position the guide line under the arrow's own center. -->
+             fixed 1px BorderThickness produce the cascading per-level indent.
+             TabSpacingGuideLineMargin is where the line is actually PAINTED,
+             which is the same place plus the row's own horizontal padding -
+             the arrow sits inside that padding and ItemsHost sits outside it,
+             so the two differ by exactly RowHorizontalPadding. -->
         <GridLength x:Key="TabSpacingWidth">16</GridLength>
         <Thickness x:Key="TabSpacingGuideMargin">8,0,0,0</Thickness>
         <Thickness x:Key="TabSpacingGuidePadding">7,0,0,0</Thickness>
+        <Thickness x:Key="TabSpacingGuideLineMargin">12,0,0,0</Thickness>
 
         <!-- The expand arrow's glyph drawn LARGER than the 16-unit box it
              lives in - see ExpanderGlyphScale in ApplyLayoutMetrics. The box
@@ -2555,7 +2559,7 @@
                                      line belongs to, so it stopped being a target - it shows
                                      depth, and how far a folder reaches, and nothing else. -->
                                 <Border x:Name="GuideLine"
-                                        Margin="{DynamicResource TabSpacingGuideMargin}"
+                                        Margin="{DynamicResource TabSpacingGuideLineMargin}"
                                         HorizontalAlignment="Left"
                                         Width="1"
                                         IsHitTestVisible="False"

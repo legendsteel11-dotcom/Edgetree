@@ -11209,8 +11209,16 @@ public partial class MainWindow : Window
     private const double ViewerChipGap = 4;
     private const double ViewerChipGroupGap = 10;
 
+    // 행의 가로 패딩. 세로와 달리 글꼴을 따라가지 않는다.
+    //
+    // 상수로 뽑은 이유는 이 값이 두 곳에서 만나기 때문이다: 꺽쇠는 이 패딩
+    // 안쪽에서 시작하는데, 안내선을 그리는 ItemsHost는 행 테두리의 형제라
+    // 패딩 바깥에서 잰다. 한쪽에만 적으면 선이 꺽쇠 중심에서 이만큼 왼쪽에
+    // 그려진다 - 오른쪽 꺽쇠는 잉크가 좁아 안 보이다가 아래로 돌면 드러난다.
+    private const double RowHorizontalPadding = 4;
+
     // 꺽쇠 글리프의 잉크가 자기 상자에서 차지하는 폭 비율. Material
-    // keyboard_arrow_right의 잉크는 960 상자 안에서 333~624(291)이라 0.303이고,
+    // keyboard_arrow_right는 960 상자 안에서 333~624(291)이라 0.303이고,
     // 세로로는 480이라 0.5다. 아래로 돌면 그 둘이 맞바뀐다 - 접었을 때보다
     // 폈을 때 잉크가 옆으로 더 나가는 것이 여기서 나온다.
     private const double ExpanderInkShare = 0.303;
@@ -11406,7 +11414,8 @@ public partial class MainWindow : Window
         // both ExplorerTreeViewItemStyle and FavoriteListBoxItemStyle (see
         // their own comments) so the tree and favorites rows always match.
         double verticalPadding = RowVerticalPadding;
-        Resources["RowPadding"] = new Thickness(4, verticalPadding, 4, verticalPadding);
+        Resources["RowPadding"] = new Thickness(
+            RowHorizontalPadding, verticalPadding, RowHorizontalPadding, verticalPadding);
 
         // The other half of the squeeze: the NAME's line box. The icon alone
         // buys nothing, because at every font step the two land within a pixel
@@ -11502,6 +11511,17 @@ public partial class MainWindow : Window
         // default TabSpacing of 16.
         Resources["TabSpacingGuideMargin"] = new Thickness(tabSpacing / 2, 0, 0, 0);
         Resources["TabSpacingGuidePadding"] = new Thickness(tabSpacing / 2 - 1, 0, 0, 0);
+        // 그런데 선이 실제로 그려지는 자리는 거기서 행의 가로 패딩만큼 오른쪽이다
+        // (2026-08-16). 위의 둘은 자리를 만드는 쪽이고 - 레벨당 들여쓰기가 정확히
+        // 탭 간격이 되도록 1px 테두리를 사이에 두고 갈라 놓은 값 - 선을 칠하는
+        // 것은 같은 Grid에 겹쳐 놓인 별개의 Border다. 그래서 칠하는 쪽만 옮기면
+        // 들여쓰기는 그대로 두고 선만 꺽쇠 중심으로 간다.
+        //
+        // 왜 어긋나 있었나: 꺽쇠는 행 테두리의 패딩 안에서 시작하는데 ItemsHost는
+        // 그 테두리의 형제라 패딩 밖에서 잰다. 차이는 RowHorizontalPadding 하나로,
+        // 탭 간격이나 글꼴과 무관하게 항상 같은 값이다.
+        Resources["TabSpacingGuideLineMargin"] =
+            new Thickness(tabSpacing / 2 + RowHorizontalPadding, 0, 0, 0);
         // 상자(16)는 그대로, 안의 마크만 키운다 - 아래 nameGap 계산이 이 배수를
         // ExpanderInkOverhang을 통해 이미 반영한다.
         Resources["ExpanderGlyphSize"] = 16.0 * ExpanderGlyphScale;
@@ -11556,11 +11576,11 @@ public partial class MainWindow : Window
         // 그래서 대가는 트리 전체가 한 번 오른쪽으로 밀리는 것뿐이고, 두 단계만
         // 내려가도 좁은 들여쓰기가 아낀 폭이 더 크다.
         //
-        // 덤으로 같이 없어지는 것: 아래로 돌아간 꺽쇠는 잉크가 더 옆으로 나가므로
+        // 덤으로 같이 없어지는 것: 아래로 돌아간 꺽쇠는 잉크가 0.25까지 나가므로
         // 상자가 들여쓰기의 두 배를 넘으면(큰 글꼴 + 좁은 들여쓰기) 끝이 아이콘
         // 밑으로 들어갔다 - 아이콘 열이 나중에 그려져 위를 덮기 때문이다. 오른쪽
-        // 꺽쇠는 잉크가 좁아 훨씬 늦게까지 버티므로 폈을 때만 작아 보였다.
-        // 간격이 생기면 그 조건이 성립하지 않는다.
+        // 꺽쇠는 0.15라 3.3배까지 버티므로 접었을 때만 작아 보였다. 간격이
+        // 생기면 그 조건이 성립하지 않는다.
         double gapNow = tabSpacing / 2.0 - ExpanderInkOverhang * rowGlyphBox;
         double wantedGap = Math.Max(ExpanderNameGapFloor, ExpanderNameGapTarget * compact);
         double nameGap = Math.Round(Math.Max(0.0, wantedGap - gapNow));
