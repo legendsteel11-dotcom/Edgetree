@@ -24836,6 +24836,30 @@ public partial class MainWindow : Window
                     row.Visibility = Visibility.Collapsed;
                 }
             }
+
+            // AND NO RULE ACROSS THE TOP. Every separator in this menu fences
+            // its group off from what is above it, and in the cover what is
+            // above may all have just gone - so the first one left draws a line
+            // under nothing. Handled as a rule rather than by naming the
+            // separator that did it, because which one is first depends on the
+            // file: a picture's show rows, a film's playback group, or neither.
+            //
+            // Only while covered. The full menu always has rows above its first
+            // separator, and this is a pass nobody should pay for on an
+            // ordinary right-click.
+            foreach (var entry in coveredMenu.Items)
+            {
+                if (entry is Separator leading)
+                {
+                    leading.Visibility = Visibility.Collapsed;
+                    continue;
+                }
+
+                if (entry is UIElement { Visibility: Visibility.Visible })
+                {
+                    break;
+                }
+            }
         }
 
         // Last, so the group reads as the fence it is, and AFTER the pass above
