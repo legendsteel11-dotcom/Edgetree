@@ -6453,6 +6453,146 @@ public partial class MainWindow : Window
 
     // The row one below the current selection, in the order the tree is drawn -
     // into an expanded folder, or on to the next drive when a subtree ends.
+    // Where a row's top edge sits inside the tree's own viewport, in pixels.
+    // NaN when it cannot be answered - no scroll viewer yet, or a container
+    // that virtualization has not realized.
+    private double MeasuredRowTop(System.Windows.FrameworkElement? row)
+    {
+        if (row is null || FindTreeScrollViewer() is not { } scrollViewer)
+        {
+            return double.NaN;
+        }
+
+        return row.TransformToAncestor(scrollViewer)
+            .Transform(new System.Windows.Point(0, 0)).Y;
+    }
+
+    // The row nearest the top of the viewport, and where its top edge sits.
+    // The anchor a reveal holds still - see KeepRevealRowInPlace.
+    private (FileSystemItem? Item, double Top) TopmostRealizedRow()
+    {
+        if (FindTreeScrollViewer() is not { } scrollViewer)
+        {
+            return (null, double.NaN);
+        }
+
+        FileSystemItem? best = null;
+        double bestTop = double.MaxValue;
+        Walk(ExplorerTree);
+        return (best, best is null ? double.NaN : bestTop);
+
+        void Walk(DependencyObject node)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(node);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(node, i);
+                if (child is TreeViewItem { IsVisible: true, DataContext: FileSystemItem item } row)
+                {
+                    double top = row.TransformToAncestor(scrollViewer)
+                        .Transform(new System.Windows.Point(0, 0)).Y;
+                    // At or below the top edge, with a pixel of slack for the
+                    // row the viewport is cutting in half.
+                    if (top >= -1 && top < bestTop)
+                    {
+                        bestTop = top;
+                        best = item;
+                    }
+                }
+
+                Walk(child);
+            }
+        }
+    }
+
+    // WHAT IS ON SCREEN STAYS ON SCREEN (2026-08-16, second cut).
+    //
+    // The first cut held the PRESSED row still, which is what was asked for
+    // and turned out to be the wrong half of the trade: the revealed rows go
+    // in immediately ABOVE that row, so pinning it pushed everything above it
+    // off the top of the viewport - reported as folders disappearing when the
+    // 더 보기 was pressed. The anchor is the row at the TOP instead, which is
+    // above the insertion point and therefore does not move at all: the new
+    // rows appear where they belong and the pressed row travels down by
+    // exactly as many as arrived.
+    //
+    // MEASURED, NOT COUNTED. The offset is the thing that came out wrong (a
+    // ReplaceAll Reset makes the panel derive it again from sizes it no longer
+    // has), so a correction built out of row counts would be asking the same
+    // broken sum a second time. Same lesson as the landing fix of 2026-08-14.
+    // AND THE PRESSED ROW IS THE FALLBACK, not the rule (2026-08-16). Holding
+    // the pressed row is what a collapse wants - the hand is on it and the
+    // rows that vanish are above it - but as the RULE it drifts: a reveal
+    // anchors the top and moves the offset by nothing, a collapse anchoring
+    // the pressed row moves it by N, so every round trip walks the view N rows
+    // upward. That is the same shape as the fault this whole method exists to
+    // fix, arrived at from the other side.
+    //
+    // As a fallback it cannot accumulate, because it only runs when the top
+    // anchor is GONE - the viewport was sitting inside the block being taken
+    // away, which is the one case that had no correction at all before, and
+    // the next reveal anchors the top again.
+    private void KeepRevealRowInPlace(
+        FileSystemItem? anchor, double anchorTop,
+        FileSystemItem? folder, double pressedTop)
+    {
+        if (FindTreeScrollViewer() is not { } scrollViewer)
+        {
+            return;
+        }
+
+        // The reveal's own rows have to be in the tree before anything can be
+        // measured against them.
+        ExplorerTree.UpdateLayout();
+
+        double heldTop = anchorTop;
+        var container = anchor is null || double.IsNaN(anchorTop)
+            ? null
+            : FindRealizedContainer(anchor);
+        string held = anchor?.Name ?? "-";
+
+        if (container is null && folder is not null && !double.IsNaN(pressedTop))
+        {
+            // The row is a NEW instance either way - 더 보기 and 접기 are two
+            // synthetic rows, not one that changes its label - so it is found
+            // by its place rather than by identity.
+            if (folder.Children.LastOrDefault(c => c.IsShowMore) is { } pressed)
+            {
+                container = FindRealizedContainer(pressed);
+                heldTop = pressedTop;
+                held = "더보기";
+            }
+        }
+
+        if (container is null)
+        {
+            return;
+        }
+
+        double afterTop = MeasuredRowTop(container);
+        double rowHeight = container.ActualHeight;
+        if (double.IsNaN(afterTop) || rowHeight <= 0)
+        {
+            return;
+        }
+
+        anchorTop = heldTop;
+
+        // The tree scrolls BY ROW, so the correction has to be whole rows -
+        // a pixel offset would be rounded away by the panel anyway.
+        int steps = (int)Math.Round((afterTop - anchorTop) / rowHeight);
+        if (steps == 0)
+        {
+            return;
+        }
+
+        double before = scrollViewer.VerticalOffset;
+        scrollViewer.ScrollToVerticalOffset(before + steps);
+        LogClickLine(
+            $"reveal: held {held} top {anchorTop:F0} -> {afterTop:F0} " +
+            $"rowH={rowHeight:F1} offset {before:F0} -> {before + steps:F0}");
+    }
+
     // Skips the rows nobody selects ("더 보기", the not-yet-loaded placeholder).
     private void SelectNextVisibleRow()
     {
@@ -12929,6 +13069,23 @@ public partial class MainWindow : Window
             LogTreeClick(showMore, onExpander: false, e.ClickCount);
             NoteRevealPressForScrollWatch(showMore.IsShowLess ? "recollapse" : "reveal");
 
+            // WHERE THE PRESSED ROW IS, before anything moves. Both branches
+            // below rebuild Children through ReplaceAll, which is one Reset -
+            // and a Reset makes the virtualizing panel throw away what it knew
+            // and derive the offset again. It derives it from the sizes it
+            // has, some of which belong to rows that are no longer drawn, so
+            // each press lands a little off and repeated presses walk the row
+            // off the screen (measured 2026-08-16: one reveal-and-collapse
+            // returned the extent to 219 exactly and left the offset 11 rows
+            // away from where it started).
+            //
+            // The tell in the log is that the offset moved FURTHER than the
+            // row count did - +36 for 20 new rows. Nothing that inserts rows
+            // can do that; only a re-derivation can.
+            var (anchor, anchorTop) = TopmostRealizedRow();
+            double pressedTop = MeasuredRowTop(treeViewItem);
+            var revealFolder = showMore.Parent;
+
             if (showMore.IsShowLess)
             {
                 // Queued for the same reason the collapse handler queues it:
@@ -12936,21 +13093,29 @@ public partial class MainWindow : Window
                 // the selection re-enters the tree from inside a mouse event
                 // (the 2026-08-02 "Collection was modified" crash). Revealing
                 // only ADDS rows, so it has never needed the same care.
-                var folder = showMore.Parent;
                 Dispatcher.BeginInvoke(
-                    () => folder?.RecollapseOverflow(),
+                    () =>
+                    {
+                        revealFolder?.RecollapseOverflow();
+                        KeepRevealRowInPlace(anchor, anchorTop, revealFolder, pressedTop);
+                    },
                     System.Windows.Threading.DispatcherPriority.Background);
             }
             else
             {
-                showMore.Parent?.ShowAllChildren();
+                revealFolder?.ShowAllChildren();
+                // After the layout the reveal just asked for, not inside it:
+                // the row's new container does not exist until then.
+                Dispatcher.BeginInvoke(
+                    () => KeepRevealRowInPlace(anchor, anchorTop, revealFolder, pressedTop),
+                    System.Windows.Threading.DispatcherPriority.Loaded);
             }
 
             e.Handled = true;
             return;
         }
 
-        // The bookmark ribbon releases the bookmark instead of selecting the
+            // The bookmark ribbon releases the bookmark instead of selecting the
         // row - matched by name for the same reason as the sort icon below.
         // Handled, so the press never reaches the row: a click that both
         // unmarks and selects would leave the user unsure which one they
