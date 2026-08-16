@@ -11028,6 +11028,10 @@ public partial class MainWindow : Window
             // move rather than a window one.
             ApplyViewerSide();
             UpdateViewerNavigator();
+            // The clock reads the setting the preset has just written. Only
+            // needed on this branch: the other one OPENS the panel, and opening
+            // asks for the clock on its own way up.
+            UpdateViewerClock();
             _filmstripBuiltFor = default;
             UpdateViewerCarousel();
             ApplyFilmstripCellSize();

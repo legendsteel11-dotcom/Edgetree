@@ -101,6 +101,14 @@ public class AppPreset
         nameof(AppSettings.ViewerFilmstripCellHeight),
         nameof(AppSettings.ViewerNavigator),
         nameof(AppSettings.ViewerSideSwapped),
+
+        // 시계. Missed when it was built (2026-08-16) rather than left out: it
+        // is a display switch on the panel exactly as the two above it are, it
+        // costs nothing to apply, and a preset named for looking at pictures is
+        // the obvious place to want it. The full cover is the one panel state
+        // that is NOT here, and for a reason of its own - see the note under
+        // SizeFields.
+        nameof(AppSettings.ViewerClock),
     };
 
     internal static readonly string[] LookFields =
