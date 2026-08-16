@@ -24632,7 +24632,19 @@ public partial class MainWindow : Window
         // that offered it (a folder refreshed down to a single picture), and a
         // running show with no visible switch would be a thing that cannot be
         // turned off.
-        bool canWalk = IsViewerCarouselItem(item) && GetViewerCarouselItems(item).Count > 1;
+        // ASKED WITH THE SHOW'S OWN SET, not the carousel's (2026-08-16). The
+        // XAML beside these rows has claimed "pictures only, which comes for
+        // free" since they were written, and it was not free: the carousel is
+        // everything the panel can show, so film and sound are in it, and a
+        // film in a folder of photographs offered a slideshow on its own menu.
+        // IsViewerSlideshowItem is what the show actually walks.
+        //
+        // The CURRENT item has to be a picture too, which narrows what was
+        // possible before - StartSlideshow will begin from a film by moving to
+        // the first picture, and that is a fair thing for the keyboard to do
+        // and a strange row to read on a film's own menu.
+        bool canWalk = IsViewerSlideshowItem(item)
+            && GetViewerCarouselItems(item).Count(IsViewerSlideshowItem) > 1;
         var slideshowRows = canWalk || IsSlideshowRunning ? Visibility.Visible : Visibility.Collapsed;
         ViewerSlideshowSeparator.Visibility = slideshowRows;
         ViewerSlideshowItem.Visibility = slideshowRows;
