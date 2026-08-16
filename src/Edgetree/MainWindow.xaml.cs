@@ -25015,11 +25015,55 @@ public partial class MainWindow : Window
         }
 
         bool showingVideo = _viewerVideoPath is not null;
-        if ((!showingVideo && (ViewerImage.Visibility != Visibility.Visible || ViewerImage.Source is null))
-            || ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsShowMore: false } item
-            || !string.Equals(item.FullPath, _pendingViewerPath, StringComparison.OrdinalIgnoreCase))
+        if (!showingVideo && (ViewerImage.Visibility != Visibility.Visible || ViewerImage.Source is null))
         {
             e.Handled = true;
+            return;
+        }
+
+        // THE PANEL AND THE TREE CAN COME APART, and until 2026-08-16 that was
+        // a silent dead right-click. The gate itself is right - every file row
+        // in this menu acts on the SELECTION, so opening it while the two point
+        // at different files would rename, delete or set as wallpaper something
+        // other than the picture under the cursor.
+        //
+        // What was wrong is what happened next: nothing at all, with no way to
+        // tell a blocked menu from a broken one. Reported after a slideshow ran
+        // a quarter of an hour - the show deliberately does not move the tree,
+        // StopSlideshow lands the selection on the shown picture afterwards, and
+        // that landing had given up (click.log 17:13:41, see
+        // SelectVisibleItemStep). Leaving the cover did not help, because the
+        // selection was still on the picture the show had started from.
+        //
+        // So: say so in the log, and in the FULL SCREEN - where this menu is the
+        // only surface there is - open the rows that act on no file, exactly as
+        // a running show already does. Outside the cover ApplyViewerWindowVerbs
+        // shows nothing, and an empty popup is worse than none, so the block
+        // stands there.
+        if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsShowMore: false } item
+            || !string.Equals(item.FullPath, _pendingViewerPath, StringComparison.OrdinalIgnoreCase))
+        {
+            LogClickLine(
+                "viewer menu blocked: panel and tree disagree " +
+                $"(panel={Path.GetFileName(_pendingViewerPath) ?? "-"}, " +
+                $"tree={(ExplorerTree.SelectedItem as FileSystemItem)?.Name ?? "-"}, " +
+                $"fullscreen={_viewerFullscreen})");
+
+            if (!_viewerFullscreen || ViewerImageHost.ContextMenu is not { } strandedMenu)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            foreach (var entry in strandedMenu.Items)
+            {
+                if (entry is UIElement row)
+                {
+                    row.Visibility = Visibility.Collapsed;
+                }
+            }
+
+            ApplyViewerWindowVerbs(strandedMenu);
             return;
         }
 
