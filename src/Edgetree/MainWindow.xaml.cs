@@ -27881,6 +27881,41 @@ public partial class MainWindow : Window
 
     private void ViewerFillChip_Click(object sender, RoutedEventArgs e) => SetViewerRestByHand(ViewerRestMode.Fill);
 
+    // 자름맞춤 FOR A FILM, and the reason it is a separate handler is the one
+    // thing it must not do: remember (2026-08-16, the author's call).
+    //
+    // The chips above set the REST state, which is what carries a choice down a
+    // folder - right for pictures, wrong here. A film cropped to the panel
+    // unasked is not what pressing play meant, which is why arriving films
+    // clear the flag outright; if this row wrote the rest, the NEXT film would
+    // arrive cropped and the clearing would be undone by the thing that set it.
+    // So it moves the live flag only, and the next film starts fitted again.
+    //
+    // Nothing else had to be built. The cover scale is measured from
+    // _viewerPixelWidth/Height, which the film sets from its own natural size
+    // (see MediaOpened), and ViewerDisplayScale has always honoured the flag -
+    // the film simply had no way to ask and no reason to be asked.
+    private void ViewerMediaFill_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewerFill)
+        {
+            // 맞춤으로 되돌리기. Explicitly rather than by toggling into a
+            // number: fit is the film's own arrival state and the one this row
+            // came from.
+            _viewerZoom = null;
+            _viewerFill = false;
+        }
+        else
+        {
+            _viewerZoom = null;
+            _viewerFill = true;
+        }
+
+        ViewerZoomPan.X = 0;
+        ViewerZoomPan.Y = 0;
+        ApplyViewerZoom();
+    }
+
     // A chip pressed WHILE A SHOW RUNS is the user overruling the 자름맞춤 the
     // show set for itself, so the show stops owing them the old one back - it
     // would otherwise undo their press the moment the show ended. The chips do
