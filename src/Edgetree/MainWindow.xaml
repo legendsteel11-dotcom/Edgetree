@@ -230,6 +230,14 @@
              plumbing. -->
         <Visibility x:Key="FolderIconVisibility">Visible</Visibility>
         <Visibility x:Key="FileIconVisibility">Visible</Visibility>
+        <!-- Drives, split off from the folders 2026-08-16 on request. They are
+             folders as far as the tree is concerned and had always followed
+             그 switch, but they are not the thing that switch is FOR: turning
+             folder icons off is about the hundreds of identical folder marks
+             down the tree, and it took the half-dozen drive icons - the only
+             icons in the window that differ from one another and say what a
+             row IS - with it. -->
+        <Visibility x:Key="DriveIconVisibility">Visible</Visibility>
 
         <!-- Row icon/name size/margins - see MainWindow.xaml.cs's
              ApplyIconMetrics for how these four are actually computed
@@ -1728,6 +1736,15 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="showFileIcons"
                         Click="ShowFileIconsMenuItem_Click"/>
+                <!-- Third of the icon toggles, and last because it is the
+                     exception the other two make room for: drives had always
+                     ridden on 폴더 아이콘, being folders, and turning that off
+                     to be rid of hundreds of identical folder marks also took
+                     the half-dozen icons that actually tell rows apart. -->
+                <MenuItem Header="{x:Static services:Strings.MenuShowDriveIcons}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="showDriveIcons"
+                        Click="ShowDriveIconsMenuItem_Click"/>
                 <MenuItem Header="{x:Static services:Strings.MenuHideTitleBarTitle}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="hideTitleBarTitle"
@@ -3764,6 +3781,22 @@
                             Property="Visibility"
                             Value="{DynamicResource FolderIconVisibility}"/>
                 </DataTrigger>
+                <!-- AFTER the folder trigger, and that ordering is the whole
+                     mechanism: a drive satisfies both conditions, and the last
+                     matching trigger is the one WPF applies. So this reads as
+                     the exception it is - drives are folders, except about
+                     their icon. -->
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsDirectory}"
+                                Value="True"/>
+                        <Condition Binding="{Binding IsRoot}"
+                                Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="RowIcon"
+                            Property="Visibility"
+                            Value="{DynamicResource DriveIconVisibility}"/>
+                </MultiDataTrigger>
                 <DataTrigger Binding="{Binding IsBookmarked}"
                         Value="True">
                     <Setter TargetName="BookmarkMarkerBorder"

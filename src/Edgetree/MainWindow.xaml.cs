@@ -612,6 +612,7 @@ public partial class MainWindow : Window
         ApplyColorSettings();
         ApplyFolderIconVisibility();
         ApplyFileIconVisibility();
+        ApplyDriveIconVisibility();
         ApplyTitleTextVisibility();
 
         // Deferred rather than done inline above: restoring possibly many
@@ -7997,6 +7998,7 @@ public partial class MainWindow : Window
                 FindMenuItem(generalSettings, "trayIcon") is { } trayIcon &&
                 FindMenuItem(generalSettings, "showFolderIcons") is { } showFolderIcons &&
                 FindMenuItem(generalSettings, "showFileIcons") is { } showFileIcons &&
+                FindMenuItem(generalSettings, "showDriveIcons") is { } showDriveIcons &&
                 FindMenuItem(generalSettings, "hideTitleBarTitle") is { } hideTitleBarTitle &&
                 FindMenuItem(generalSettings, "showPanelDividers") is { } showPanelDividers &&
                 // showPathBar left the menu on 2026-08-11 and had to leave this
@@ -8016,6 +8018,7 @@ public partial class MainWindow : Window
                 trayIcon.IsChecked = _settings.AlwaysShowTrayIcon;
                 showFolderIcons.IsChecked = _settings.ShowFolderIcons;
                 showFileIcons.IsChecked = _settings.ShowFileIcons;
+                showDriveIcons.IsChecked = _settings.ShowDriveIcons;
                 hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
                 showPanelDividers.IsChecked = _settings.ShowPanelDividers;
                 autoCollapse.IsChecked = _settings.AutoCollapseFolders;
@@ -9845,6 +9848,19 @@ public partial class MainWindow : Window
         }
     }
 
+    // Drives, split off from the folder toggle (2026-08-16, on request). No
+    // bookmark refresh with it, unlike the two above: that panel lists folders
+    // and favourites, never a drive root, so there is nothing there to redraw.
+    private void ShowDriveIconsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.ShowDriveIcons = menuItem.IsChecked;
+            _settingsService.Save(_settings);
+            ApplyDriveIconVisibility();
+        }
+    }
+
     private void ShowPanelDividersMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem menuItem)
@@ -11123,6 +11139,7 @@ public partial class MainWindow : Window
             ApplyIconStyle();
             ApplyFolderIconVisibility();
             ApplyFileIconVisibility();
+            ApplyDriveIconVisibility();
             ApplyTitleTextVisibility();
             ApplyPathBarVisibility();
             ApplyFavoritesPosition();
@@ -11405,6 +11422,16 @@ public partial class MainWindow : Window
     {
         Resources["FileIconVisibility"] = _settings.ShowFileIcons ? Visibility.Visible : Visibility.Collapsed;
         ApplyLayoutMetrics();
+    }
+
+    // No ApplyLayoutMetrics with it, unlike the two above. Those two decide the
+    // gutter arithmetic - which side of a guide line a file's name lands on,
+    // and whether the arrow column collapses at all - and a drive answers none
+    // of that: it is the top row of its own subtree, with nothing beside it to
+    // line up against.
+    private void ApplyDriveIconVisibility()
+    {
+        Resources["DriveIconVisibility"] = _settings.ShowDriveIcons ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // Scales the row icon's size and margins with the tree's FontSize - same

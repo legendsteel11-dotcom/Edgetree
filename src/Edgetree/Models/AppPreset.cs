@@ -122,6 +122,7 @@ public class AppPreset
         nameof(AppSettings.ScrollBarThickness),
         nameof(AppSettings.ShowFolderIcons),
         nameof(AppSettings.ShowFileIcons),
+        nameof(AppSettings.ShowDriveIcons),
         nameof(AppSettings.UseShellIcons),
         // ShowPathBar is deliberately absent since 2026-08-11: the strip is
         // always on, so a preset carrying it would be storing an answer to a

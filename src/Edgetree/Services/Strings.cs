@@ -194,6 +194,10 @@ public static class Strings
     public static string MenuAlwaysShowTrayIcon = "트레이 아이콘";
     public static string MenuShowFolderIcons = "폴더 아이콘";
     public static string MenuShowFileIcons = "파일 아이콘";
+    // 드라이브만 따로. 폴더 아이콘과 나란히 두되 이름이 무엇을 가리키는지가
+    // 분명해야 해서 "드라이브 아이콘" 그대로다 - 이 셋은 서로의 예외가 아니라
+    // 각자 한 종류의 행을 맡는다.
+    public static string MenuShowDriveIcons = "드라이브 아이콘";
     public static string MenuHideTitleBarTitle = "제목 표시줄 타이틀 제거";
     // Names the way BACK, because that is what someone looks for first when a
     // drag did something they did not expect. The other half of the rule -
@@ -907,6 +911,7 @@ public static class Strings
         MenuAlwaysShowTrayIcon = "Always Show Tray Icon";
         MenuShowFolderIcons = "Show Folder Icons";
         MenuShowFileIcons = "Show File Icons";
+        MenuShowDriveIcons = "Show Drive Icons";
         MenuHideTitleBarTitle = "Hide Title Bar Text";
         MenuDragMoves = "Drag Moves (hold Ctrl to copy)";
         MenuShowPanelDividers = "Panel Dividers";

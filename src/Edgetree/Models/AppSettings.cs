@@ -624,6 +624,16 @@ public class AppSettings
     // stays on.
     public bool ShowFileIcons { get; set; } = true;
 
+    // Drive roots, split off from ShowFolderIcons on request (2026-08-16).
+    //
+    // They ARE folders, so they had always followed that switch, and the split
+    // is about what each switch is for rather than about what a drive is.
+    // Turning folder icons off answers "the same mark on hundreds of rows says
+    // nothing" - and the drive icons are the opposite case: half a dozen of
+    // them, each different from the next, the only icons in the window that
+    // tell you what a row IS rather than that it is a folder.
+    public bool ShowDriveIcons { get; set; } = true;
+
     // "제목 표시줄 타이틀 제거" - hides the "내 PC"/"This PC" text in the title bar
     // (RootPathText), for someone who wants the title bar as bare as possible.
     // Doesn't touch the Debug-only "(DEBUG)" suffix's own logic (see
