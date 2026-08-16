@@ -5233,7 +5233,7 @@ public partial class MainWindow : Window
     // FileSystemItem.DisplayCap keeps the tree light enough that the reveal
     // walk realizes the target's container reliably on the first click, even
     // below a huge folder (NavigateToPath re-caps overflow first).
-    private void NavigateToFavorite(FavoriteEntry entry)
+    private async void NavigateToFavorite(FavoriteEntry entry)
     {
         {
             // Re-clicking a favorite that's already revealed, expanded, and
@@ -5265,6 +5265,24 @@ public partial class MainWindow : Window
                 FindRealizedContainer(selected) is { } selectedContainer)
             {
                 PinRowToTop(selectedContainer);
+                return;
+            }
+
+            // ASKED BEFORE THE WALK, and only once the re-pin above has had its
+            // chance: a favourite already on screen is plainly reachable, and
+            // that path is the common one - no reason to go to disk for it.
+            //
+            // A folder that is gone made this click do nothing at all until
+            // 2026-08-16, which is what someone moving their settings to
+            // another PC meets first (see PlaceIsReachable).
+            if (!await PlaceIsReachable(entry.Path))
+            {
+                if (AskToForgetMissingPlace(entry.Path))
+                {
+                    _settings.Favorites.Remove(entry);
+                    _settingsService.Save(_settings);
+                    UpdateFavoritesPanelVisibility();
+                }
                 return;
             }
 
@@ -11241,6 +11259,13 @@ public partial class MainWindow : Window
         // rather than failing here.
         if (placeChanged && _settings.LastSelectedPath is { Length: > 0 } place)
         {
+            // NO DIALOG HERE, deliberately, unlike a favourite or a bookmark.
+            // Those are a click that says "take me there" and nothing else, so
+            // silence is the whole failure; a preset is a shape, and the folder
+            // rides along - stopping the press with a question about the one
+            // part that could not be delivered would put a box in front of
+            // something that otherwise worked. The log is enough to answer a
+            // report with (2026-08-16).
             NavigateToPath(place, source: "preset");
         }
 
@@ -16860,22 +16885,65 @@ public partial class MainWindow : Window
     // point at a network drive that has gone to sleep.
     private async void JumpToBookmarkPath(string path)
     {
-        bool isDirectory = await Task.Run(() =>
+        // The answer was being thrown away until 2026-08-16 - the check was
+        // written, run off the UI thread, and never read. See PlaceIsReachable,
+        // which is now where it lives and what the favourites use too.
+        if (!await PlaceIsReachable(path))
         {
-            try
+            if (AskToForgetMissingPlace(path))
             {
-                return Directory.Exists(path);
+                RemoveBookmark(path);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
-                                           or NotSupportedException)
-            {
-                return false;
-            }
-        });
+            return;
+        }
 
         SetSearchViewActive(false);
         NavigateToPath(path, source: "bookmark-list");
     }
+
+    // ----- 가리키는 곳이 사라졌을 때 ---------------------------------------------
+    //
+    // 설정을 내보내 다른 PC에서 불러오면 드라이브 문자부터 안 맞는 일이 흔한데,
+    // 지금까지는 즐겨찾기를 눌러도 아무 일이 없었다 - NavigateToPath가 아는 루트
+    // 중에 없으면 조용히 돌아오기 때문이고, 그 무반응이 고장으로 읽혔다.
+    //
+    // 목록을 훑지 않는다. 방금 누른 그 하나를, 누른 그 순간에 묻는다 - 백 개가
+    // 있어도 검사는 한 번이다.
+    //
+    // 그리고 UI 스레드에서 묻지 않는다. 죽은 네트워크 경로에 대한 Directory.Exists는
+    // SMB가 포기할 때까지 몇 초를 붙들 수 있고, 그건 오늘 고친 검색 프리징과 같은
+    // 계열이다. 북마크 쪽이 이미 이 형태로 짜여 있었다.
+    private static Task<bool> PlaceIsReachable(string path) => Task.Run(() =>
+    {
+        try
+        {
+            return Directory.Exists(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+                                       or NotSupportedException)
+        {
+            return false;
+        }
+    });
+
+    // 지울지 묻되 기본으로 지우지 않는다. 잠깐 빠진 외장 드라이브일 수도 있고,
+    // 그 경우 목록에서 지우는 것은 되돌릴 수 없다 - 경로를 그대로 보여 주는 것이
+    // 어느 쪽인지 판단할 유일한 재료다.
+    //
+    // CANCEL IS THE DEFAULT BUTTON, which the paragraph above said and the call
+    // did not: OKCancel focuses OK, so the box could be dismissed with a
+    // reflexive Enter and take the entry with it (reported the same day it
+    // shipped - "it just vanished"). A box that asks whether to delete
+    // something should not have deleting as the key that is already under the
+    // hand.
+    private bool AskToForgetMissingPlace(string path)
+        => MessageBox.Show(
+            this,
+            string.Format(Strings.PlaceMissingBody, path),
+            Strings.PlaceMissingTitle,
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Question,
+            MessageBoxResult.Cancel) == MessageBoxResult.OK;
 
     private void RemoveBookmark(string path)
     {

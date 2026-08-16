@@ -61,6 +61,15 @@ public static class Strings
     // Ctrl+Shift+1~5가 아직 없는 칸에 닿았을 때. 번호를 되읽어 주는 것이 이
     // 물음의 반이다 - 3을 눌렀는데 4번이 만들어지면 그건 다른 일이 일어난 것이고,
     // 슬롯은 목록 순서대로 채워지므로 그럴 수 있다.
+    // 즐겨찾기·북마크가 가리키는 폴더가 사라졌을 때. 설정을 다른 PC로 옮기면
+    // 드라이브 문자부터 안 맞는 경우가 많고, 지금까지는 눌러도 아무 일이 없어서
+    // 고장으로 읽혔다.
+    //
+    // 지우는 것을 묻되 기본이 아니다 - 잠깐 빠진 외장 드라이브일 수도 있고, 그
+    // 경우 목록에서 지우는 것은 되돌릴 수 없다. 경로를 그대로 보여 주는 것이
+    // 어느 쪽인지 판단할 유일한 재료다.
+    public static string PlaceMissingTitle = "폴더 없음";
+    public static string PlaceMissingBody = "이 폴더를 찾을 수 없습니다.\n\n{0}\n\n목록에서 지울까요?";
     public static string PresetSlotEmptyTitle = "프리셋";
     public static string PresetSlotEmptyBody = "{0}번 프리셋이 아직 없습니다.\n지금 상태를 저장할까요?";
 
@@ -824,6 +833,8 @@ public static class Strings
         PresetNameTitle = "Preset name";
         PresetNameHint = "Saves position, size, docking, colours, file types and the current folder";
         PresetDefaultName = "Preset {0}";
+        PlaceMissingTitle = "Folder not found";
+        PlaceMissingBody = "This folder cannot be found.\n\n{0}\n\nRemove it from the list?";
         PresetSlotEmptyTitle = "Presets";
         PresetSlotEmptyBody = "There is no preset {0} yet.\nSave the current setup there?";
 
