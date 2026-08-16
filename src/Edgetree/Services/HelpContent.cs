@@ -381,10 +381,10 @@ public static class HelpContent
                       "The two chips at the left of the transport", "Background play · keep playing"),
                     R("백그라운드 재생", "다른 폴더 이동해도 계속 (끄면 정지 · 파일 해제)",
                       "Background play", "Carries on in other folders - switching it off stops it and frees the file"),
-                    R("이어서 재생 우클릭", "폴더 반복 · 한 곡 반복 · 셔플",
-                      "Right-click the keep-playing chip", "Repeat folder · repeat one · shuffle"),
-                    R("음악 폴더 선택", "▶ 폴더 전체 재생 · 셔플 재생",
-                      "Select a folder of music", "▶ play the folder, or shuffle it"),
+                    R("이어서 재생 우클릭", "폴더 반복 · 한 곡 반복 · 셔플 반복",
+                      "Right-click the keep-playing chip", "Repeat folder · repeat one · repeat shuffled"),
+                    R("음악 폴더 선택", "▶ 폴더 전체 재생 · 셔플 반복",
+                      "Select a folder of music", "▶ play the folder, or repeat it shuffled"),
                     // The condition is the row's reason for existing: without
                     // it, right-clicking a folder that has never been opened
                     // shows nothing and reads as the feature being missing.

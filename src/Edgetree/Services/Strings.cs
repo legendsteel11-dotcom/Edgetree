@@ -491,7 +491,11 @@ public static class Strings
     public static string ViewerRepeatOff = "이어서 재생 안 함";
     public static string ViewerRepeatAll = "폴더 반복";
     public static string ViewerRepeatOne = "한 곡 반복";
-    public static string ViewerRepeatShuffle = "셔플 재생";
+    // "셔플 재생"이었다가 2026-08-16에 바꿈. 이 모드는 한 바퀴로 끝나지 않고
+    // 가방이 비면 다시 섞어 무한히 돈다(NextViewerPlaybackItem) - 끝이 없으니
+    // 관찰로는 확인할 수가 없어서, 라벨이 대신 말해야 하는 사실임. 나머지 셋도
+    // 전부 "반복"으로 끝나므로 한 묶음으로도 읽힘.
+    public static string ViewerRepeatShuffle = "셔플 반복";
     // Appended to whichever of the four is in force. The switch turns the thing
     // on and off, and nothing about it said where the other three modes live -
     // which was the first thing asked about it (2026-08-11).
@@ -998,7 +1002,7 @@ public static class Strings
         ViewerRepeatOff = "Don't continue";
         ViewerRepeatAll = "Repeat folder";
         ViewerRepeatOne = "Repeat one";
-        ViewerRepeatShuffle = "Shuffle";
+        ViewerRepeatShuffle = "Repeat shuffled";
         ViewerRepeatHint = "right-click to change";
         ViewerBackgroundPlay = "Background play · keeps going in other folders";
         ViewerFolderItemCount = "{0} files this panel can show";
