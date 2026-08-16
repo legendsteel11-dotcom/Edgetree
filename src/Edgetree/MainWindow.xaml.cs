@@ -7861,6 +7861,12 @@ public partial class MainWindow : Window
                     FilmstripFetchSteps[0], FilmstripFetchSteps[^1]);
             }
 
+            if (FindMenuItem(imageViewer, "viewerClockSizeRow") is { } clockSizeRow)
+            {
+                UpdateStepperRow(clockSizeRow, ViewerClockScale * 100,
+                    ViewerClockScaleSteps[0] * 100, ViewerClockScaleSteps[^1] * 100);
+            }
+
             if (FindMenuItem(imageViewer, "openMediaInViewer") is { } openMediaInViewer)
             {
                 openMediaInViewer.IsChecked = _settings.OpenMediaInViewer;
@@ -27133,6 +27139,26 @@ public partial class MainWindow : Window
         return timer;
     }
 
+    // 시계 크기의 단계와 그 범위. 퍼센트로 보여 주지만 저장은 배수다.
+    //
+    // 25% 간격인 이유는 이 값이 배수이기 때문이다 - 5%씩 움직이면 큰 화면에서는
+    // 한 단계가 몇 픽셀이고 작은 패널에서는 눈에도 안 보인다.
+    //
+    // 위 끝이 150%인 것은 취향이 아니라 폭이다. 기준 크기는 패널 폭의 0.224이고
+    // "13:41" 다섯 글자가 그 폭의 6할쯤을 쓰므로 여유가 4할이 채 안 된다 -
+    // 1.5배면 거의 꽉 차고, 175%와 200%는 시:분이 패널 밖으로 잘려 나간다
+    // (2026-08-16, 두 단계를 넣었다가 화면을 보고 뺐음). 더 키우려면 자르지 않는
+    // 방법부터 정해야 하고, 그건 이 스테퍼가 아니라 시계의 배치 문제다.
+    private static readonly double[] ViewerClockScaleSteps =
+        { 0.5, 0.75, 1.0, 1.25, 1.5 };
+
+    // 사다리 밖의 값은 기본값으로 답한다 - 손으로 고친 파일이라는 뜻이고,
+    // 무엇을 의도했는지 짐작할 근거가 없다. 글꼴 크기와 같은 규칙.
+    private double ViewerClockScale =>
+        ViewerClockScaleSteps.Contains(_settings.ViewerClockScale)
+            ? _settings.ViewerClockScale
+            : 1.0;
+
     // Called from the panel's own SizeChanged as well as from the switch, so
     // the clock follows a width drag and the full-cover toggle the way the
     // picture does.
@@ -27155,10 +27181,15 @@ public partial class MainWindow : Window
         // stops moving while the drop still has to.
         ViewerClock.Margin = new Thickness(0, height * ViewerClockTopShare, 0, 0);
 
+        // The user's multiple is applied AFTER the clamp, which scales the floor
+        // and the ceiling with it - the same as clamping to (min x s, max x s)
+        // and a good deal easier to read. Both bounds are meant to move: the
+        // ceiling stops a full cover becoming a backdrop for a number, and
+        // someone who set 150% has said that is what they want.
         double size = Math.Clamp(
             Math.Min(width * ViewerClockWidthShare, height * ViewerClockHeightShare),
             ViewerClockMinSize,
-            ViewerClockMaxSize);
+            ViewerClockMaxSize) * ViewerClockScale;
         // A resize raises this every frame and a FontSize write is a full
         // measure of the text - so nothing is written until the number has
         // actually moved a pixel's worth.
@@ -27172,6 +27203,39 @@ public partial class MainWindow : Window
         ViewerClockMeridiem.FontSize = Math.Max(9, size * ViewerClockMeridiemShare);
         ViewerClockDate.FontSize = Math.Max(10, size * ViewerClockDateShare);
         ViewerClockShadow.BlurRadius = Math.Max(6, size * 0.14);
+    }
+
+    private void ViewerClockSizeDecrement_Click(object sender, RoutedEventArgs e)
+        => StepViewerClockSize(sender, -1);
+
+    private void ViewerClockSizeIncrement_Click(object sender, RoutedEventArgs e)
+        => StepViewerClockSize(sender, +1);
+
+    // 사다리를 걷는다. 배수라 곱셈 간격이 맞고, 픽셀로 걸으면 한 단계가 화면마다
+    // 다른 뜻이 된다 - 글꼴 크기가 단계 목록을 걷는 것과 같은 이유.
+    private void StepViewerClockSize(object sender, int delta)
+    {
+        int index = Array.IndexOf(ViewerClockScaleSteps, ViewerClockScale);
+        if (index < 0)
+        {
+            index = Array.IndexOf(ViewerClockScaleSteps, 1.0);
+        }
+
+        double value = ViewerClockScaleSteps[
+            Math.Clamp(index + delta, 0, ViewerClockScaleSteps.Length - 1)];
+        if (value != _settings.ViewerClockScale)
+        {
+            _settings.ViewerClockScale = value;
+            _settingsService.Save(_settings);
+            // 크기만 바뀌면 되고 시계는 이미 떠 있을 수도, 꺼져 있을 수도 있다.
+            // LayoutViewerClock이 꺼진 상태에서 스스로 물러난다.
+            LayoutViewerClock();
+        }
+
+        // 눌린 값이 아니라 실제로 앉은 값을 되읽는다 - 끝에서 눌렀을 때 읽는
+        // 숫자와 회색이 되는 단추가 서로 맞아야 한다.
+        UpdateStepperRow(sender, ViewerClockScale * 100,
+            ViewerClockScaleSteps[0] * 100, ViewerClockScaleSteps[^1] * 100);
     }
 
     private void ViewerClockMenuItem_Click(object sender, RoutedEventArgs e)

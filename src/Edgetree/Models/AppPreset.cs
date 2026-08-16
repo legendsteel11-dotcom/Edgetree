@@ -109,6 +109,7 @@ public class AppPreset
         // that is NOT here, and for a reason of its own - see the note under
         // SizeFields.
         nameof(AppSettings.ViewerClock),
+        nameof(AppSettings.ViewerClockScale),
     };
 
     internal static readonly string[] LookFields =

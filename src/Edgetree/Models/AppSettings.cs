@@ -335,6 +335,20 @@ public class AppSettings
     // picture opened it to see the picture.
     public bool ViewerClock { get; set; } = false;
 
+    // 시계 크기, as a multiple of the size the panel would choose on its own
+    // (asked 2026-08-16, by someone who saw it).
+    //
+    // A MULTIPLIER rather than a point size, because the thing being adjusted
+    // is not a font: the clock is sized as a share of the surface it sits on,
+    // so the same number has to mean the same thing in a 240px column and on a
+    // 4K cover. A stored point size would be right on one of those and absurd
+    // on the other, and the panel would go on overruling it either way.
+    //
+    // It scales the CEILING with it, which is the point of asking for 150%: the
+    // ceiling exists so a full cover does not become a backdrop for a number,
+    // and someone turning this up has said that is what they want.
+    public double ViewerClockScale { get; set; } = 1.0;
+
     public bool StartWithWindows { get; set; } = false;
 
     // Defaults to true to match the tray icon's existing always-on behavior
@@ -807,6 +821,9 @@ public class AppSettings
         AutoHideHandleWidth = Sane(AutoHideHandleWidth, 8, min: 1);
         SlideshowSeconds = (int)Sane(SlideshowSeconds, 5, min: 3);
         TreeFontSize = Sane(TreeFontSize, 12, min: 1);
+        // 배수라 0이 곧 글자 없음이다 - 0은 FontSize에서 예외이고, 그 앞의
+        // Math.Clamp는 NaN을 NaN 그대로 통과시킨다. 범위는 쓰는 자리가 정한다.
+        ViewerClockScale = Sane(ViewerClockScale, 1.0, min: 0.1);
         FavoritesPanelHeight = Sane(FavoritesPanelHeight, 100, min: 0);
         DockedHeightRatio = Sane(DockedHeightRatio, 1.0, min: 0, max: 1);
         DockedTopRatio = Sane(DockedTopRatio, 0.0, min: 0, max: 1);

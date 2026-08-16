@@ -1824,6 +1824,46 @@
                         InputGestureText="F9"
                         AutomationProperties.AutomationId="viewerClock"
                         Click="ViewerClockMenuItem_Click"/>
+                <!-- Directly under the switch it belongs to, and a PERCENTAGE
+                     rather than a point size: the clock is sized as a share of
+                     the panel it sits on, so a stored point size would be right
+                     in one panel and absurd in the next. 100 is whatever the
+                     panel would have chosen on its own.
+                     Asked for by someone who saw the clock over a shoulder
+                     (2026-08-16) - which is the audience this whole overlay was
+                     built for. -->
+                <MenuItem StaysOpenOnClick="True"
+                        Focusable="False"
+                        Padding="{DynamicResource MenuStepperRowPadding}"
+                        AutomationProperties.AutomationId="viewerClockSizeRow">
+                    <MenuItem.Header>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                    Text="{x:Static services:Strings.MenuViewerClockSize}"
+                                    Foreground="{DynamicResource MenuForeground}"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,8,0"/>
+                            <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal">
+                                <Button Content="−"
+                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                        Click="ViewerClockSizeDecrement_Click"/>
+                                <TextBlock Text="100"
+                                        Foreground="{DynamicResource MenuForeground}"
+                                        Width="34"
+                                        TextAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                                <Button Content="+"
+                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                        Click="ViewerClockSizeIncrement_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </MenuItem.Header>
+                </MenuItem>
                 <Separator/>
                 <MenuItem Header="{x:Static services:Strings.MenuPrecacheThumbnails}"
                         IsCheckable="True"
