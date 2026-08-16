@@ -10757,7 +10757,11 @@ public partial class MainWindow : Window
     // for how expensive those have been). So: dock, come out of hiding, close
     // the panel, apply, then put the panel and the hiding back on as the preset
     // asks for them.
-    private void HeaderContextMenu_Opened(object sender, RoutedEventArgs e)
+    // Named for what it does rather than for one of its menus: the title bar's
+    // menu and the tree's empty-space menu both carry the preset rows, and the
+    // picture's own menu builds them from its own handler in the cover. Anything
+    // holding a Separator tagged "presets" can use this.
+    private void PresetCarryingMenu_Opened(object sender, RoutedEventArgs e)
     {
         AnyMenu_Opened(sender, e);
         if (sender is ContextMenu menu)

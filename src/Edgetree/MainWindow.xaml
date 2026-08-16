@@ -1065,7 +1065,7 @@
              ContextMenu_PreviewMouseRightButtonUp. -->
         <ContextMenu x:Key="ExplorerEmptySpaceContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
-                Opened="AnyMenu_Opened"
+                Opened="PresetCarryingMenu_Opened"
                 Closed="AnyMenu_Closed"
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
             <!-- The GLOBAL refresh - drive list plus every loaded folder -
@@ -1108,6 +1108,28 @@
                     SubmenuOpened="FileFilterSubmenu_Opened">
                 <MenuItem Header=""/>
             </MenuItem>
+            <!-- THE THIRD PLACE THE PRESETS LIVE, and the third time the same
+                 thing sent them there: the header is where they belong and the
+                 header keeps being out of reach. Full screen hides it (so the
+                 picture's menu carries them), the keys answer it for people who
+                 use keys, and a narrow window shrinks the title bar until
+                 right-clicking it is a small target. A tall tree adds distance
+                 to that - the header is at the far end of the window from where
+                 the hand already is (author, 2026-08-16).
+
+                 The rows go at the BOTTOM here, under the app-level group this
+                 menu already ends with (숨긴 폴더 · 네트워크 위치 · 파일 종류),
+                 rather than at the top as in the header's own menu - what leads
+                 a menu should be what that menu is mostly for, and this one is
+                 mostly about the tree.
+
+                 The closing anchor is COLLAPSED on purpose. BuildPresetMenu
+                 finds both separators by Tag and fills the gap between them, and
+                 a visible rule below the last row would draw a line under
+                 nothing. A collapsed Separator is still an item, so it still
+                 anchors. -->
+            <Separator Tag="presets-begin"/>
+            <Separator Tag="presets" Visibility="Collapsed"/>
         </ContextMenu>
 
         <ContextMenu x:Key="ExplorerItemContextMenu"
@@ -1467,7 +1489,7 @@
              it is the only row here that does not change anything. -->
         <ContextMenu x:Key="HeaderContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
-                Opened="HeaderContextMenu_Opened"
+                Opened="PresetCarryingMenu_Opened"
                 Closed="AnyMenu_Closed"
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
             <!-- THE PRESETS GO ABOVE THIS LINE, inserted in code every time the
