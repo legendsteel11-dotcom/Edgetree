@@ -48,8 +48,8 @@ public static class HelpContent
         T("안 쓰는 폴더 감추기", "Hide the folders you never open"),
         // Which of the two wins is the part nobody guesses, and it is the part
         // that makes the pair usable at all.
-        T("자주 쓰는 파일 종류 지정하기 (필요 시 제외도 함께, 제외는 최우선 조건)",
-          "Set the file kinds you work with - and the ones to exclude, which win over everything else"),
+        T("자주 쓰는 파일 종류(확장자) 지정하기 (제외 확장자 입력시 최우선 적용)",
+          "Set the file kinds you work with - anything you type as excluded wins over the rest"),
         T("자주 가는 폴더는 북마크나 즐겨찾기로", "Bookmark the folders you keep going back to"),
         T("썸네일 캐싱 켜고 이미지 많은 폴더 빠르게 관리",
           "Turn thumbnail caching on and move through big image folders fast"),
@@ -113,8 +113,8 @@ public static class HelpContent
                       "Drag the top or bottom edge", "Height, and where the band sits"),
                     R("그 가장자리 더블클릭", "화면 높이 전체로 복원",
                       "Double-click that edge", "Back to the full height"),
-                    R("드래그 중 Shift · Ctrl", "격자에 맞춰 스냅 (Ctrl이 더 촘촘)",
-                      "Shift · Ctrl while dragging", "Snap to a grid - Ctrl is the finer one"),
+                    R("드래그 중 Shift · Ctrl", "격자에 맞춰 스냅 (Ctrl이 더 작은 격자)",
+                      "Shift · Ctrl while dragging", "Snap to a grid - Ctrl uses a smaller one"),
                 }),
             }),
 
@@ -155,8 +155,14 @@ public static class HelpContent
                 {
                     R("제목 표시줄 우클릭", "저장된 프리셋 목록 · 프리셋 추가 (최대 5개)",
                       "Right-click the title bar", "The setups you saved, and 프리셋 추가 - up to five"),
-                    R("저장 항목", "위치 · 크기 · 도킹 · 자동 숨김 · 색상 · 파일 종류 · 현재 폴더",
-                      "What it holds", "Position, size, docking, auto-hide, colours, file types, and the open folder"),
+                    // The list this row used to carry (위치 · 크기 · 도킹 · 자동
+                    // 숨김 · 색상 · 파일 종류 · 현재 폴더) came out on the author's
+                    // call (2026-08-16): seven items read as seven things to
+                    // check, when the answer a reader wants is that they do not
+                    // have to check any of them. It also went stale twice as
+                    // AppPreset.Fields grew, which a sentence cannot.
+                    R("저장 항목", "현재 앱 설정 모두를 그대로 저장",
+                      "What it holds", "Everything you have set up, exactly as it stands"),
                     R("이름 옆 ›", "적용 · 덮어쓰기 · 이름 바꾸기 · 삭제",
                       "The › beside a name", "Apply · overwrite · rename · delete"),
                     // The two keys, which is what this section is for - the rows
@@ -164,9 +170,9 @@ public static class HelpContent
                     R("Ctrl+1 ~ 5", "그 번호의 프리셋으로 전환 (없으면 그 자리에 저장할지 물음)",
                       "Ctrl+1 ~ 5",
                       "Go to that preset - and if there is none yet, offers to save this setup there"),
-                    R("Ctrl+Shift+S", "지금 들어 있는 프리셋에 현재 상태를 덮어쓰기 (묻지 않음)",
+                    R("Ctrl+Shift+S", "현재 선택된 프리셋에 확인 없이 바로 덮어씌움",
                       "Ctrl+Shift+S",
-                      "Writes what is on screen back into the preset you are in - no questions"),
+                      "Overwrites the preset you are in, straight away, without asking"),
                 }),
             }),
 
@@ -182,12 +188,12 @@ public static class HelpContent
                     // between folders you have been in, not between every row
                     // you clicked, and someone who expects the second one will
                     // read the first press as a miss.
-                    R("Ctrl+← · Ctrl+→", "지나온 폴더로 뒤로 · 앞으로 (경로 표시줄의 < > 와 같음)",
+                    R("Ctrl+← · Ctrl+→", "사용한 폴더로 뒤로 · 앞으로 (경로 표시줄의 < > 와 같음)",
                       "Ctrl+← · Ctrl+→",
-                      "Back · forward through the folders you have been in - the same as the path bar's < >"),
-                    R("경로 표시줄의 목록 단추", "다녀온 폴더를 목록으로 열어 바로 이동 (< > 우클릭도 같음)",
+                      "Back · forward through the folders you have used - the same as the path bar's < >"),
+                    R("경로 표시줄의 목록 버튼", "사용한 폴더들을 확인하고 바로 이동",
                       "The list button on the path bar",
-                      "Opens the folders you have been in as a list, and goes straight there - right-clicking < > does the same"),
+                      "See the folders you have used, and go straight to one"),
                     R("Ctrl + 휠", "빠른 스크롤", "Ctrl + wheel", "Scroll about five times faster"),
                     R("Ctrl + / −", "글자 크기 조절", "Ctrl + / −", "Text size"),
                     R("Enter", "열기", "Enter", "Open"),
@@ -248,8 +254,9 @@ public static class HelpContent
                 {
                     R("아래쪽 필터 버튼 줄", "종류별 필터링",
                       "The filter buttons at the bottom", "Show only some kinds of file"),
-                    R("필터 버튼 → 사용자 지정", "확장자 직접 입력",
-                      "A filter button → Custom", "Type the extensions yourself"),
+                    R("필터 버튼 → 사용자 지정", "확장자 직접 입력 ( *. 없이 쉼표로 구분해서 여러 개 입력)",
+                      "A filter button → Custom",
+                      "Type the extensions yourself - no *. , and comma-separated for several"),
                     // The same list twice, and it earns the second line: this
                     // section is where someone hunting the filter looks, and
                     // they will not scroll up to 트리 to find out that the
@@ -438,8 +445,13 @@ public static class HelpContent
                       "Right-click → Video size → Fill",
                       "Fills the panel and crops the overflow - the next film starts fitted again"),
                     R("우클릭 → 자막", "켜기 · 크기 · 싱크 조절", "Right-click → Subtitles", "On, size, and sync"),
-                    R("전체 화면에서 아래쪽", "재생 막대 표시",
-                      "Full screen, point at the bottom", "Bring the transport bar back"),
+                    // 컨트롤 패널, not 재생 막대 (2026-08-16). The strip is what
+                    // a reader calls it, and the app had two names for it in
+                    // its own text - this row and the music group below. The
+                    // English stays "playback controls" rather than a literal
+                    // control panel, which is Windows' own thing.
+                    R("전체 화면에서 아래쪽", "컨트롤 패널 표시",
+                      "Full screen, point at the bottom", "Bring the playback controls back"),
                     // The rows someone asks about rather than discovers, and the
                     // help is where that answer belongs: this is the page people
                     // are already looking for something on, so saying what does
@@ -486,8 +498,8 @@ public static class HelpContent
                     R("재생 형식", "mp3 · wav · flac · m4a · m4b · aac · wma",
                       "Formats it plays", "mp3 · wav · flac · m4a · m4b · aac · wma"),
                     R("앨범아트 클릭", "재생 · 정지", "Click the album art", "Play · pause"),
-                    R("재생 막대 왼쪽 두 칩", "백그라운드 재생 · 이어서 재생",
-                      "The two chips at the left of the transport", "Background play · keep playing"),
+                    R("컨트롤 패널 왼쪽 두 칩", "백그라운드 재생 · 이어서 재생",
+                      "The two chips at the left of the playback controls", "Background play · keep playing"),
                     R("백그라운드 재생", "다른 폴더 이동해도 계속 (끄면 정지 · 파일 해제)",
                       "Background play", "Carries on in other folders - switching it off stops it and frees the file"),
                     R("이어서 재생 우클릭", "폴더 반복 · 한 곡 반복 · 셔플 반복",
