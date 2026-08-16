@@ -10557,26 +10557,44 @@ public partial class MainWindow : Window
     // this method's and is thrown away before each rebuild. That is also what
     // makes "everything above the anchor" a safe thing to delete: no declared
     // item is ever up there.
+    //
+    // TWO tags since 2026-08-16, because the viewer's own menu carries these
+    // rows too and carries them in the MIDDLE: full screen hides the header, so
+    // the header's menu is repeated at the bottom of the picture's. "presets" is
+    // still the end anchor; "presets-begin" is an optional fence above, and
+    // without one the region starts at the top exactly as it always did. Both
+    // are found by Tag, never by index - addressing a menu by position has
+    // broken two menus in this app already.
     private void BuildPresetMenu(ContextMenu menu)
     {
         int anchor = -1;
+        int start = 0;
         for (int i = 0; i < menu.Items.Count; i++)
         {
-            if (menu.Items[i] is Separator separator && separator.Tag as string == "presets")
+            if (menu.Items[i] is not Separator separator)
+            {
+                continue;
+            }
+
+            if (separator.Tag as string == "presets-begin")
+            {
+                start = i + 1;
+            }
+            else if (separator.Tag as string == "presets")
             {
                 anchor = i;
                 break;
             }
         }
 
-        if (anchor < 0)
+        if (anchor < 0 || start > anchor)
         {
             return;
         }
 
-        while (anchor > 0)
+        while (anchor > start)
         {
-            menu.Items.RemoveAt(0);
+            menu.Items.RemoveAt(start);
             anchor--;
         }
 
@@ -10584,7 +10602,7 @@ public partial class MainWindow : Window
         // "저장된 프리셋 없음" line a submenu would use: at the top of the
         // header's own menu that line would be the first thing anyone reads,
         // and the item below it already says what to do about it.
-        int at = 0;
+        int at = start;
         var presets = _settings.Presets;
         for (int i = 0; i < presets.Count; i++)
         {
@@ -24412,6 +24430,13 @@ public partial class MainWindow : Window
 
             ViewerSlideshowItem.IsChecked = true;
             UpdateStepperRow(ViewerSlideshowSecondsRow, _settings.SlideshowSeconds, 3, 60);
+            // The window's own verbs survive the gate that collapsed everything
+            // else. The reason that gate exists is that a show does not move the
+            // tree, so every FILE action here would act on the wrong file -
+            // these act on no file at all. A show running full screen is also
+            // the deepest anyone gets from the title bar, which is the state
+            // this group was added for.
+            ApplyViewerWindowVerbs(runningMenu);
             return;
         }
 
@@ -24540,6 +24565,129 @@ public partial class MainWindow : Window
         // A folder can land here via its shell thumbnail; the picker is a
         // file-only verb (same rule the row menu applies).
         ViewerOpenWithItem.IsEnabled = !item.IsDirectory;
+
+        // FULL SCREEN IS THE HEADER'S MENU AND NOTHING ELSE (2026-08-16).
+        //
+        // The file rows were left in when the window verbs were first added and
+        // came straight back out: full screen is the state where the picture is
+        // being WATCHED, and cutting, renaming or deleting the thing on screen
+        // is not part of watching it. Mixing the two also made the point of the
+        // change unreadable - a header menu at the foot of eleven file rows is
+        // not the header's menu, it is a longer version of the picture's.
+        //
+        // What survives beside the verbs is the SHOW, and only where the rules
+        // above already put it: the way to stop a show has to stay on the
+        // surface the show is running on. Every other row is the panel's own
+        // and the panel is not what is on screen.
+        if (_viewerFullscreen && ViewerImageHost.ContextMenu is { } coveredMenu)
+        {
+            foreach (var entry in coveredMenu.Items)
+            {
+                if (entry is UIElement row && !IsViewerShowRow(row) && !IsViewerWindowVerbRow(row))
+                {
+                    row.Visibility = Visibility.Collapsed;
+                }
+            }
+        }
+
+        // Last, so the group reads as the fence it is, and AFTER the pass above
+        // - the preset rows are built into this collection, so a walk that
+        // collapses what it does not recognise has to run before they exist.
+        if (ViewerImageHost.ContextMenu is { } menuWithVerbs)
+        {
+            ApplyViewerWindowVerbs(menuWithVerbs);
+        }
+    }
+
+    // The show's two ROWS, deliberately not its separator. That separator fences
+    // the show off from the file rows above it, and in full screen there are no
+    // file rows above it - so it is left to the collapse pass and the menu opens
+    // on the show itself instead of on a rule across the top.
+    private bool IsViewerShowRow(UIElement row)
+        => ReferenceEquals(row, ViewerSlideshowItem)
+            || ReferenceEquals(row, ViewerSlideshowSecondsRow);
+
+    private bool IsViewerWindowVerbRow(UIElement row)
+        => ReferenceEquals(row, ViewerWindowSeparator)
+            || ReferenceEquals(row, ViewerWindowPresetSeparator)
+            || ReferenceEquals(row, ViewerHelpItem)
+            || ReferenceEquals(row, ViewerWindowVerbSeparator)
+            || ReferenceEquals(row, ViewerMinimizeItem)
+            || ReferenceEquals(row, ViewerRestartItem)
+            || ReferenceEquals(row, ViewerExitSeparator)
+            || ReferenceEquals(row, ViewerExitItem);
+
+    // The header's menu, shown at the foot of the picture's while the header
+    // itself is not on screen (2026-08-16). Full screen is the one state that
+    // takes the title bar away, and with it 프리셋 추가, 다시 시작 and 종료 -
+    // none of which has anywhere else to be reached from.
+    //
+    // The presets are BUILT here rather than declared, the same call the header
+    // makes on its own open, so the two lists cannot drift apart. Building them
+    // only while the group is visible also keeps the rebuild off every ordinary
+    // right-click on a picture.
+    private void ApplyViewerWindowVerbs(ContextMenu menu)
+    {
+        var rows = _viewerFullscreen ? Visibility.Visible : Visibility.Collapsed;
+
+        // The leading fence only when there is something above it to fence off,
+        // which in full screen means the show's own rows and nothing else. A
+        // menu that opens with a rule across the top has drawn a line under
+        // nothing.
+        ViewerWindowSeparator.Visibility =
+            rows == Visibility.Visible && ViewerSlideshowItem.Visibility == Visibility.Visible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        ViewerWindowPresetSeparator.Visibility = rows;
+        ViewerHelpItem.Visibility = rows;
+        ViewerWindowVerbSeparator.Visibility = rows;
+        ViewerMinimizeItem.Visibility = rows;
+        ViewerRestartItem.Visibility = rows;
+        ViewerExitSeparator.Visibility = rows;
+        ViewerExitItem.Visibility = rows;
+
+        if (rows == Visibility.Visible)
+        {
+            BuildPresetMenu(menu);
+        }
+        else
+        {
+            // Cleared as well as hidden. The rows are made in code, so leaving
+            // them in a collapsed region would hand the next open a list to
+            // remove that is one release out of date - and BuildPresetMenu is
+            // the only thing that knows they are there.
+            ClearBuiltPresetRows(menu);
+        }
+    }
+
+    // Takes the built rows back out from between the two fences, leaving the
+    // fences themselves. Shares its walk with BuildPresetMenu by calling it on
+    // an empty region would be circular, so the removal is spelled out once
+    // here and once there.
+    private static void ClearBuiltPresetRows(ContextMenu menu)
+    {
+        int start = -1;
+        for (int i = 0; i < menu.Items.Count; i++)
+        {
+            if (menu.Items[i] is not Separator separator)
+            {
+                continue;
+            }
+
+            if (separator.Tag as string == "presets-begin")
+            {
+                start = i + 1;
+            }
+            else if (separator.Tag as string == "presets" && start >= 0)
+            {
+                while (i > start)
+                {
+                    menu.Items.RemoveAt(start);
+                    i--;
+                }
+                return;
+            }
+        }
     }
 
     private void ViewerSetWallpaper_Click(object sender, RoutedEventArgs e)

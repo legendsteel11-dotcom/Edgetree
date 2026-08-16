@@ -6889,6 +6889,55 @@
                                         Click="RevealInExplorer_Click"/>
                                 <MenuItem Header="{x:Static services:Strings.MenuProperties}"
                                         Click="ShowProperties_Click"/>
+                                <!-- THE HEADER'S OWN MENU, REPEATED HERE WHILE
+                                     THE HEADER IS GONE (2026-08-16). Full
+                                     screen hides the title bar, and with it the
+                                     only way to save a preset, restart or quit -
+                                     verbs that have nowhere else to live (the X
+                                     stopped ending the app in 2026-08-10, and
+                                     the tray icon is optional). A mode that
+                                     takes the whole screen should not also take
+                                     away the way out of the app.
+                                     Rows, not a submenu: it is what the header
+                                     shows, in the order the header shows it, so
+                                     the two read as the same menu rather than
+                                     as a copy of it.
+                                     Collapsed at every other time - docked or
+                                     windowed, the header is right there, and
+                                     five rows repeated under the file actions
+                                     would be five rows to read past. -->
+                                <Separator x:Name="ViewerWindowSeparator"
+                                        Tag="presets-begin"
+                                        Visibility="Collapsed"/>
+                                <!-- The presets land between the two tagged
+                                     separators, exactly as they land above the
+                                     tagged one in the header menu - see
+                                     BuildPresetMenu, which reads both tags and
+                                     never addresses a menu by position. -->
+                                <Separator x:Name="ViewerWindowPresetSeparator"
+                                        Tag="presets"
+                                        Visibility="Collapsed"/>
+                                <MenuItem x:Name="ViewerHelpItem"
+                                        Header="{x:Static services:Strings.MenuHelp}"
+                                        InputGestureText="F1"
+                                        Visibility="Collapsed"
+                                        Click="HelpMenuItem_Click"/>
+                                <Separator x:Name="ViewerWindowVerbSeparator"
+                                        Visibility="Collapsed"/>
+                                <MenuItem x:Name="ViewerMinimizeItem"
+                                        Header="{x:Static services:Strings.ToolTipMinimize}"
+                                        Visibility="Collapsed"
+                                        Click="MinimizeButton_Click"/>
+                                <MenuItem x:Name="ViewerRestartItem"
+                                        Header="{x:Static services:Strings.MenuRestart}"
+                                        Visibility="Collapsed"
+                                        Click="RestartMenuItem_Click"/>
+                                <Separator x:Name="ViewerExitSeparator"
+                                        Visibility="Collapsed"/>
+                                <MenuItem x:Name="ViewerExitItem"
+                                        Header="{x:Static services:Strings.TrayExit}"
+                                        Visibility="Collapsed"
+                                        Click="ExitAppMenuItem_Click"/>
                             </ContextMenu>
                         </Border.ContextMenu>
                         <!-- Uniform with no StretchDirection cap: the user
