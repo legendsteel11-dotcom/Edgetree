@@ -5126,6 +5126,11 @@ public partial class MainWindow : Window
         bool firstFavorite = _settings.Favorites.Count == 0;
         _settings.Favorites.Add(entry);
 
+        // Before the panel work below, so everything after it measures and
+        // scrolls the list that is actually going to be on screen - see
+        // ShowSidePanelFor for why the panel follows an add at all.
+        ShowSidePanelFor(bookmarks: false);
+
         // The panel might not have existed at all yet (0 -> 1 favorites), so
         // the row/splitter need their initial reveal here - FitFavoritesPanel
         // alone only ever sets FavoritesRowDef's height, not FavoritesSplitterRow.
@@ -17146,7 +17151,40 @@ public partial class MainWindow : Window
         // Saved immediately, same reasoning as the color settings: a bookmark
         // is a deliberate act whose whole point is persisting.
         _settingsService.Save(_settings);
+        if (added)
+        {
+            ShowSidePanelFor(bookmarks: true);
+        }
         RefreshBookmarkPanelIfShowing(added ? item.FullPath : null);
+    }
+
+    // ----- 방금 담은 곳을 보여 주기 ------------------------------------------------
+    //
+    // 즐겨찾기 패널을 열어 둔 채 북마크를 추가하면 아무 일도 안 일어난 것처럼
+    // 보였다 - 담기는 담겼는데 화면에 있는 목록은 다른 쪽이라서. 반대도 같다
+    // (2026-08-16 보고: "왜 없지? 하게 된다").
+    //
+    // 메뉴에서 막는 쪽을 먼저 검토했고 안 했다. 북마크는 패널 말고도 행의 리본,
+    // Ctrl+Alt+K, 북마크 목록에서 동작하므로 메뉴만 막으면 그 셋과 답이 달라지고,
+    // 무엇보다 헷갈림은 "하면 안 되는 걸 했다"가 아니라 "한 것이 안 보인다"이다.
+    // 보여 주면 사라지는 종류의 문제였다.
+    //
+    // 추가할 때만, 그리고 이미 그 목록이 보이고 있으면 아무것도 안 한다. 지울
+    // 때는 따라가지 않는다 - 지운 것을 보여 주려고 화면을 바꾸는 것은 볼 것이
+    // 없는 곳으로 데려가는 일이다.
+    // 패널을 아예 꺼 둔 사람에게는 아무것도 안 한다. 그건 목록을 안 보겠다고
+    // 정해 둔 것이고, 항목 하나 담았다고 패널이 열리는 것은 이 수정이 없애려는
+    // 놀람보다 큰 놀람이다. 그 경우 담긴 것은 여전히 담긴다.
+    private void ShowSidePanelFor(bool bookmarks)
+    {
+        if (IsPanelHiddenMode || IsBookmarkPanelMode == bookmarks)
+        {
+            return;
+        }
+
+        _settings.SidePanelMode = bookmarks ? "bookmarks" : "favorites";
+        _settingsService.Save(_settings);
+        ApplySidePanelMode();
     }
 
     // +1 = next (Ctrl+Alt+L), -1 = previous (Ctrl+Alt+J), cycling in the
