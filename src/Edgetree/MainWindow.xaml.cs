@@ -11209,12 +11209,24 @@ public partial class MainWindow : Window
     private const double ViewerChipGap = 4;
     private const double ViewerChipGroupGap = 10;
 
-    // 꺽쇠 잉크의 오른쪽 끝이 열 중앙에서 넘어가는 양(상자 크기에 대한 비율).
-    // Material keyboard_arrow_right의 잉크는 960 상자 안에서 333~624(291)이라
-    // 폭이 0.303이고, 상자가 열 가운데에 놓이므로 그 절반이 그대로 넘침이 된다.
-    // 아래로 돌면 세로 480이 폭 자리에 와서 0.25까지 나간다 - 회전이 폭과 높이를
-    // 맞바꾸므로, 접었을 때보다 폈을 때 옆으로 더 나간다.
-    private const double ExpanderInkOverhang = 0.1515;
+    // 꺽쇠 글리프의 잉크가 자기 상자에서 차지하는 폭 비율. Material
+    // keyboard_arrow_right의 잉크는 960 상자 안에서 333~624(291)이라 0.303이고,
+    // 세로로는 480이라 0.5다. 아래로 돌면 그 둘이 맞바뀐다 - 접었을 때보다
+    // 폈을 때 잉크가 옆으로 더 나가는 것이 여기서 나온다.
+    private const double ExpanderInkShare = 0.303;
+
+    // 그 글리프를 상자보다 크게 그리는 배수. 상자는 그대로 두고 안의 마크만
+    // 키우므로 자리도, 클릭 범위도, 이웃과의 정렬도 안 변한다.
+    //
+    // 1.0에서는 기본 글꼴 기준 잉크가 4.85 x 8px으로, 바로 옆 16px 아이콘에
+    // 비해 가늘게 읽혔다. 마크는 상자를 꽉 채우라고 그려진 것이 아니라서
+    // 상자를 키우면(=아이콘과 행 높이까지) 될 일이 아니고, 안의 비율만
+    // 손대는 것이 이 한 줄이다.
+    private const double ExpanderGlyphScale = 1.3;
+
+    // 잉크의 오른쪽 끝이 열 중앙에서 넘어가는 양(상자 크기에 대한 비율).
+    // 상자가 열 가운데에 놓이므로 잉크의 절반 폭이 그대로 넘침이 된다.
+    private static double ExpanderInkOverhang => ExpanderInkShare / 2.0 * ExpanderGlyphScale;
 
     // 꺽쇠와 그 뒤 아이콘/이름 사이가 이보다 좁아지지 않게 한다. 기본 글꼴에서의
     // 픽셀 값이고 CompactScale로 글꼴을 따라간다.
@@ -11490,6 +11502,9 @@ public partial class MainWindow : Window
         // default TabSpacing of 16.
         Resources["TabSpacingGuideMargin"] = new Thickness(tabSpacing / 2, 0, 0, 0);
         Resources["TabSpacingGuidePadding"] = new Thickness(tabSpacing / 2 - 1, 0, 0, 0);
+        // 상자(16)는 그대로, 안의 마크만 키운다 - 아래 nameGap 계산이 이 배수를
+        // ExpanderInkOverhang을 통해 이미 반영한다.
+        Resources["ExpanderGlyphSize"] = 16.0 * ExpanderGlyphScale;
 
         var plainMargin = new Thickness(0, 0, 6 * scale, 0);
         Resources["FolderRowIconMargin"] = plainMargin;
