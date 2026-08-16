@@ -1447,6 +1447,68 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Ctrl+S writes the current shape back into the preset the app is
+        // already in (asked 2026-08-16). The menu has done this since presets
+        // shipped; what it has not had is a way to do it without opening a
+        // menu, which is the whole point of having tuned something and wanting
+        // it kept.
+        //
+        // SHIFT STAYS ON THIS ONE while the number keys below go without it,
+        // and the asymmetry is the point (settled 2026-08-16, after asking
+        // whether these could be pressed by mistake).
+        //
+        // The keys cannot be hit from another app - there is no global hotkey
+        // and no hook here, and revealing the auto-hidden sidebar takes no
+        // focus, so a Ctrl+S aimed at an editor reaches the editor. What is
+        // left is the hand that clicked into this window a moment ago and is
+        // still thinking of the last one, and Ctrl+S is the strongest habit
+        // there is.
+        //
+        // Which matters here and not next door because the two differ in what a
+        // slip costs. Going to the wrong preset loses nothing - press another
+        // number. Writing to one REPLACES a stored shape, and there is no
+        // undo. The riskier verb keeps the extra key.
+        //
+        // IT DOES NOT ASK, and that is the one difference from the menu row.
+        // The box that row opens is a rename and a confirmation at once, and it
+        // earns that on a row a hand can slip onto; a deliberate chord is
+        // already the confirmation.
+        //
+        // With no preset active there is nothing to write back, so it falls
+        // through to 프리셋 추가 - a save key that saves nothing is a broken
+        // key, and naming a new slot is the only thing left for it to mean.
+        if (e.Key == Key.S && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            SaveActivePreset();
+            e.Handled = true;
+            return;
+        }
+
+        // Ctrl+1~5 GO to a slot. The five slots have been addressable in
+        // principle since they were built - AppPreset.MaxPresets says as much,
+        // and names a chord to do it - and this is that, one press rather than
+        // the two a leader key would take.
+        //
+        // NO SHIFT on these, unlike the save above. Landing on the wrong preset
+        // costs nothing - the next number undoes it - so the shorter key is
+        // free to be the short one.
+        //
+        // AN EMPTY SLOT ASKS instead of doing nothing. A number that answers on
+        // one press and silently on another reads as a broken key, and the only
+        // thing an empty slot can mean is the one thing worth offering: put
+        // what is on screen into it. That question is the exception to this
+        // app's usual quiet - it is a slot being filled for the first time, and
+        // the alternative is a press that appears to fail.
+        if (Keyboard.Modifiers == ModifierKeys.Control &&
+            PresetSlotForKey(e.Key) is { } slot &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            GoToPresetSlot(slot);
+            e.Handled = true;
+            return;
+        }
+
         // F9 toggles the clock, next to F8 for the same reason it is next to it
         // in the head: the show is when it is most wanted. It needs its own key
         // rather than only a menu row because during a show the picture's menu
@@ -10750,9 +10812,18 @@ public partial class MainWindow : Window
             IsChecked = current,
             Tag = current ? null : "reserve-check-column",
         };
-        row.Items.Add(PresetActionItem(Strings.MenuPresetApply, index, PresetApply_Click));
+        // THE KEYS ARE ON THE ROWS THEY BELONG TO. 적용 carries its slot number
+        // on every row, because that is the number the key takes; 덮어쓰기
+        // carries Ctrl+Shift+S only on the row the app is currently in, since
+        // that key writes to that one and no other. A gesture printed beside a
+        // row it does not drive is worse than none.
+        row.Items.Add(PresetActionItem(
+            Strings.MenuPresetApply, index, PresetApply_Click,
+            index < AppPreset.MaxPresets ? $"Ctrl+{index + 1}" : null));
         row.Items.Add(new Separator());
-        row.Items.Add(PresetActionItem(Strings.MenuPresetOverwrite, index, PresetOverwrite_Click));
+        row.Items.Add(PresetActionItem(
+            Strings.MenuPresetOverwrite, index, PresetOverwrite_Click,
+            current ? "Ctrl+Shift+S" : null));
         row.Items.Add(PresetActionItem(Strings.MenuPresetRename, index, PresetRename_Click));
         row.Items.Add(new Separator());
         row.Items.Add(PresetActionItem(Strings.MenuPresetDelete, index, PresetDelete_Click));
@@ -10767,9 +10838,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private static MenuItem PresetActionItem(string header, int index, RoutedEventHandler handler)
+    private static MenuItem PresetActionItem(
+        string header, int index, RoutedEventHandler handler, string? gesture = null)
     {
         var item = new MenuItem { Header = header, Tag = index };
+        if (gesture is not null)
+        {
+            item.InputGestureText = gesture;
+        }
         item.Click += handler;
         return item;
     }
@@ -10853,6 +10929,81 @@ public partial class MainWindow : Window
         // Same reasoning as adding one: this slot now holds exactly what is on
         // screen, so it is the one the app is in.
         _settings.ActivePreset = name;
+        _settingsService.Save(_settings);
+    }
+
+    // ----- 프리셋 단축키 ---------------------------------------------------------
+    //
+    // 숫자 줄만 받는다. 넘패드는 일부러 뺐다 - 넘패드 1~5는 NumLock이 꺼져 있으면
+    // End·↓·PageDown이라, 같은 손짓이 어떤 날은 프리셋을 바꾸고 어떤 날은 트리를
+    // 굴린다.
+    private static int? PresetSlotForKey(Key key) => key switch
+    {
+        Key.D1 => 1,
+        Key.D2 => 2,
+        Key.D3 => 3,
+        Key.D4 => 4,
+        Key.D5 => 5,
+        _ => null,
+    };
+
+    // 슬롯 번호는 1부터이고 목록은 0부터다. 그 사이를 여기 한 곳에서만 넘는다.
+    private void GoToPresetSlot(int slot)
+    {
+        if (slot >= 1 && slot <= _settings.Presets.Count)
+        {
+            ApplyPreset(_settings.Presets[slot - 1]);
+            return;
+        }
+
+        // 빈 슬롯. 다섯 칸이 다 찼는데 여섯 번째를 부른 것이 아니라, 아직 그
+        // 번호까지 만들지 않은 것이다 - 목록이 조밀하므로 3번을 눌렀는데 두 개만
+        // 있으면 "다음 칸"이 3번이 된다.
+        if (_settings.Presets.Count >= AppPreset.MaxPresets)
+        {
+            return;
+        }
+
+        if (System.Windows.MessageBox.Show(
+                this,
+                string.Format(Strings.PresetSlotEmptyBody, slot),
+                Strings.PresetSlotEmptyTitle,
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Question) != MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        // 이름은 묻지 않는다. 이 자리에서 사용자가 말한 것은 번호이지 이름이
+        // 아니고, 이름은 나중에 목록에서 바꿀 수 있다 - 여기서 상자를 하나 더
+        // 여는 것은 방금 "예"라고 답한 사람에게 또 묻는 일이다.
+        NoteCurrentPlace();
+        string name = string.Format(Strings.PresetDefaultName, _settings.Presets.Count + 1);
+        _settings.Presets.Add(AppPreset.Capture(_settings, name));
+        _settings.ActivePreset = name;
+        _settingsService.Save(_settings);
+    }
+
+    // Ctrl+Shift+S. 지금 들어 있는 프리셋에 화면의 모양을 그대로 덮어쓴다.
+    //
+    // ActivePreset은 이름으로 물어본다 - 인덱스는 위 칸이 지워지면 움직이고,
+    // 이름은 사용자가 보고 있는 것이다(그 필드의 주석이 이미 그렇게 말한다).
+    private void SaveActivePreset()
+    {
+        var active = _settings.Presets.FirstOrDefault(
+            preset => string.Equals(preset.Name, _settings.ActivePreset, StringComparison.Ordinal));
+
+        if (active is null)
+        {
+            // 들어 있는 프리셋이 없으면 저장할 대상도 없다. 메뉴의 프리셋 추가와
+            // 같은 길로 보내되, 그쪽은 이름을 묻는다 - 새 슬롯에는 이름이 있어야
+            // 하고, 그 이름은 사용자만 안다.
+            PresetAdd_Click(this, new RoutedEventArgs());
+            return;
+        }
+
+        NoteCurrentPlace();
+        active.Overwrite(_settings);
         _settingsService.Save(_settings);
     }
 

@@ -148,6 +148,14 @@ public static class HelpContent
                       "What it holds", "Position, size, docking, auto-hide, colours, file types, and the open folder"),
                     R("이름 옆 ›", "적용 · 덮어쓰기 · 이름 바꾸기 · 삭제",
                       "The › beside a name", "Apply · overwrite · rename · delete"),
+                    // The two keys, which is what this section is for - the rows
+                    // above name a menu, and these are the reason not to open it.
+                    R("Ctrl+1 ~ 5", "그 번호의 프리셋으로 전환 (없으면 그 자리에 저장할지 물음)",
+                      "Ctrl+1 ~ 5",
+                      "Go to that preset - and if there is none yet, offers to save this setup there"),
+                    R("Ctrl+Shift+S", "지금 들어 있는 프리셋에 현재 상태를 덮어쓰기 (묻지 않음)",
+                      "Ctrl+Shift+S",
+                      "Writes what is on screen back into the preset you are in - no questions"),
                 }),
             }),
 
@@ -286,6 +294,15 @@ public static class HelpContent
                       "미디어 파일을 선택할 경우에만 패널이 펼쳐짐 (폴더는 동작하지 않음)",
                       "Options → Multimedia panel → Expand on selection",
                       "Expands the panel when a media file is selected - folders do nothing"),
+                    // The cover takes the header away, so the two rows below say
+                    // where its menu went and how the mode names what it is
+                    // showing. Both are answers to "there is nothing on screen".
+                    R("전체 화면에서 우클릭", "파일 항목 대신 제목 표시줄 메뉴 (프리셋 · 도움말 · 다시 시작 · 종료)",
+                      "Right-click in full screen",
+                      "The title bar's menu instead of the file items - presets, help, restart, quit"),
+                    R("전체 화면에서 마우스 움직이기", "파일 이름과 단축키를 아래에 잠깐 표시 (그림일 때)",
+                      "Move the mouse in full screen",
+                      "Shows the file name and the keys at the foot for a moment - pictures only"),
                 }),
 
                 new Group(T("이미지", "Images"), new[]
@@ -361,6 +378,13 @@ public static class HelpContent
                     R("재생 중 ↑ ↓", "볼륨 조절 (일시정지하면 항목 이동으로 복귀)",
                       "↑ ↓ while playing", "Volume - they walk the folder again once it is paused"),
                     R("재생 중 M", "음소거", "M while playing", "Mute"),
+                    // The film's own 자름맞춤, which the picture's chip row has
+                    // had all along. Says it does NOT carry over, because the
+                    // picture's does and someone who met it there will expect
+                    // the same.
+                    R("우클릭 → 영상 크기 → 자름맞춤", "패널을 꽉 채우고 넘치는 부분은 자름 (다음 영상은 맞춤으로 시작)",
+                      "Right-click → Video size → Fill",
+                      "Fills the panel and crops the overflow - the next film starts fitted again"),
                     R("우클릭 → 자막", "켜기 · 크기 · 싱크 조절", "Right-click → Subtitles", "On, size, and sync"),
                     R("전체 화면에서 아래쪽", "재생 막대 표시",
                       "Full screen, point at the bottom", "Bring the transport bar back"),

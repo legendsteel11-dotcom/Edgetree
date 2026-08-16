@@ -58,6 +58,11 @@ public static class Strings
     // The default name for slot N. Deliberately dull - the user renames it to
     // what the shape is for, and a clever default would get in the way of that.
     public static string PresetDefaultName = "프리셋{0}";
+    // Ctrl+Shift+1~5가 아직 없는 칸에 닿았을 때. 번호를 되읽어 주는 것이 이
+    // 물음의 반이다 - 3을 눌렀는데 4번이 만들어지면 그건 다른 일이 일어난 것이고,
+    // 슬롯은 목록 순서대로 채워지므로 그럴 수 있다.
+    public static string PresetSlotEmptyTitle = "프리셋";
+    public static string PresetSlotEmptyBody = "{0}번 프리셋이 아직 없습니다.\n지금 상태를 저장할까요?";
 
     public static string MenuFileFilter = "표시할 파일 종류";
     // 푸터 칩은 여덟 개가 한 줄에 서야 해서 가장 긴 라벨만 줄여 씀. 나머지는
@@ -811,6 +816,8 @@ public static class Strings
         PresetNameTitle = "Preset name";
         PresetNameHint = "Saves position, size, docking, colours, file types and the current folder";
         PresetDefaultName = "Preset {0}";
+        PresetSlotEmptyTitle = "Presets";
+        PresetSlotEmptyBody = "There is no preset {0} yet.\nSave the current setup there?";
 
         MenuFileFilter = "Show File Types";
         FilterChipExecutable = "Programs";
