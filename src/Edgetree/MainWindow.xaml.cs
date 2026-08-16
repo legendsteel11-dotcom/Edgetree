@@ -19112,12 +19112,26 @@ public partial class MainWindow : Window
     private const double MinViewerWidth = 240;
     // 800 → 1600 → 3200 → 3720 the day the split drag landed, each step
     // because the previous one kept being hit: the panel is where the pixels
-    // should go. 3720 is 4K arithmetic - 3840 minus the tree's 120 floor - so
-    // a near-fullscreen window can give everything but the tree strip to the
-    // panel. The split can only grow within the current window anyway - the
-    // real bound is the window minus MinTreeSplitWidth - so this cap mostly
-    // bounds what a saved width can re-widen the window by on the next open.
-    private const double MaxViewerWidth = 3720;
+    // should go. 3720 was 4K arithmetic - 3840 minus the tree's 120 floor - so
+    // a near-fullscreen window could give everything but the tree strip to the
+    // panel.
+    //
+    // THAT PREMISE DIED ON 2026-08-15, when the full cover stopped reserving a
+    // tree share at all so a media window could be made small. The panel is
+    // then the whole window, and a number built out of the tree's floor caps
+    // the WINDOW instead of the column: widening inside the cover stopped
+    // 3720 wide and left exactly 120px of desktop showing, while widening in
+    // the split reached the screen edge (120 + 3720). Which one you got
+    // depended on the mode you happened to drag in, which is why it read as
+    // random - reported 2026-08-16, and the leftover being "exactly the tree's
+    // width" was the tell, since that is literally what the number was made of.
+    //
+    // So the ceiling follows the screen it is on. The old number stays as a
+    // FLOOR: this cap's real job is bounding what a SAVED width may re-widen
+    // the window by on the next open (the split can only grow inside the
+    // current window anyway), and a smaller monitor must not shrink that.
+    private double MaxViewerWidth
+        => Math.Max(3720, GetCurrentMonitorWorkArea().Width);
     // The tree column's floor under the SPLIT drag - deliberately smaller
     // than MinExpandedWidth: that one is a WINDOW floor (the header
     // buttons must fit), and the header spans all three columns, so the
