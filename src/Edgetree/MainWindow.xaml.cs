@@ -11209,6 +11209,22 @@ public partial class MainWindow : Window
     private const double ViewerChipGap = 4;
     private const double ViewerChipGroupGap = 10;
 
+    // 꺽쇠 잉크의 오른쪽 끝이 열 중앙에서 넘어가는 양(상자 크기에 대한 비율).
+    // Material keyboard_arrow_right의 잉크는 960 상자 안에서 333~624(291)이라
+    // 폭이 0.303이고, 상자가 열 가운데에 놓이므로 그 절반이 그대로 넘침이 된다.
+    // 아래로 돌면 세로 480이 폭 자리에 와서 0.25까지 나간다 - 회전이 폭과 높이를
+    // 맞바꾸므로, 접었을 때보다 폈을 때 옆으로 더 나간다.
+    private const double ExpanderInkOverhang = 0.1515;
+
+    // 꺽쇠와 그 뒤 아이콘/이름 사이가 이보다 좁아지지 않게 한다. 기본 글꼴에서의
+    // 픽셀 값이고 CompactScale로 글꼴을 따라간다.
+    //
+    // 바닥이 따로 있는 이유: 곡선을 그대로 내리면 최소 단계에서 2.2px이 되는데,
+    // 작은 단계는 그 자체로 이미 빠듯해서 여기서 더 가져갈 것이 없다. 곡선이
+    // "여백이 글자보다 먼저 양보한다"는 규칙인데, 양보할 것이 없는 지점이 있다.
+    private const double ExpanderNameGapTarget = 5.0;
+    private const double ExpanderNameGapFloor = 3.0;
+
     private void ApplyLayoutMetrics()
     {
         double scale = TreeFontScale;
@@ -11506,6 +11522,40 @@ public partial class MainWindow : Window
         // no longer even show an icon to justify it.
         bool bothOff = !_settings.ShowFolderIcons && !_settings.ShowFileIcons;
         Resources["FileArrowGutterWidth"] = new GridLength(bothOff ? 0 : tabSpacing);
+
+        // 꺽쇠와 이름 사이의 간격이 "들여쓰기 간격"에 묶여 있던 것 (2026-08-16).
+        // 꺽쇠는 자기 열 가운데에 놓이고 이름은 그 열이 끝나는 곳에서 시작하므로,
+        // 눈에 보이는 간격은
+        //     들여쓰기/2 - ExpanderInkOverhang x 꺽쇠상자
+        // 즉 정확히 들여쓰기의 절반이다. 기본값(12, 12pt)에서 3.6px이고, 4로
+        // 내리면 -0.4px - 잉크가 아이콘을 파고든다. 좁은 들여쓰기를 고르는 이유는
+        // 세로줄을 아끼려는 것이지 이름을 꺽쇠에 붙이려는 것이 아닌데, 한 숫자가
+        // 둘 다 하고 있었다.
+        //
+        // 더하는 것이 아니라 하한이다. 넓은 들여쓰기(기본 글꼴에서 16 이상)는
+        // 이미 목표를 넘으므로 0이 나오고, 그래서 그 구간의 화면은 한 픽셀도 안
+        // 움직인다. 좁은 쪽만 채운다.
+        //
+        // 레벨마다 쌓이지 않는다 - 여기서 나오는 것은 행 안의 여백이고, 레벨당
+        // 들여쓰기는 여전히 ItemsHost의 margin+padding(=들여쓰기)이 정한다.
+        // 그래서 대가는 트리 전체가 한 번 오른쪽으로 밀리는 것뿐이고, 두 단계만
+        // 내려가도 좁은 들여쓰기가 아낀 폭이 더 크다.
+        //
+        // 덤으로 같이 없어지는 것: 아래로 돌아간 꺽쇠는 잉크가 더 옆으로 나가므로
+        // 상자가 들여쓰기의 두 배를 넘으면(큰 글꼴 + 좁은 들여쓰기) 끝이 아이콘
+        // 밑으로 들어갔다 - 아이콘 열이 나중에 그려져 위를 덮기 때문이다. 오른쪽
+        // 꺽쇠는 잉크가 좁아 훨씬 늦게까지 버티므로 폈을 때만 작아 보였다.
+        // 간격이 생기면 그 조건이 성립하지 않는다.
+        double gapNow = tabSpacing / 2.0 - ExpanderInkOverhang * rowGlyphBox;
+        double wantedGap = Math.Max(ExpanderNameGapFloor, ExpanderNameGapTarget * compact);
+        double nameGap = Math.Round(Math.Max(0.0, wantedGap - gapNow));
+        Resources["ExpanderNameGap"] = new Thickness(nameGap, 0, 0, 0);
+        // 아이콘을 둘 다 끄면 파일 행은 꺽쇠 자리 자체를 접는다(위) - 접은 자리
+        // 앞에 여백만 남으면 접은 뜻이 없으므로 간격도 함께 접는다.
+        Resources["FileNameGap"] = new Thickness(bothOff ? 0 : nameGap, 0, 0, 0);
+        // 즐겨찾기/북마크 행은 꺽쇠가 없고 같은 폭의 빈 자리로 트리와 줄을 맞춘다.
+        // 트리 쪽이 (꺽쇠 열 + 간격)이 되었으니 여기서는 둘을 합쳐 한 칸으로 준다.
+        Resources["FavoriteGutterWidth"] = new GridLength(tabSpacing + nameGap);
 
         // Search result rows track the same zoom (Ctrl +/-) as the tree, so the
         // filename matches the tree's current font and the folder-path header

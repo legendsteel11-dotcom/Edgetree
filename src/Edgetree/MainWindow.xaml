@@ -390,6 +390,20 @@
              their icon/name with a folder's icon/name the normal way. -->
         <GridLength x:Key="FileArrowGutterWidth">16</GridLength>
 
+        <!-- The gap between the expand arrow and the icon/name after it, which
+             used to be whatever the indent width happened to leave over - see
+             ApplyLayoutMetrics for the arithmetic and why this is a FLOOR
+             rather than an addition. ExpanderNameGap is every row's; FileNameGap
+             is the same number except in the one case that collapses the arrow
+             gutter itself (both icon kinds off), where the gap goes with it.
+             FavoriteGutterWidth folds the two into the single stand-in column
+             the favorites/bookmark rows use in place of an arrow.
+             All three default to "changes nothing" until ApplyLayoutMetrics
+             first runs, matching the 16px indent these defaults describe. -->
+        <Thickness x:Key="ExpanderNameGap">0,0,0,0</Thickness>
+        <Thickness x:Key="FileNameGap">0,0,0,0</Thickness>
+        <GridLength x:Key="FavoriteGutterWidth">16</GridLength>
+
         <Style x:Key="ToggleButtonStyle"
                 TargetType="Button">
             <Setter Property="Background"
@@ -2492,9 +2506,16 @@
                                                   HorizontalAlignment="Center"
                                                   LayoutTransform="{DynamicResource ExpanderArrowScale}"
                                                   IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
+                                    <!-- The arrow sits CENTERED in a column as wide as
+                                         the indent, so what is left between its ink and
+                                         this content is half the indent minus a constant -
+                                         the gap shrank whenever the indent did, which is
+                                         not what the indent option is for. This margin is
+                                         what holds it apart instead. -->
                                     <ContentPresenter x:Name="PART_Header"
                                             Grid.Column="1"
                                             ContentSource="Header"
+                                            Margin="{DynamicResource ExpanderNameGap}"
                                                       HorizontalAlignment="Stretch"
                                             VerticalAlignment="Center"/>
                                 </Grid>
@@ -2553,6 +2574,12 @@
                                 <Setter TargetName="ExpanderColumn"
                                         Property="Width"
                                         Value="{DynamicResource FileArrowGutterWidth}"/>
+                                <!-- And the gap in front of the content goes with the
+                                     gutter in that same case: a collapsed gutter with
+                                     a margin still standing in it has not collapsed. -->
+                                <Setter TargetName="PART_Header"
+                                        Property="Margin"
+                                        Value="{DynamicResource FileNameGap}"/>
                             </Trigger>
                             <!-- Brightens this folder's guide line whenever it's an
                                  ancestor of the currently selected item (maintained by
@@ -3976,10 +4003,13 @@
                                          up with the tree's text (which starts right after
                                          its expander) instead of collapsing flush left with
                                          everything else in it. Shares ExpanderColumn's
-                                         TabSpacingWidth rather than hardcoding its default
-                                         width, so the "들여쓰기 간격" option moves favorites and
-                                         tree rows together. -->
-                                    <ColumnDefinition Width="{DynamicResource TabSpacingWidth}"/>
+                                         width rather than hardcoding its default, so the
+                                         "들여쓰기 간격" option moves favorites and tree rows
+                                         together - FavoriteGutterWidth being that column
+                                         PLUS the arrow-to-name gap the tree row carries as
+                                         a margin, since there is no arrow here to hang one
+                                         off. -->
+                                    <ColumnDefinition Width="{DynamicResource FavoriteGutterWidth}"/>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
