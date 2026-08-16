@@ -10,7 +10,7 @@ import { t } from '../i18n'
 // A SECTION, not a page of its own. It was built as a second HTML entry first
 // (2026-08-15) and the author found moving off the page and back a nuisance for
 // what is, in the end, more of what the page above is already showing.
-const COUNT = 12
+const COUNT = 16
 const shots = Array.from({ length: COUNT }, (_, i) => String(i + 1).padStart(2, '0'))
 
 const open = ref<number | null>(null)
