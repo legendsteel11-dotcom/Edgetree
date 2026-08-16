@@ -6936,6 +6936,48 @@ public partial class MainWindow : Window
         return container as TreeViewItem;
     }
 
+    // 더 보기 / 접기를 누르면 그 행을 가진 폴더가 선택된다 (2026-08-16).
+    //
+    // 그 행들은 자기가 어느 폴더의 것인지 말하지 않는다. 같은 이름의 폴더가
+    // 겹쳐 있거나, 서로 다른 폴더의 더 보기 행이 나란히 보이면(들여쓰기만 다르다)
+    // 지금 무엇을 펼치고 접는지 알 수 없다.
+    //
+    // 답을 폴더 행이 아니라 안내선이 한다는 것이 이 수의 요점이다. 긴 목록의
+    // 더 보기 행은 대개 화면 맨 아래에 있고 폴더 행은 한참 위 - 화면 밖인 경우가
+    // 많다. 그런데 폴더를 선택하면 그 폴더가 자기 자식들의 안내선을 밝히므로
+    // (ExplorerTree_SelectedItemChanged의 guide target - 폴더는 부모가 아니라
+    // 자기 자신을 쓴다), 누른 행 바로 왼쪽의 세로선이 켜진다. 폴더가 안 보여도
+    // 신호는 손 옆에 있다.
+    private void SelectRevealFolder(FileSystemItem? folder)
+    {
+        // 컨테이너는 사실상 항상 있다 - 자식 행들은 부모 컨테이너의 ItemsHost
+        // 안에 들어 있으므로, 더 보기 행이 보이는 한 부모는 화면 밖이어도
+        // realize된 상태다. 그래도 걸러 두는 것은 가상화가 언제 무엇을 치우는지에
+        // 이 기능이 기대지 않게 하기 위해서다.
+        if (folder is null || FindRealizedContainer(folder) is not { } container)
+        {
+            return;
+        }
+
+        // 선택은 "그 행으로 스크롤하라"는 요청을 함께 낸다. 여기서는 그러면 안
+        // 된다 - 누른 행을 제자리에 붙들어 두는 것이 이 핸들러가 하는 일인데,
+        // 폴더 행은 대개 한참 위에 있어서 화면이 통째로 뛴다. 필터 토글이 같은
+        // 이유로 쓰는 억제와 같은 방식으로, 이벤트가 시작되는 컨테이너에서 잡아
+        // ScrollViewer까지 올려보내지 않는다. 이 한 번의 대입 동안만 걸어 두므로
+        // 즐겨찾기나 북마크처럼 일부러 뛰는 것은 그대로 뛴다.
+        void SuppressBringIntoView(object _, RequestBringIntoViewEventArgs e) => e.Handled = true;
+
+        container.RequestBringIntoView += SuppressBringIntoView;
+        try
+        {
+            container.IsSelected = true;
+        }
+        finally
+        {
+            container.RequestBringIntoView -= SuppressBringIntoView;
+        }
+    }
+
     private ScrollViewer? FindTreeScrollViewer()
     {
         ExplorerTree.ApplyTemplate();
@@ -13154,6 +13196,13 @@ public partial class MainWindow : Window
             LogTreeClick(showMore, onExpander: false, e.ClickCount);
             NoteRevealPressForScrollWatch(showMore.IsShowLess ? "recollapse" : "reveal");
 
+            var revealFolder = showMore.Parent;
+
+            // BEFORE the anchor is measured, so that if anything moves the view
+            // in spite of the suppression inside, the measurement below is
+            // taken after it rather than invalidated by it.
+            SelectRevealFolder(revealFolder);
+
             // WHERE THE PRESSED ROW IS, before anything moves. Both branches
             // below rebuild Children through ReplaceAll, which is one Reset -
             // and a Reset makes the virtualizing panel throw away what it knew
@@ -13169,7 +13218,6 @@ public partial class MainWindow : Window
             // can do that; only a re-derivation can.
             var (anchor, anchorTop) = TopmostRealizedRow();
             double pressedTop = MeasuredRowTop(treeViewItem);
-            var revealFolder = showMore.Parent;
 
             if (showMore.IsShowLess)
             {
@@ -13178,6 +13226,12 @@ public partial class MainWindow : Window
                 // the selection re-enters the tree from inside a mouse event
                 // (the 2026-08-02 "Collection was modified" crash). Revealing
                 // only ADDS rows, so it has never needed the same care.
+                //
+                // Selecting the owning folder above happens to move the
+                // selection out of the rows this is about to drop, which is
+                // that crash's own precondition. The queue stays anyway: it is
+                // the guard, and a guard that only holds while an unrelated
+                // feature keeps behaving is not one.
                 Dispatcher.BeginInvoke(
                     () =>
                     {
