@@ -260,7 +260,13 @@ public static class HelpContent
                       "The same list the filter buttons carry"),
                     R("폴더 행의 정렬 아이콘", "그 폴더만 개별 정렬", "The sort icon on a folder row", "Sort that one folder its own way"),
                     R("옵션 → 정렬 기준", "전체 기본 정렬", "Options → Sort by", "The default for everything"),
-                    R("더 보기", "나머지 항목 펼치기", "Show more", "Reveal the rest"),
+                    // 접기 belongs on the same row as 더 보기, and the selection
+                    // is the point of the row rather than a side effect: a long
+                    // list puts the 더 보기 row at the bottom of the screen with
+                    // its folder scrolled off, so two identically named folders
+                    // are told apart by which guide line lights up.
+                    R("더 보기 · 접기", "나머지 항목 펼치기 · 되접기 (그 부모 폴더가 선택됨)",
+                      "Show more · Show less", "Reveal the rest, or fold it back - its parent folder gets selected"),
                 }),
             }),
 
@@ -335,9 +341,15 @@ public static class HelpContent
                     // the cover goes up, so a row telling someone to move the
                     // mouse explains a thing that has already explained itself.
                     // Its gesture also ran long enough to wrap the column.
-                    R("전체 화면에서 우클릭", "파일 항목 대신 제목 표시줄 메뉴 (프리셋 · 도움말 · 다시 시작 · 종료)",
+                    //
+                    // What the row lists came back once (2026-08-16). Folding
+                    // away everything but the show left a picture with no way
+                    // to reach its own size, navigator or thumbnail bar, since
+                    // the chip row those live on went up with the header. Only
+                    // the FILE items fold now, so the row names both halves.
+                    R("전체 화면에서 우클릭", "파일 항목 대신 그림 크기 · 내비게이터 · 썸네일 바와 제목 표시줄 메뉴 (프리셋 · 도움말 · 다시 시작 · 종료)",
                       "Right-click in full screen",
-                      "The title bar's menu instead of the file items - presets, help, restart, quit"),
+                      "Picture size, navigator and thumbnail bar instead of the file items, plus the title bar's menu - presets, help, restart, quit"),
                 }),
 
                 new Group(T("이미지", "Images"), new[]
@@ -388,6 +400,11 @@ public static class HelpContent
                       "Click, ↑ ↓, or pick a row while it runs", "Ends the show, staying on the picture you were looking at"),
                     R("F9 · ⋯ → 멀티미디어 패널 → 시계와 날짜", "패널 위에 시각·날짜·요일을 표시",
                       "F9 · ⋯ → Multimedia panel → Clock and date", "Puts the time, date and day over the panel"),
+                    // The size is a SHARE of the panel, not a point size, and
+                    // the row says so - otherwise a percentage reads as a fixed
+                    // size and widening the window looks like it lost the setting.
+                    R("⋯ → 멀티미디어 패널 → 시계 크기", "50% ~ 150% (패널 크기에 대한 비율)",
+                      "⋯ → Multimedia panel → Clock size", "50% to 150%, as a share of the panel"),
                     // The wallpaper item had NO row at all until now - it has
                     // been in the picture's menu for weeks. Worth a line on its
                     // own account, and more so since 2.1.0: which monitor it
