@@ -540,9 +540,7 @@ public partial class MainWindow : Window
             OpenViewer();
         }
 
-        ExplorerTree.FontSize = TreeFontSizeSteps.Contains(_settings.TreeFontSize)
-            ? _settings.TreeFontSize
-            : DefaultTreeFontSize;
+        ExplorerTree.FontSize = SaneTreeFontSize(_settings.TreeFontSize);
 
         ReloadRoots();
 
@@ -1713,6 +1711,19 @@ public partial class MainWindow : Window
         int newIndex = Math.Clamp(currentIndex + direction, 0, TreeFontSizeSteps.Length - 1);
         SetTreeFontSize(TreeFontSizeSteps[newIndex]);
     }
+
+    // A stored font size, answered for. The steps are the only sizes the app
+    // can be put into by hand (Ctrl +/- walks them, the menu stepper walks
+    // them), so anything else in the file was not written by using the app -
+    // and there is no sensible way to honour half of it. Falls back to the
+    // default rather than to the nearest step: a number off the ladder is a
+    // file that has been edited, and the default is the answer that needs no
+    // guessing about what was meant.
+    //
+    // Shared by startup and by a preset apply. It was startup's alone until
+    // 2026-08-16, which left the preset path as the one way around it.
+    private static double SaneTreeFontSize(double size)
+        => TreeFontSizeSteps.Contains(size) ? size : DefaultTreeFontSize;
 
     private void SetTreeFontSize(double size)
     {
@@ -10879,7 +10890,14 @@ public partial class MainWindow : Window
 
         if (lookChanged)
         {
-            SetTreeFontSize(_settings.TreeFontSize);
+            // THROUGH THE SAME GUARD STARTUP USES, not straight from the value
+            // (2026-08-16). Startup has always refused a font size that is not
+            // one of the steps - a hand-edited file is the reason it is there -
+            // and this path did not, so a preset was the one way a number the
+            // stepper cannot produce reached the tree. Normalize() above it only
+            // promises finite and non-negative; the STEP is a use-site rule and
+            // this is a use site.
+            SetTreeFontSize(SaneTreeFontSize(_settings.TreeFontSize));
             ApplyTreeFontWeight();
             ApplyHeaderMetrics();
             ApplyIconStyle();

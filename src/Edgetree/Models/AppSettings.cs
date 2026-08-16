@@ -811,6 +811,44 @@ public class AppSettings
         DockedHeightRatio = Sane(DockedHeightRatio, 1.0, min: 0, max: 1);
         DockedTopRatio = Sane(DockedTopRatio, 0.0, min: 0, max: 1);
         NormalizeColors();
+        NormalizePresets();
+    }
+
+    // ----- 프리셋 목록이 밖에서 들어올 때 ---------------------------------------
+    //
+    // 위의 숫자들과 달리 여기서 막는 것은 값이 아니라 NULL이다. System.Text.Json은
+    // 선언된 초기값을 무시하고 `"Presets": null`을 그대로 null로 넣으므로, 손으로
+    // 고친(혹은 반쯤 쓰다 만) 파일 하나가 헤더 우클릭 한 번에 앱을 끝낸다 -
+    // 메뉴를 여는 것이 `_settings.Presets.Count`이기 때문이다. 목록 안의 null
+    // 원소와 `"Values": null`도 같은 자리에서 같은 방식으로 터진다.
+    //
+    // 개수는 손대지 않는다. 다섯을 넘겨 적어 둔 파일이 있으면 여섯 번째도 그대로
+    // 보이고 `프리셋 추가`만 사라진다. 넘치는 것을 잘라내는 쪽이 깔끔해 보이지만
+    // 그건 사용자가 적어 둔 것을 앱이 조용히 지우는 일이고, 이 파일의 나머지
+    // 전체가 그 반대 방향으로 쓰여 있다(읽을 수 없는 파일도 지우지 않고 옆에
+    // 남겨 둔다).
+    private void NormalizePresets()
+    {
+        if (Presets is null)
+        {
+            Presets = new();
+            return;
+        }
+
+        Presets.RemoveAll(preset => preset is null);
+
+        for (int i = 0; i < Presets.Count; i++)
+        {
+            var preset = Presets[i];
+            preset.Values ??= new();
+            // 이름 없는 슬롯은 지우지 않고 이름을 준다. 빈 줄은 메뉴에서 누를 수
+            // 있으면서 아무것도 아닌 것으로 보이고, 그 프리셋이 담고 있는 모양은
+            // 멀쩡하다.
+            if (string.IsNullOrWhiteSpace(preset.Name))
+            {
+                preset.Name = $"#{i + 1}";
+            }
+        }
     }
 
     private static double Sane(double value, double fallback, double min, double max = double.MaxValue)

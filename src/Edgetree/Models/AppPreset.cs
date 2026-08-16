@@ -76,6 +76,24 @@ public class AppPreset
         nameof(AppSettings.ViewerWidth),
     };
 
+    // 전체 덮기 IS NOT IN THE LIST, and was for about an hour on 2026-08-16.
+    // Kept as a note because the idea is a good one and the reason it came out
+    // is not "it does not work" - it is WHEN it can be applied.
+    //
+    // The mode collapses the tree's viewport to nothing, and a preset also
+    // walks the tree to the folder it was saved in. That walk is asynchronous
+    // (NavigateToPath retries across dispatcher turns and confirms a second
+    // later), so applying the cover on the line after it dropped the viewport
+    // to 0 while containers were still being regenerated - and WPF's own scroll
+    // anchor was left pointing at one that had gone. ArgumentNullException in
+    // VirtualizingStackPanel.FindScrollOffset, four in a burst, the recovery in
+    // App.xaml.cs stopping by design on the fifth.
+    //
+    // Going back means hanging the cover off the END of that walk, which ends
+    // three different ways (settled, dropped by user input, never quiet) and so
+    // needs an answer for each plus a last-resort. Start there, not at the
+    // apply order.
+
     // What the panel looks like once it is open, which costs nothing to change.
     internal static readonly string[] ViewerLookFields =
     {
