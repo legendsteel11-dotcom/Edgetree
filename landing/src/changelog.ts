@@ -33,12 +33,38 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    // THE FONT STEP LEADS, because this round's theme is a smaller screen and a
-    // smaller font, and that line is the one a person recognises themselves in.
-    // It carries its CONSEQUENCE rather than the number alone: an 8pt step on
-    // its own is a setting, while "more fits on screen" is the reason anyone
-    // would want it - and it was not true before, since the expand arrow was
-    // fixed at 16px and held every row open by itself.
+    // THE AUTHOR CUT THIS LIST FROM 21 LINES TO 13 (2026-08-16), and the
+    // reasons given for the cuts are worth more than the list itself, because
+    // they name a test this file did not have. Three words did all the work:
+    // 당연함, 미약함, 사소함.
+    //
+    // 당연함 IS THE SHARPEST OF THE THREE - a line describing something the
+    // reader assumed the app already did. It costs a slot and returns nothing,
+    // and worse, it invites the thought that the app could not do it until now.
+    // Four lines went out on it: the clock's size ("크기도 조절"), slideshows
+    // filling the panel, films cropping to fill it, and the full cover reaching
+    // its own controls. All four were genuine work; none of them is news to
+    // someone who has not used the app. Ask of every line: would a reader be
+    // surprised this needed saying?
+    //
+    // 미약함 took the 8pt font step, which had LED the card - and the round's
+    // theme was a smaller screen. A settings range is not a reason to download
+    // anything, even carrying its consequence. Being a round's theme does not
+    // qualify a line for the top of the card; being what someone WANTS does.
+    //
+    // 사소함 took the footer chips going bold, the missing-folder notice, and
+    // three fixes narrow enough that naming them describes a fault more than a
+    // remedy (the window widening once after a full cover, the panel opening
+    // shorter than its list, the tree creeping upward). Two of those are
+    // absorbed rather than lost: the 더 보기·접기 line now carries the drift as
+    // well, and the expand-arrow line carries the gap beside it.
+    //
+    // WORDING, same pass: 대폭 came out of the formats line - the count is the
+    // argument, an intensifier only weakens it. And two internal names were
+    // replaced by what a reader would say: 전체 덮기 → 앱 전체화면, 조작 막대 →
+    // 컨트롤 패널. The card is not where the app teaches its own vocabulary.
+    // (English keeps "the playback controls" there instead of a literal
+    // "control panel", which is Windows' own thing.)
     //
     // THE SEARCH FREEZE SHOWED THERE IS A THIRD WAY OUT, and it is worth
     // stating as a rule (author, 2026-08-16). This file's header sets up what
@@ -57,52 +83,56 @@ export const changelog: ChangelogEntry[] = [
     // Reach for it whenever a true line would read as a general property of the
     // app rather than as a case someone ran into.
     //
-    // The 더 보기 lines are a pair on purpose - one is the drift someone SAW,
-    // the other is the confusion underneath it (which of two identically named
-    // folders is opening). Both are recognisable from outside, which is the
-    // test for being in the card at all.
+    // ONE 더 보기·접기 LINE, not the two it started as. The drift someone SAW
+    // and the folder selection that answers "which of these two identically
+    // named lists am I opening" are one sentence to a reader, and the fix is
+    // only interesting as the reason the other half works.
     //
-    // A LONGER LIST THAN USUAL, and named fixes are welcome in it (author,
-    // 2026-08-16) - what is not welcome is the trivia. Two renames came out on
-    // that instruction: 셔플 → 셔플 반복, and the app calling itself 앱 rather
-    // than 사이드바. Both are real edits and neither changes anything a person
-    // can do, which is the line between this card and the release notes.
+    // NAMED FIXES ARE WELCOME HERE (author, 2026-08-16) - what is not welcome
+    // is the trivia. Renames go out on that instruction: 셔플 → 셔플 반복, and
+    // the app calling itself 앱 rather than 사이드바. So do the edits with no
+    // gesture behind them - the colour list gaining dividers, presets gaining
+    // their own heading, the separator that kept appearing at the top of a
+    // menu, a settings file that cannot be written now saying so once. All
+    // real work; none of it changes what a person can do, which is the line
+    // between this card and the release notes.
+    //
+    // THE ORDER IS THE ONLY STRUCTURE THIS LIST HAS - it renders flat, with no
+    // headings - so it has to be arranged rather than appended to. Three runs:
+    // what is new, then the tree and its lists, then the fixes. Fixes last
+    // because a card above a download button should open on what the app does,
+    // and because a run of 수정 lines reads as a list of what was broken when it
+    // sits at the top.
     version: 'v2.3.0',
     ko: [
-      '글꼴 크기 8pt 추가 — 작게 할수록 한 화면에 더 많이 보임',
-      'PSD·RAW·JXL 등 패널에서 볼 수 있는 그림 형식 대폭 추가',
+      'PSD·RAW·JXL 등 패널에서 볼 수 있는 그림 형식 추가',
       '패널 위에 시계 표시(F9)',
+      '프리셋을 Ctrl+1~5로 바꾸고, Ctrl+Shift+S로 덮어씀',
       '파일을 선택하면 멀티미디어 패널이 자동으로 열림(옵션)',
-      '슬라이드 쇼가 패널을 꽉 채워 재생',
+      '드라이브 아이콘 표시 옵션 추가',
       '색상 설정에 펼침 화살표와 하단 칩 색 추가',
-      '일부 대용량 폴더에서 검색 도중 검색어를 고칠 때 멈추던 문제 수정',
-      '더 보기·접기를 반복할 때 트리가 조금씩 위로 밀리던 문제 수정',
-      '더 보기·접기를 누르면 그 폴더가 선택되어 어느 목록인지 보임',
-      '펼침 화살표를 직각 모양으로, 들여쓰기 안내선을 화살표 중앙에',
-      '들여쓰기 간격을 좁혀도 펼침 화살표와 폴더 이름이 붙지 않음',
-      '전체 덮기에서 나온 뒤 창 크기를 조절하면 창이 한 번 벌어지던 문제 수정',
-      '북마크·즐겨찾기 패널이 목록보다 짧게 열려 첫 조절에서 덜컹이던 문제 수정',
-      '썸네일 바가 PSD·RAW처럼 무거운 그림까지 미리 읽어 느려지던 문제 수정',
-      '음악 재생 중 전체 덮기에서 조작 막대가 가리키는 동안 사라지던 문제 수정',
-      '하단 확장자 칩의 글자를 항상 굵게, 위치도 상자 가운데로',
+      '재생중인 음악과 별개로 선택된 음악이 더 쉽게 구분됨',
+      '더 보기·접기 시 부모폴더 선택, 들여쓰기 안내선 바로 적용',
+      '펼침 기호 수정 및 들여쓰기 안내선을 중심에 맞춤',
+      '북마크·즐겨찾기를 추가하면 패널이 그 목록으로 바뀜',
+      '일부 대용량·네트워크 폴더에서 인덱싱 도중 검색어를 고칠 때 멈추던 문제 수정',
+      '썸네일 바가 PSD·RAW처럼 큰 파일까지 미리 읽어 느려지던 문제 수정',
+      '음악 재생 중 앱 전체화면에서 컨트롤 패널이 가리키는 동안 사라지던 문제 수정',
     ],
     en: [
-      'Font size down to 8pt - and the rows come down with it',
-      'PSD, RAW, JXL and many more picture formats in the panel',
+      'PSD, RAW, JXL and more picture formats in the panel',
       'A clock over the panel (F9)',
+      'Switch presets with Ctrl+1-5, overwrite with Ctrl+Shift+S',
       'The multimedia panel opens when you select a file (option)',
-      'Slideshows fill the panel',
+      'An option to show drive icons',
       'Colour settings for the expand arrow and the footer chips',
-      'Fixed: in some large folders, editing the search box mid-scan left the app unresponsive',
-      'Fixed: repeated Show more / Show less crept the tree upward',
-      'Show more / Show less selects the folder it belongs to',
-      'The expand arrow at a right angle, and the indent guide through its centre',
-      'A narrow indent no longer pushes the arrow against the folder name',
-      'Fixed: the window jumped wider on the first resize after a full cover',
-      'Fixed: the bookmarks and favorites panel opened shorter than its own list',
-      'Fixed: the thumbnail bar read ahead into heavy formats like PSD and RAW',
-      'Fixed: in full cover, the transport hid itself while being pointed at',
-      'The footer file-type chips: bold, and their labels centred',
+      'The track you picked reads apart from the one that is playing',
+      'Show more / Show less selects the parent folder, and the indent guides follow at once',
+      'A reworked expand arrow, with the indent guide through its centre',
+      'Adding a bookmark or favourite opens the list it went into',
+      'Fixed: in some large or network folders, editing the search box while it indexed left the app unresponsive',
+      'Fixed: the thumbnail bar read ahead into large files like PSD and RAW',
+      'Fixed: in full screen, the playback controls hid themselves while being pointed at',
     ],
   },
   {
