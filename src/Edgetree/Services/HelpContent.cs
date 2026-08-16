@@ -135,12 +135,23 @@ public static class HelpContent
                     R("핀 클릭", "도킹 상태로 복귀",
                       "Click the pin", "Go back to being docked"),
                 }),
+            }),
 
-                // Under 창 모드 because what a preset holds is mostly the
-                // window: where it sits, how big it is, which edge, whether it
-                // hides. The colours and the file-kind filter ride along, and
-                // saying so in one row beats a section of its own.
-                new Group(T("프리셋", "Presets"), new[]
+        // A SECTION OF ITS OWN since 2026-08-16, having been a group inside
+        // 창 모드 - put there because what a preset holds is mostly the window
+        // and one group seemed enough for the colours and the filter riding
+        // along.
+        //
+        // It has outgrown that twice over. What a preset holds now reaches the
+        // whole palette, the panel's own switches and the folder it was saved
+        // in, none of which is a window mode; and it has keys, which is what
+        // a reader scans these headings for. A subject nested under another
+        // one is a subject a reader has to already know the location of.
+        new Section(
+            T("프리셋", "Presets"),
+            new[]
+            {
+                new Group(string.Empty, new[]
                 {
                     R("제목 표시줄 우클릭", "저장된 프리셋 목록 · 프리셋 추가 (최대 5개)",
                       "Right-click the title bar", "The setups you saved, and 프리셋 추가 - up to five"),
@@ -211,6 +222,21 @@ public static class HelpContent
                     R("우클릭 → 폴더 숨기기", "트리에서 폴더를 감춤, 검색에서는 보이나 작업 시 폴더 숨김 해제 필요",
                       "Right-click → Hide this folder",
                       "Hidden from the tree; search still finds it, but working on it means unhiding it first"),
+                    // THE MENU WITH NO ROW UNDER IT. Everything else in this
+                    // section acts on the row that was clicked, so a menu that
+                    // needs the absence of one is the gesture nobody arrives at
+                    // by accident - and the four lists behind it are reachable
+                    // no other way without opening the options menu.
+                    //
+                    // Listed rather than summarised, because the list IS the
+                    // reason to go there. 새로고침 is called 전체 here for the
+                    // one thing this menu's version does that the row's does
+                    // not: the row refreshes that folder, this one the drive
+                    // list and every folder open in the tree.
+                    R("빈 곳 우클릭",
+                      "전체 새로고침 · 새 폴더 · 북마크 · 숨긴 폴더 · 네트워크 위치 · 표시할 파일 종류",
+                      "Right-click empty space",
+                      "Refresh everything · New Folder · Bookmark · Hidden Folders · Network Locations · Show File Types"),
                 }),
             }),
 
@@ -224,6 +250,14 @@ public static class HelpContent
                       "The filter buttons at the bottom", "Show only some kinds of file"),
                     R("필터 버튼 → 사용자 지정", "확장자 직접 입력",
                       "A filter button → Custom", "Type the extensions yourself"),
+                    // The same list twice, and it earns the second line: this
+                    // section is where someone hunting the filter looks, and
+                    // they will not scroll up to 트리 to find out that the
+                    // gesture exists. The row there answers "what is that menu";
+                    // this one answers "where else can I set this".
+                    R("트리 빈 곳 우클릭 → 표시할 파일 종류", "필터 버튼 줄과 같은 목록",
+                      "Right-click empty tree space → Show File Types",
+                      "The same list the filter buttons carry"),
                     R("폴더 행의 정렬 아이콘", "그 폴더만 개별 정렬", "The sort icon on a folder row", "Sort that one folder its own way"),
                     R("옵션 → 정렬 기준", "전체 기본 정렬", "Options → Sort by", "The default for everything"),
                     R("더 보기", "나머지 항목 펼치기", "Show more", "Reveal the rest"),
@@ -294,15 +328,16 @@ public static class HelpContent
                       "미디어 파일을 선택할 경우에만 패널이 펼쳐짐 (폴더는 동작하지 않음)",
                       "Options → Multimedia panel → Expand on selection",
                       "Expands the panel when a media file is selected - folders do nothing"),
-                    // The cover takes the header away, so the two rows below say
-                    // where its menu went and how the mode names what it is
-                    // showing. Both are answers to "there is nothing on screen".
+                    // The cover takes the header away, so this says where its
+                    // menu went. Its companion - the line that names the file
+                    // at the foot on a mouse move - had a row here too and it
+                    // came out (2026-08-16): the line shows ITSELF the moment
+                    // the cover goes up, so a row telling someone to move the
+                    // mouse explains a thing that has already explained itself.
+                    // Its gesture also ran long enough to wrap the column.
                     R("전체 화면에서 우클릭", "파일 항목 대신 제목 표시줄 메뉴 (프리셋 · 도움말 · 다시 시작 · 종료)",
                       "Right-click in full screen",
                       "The title bar's menu instead of the file items - presets, help, restart, quit"),
-                    R("전체 화면에서 마우스 움직이기", "파일 이름과 단축키를 아래에 잠깐 표시 (그림일 때)",
-                      "Move the mouse in full screen",
-                      "Shows the file name and the keys at the foot for a moment - pictures only"),
                 }),
 
                 new Group(T("이미지", "Images"), new[]
