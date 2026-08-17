@@ -21279,6 +21279,21 @@ public partial class MainWindow : Window
            && _viewerVideoPath is { } playing
            && IsViewerAudio(playing);
 
+    // "A TRACK'S COVER IS ON SCREEN", i.e. the panel is showing a picture that
+    // happens to have arrived inside a sound file (2026-08-17). Asked wherever
+    // the app decides whether there is something to SIZE, because a cover is
+    // sized like any other picture - see UpdateViewerZoomBar for the reversal
+    // this belongs to.
+    //
+    // Source rather than the path alone: a track with no art gets the disc
+    // button and no picture at all, and there is nothing to fit in that.
+    private bool ViewerShowingAudioCover
+        => _pendingViewerPath is { } shown
+           && IsViewerAudio(shown)
+           && ViewerImage.Visibility == Visibility.Visible
+           && ViewerImage.Source is not null
+           && _viewerPixelWidth > 0;
+
     private void ViewerBackgroundChip_Click(object sender, RoutedEventArgs e)
     {
         _settings.ViewerBackgroundPlay = ViewerBackgroundChip.IsChecked == true;
@@ -24361,29 +24376,34 @@ public partial class MainWindow : Window
         // chips into the carousel row above instead would put eight controls on
         // a row that has no thinning device of its own - FitViewerMediaRow
         // belongs to the transport - so a narrow panel would simply clip them.
-        // A TRACK NEVER GETS THIS STRIP, and album art is why the question came
-        // up at all (2026-08-12). Every control on it - 맞춤, 1:1, the zoom
-        // stepper, the navigator - is for examining a picture the user opened.
-        // A cover is not that: it came out of the file with the song, its pixel
-        // size is nowhere on screen, and the caption above it is naming an mp3's
-        // name, weight and date. 1:1 on one offers a crop of a picture nobody
-        // chose to look at.
+        // ALBUM ART GETS THE STRIP TOO (2026-08-17). A track was refused it on
+        // 2026-08-12 on the argument that a cover is not a picture the user
+        // opened - it came out of the file with the song, and 1:1 on one offers a
+        // crop of a picture nobody chose to look at. What that missed is that the
+        // panel already treats it as a picture everywhere else: the wheel zooms
+        // it, a drag pans it, and the navigator maps it. So the only thing the
+        // refusal removed was the three REST states, which left the odd shape the
+        // user reported - "확대·축소와 내비게이터는 되는데 크기조절만 안 된다".
+        // Between one control that is missing and three that are, the missing one
+        // is the mistake.
         //
-        // The band it leaves behind is not empty: the transport stands in it,
-        // parked, whether or not anything is playing - see
-        // UpdateViewerParkedTransport.
-        if (_pendingViewerPath is { } shown && IsViewerAudio(shown))
-        {
-            ViewerZoomBar.Visibility = Visibility.Collapsed;
-            UpdateViewerParkedTransport();
-            return;
-        }
-
-        // A parked bar left over from a track must not survive onto a
-        // photograph's strip.
+        // Nothing about the mechanics needed changing: the cover's own pixels are
+        // what the zoom measures against (see the shell-thumbnail branch), so
+        // 맞춤 and 자름맞춤 mean exactly what they mean for a photograph, and 1:1
+        // means the cover at the size it arrived - modest, not a lie.
+        //
+        // A track with NO cover still gets nothing, and that falls out of
+        // hasImage below rather than needing a rule: the disc button branch never
+        // sets a Source.
+        //
+        // The transport keeps its own row underneath either way - the two have
+        // been able to stand together since background play, where a photograph
+        // is being sized while a track sounds. This is that same pair with one
+        // file instead of two.
         UpdateViewerParkedTransport();
 
-        bool hasImage = _viewerPixelWidth > 0 && ViewerImage.Source is not null && !ViewerMediaIsSelection;
+        bool hasImage = _viewerPixelWidth > 0 && ViewerImage.Source is not null &&
+            (!ViewerMediaIsSelection || ViewerShowingAudioCover);
         ViewerZoomBar.Visibility = hasImage ? Visibility.Visible : Visibility.Collapsed;
         if (!hasImage)
         {
@@ -25322,7 +25342,12 @@ public partial class MainWindow : Window
         // the rest of the chrome and leaves the wheel and the keys as the only
         // way to change the size. The panel keeps its chips, so the row would
         // be a second copy of them there and stays away.
-        bool coveredPicture = _viewerFullscreen && !ViewerMediaIsSelection;
+        // A COVER COUNTS AS THE PICTURE HERE TOO (2026-08-17). Album art now
+        // carries the same three rest states as a photograph, and full screen is
+        // the one place its chips are off screen - so without this the cover
+        // would be the only picture in the app with no way to resize it there.
+        bool coveredPicture = _viewerFullscreen &&
+            (!ViewerMediaIsSelection || ViewerShowingAudioCover);
         ViewerMediaZoomItem.Visibility = movingPicture || coveredPicture
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -25747,7 +25772,11 @@ public partial class MainWindow : Window
         }
 
         ViewerMediaBar.Visibility = Visibility.Visible;
-        ViewerZoomBar.Visibility = Visibility.Collapsed;
+        // The zoom strip is NOT hidden from here any more (2026-08-17): a track
+        // showing a cover is entitled to it, and this method is called from
+        // several places where nothing has asked that question. One owner for
+        // that row - UpdateViewerZoomBar, which is also this method's only
+        // caller that has an answer.
         // The engine is not holding anything, so the readout says so rather
         // than holding the last file's numbers.
         ResetViewerMediaReadout();

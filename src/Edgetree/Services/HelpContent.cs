@@ -506,6 +506,12 @@ public static class HelpContent
                     R("재생 형식", "mp3 · wav · flac · m4a · m4b · aac · wma",
                       "Formats it plays", "mp3 · wav · flac · m4a · m4b · aac · wma"),
                     R("앨범아트 클릭", "재생 · 정지", "Click the album art", "Play · pause"),
+                    // 2026-08-17: 앨범아트도 그림과 같은 조절 줄을 받게 되면서
+                    // 필요해진 줄. 앞의 줄이 "클릭은 재생"이라고 말하므로 크기를
+                    // 어디서 바꾸는지는 바로 옆에 있는 것이 맞다.
+                    R("앨범아트 크기", "그림과 같은 줄에서 맞춤 · 1:1 · 자름맞춤 · 확대 축소",
+                      "Album art size",
+                      "The same row a picture gets - fit, 1:1, crop to fill, and the zoom stepper"),
                     R("컨트롤 패널 왼쪽 두 칩", "백그라운드 재생 · 이어서 재생",
                       "The two chips at the left of the playback controls", "Background play · keep playing"),
                     R("백그라운드 재생", "다른 폴더 이동해도 계속 (끄면 정지 · 파일 해제)",
