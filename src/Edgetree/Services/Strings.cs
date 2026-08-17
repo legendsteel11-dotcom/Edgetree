@@ -740,9 +740,15 @@ public static class Strings
     public static string TrayHide = "트레이로";
     public static string TrayAbout = "정보";
     public static string TrayExit = "종료";
-    // Only present in the tray menu when there is actually a newer release -
-    // no row at all otherwise, and never a balloon.
-    public static string TrayUpdateAvailable = "새 업데이트 - v{0}";
+    // Only present when there is actually a newer release - no row at all
+    // otherwise, and never a balloon. Shared by the tray menu, the tray's
+    // tooltip and (2026-08-17) the options menu's top row: one fact, one wording.
+    // Renamed off Tray* when the third place arrived.
+    public static string UpdateAvailableRow = "새 업데이트 - v{0}";
+    // Where that row goes, shown in the gesture column beside it. Not
+    // translated - it is a hostname, and it is the same one both languages
+    // download from.
+    public static string UpdateSiteHost = "edgetree.vercel.app";
 
     // MessageBox titles/bodies
     public static string PasteFailedTitle = "붙여넣기 실패";
@@ -1177,7 +1183,7 @@ public static class Strings
         TrayHide = "Send to Tray";
         TrayAbout = "About";
         TrayExit = "Exit";
-        TrayUpdateAvailable = "New update - v{0}";
+        UpdateAvailableRow = "New update - v{0}";
 
         PasteFailedTitle = "Paste Failed";
         MoveIntoSelfError = "A folder can't be moved into itself or into one of its own subfolders.";

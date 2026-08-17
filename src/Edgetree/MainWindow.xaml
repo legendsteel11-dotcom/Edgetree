@@ -1733,6 +1733,24 @@
                 Opened="OptionsMenu_Opened"
                 Closed="AnyMenu_Closed"
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
+            <!-- THE NEW VERSION, AT THE TOP AND ONLY WHEN THERE IS ONE
+                 (2026-08-17, on request). The check has been running since
+                 v1.5.0 and it was telling the tray, the tray's tooltip and 앱
+                 정보 - i.e. three places, none of them the menu people actually
+                 open. Same words the tray row uses: two rows describing one fact
+                 in different terms would read as two facts.
+                 The domain sits in the gesture column, where a shortcut would
+                 be, so the row says what it is and the column says where it
+                 goes without the header growing.
+                 Both rows are Collapsed here and shown by OptionsMenu_Opened -
+                 an update that arrives while the app is open reaches the menu on
+                 its next opening, which is the only moment this matters. -->
+            <MenuItem AutomationProperties.AutomationId="optionsUpdate"
+                    InputGestureText="{x:Static services:Strings.UpdateSiteHost}"
+                    Visibility="Collapsed"
+                    Click="UpdateAvailableMenuItem_Click"/>
+            <Separator AutomationProperties.AutomationId="optionsUpdateSeparator"
+                    Visibility="Collapsed"/>
             <!-- One-shot cleanup, unlike the title bar's collapse button (which
                  is a toggle that remembers what was expanded and can restore
                  it). Disabled while nothing is expanded - see

@@ -794,6 +794,21 @@ public partial class MainWindow : Window
     // is far inside GitHub's 60/hour-per-IP limit.
     private async Task CheckForUpdateOnceAsync()
     {
+#if DEBUG
+        // TEST SWITCH, Debug only (2026-08-17). Write a version into
+        // %AppData%\Edgetree\fake-update and the app behaves as though that
+        // release exists. Everything this check drives - the dot, the tooltip,
+        // the tray row and now the options menu's top row - is unreachable on a
+        // machine running the newest build, which is every machine this is
+        // developed on, so the rows could only ever be seen by shipping them
+        // untested. Compiled out of Release entirely.
+        if (ReadFakeUpdateVersion() is { } faked)
+        {
+            ShowUpdateFound(faked);
+            return;
+        }
+#endif
+
         try
         {
             using var http = new System.Net.Http.HttpClient();
@@ -820,15 +835,7 @@ public partial class MainWindow : Window
 
             // Still on the UI thread here - no ConfigureAwait(false) above,
             // deliberately, so these touch the controls safely.
-            UpdateAvailableVersion = latest;
-            UpdateAvailableDot.Visibility = Visibility.Visible;
-            OptionsButton.ToolTip =
-                $"{Strings.ToolTipOptions} — {string.Format(Strings.ToolTipUpdateAvailable, "v" + latest)}";
-
-            // The same news on the tray icon, which is the only part of the app
-            // still on screen once the sidebar is hidden or sent to the tray -
-            // the dot above is behind whichever of those is in effect.
-            (Application.Current as App)?.ShowUpdateAvailable(latest);
+            ShowUpdateFound(latest);
         }
         catch (Exception e) when (e is System.Net.Http.HttpRequestException
             or TaskCanceledException
@@ -839,6 +846,42 @@ public partial class MainWindow : Window
             // 표시만 - a check that can't complete simply doesn't show a dot.
         }
     }
+
+    // Everywhere the news lands, in one place: the dot on the options button, the
+    // button's tooltip, the tray icon and its own tooltip - and the options
+    // menu's top row, which reads the version below when it opens. Written as a
+    // method when the test switch above needed the same five things (2026-08-17).
+    private void ShowUpdateFound(Version version)
+    {
+        UpdateAvailableVersion = version;
+        UpdateAvailableDot.Visibility = Visibility.Visible;
+        OptionsButton.ToolTip =
+            $"{Strings.ToolTipOptions} — {string.Format(Strings.ToolTipUpdateAvailable, "v" + version)}";
+
+        // The same news on the tray icon, which is the only part of the app
+        // still on screen once the sidebar is hidden or sent to the tray -
+        // the dot above is behind whichever of those is in effect.
+        (Application.Current as App)?.ShowUpdateAvailable(version);
+    }
+
+#if DEBUG
+    private static Version? ReadFakeUpdateVersion()
+    {
+        try
+        {
+            string path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Edgetree", "fake-update");
+            return File.Exists(path) && Version.TryParse(File.ReadAllText(path).Trim(), out var version)
+                ? version
+                : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+#endif
 
     // The newer release CheckForUpdateOnceAsync found, if any - read by the
     // About window (both the menu path here and App's tray path) to show its
@@ -7978,7 +8021,7 @@ public partial class MainWindow : Window
             update.Visibility = updateRows;
             if (UpdateAvailableVersion is { } version)
             {
-                update.Header = string.Format(Strings.TrayUpdateAvailable, version);
+                update.Header = string.Format(Strings.UpdateAvailableRow, version);
             }
         }
 
@@ -8011,6 +8054,11 @@ public partial class MainWindow : Window
 
     private void TrayUpdateMenuItem_Click(object sender, RoutedEventArgs e)
         => (Application.Current as App)?.OpenReleasesPageFromTray();
+
+    // The options menu's twin of the row above. Its own utm source, so the two
+    // routes can be told apart - see OpenReleasesPage.
+    private void UpdateAvailableMenuItem_Click(object sender, RoutedEventArgs e)
+        => (Application.Current as App)?.OpenReleasesPageFromMenu();
 
     private void TrayToggleMenuItem_Click(object sender, RoutedEventArgs e)
         => (Application.Current as App)?.ToggleMainWindowFromTray();
@@ -8125,6 +8173,33 @@ public partial class MainWindow : Window
         // AutomationId rather than Tag: Tag is already spoken for in this menu -
         // the MenuItem template reads it to reserve the check column
         // ("reserve-check-column"), so identity had to live somewhere else.
+        // The update rows first, and OUTSIDE the conjunction below on purpose:
+        // that chain is all-or-nothing by design, and a row about a new version
+        // must not be able to take the whole menu's state down with it if its id
+        // is ever renamed. Same shape as the tray's own handling.
+        if (sender is ContextMenu updateHost)
+        {
+            var updateRow = FindMenuItem(updateHost, "optionsUpdate");
+            var updateSeparator = updateHost.Items.OfType<Separator>().FirstOrDefault(item =>
+                System.Windows.Automation.AutomationProperties.GetAutomationId(item) == "optionsUpdateSeparator");
+            var updateVisibility = UpdateAvailableVersion is null
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            if (updateRow is not null)
+            {
+                updateRow.Visibility = updateVisibility;
+                if (UpdateAvailableVersion is { } newVersion)
+                {
+                    updateRow.Header = string.Format(Strings.UpdateAvailableRow, newVersion);
+                }
+            }
+
+            if (updateSeparator is not null)
+            {
+                updateSeparator.Visibility = updateVisibility;
+            }
+        }
+
         if (sender is ContextMenu menu &&
             FindMenuItem(menu, "collapseAllExpanded") is { } collapseAllExpanded &&
             FindMenuItem(menu, "generalSettings") is { } generalSettings &&

@@ -77,7 +77,7 @@ public partial class App : Application
         // 63 characters is the hard limit on a tray tooltip; the app name plus
         // a short version cannot reach it, but the format string is
         // translatable, so it is trimmed rather than trusted.
-        string tip = $"Edgetree — {string.Format(Strings.TrayUpdateAvailable, version)}";
+        string tip = $"Edgetree — {string.Format(Strings.UpdateAvailableRow, version)}";
         _trayIcon.Text = tip.Length <= 63 ? tip : tip[..63];
 
         if (_trayBaseIcon is not null && _trayUpdateIcon is null)
@@ -155,7 +155,12 @@ public partial class App : Application
     // release anyway. It is also ours, so the visit is measurable - hence the
     // utm_source, without which this cannot be told apart from any other
     // referrer.
-    private static void OpenReleasesPage()
+    // The SOURCE is a parameter as of 2026-08-17, when the options menu became a
+    // second way in. The utm exists to make these visits measurable, and one
+    // label for two routes would answer "did anyone click it" while hiding which
+    // row they clicked - the tray's, which is on screen even when the app is not,
+    // or the menu's, which is where someone already using the app would find it.
+    private static void OpenReleasesPage(string source)
     {
         try
         {
@@ -165,7 +170,7 @@ public partial class App : Application
                 // part of the fragment and it never reaches analytics.
                 // #download is DownloadSection.vue's own id, and it lands on
                 // the update-history card that sits just above the buttons.
-                FileName = "https://edgetree.vercel.app/?utm_source=app-tray#download",
+                FileName = $"https://edgetree.vercel.app/?utm_source={source}#download",
                 UseShellExecute = true
             });
         }
@@ -354,7 +359,9 @@ public partial class App : Application
     // Reached from the tray menu, which now lives in MainWindow's resources -
     // the actions stay here because they are the application's, not the
     // window's, and two of them run with no window on screen at all.
-    internal void OpenReleasesPageFromTray() => OpenReleasesPage();
+    internal void OpenReleasesPageFromTray() => OpenReleasesPage("app-tray");
+
+    internal void OpenReleasesPageFromMenu() => OpenReleasesPage("app-menu");
 
     internal void ToggleMainWindowFromTray() => ToggleMainWindowTray();
 
