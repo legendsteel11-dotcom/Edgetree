@@ -3570,7 +3570,11 @@
                     Value="20000"/>
             <Setter Property="ToolTip">
                 <Setter.Value>
-                    <ToolTip Content="{Binding FullPath}"
+                    <!-- TooltipPath, not FullPath: the 더 보기 · 접기 row shares
+                         this style and has no path of its own, so the model
+                         answers with its parent's. Identical for every real
+                         row. -->
+                    <ToolTip Content="{Binding TooltipPath}"
                             FontSize="{Binding PlacementTarget.FontSize, RelativeSource={RelativeSource Self}}"/>
                 </Setter.Value>
             </Setter>
@@ -3665,6 +3669,15 @@
                      row that caps oversized folders (FileSystemItem.DisplayCap);
                      clicking it reveals the rest (see
                      TreeViewItem_PreviewMouseLeftButtonDown). -->
+                <!-- IT SAYS WHOSE LIST IT IS (2026-08-17, on request). Two of
+                     these rows can sit a line apart - one folder's overflow
+                     under another's - and with nested folders of the same name
+                     there was nothing on the row to tell them apart. Selecting
+                     the owning folder on a press (03d96e2) answers it after the
+                     fact; the tooltip answers before. The alternative recorded
+                     that day was printing the name in the row itself, and its
+                     cost was the row getting longer - a tooltip costs nothing
+                     until it is asked for. -->
                 <TextBlock x:Name="ShowMoreText"
                            Grid.Column="1"
                            Text="{Binding ShowMoreLabel}"
@@ -3672,6 +3685,7 @@
                            VerticalAlignment="Center"
                            Visibility="Collapsed"
                            FontStyle="Italic"
+                           Style="{StaticResource RowPathTooltip}"
                            TextTrimming="CharacterEllipsis"/>
                 <!-- Shown only when this folder has its own remembered sort
                      (HasSortOverride - see FileSystemItem and

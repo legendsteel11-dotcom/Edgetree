@@ -79,6 +79,18 @@ public class FileSystemItem : INotifyPropertyChanged
     public string ShowMoreLabel => string.Format(
         IsShowLess ? Strings.ShowLessFormat : Strings.ShowMoreFormat, RemainingCount);
 
+    // WHAT A ROW'S TOOLTIP SAYS (2026-08-17). Its own path for a real row; for
+    // the synthetic 더 보기 · 접기 row, the PARENT's - that row has no path of its
+    // own, and the question someone hovers it with is which folder this list
+    // belongs to. Two rows of the same label can sit two lines apart with
+    // different indents (one folder's overflow under another's), and nested
+    // folders of the SAME NAME made that unreadable; the answer is the path.
+    //
+    // Decided here rather than with a second tooltip style so the delay and the
+    // duration stay written once - see RowPathTooltip in MainWindow.xaml, which
+    // both rows now share.
+    public string TooltipPath => IsShowMore ? Parent?.FullPath ?? string.Empty : FullPath;
+
     // Drive roots (FileSystemService.GetDriveRoots) are the only items ever
     // constructed with no parent - used to bold their row (C:, D:, ...).
     public bool IsRoot => Parent is null;
