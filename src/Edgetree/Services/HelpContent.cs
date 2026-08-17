@@ -268,6 +268,15 @@ public static class HelpContent
                 {
                     R("아래쪽 필터 버튼 줄", "종류별 필터링",
                       "The filter buttons at the bottom", "Show only some kinds of file"),
+                    // 동작이 바뀐 것을 적는 줄 (2026-08-17). 필터를 변경하면 트리가
+                    // 접히고 맨 위로 가는데, 그것을 알리는 곳이 어디에도 없었다.
+                    //
+                    // 처음에는 "보던 위치는 북마크로 복귀"를 괄호로 붙였고 사용자가
+                    // 바로 뺐다. 되돌리는 방법을 같은 줄에 적는 것은 **잃은 것에
+                    // 대한 변명으로 읽힌다** - 도움말은 동작을 적는 자리이고, 사용자를
+                    // 달래는 자리가 아니다. 사실만 적는다.
+                    R("필터 변경 시", "트리를 접고 맨 위로 이동",
+                      "When a filter changes", "The tree folds and goes to the top"),
                     R("필터 버튼 → 사용자 지정", "확장자 직접 입력 ( *. 없이 쉼표로 구분해서 여러 개 입력)",
                       "A filter button → Custom",
                       "Type the extensions yourself - no *. , and comma-separated for several"),
