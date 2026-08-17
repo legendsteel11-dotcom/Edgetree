@@ -184,6 +184,14 @@ public static class HelpContent
                 {
                     R("↑ ↓", "위 · 아래 행 이동", "↑ ↓", "Previous · next row"),
                     R("← →", "접기 · 펼치기", "← →", "Collapse · expand"),
+                    // 2026-08-17: 열린 폴더를 눌러도 안 접히게 바뀌었으므로 이
+                    // 두 줄이 필요해졌다. 접는 방법이 둘(다시 누르기 · 꺽쇠)이고
+                    // 어느 쪽도 화면에 안 적혀 있다.
+                    R("폴더 클릭", "접힌 폴더는 펼치기 · 열린 폴더는 선택만, 다시 누르면 접기",
+                      "Clicking a folder",
+                      "A closed folder opens; an open one is only selected - press it again to close"),
+                    R("꺽쇠 클릭", "누를 때마다 바로 접기 · 펼치기",
+                      "Clicking the chevron", "Opens and closes on every press"),
                     // Named for the places rather than for the rows: it moves
                     // between folders you have been in, not between every row
                     // you clicked, and someone who expects the second one will

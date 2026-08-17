@@ -13976,9 +13976,33 @@ public partial class MainWindow : Window
         if (!clickedOnExpander && !clickedInIndent && e.ClickCount == 1 &&
             treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsDirectory: true, IsEditing: false } item)
         {
+            // ARRIVING AT AN OPEN FOLDER ONLY SELECTS IT (2026-08-17, 사용자
+            // 제안). Clicking an already-open folder used to shut it, so going
+            // to a folder - to make it the panel's folder, to paste into it, to
+            // read where you are - cost the view of what is inside it, and
+            // getting that back cost a second click. Closing is now the SECOND
+            // click, and a closed folder still opens on the first: the direction
+            // that reveals happens immediately, the direction that takes
+            // something away asks twice.
+            //
+            // "Second click" means "this row was already selected", which is the
+            // same definition the rename gesture below uses - IsSelected still
+            // reads the PRE-click state here, this being the tunneling preview.
+            // No new state, and no timer: the row you are standing on is the one
+            // a click can close.
+            //
+            // The CHEVRON is untouched (clickedOnExpander is excluded from this
+            // whole path): it is the explicit control for open/shut, and an
+            // explicit control must not need two presses.
+            bool arrivingAtOpenFolder = treeViewItem.IsExpanded && !treeViewItem.IsSelected;
+
             treeViewItem.IsSelected = true;
-            _deferredExpandItem = item;
-            _deferredExpandPressPoint = e.GetPosition(ExplorerTree);
+
+            if (!arrivingAtOpenFolder)
+            {
+                _deferredExpandItem = item;
+                _deferredExpandPressPoint = e.GetPosition(ExplorerTree);
+            }
         }
 
         // Explorer-style "slow double-click" rename. Files only: a click on a
