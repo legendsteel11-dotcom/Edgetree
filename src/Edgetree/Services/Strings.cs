@@ -415,6 +415,11 @@ public static class Strings
     // 대신 `바탕화면`인 것이 요점 - 앱 전체화면 자체가 이미 "화면"을 쓰고 있어서
     // 그 말로는 둘이 구분되지 않는다.
     public static string ViewerFullDesktop = "바탕화면 전체";
+    // 들어가고 나오는 문. 지금까지 휠클릭 하나뿐이었고, 그건 배워야 아는 것이라
+    // 이 모드가 있다는 사실 자체가 안 보였다 (2026-08-17). 단축키를 아는 사람은
+    // 계속 그걸 쓰면 되고, 이 행은 처음 쓰는 사람을 위한 것이다. 바로 아래
+    // 바탕화면 전체와 짝이 되도록 그 위에 둔다 - 위가 모드, 아래가 그 범위.
+    public static string ViewerFullscreen = "앱 전체화면";
     public static string MenuImageViewer = "멀티미디어 패널";
     // 캐싱 rather than 미리 불러오기, reversing the earlier choice to name it for
     // what it does instead of for the machinery: 캐싱 is the word Korean users
@@ -1022,6 +1027,7 @@ public static class Strings
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
         ViewerFilmstrip = "Thumbnail bar";
+        ViewerFullscreen = "Full screen";
         ViewerFullDesktop = "Fill the desktop";
         MenuImageViewer = "Multimedia panel";
         MenuPrecacheThumbnails = "Preload image thumbnails";

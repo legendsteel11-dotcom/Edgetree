@@ -779,6 +779,16 @@ public class AppSettings
     // is skipped when cycling, not an error.
     public List<string> BookmarkPaths { get; set; } = new();
 
+    // 앱 전체화면 상태. 패널이 트리의 자리까지 가져가고 헤더가 사라진 그 모드에
+    // 있었는가 (2026-08-17).
+    //
+    // 여기 담기는 것은 **앱 전체화면뿐이고, 창을 최대화하는 쪽은 복원하지 않는다.**
+    // 바탕화면 전체는 그 자체로 별도의 옵션(ViewerFullscreenFillsDesktop)이고 그
+    // 옵션은 원래 저장되지만, 다시 켤 때 그것까지 되살리면 앱이 바탕화면을 통째로
+    // 덮은 채 올라온다 - 이 앱은 스스로 다시 시작하는 경로가 있어서 사용자가 부르지
+    // 않은 순간에 그 일이 일어날 수 있다.
+    public bool ViewerFullscreen { get; set; } = false;
+
     // 새 그림이 도착할 때의 크기: "fit" · "actual" · "fill" (맞춤 · 1:1 · 자름맞춤).
     //
     // 2026-08-09에는 세션 한정이었고, 그때 적어 둔 이유는 **휠과 +/-를 기억하지

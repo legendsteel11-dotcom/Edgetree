@@ -6395,61 +6395,6 @@
                                         Header="{x:Static services:Strings.MenuSetWallpaper}"
                                         Tag="file"
                                         Click="ViewerSetWallpaper_Click"/>
-                                <!-- 슬라이드 쇼, on the picture rather than in
-                                     the options menu (moved 2026-08-14, the
-                                     user's call and the right one): it is a
-                                     thing done TO the pictures on screen, and
-                                     the hand is already here. Present only
-                                     while there is a set to walk - two or more
-                                     images in the folder - which is this
-                                     menu's own convention throughout: absent,
-                                     never greyed, for anything the panel
-                                     cannot do (see 배경 설정 above).
-                                     PICTURES only, which comes for free: the
-                                     set it walks is the carousel's, and a film
-                                     or a track has its own length and its own
-                                     transport. -->
-                                <Separator x:Name="ViewerSlideshowSeparator"
-                                        Visibility="Collapsed"/>
-                                <MenuItem x:Name="ViewerSlideshowItem"
-                                        Header="{x:Static services:Strings.MenuSlideshow}"
-                                        InputGestureText="F8"
-                                        IsCheckable="True"
-                                        Visibility="Collapsed"
-                                        Click="SlideshowMenuItem_Click"/>
-                                <MenuItem x:Name="ViewerSlideshowSecondsRow"
-                                        StaysOpenOnClick="True"
-                                        Focusable="False"
-                                        Visibility="Collapsed"
-                                        Padding="{DynamicResource MenuStepperRowPadding}">
-                                    <MenuItem.Header>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0"
-                                                    Text="{x:Static services:Strings.MenuSlideshowSeconds}"
-                                                    Foreground="{DynamicResource MenuForeground}"
-                                                    VerticalAlignment="Center"
-                                                    Margin="0,0,8,0"/>
-                                            <StackPanel Grid.Column="1"
-                                                    Orientation="Horizontal">
-                                                <Button Content="−"
-                                                        Style="{StaticResource MenuStepperButtonStyle}"
-                                                        Click="SlideshowSecondsDecrement_Click"/>
-                                                <TextBlock Text="5"
-                                                        Foreground="{DynamicResource MenuForeground}"
-                                                        Width="34"
-                                                        TextAlignment="Center"
-                                                        VerticalAlignment="Center"/>
-                                                <Button Content="+"
-                                                        Style="{StaticResource MenuStepperButtonStyle}"
-                                                        Click="SlideshowSecondsIncrement_Click"/>
-                                            </StackPanel>
-                                        </Grid>
-                                    </MenuItem.Header>
-                                </MenuItem>
                                 <!-- The playback group, shown only while a film
                                      is up. Play/pause and back-to-start are
                                      here as well as in the strip because a
@@ -6690,6 +6635,20 @@
                                         IsCheckable="True"
                                         Visibility="Collapsed"
                                         Click="ViewerFilmstripMenuItem_Click"/>
+                                <!-- THE DOOR ITSELF (2026-08-17). The mode had
+                                     one way in and out - middle-click on the
+                                     picture - which is a thing you have to be
+                                     told about, so the mode was invisible to
+                                     anyone who had not been. The key stays; this
+                                     row is for the first time.
+                                     Directly above 바탕화면 전체 because the two
+                                     are a pair read downward: the mode, then how
+                                     far it reaches. -->
+                                <MenuItem x:Name="ViewerFullscreenItem"
+                                        Header="{x:Static services:Strings.ViewerFullscreen}"
+                                        IsCheckable="True"
+                                        Visibility="Collapsed"
+                                        Click="ViewerFullscreenMenuItem_Click"/>
                                 <!-- HOW FAR 앱 전체화면 REACHES, in the mode where
                                      there is a choice (2026-08-17, the author's
                                      shape: keep the key, put the SCOPE on a
@@ -6707,6 +6666,67 @@
                                         IsCheckable="True"
                                         Visibility="Collapsed"
                                         Click="ViewerFullDesktopMenuItem_Click"/>
+                                <!-- BELOW THE TWO FULL-SCREEN ROWS (2026-08-17).
+                                     The 간격 stepper is a wide row with its own
+                                     controls, and with the plain rows following
+                                     it the group's left edge stepped in and out.
+                                     Plain rows first, the stepper last, so the
+                                     block reads as one column.
+                                     슬라이드 쇼, on the picture rather than in
+                                     the options menu (moved 2026-08-14, the
+                                     user's call and the right one): it is a
+                                     thing done TO the pictures on screen, and
+                                     the hand is already here. Present only
+                                     while there is a set to walk - two or more
+                                     images in the folder - which is this
+                                     menu's own convention throughout: absent,
+                                     never greyed, for anything the panel
+                                     cannot do (see 배경 설정 above).
+                                     PICTURES only, which comes for free: the
+                                     set it walks is the carousel's, and a film
+                                     or a track has its own length and its own
+                                     transport. -->
+                                <Separator x:Name="ViewerSlideshowSeparator"
+                                        Visibility="Collapsed"/>
+                                <MenuItem x:Name="ViewerSlideshowItem"
+                                        Header="{x:Static services:Strings.MenuSlideshow}"
+                                        InputGestureText="F8"
+                                        IsCheckable="True"
+                                        Visibility="Collapsed"
+                                        Click="SlideshowMenuItem_Click"/>
+                                <MenuItem x:Name="ViewerSlideshowSecondsRow"
+                                        StaysOpenOnClick="True"
+                                        Focusable="False"
+                                        Visibility="Collapsed"
+                                        Padding="{DynamicResource MenuStepperRowPadding}">
+                                    <MenuItem.Header>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                    Text="{x:Static services:Strings.MenuSlideshowSeconds}"
+                                                    Foreground="{DynamicResource MenuForeground}"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,8,0"/>
+                                            <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal">
+                                                <Button Content="−"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="SlideshowSecondsDecrement_Click"/>
+                                                <TextBlock Text="5"
+                                                        Foreground="{DynamicResource MenuForeground}"
+                                                        Width="34"
+                                                        TextAlignment="Center"
+                                                        VerticalAlignment="Center"/>
+                                                <Button Content="+"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="SlideshowSecondsIncrement_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </MenuItem.Header>
+                                </MenuItem>
                                 <!-- Both rows appear only when a subtitle file
                                      was actually found beside the film - there
                                      is nothing to switch on or size otherwise,
