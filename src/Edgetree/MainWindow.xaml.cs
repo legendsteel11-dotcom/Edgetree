@@ -4986,6 +4986,11 @@ public partial class MainWindow : Window
         Grid.SetRow(BookmarkPanelList, _settings.FavoritesAtBottom ? 3 : 1);
         Grid.SetRow(ExplorerTree, _settings.FavoritesAtBottom ? 1 : 3);
 
+        // The drop line rides with the list it draws into. Its predecessor was
+        // left behind in row 1 (it was declared there and nothing moved it), so
+        // with 아래에 표시 on it would have drawn its line across the tree.
+        Grid.SetRow(BookmarkDropIndicator, _settings.FavoritesAtBottom ? 3 : 1);
+
         // The favorites-hosting row keeps whatever height the logic below
         // gives it (collapsed/fit/dragged); the other one just needs to fill
         // the rest.
@@ -15753,11 +15758,22 @@ public partial class MainWindow : Window
     {
         var pressed = _bookmarkPressRow;
         var pressPoint = _bookmarkPressPoint;
+        bool dragged = _bookmarkDragActive;
+        int dropIndex = _bookmarkDropIndex;
         _bookmarkPressRow = null;
         _bookmarkPressPoint = null;
+        EndBookmarkDrag();
 
         if (pressed is null)
         {
+            return;
+        }
+
+        // A press that became a drag is a reorder, not a click - it must not
+        // also jump the tree on the way out.
+        if (dragged)
+        {
+            CommitBookmarkReorder(pressed, dropIndex);
             return;
         }
 
@@ -15788,13 +15804,218 @@ public partial class MainWindow : Window
     }
 
     // So the context menu acts on the row under the cursor rather than on
-    // whatever was selected before - same reason the favorites list does it.
+    // whatever was selected before.
     private void BookmarkPanelItem_PreviewMouseRightButtonDown(object sender, RoutedEventArgs e)
     {
         if (sender is ListBoxItem item)
         {
             item.IsSelected = true;
         }
+    }
+
+    // ----- 북마크 드래그 재정렬 --------------------------------------------
+    //
+    // 2026-08-02에 일부러 안 넣었던 것이다. 근거는 "순서가 곧 Ctrl+Alt+L 순환
+    // 순서라 끌어 옮기면 단축키가 소리 없이 바뀐다"였고, 대신 순서를 번호로
+    // 보여 주는 쪽을 골랐다. 다시 넣는 이유는 조건이 그때와 다르기 때문이다 -
+    // 그 번호가 화면에 있으므로 소리 없이 바뀌지 않는다. 놓는 순간 번호가 그
+    // 자리에서 다시 매겨지는 것이 곧 "단축키가 이렇게 바뀌었다"는 말이다.
+    // 순환이 서 있던 자리는 위치가 아니라 경로를 따라간다(CommitBookmarkReorder).
+    //
+    // 손잡이는 없다: 행 자체가 대상이고, 클릭과 드래그는 움직인 거리로 가른다
+    // (트리의 드래그 아웃과 같은 규칙). 좁은 행에 손잡이를 그리면 상시 시각
+    // 잡음이 되고 같은 동작의 과녁이 오히려 작아진다.
+    //
+    // DragDrop.DoDragDrop이 아니라 마우스 캡처인 것도 그대로다 - 이 제스처는
+    // 목록 밖으로 나가지 않고, OLE 드래그 루프는 이 앱에서 실제로 값을 치른
+    // 쪽이다(붙잡힌 캡처, 유령 자기 드롭). 캡처는 버튼 업과 LostMouseCapture
+    // 양쪽에서 풀고, 그 아래에 앱의 캡처 감시자가 한 겹 더 있다.
+    private bool _bookmarkDragActive;
+    private int _bookmarkDropIndex = -1;
+
+    private void BookmarkPanelList_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed ||
+            _bookmarkPressRow is null ||
+            _bookmarkPressPoint is not { } start)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(BookmarkPanelList);
+        if (!_bookmarkDragActive)
+        {
+            // Below the system's own drag threshold this is still a click - a
+            // few pixels of travel while pressing is normal, especially on a
+            // high-DPI screen with a fast mouse.
+            if (Math.Abs(current.X - start.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(current.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance)
+            {
+                return;
+            }
+            if (_bookmarkPanelRows.Count < 2)
+            {
+                return;
+            }
+
+            _bookmarkDragActive = true;
+            BookmarkPanelList.CaptureMouse();
+        }
+
+        // Dragged off the list entirely (onto the tree below, most often):
+        // that cancels, it does not drop at the nearest end. The cursor being
+        // past the last row means "the end of the list" only while it is still
+        // over the list - outside it, the gesture has left, and dumping the row
+        // at the bottom on release is a move nobody asked for.
+        bool overList =
+            current.X >= 0 && current.X <= BookmarkPanelList.ActualWidth &&
+            current.Y >= 0 && current.Y <= BookmarkPanelList.ActualHeight;
+
+        UpdateBookmarkDropIndicator(overList ? ComputeBookmarkDropIndex(current) : -1);
+
+        // The ListBox must not see this move. It reads mouse movement while it
+        // holds capture as its own drag-selection - and the capture here is
+        // OURS, taken for the reorder - so dragging a row down past the list
+        // was quietly selecting whichever item was nearest the cursor (the last
+        // one). Handling the preview event suppresses the bubbling MouseMove
+        // entirely, which is what Selector acts on.
+        e.Handled = true;
+    }
+
+    // Capture can also be taken away (another window activating, a system
+    // dialog): the drag ends where it stands rather than reordering on a
+    // release that never came.
+    private void BookmarkPanelList_LostMouseCapture(object sender, System.Windows.Input.MouseEventArgs e)
+        => EndBookmarkDrag();
+
+    private void EndBookmarkDrag()
+    {
+        bool wasDragging = _bookmarkDragActive;
+
+        _bookmarkDragActive = false;
+        _bookmarkDropIndex = -1;
+        BookmarkDropIndicator.Visibility = Visibility.Collapsed;
+
+        // Checked first: releasing capture raises LostMouseCapture, which lands
+        // right back here.
+        if (wasDragging && BookmarkPanelList.IsMouseCaptured)
+        {
+            BookmarkPanelList.ReleaseMouseCapture();
+        }
+    }
+
+    // Where the dragged row would be inserted: the first row whose middle the
+    // cursor is above, or the end of the list. Using the midpoint is what makes
+    // the indicator move only as a row boundary is actually crossed, so jitter
+    // within one row never changes anything.
+    private int ComputeBookmarkDropIndex(System.Windows.Point pointInList)
+    {
+        int count = _bookmarkPanelRows.Count;
+        for (int i = 0; i < count; i++)
+        {
+            if (BookmarkPanelList.ItemContainerGenerator.ContainerFromIndex(i) is not ListBoxItem container)
+            {
+                continue;
+            }
+
+            double top = container.TransformToAncestor(BookmarkPanelList).Transform(new System.Windows.Point(0, 0)).Y;
+            if (pointInList.Y < top + container.ActualHeight / 2)
+            {
+                return i;
+            }
+        }
+        return count;
+    }
+
+    private void UpdateBookmarkDropIndicator(int dropIndex)
+    {
+        if (dropIndex == _bookmarkDropIndex)
+        {
+            return;
+        }
+        _bookmarkDropIndex = dropIndex;
+
+        // -1 is "nowhere to drop" (the cursor has left the list): no line, and
+        // CommitBookmarkReorder leaves the order alone when it sees it.
+        if (dropIndex < 0 || BookmarkDropIndicatorOffset(dropIndex) is not { } offset)
+        {
+            BookmarkDropIndicator.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // Centred on the boundary rather than hanging below it.
+        BookmarkDropIndicator.Margin = new Thickness(0, Math.Max(0, offset - 1), 0, 0);
+        BookmarkDropIndicator.Visibility = Visibility.Visible;
+    }
+
+    private double? BookmarkDropIndicatorOffset(int dropIndex)
+    {
+        int count = _bookmarkPanelRows.Count;
+        if (count == 0)
+        {
+            return 0;
+        }
+
+        if (dropIndex < count)
+        {
+            return BookmarkPanelList.ItemContainerGenerator.ContainerFromIndex(dropIndex) is ListBoxItem container
+                ? container.TransformToAncestor(BookmarkPanelList).Transform(new System.Windows.Point(0, 0)).Y
+                : null;
+        }
+
+        return BookmarkPanelList.ItemContainerGenerator.ContainerFromIndex(count - 1) is ListBoxItem last
+            ? last.TransformToAncestor(BookmarkPanelList).Transform(new System.Windows.Point(0, 0)).Y + last.ActualHeight
+            : null;
+    }
+
+    private void CommitBookmarkReorder(BookmarkPanelRow row, int dropIndex)
+    {
+        var paths = _settings.BookmarkPaths;
+        int from = paths.FindIndex(p => string.Equals(p, row.Path, StringComparison.OrdinalIgnoreCase));
+        if (from < 0 || dropIndex < 0)
+        {
+            return;
+        }
+
+        // The insertion index was measured with the dragged row still in place,
+        // so removing it first shifts everything after it up one.
+        int to = dropIndex > from ? dropIndex - 1 : dropIndex;
+        if (to == from)
+        {
+            return;
+        }
+
+        // WHERE THE CYCLE WAS STANDING IS A PATH, NOT A NUMBER. Ctrl+Alt+L
+        // counts from an index into this very list, so leaving the index alone
+        // across a reorder would move the cycle to whatever row slid into that
+        // position - the "소리 없이 바뀐다" the 2026-08-02 note was about. The
+        // row it was on is remembered here and found again below.
+        string? standingOn = _bookmarkCycleIndex >= 0 && _bookmarkCycleIndex < paths.Count
+            ? paths[_bookmarkCycleIndex]
+            : null;
+
+        paths.RemoveAt(from);
+        paths.Insert(to, row.Path);
+
+        if (standingOn is not null)
+        {
+            _bookmarkCycleIndex = paths.FindIndex(p =>
+                string.Equals(p, standingOn, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Saved immediately, same reasoning as adding one: a deliberate
+        // arrangement whose whole point is that it persists.
+        _settingsService.Save(_settings);
+
+        // Rebuilt rather than moved: the numbers ARE positions, so every row
+        // between the two ends renumbers anyway. The rebuild also re-selects
+        // whatever the tree is standing on (SyncBookmarkPanelToSelection), so
+        // the moved row is picked out again afterwards - the selection belongs
+        // to the row that was just carried, whatever the list decided while the
+        // cursor was travelling over it.
+        RebuildBookmarkPanelRows();
+        BookmarkPanelList.SelectedItem = _bookmarkPanelRows.FirstOrDefault(r =>
+            string.Equals(r.Path, row.Path, StringComparison.OrdinalIgnoreCase));
     }
 
     private void RemoveBookmarkFromPanel_Click(object sender, RoutedEventArgs e)

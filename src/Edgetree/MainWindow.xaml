@@ -4987,7 +4987,25 @@
                     ItemContainerStyle="{StaticResource BookmarkPanelItemStyle}"
                     Visibility="Collapsed"
                     PreviewMouseLeftButtonDown="BookmarkPanelList_PreviewMouseLeftButtonDown"
-                    PreviewMouseLeftButtonUp="BookmarkPanelList_PreviewMouseLeftButtonUp"/>
+                    PreviewMouseMove="BookmarkPanelList_PreviewMouseMove"
+                    PreviewMouseLeftButtonUp="BookmarkPanelList_PreviewMouseLeftButtonUp"
+                    LostMouseCapture="BookmarkPanelList_LostMouseCapture"/>
+
+            <!-- Where a dragged bookmark would land. Sits over the list rather
+                 than inside the item template so it can be drawn BETWEEN two
+                 rows, and never takes a hit-test - the drag needs every mouse
+                 event to keep reaching the list underneath. Positioned from
+                 code (북마크 드래그 재정렬 region). -->
+            <Border x:Name="BookmarkDropIndicator"
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    Height="2"
+                    Margin="0"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Stretch"
+                    Background="{DynamicResource AccentForeground}"
+                    IsHitTestVisible="False"
+                    Visibility="Collapsed"/>
 
             <!-- The splitter row's VISIBLE part is exactly this 1px divider -
                  which is why the tree's scrollbar (and first row) start flush
