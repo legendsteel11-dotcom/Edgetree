@@ -12158,6 +12158,18 @@ public partial class MainWindow : Window
             SecondaryFontSize(ExplorerTree.FontSize, stepsDown: 3, floor: 9.0);
         Resources["FooterChipFontSize"] = chipFontSize;
 
+        // 지금 재생 중 줄은 칩 사다리가 아니라 이름 사다리에 있다 (2026-08-17,
+        // 사용자 요청). 이 줄은 훑는 글자가 아니라 읽는 글자다 - 곡 이름이고, 앱
+        // 전체화면에서는 캡션이 사라지므로 화면에 남는 유일한 이름이다. 나머지
+        // 칩들은 그대로 두어야 띠가 한 벌로 읽힌다.
+        //
+        // 처음엔 칩(주 텍스트 −3)에 1을 얹었는데 14pt에서 11 → 12라 사용자가
+        // 차이를 못 알아봤다. 사다리를 잘못 고른 것이고, 파일 이름에서 한 단계
+        // 내려온 자리(−1)가 이 줄의 뜻에 맞는다. SecondaryFontSize의 clamp가
+        // 작은 단계에서 주 텍스트를 넘지 않게 막는다.
+        Resources["ViewerNowPlayingFontSize"] =
+            SecondaryFontSize(ExplorerTree.FontSize, stepsDown: 1, floor: 9.0);
+
         // The box AROUND the label, on the compact curve. The label followed the
         // zoom and its padding did not, so on a narrow sidebar at a small font
         // the chips kept their old width and went on wrapping to four lines -

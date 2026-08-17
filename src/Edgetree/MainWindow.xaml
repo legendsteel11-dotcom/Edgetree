@@ -302,6 +302,11 @@
         <system:Double x:Key="HeaderGlyphBox">18</system:Double>
         <GridLength x:Key="HeaderRowHeight">36</GridLength>
         <system:Double x:Key="FooterChipFontSize">9</system:Double>
+        <!-- 지금 재생 중 줄은 칩이 아니라 이름이라 파일 이름에서 한 단계 내려온
+             자리에 있다 - 앱 전체화면에서는 화면에 남는 유일한 이름이다. 계산과
+             주 텍스트를 넘지 않게 하는 clamp는 ApplyLayoutMetrics에 있다.
+             11은 기본 글꼴(12pt)에서의 값. -->
+        <system:Double x:Key="ViewerNowPlayingFontSize">11</system:Double>
         <!-- The chip's own box and the gap to its neighbour. Literals on the
              three chip templates until 2026-08-15, which left the strip's text
              following Ctrl +/- while the padding around it did not - so at a
@@ -8402,7 +8407,7 @@
                                 <TextBlock x:Name="ViewerNowPlaying"
                                         Background="Transparent"
                                         Cursor="Hand"
-                                        FontSize="{DynamicResource FooterChipFontSize}"
+                                        FontSize="{DynamicResource ViewerNowPlayingFontSize}"
                                         Foreground="{DynamicResource ForegroundText}"
                                         TextAlignment="Center"
                                         TextTrimming="CharacterEllipsis"
