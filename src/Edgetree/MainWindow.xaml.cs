@@ -871,6 +871,13 @@ public partial class MainWindow : Window
         }
         SetBrushColor("FileNameForeground", light ? _settings.LightFileNameColorHex : _settings.FileNameColorHex);
         SetBrushColor("FileNameHighlightForeground", light ? _settings.LightFileNameHighlightColorHex : _settings.FileNameHighlightColorHex);
+        // 즐겨찾기·북마크 패널의 행 이름 셋. The panel used the folder brushes until
+        // 2026-08-17, i.e. no palette could tell the list from the tree beneath
+        // it; the hover twin is written beside the other two rather than in the
+        // hover block below, since the three are one group in the colour window.
+        SetBrushColor("PanelNameForeground", light ? _settings.LightPanelNameColorHex : _settings.PanelNameColorHex);
+        SetBrushColor("PanelNameHighlightForeground", light ? _settings.LightPanelNameHighlightColorHex : _settings.PanelNameHighlightColorHex);
+        SetBrushColor("PanelNameHoverForeground", light ? _settings.LightPanelNameHoverColorHex : _settings.PanelNameHoverColorHex);
         // The selection highlight keeps TWO variants behind its one resource
         // key: the user-picked color while this app is in the foreground, and
         // a 40%-opacity version of that SAME color while it isn't - what was

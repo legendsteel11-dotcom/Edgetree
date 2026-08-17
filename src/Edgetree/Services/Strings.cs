@@ -623,6 +623,12 @@ public static class Strings
     public static string ColorLabelFolderNameHoverFont = "폴더 이름 마우스 오버";
     public static string ColorLabelFileNameHoverFont = "파일 이름 마우스 오버";
     public static string ColorLabelShowMore = "더 보기";
+    // 패널 배경과 같은 말로 시작한다 - 즐겨찾기 목록·북마크 목록 둘 다 칠하므로
+    // 한쪽 이름을 달면 다른 쪽이 안 듣는 것처럼 읽힌다(제외 칩 글자 행에서 겪은
+    // 것과 같은 계열, 2026-08-15).
+    public static string ColorLabelPanelNameFont = "패널 이름";
+    public static string ColorLabelPanelNameHighlightFont = "패널 이름 강조";
+    public static string ColorLabelPanelNameHoverFont = "패널 이름 마우스 오버";
     public static string ColorLabelGuideLine = "들여쓰기 안내선";
     public static string ColorLabelGuideLineActive = "들여쓰기 안내선 강조";
     // 화살표가 아니라 기호 - 사용자가 부르는 이름 그대로.
@@ -1102,6 +1108,9 @@ public static class Strings
         ColorLabelFolderNameHoverFont = "Folder Name Mouse Hover";
         ColorLabelFileNameHoverFont = "File Name Mouse Hover";
         ColorLabelShowMore = "Show More";
+        ColorLabelPanelNameFont = "Panel Name";
+        ColorLabelPanelNameHighlightFont = "Panel Name Highlight";
+        ColorLabelPanelNameHoverFont = "Panel Name Mouse Hover";
         ColorLabelGuideLine = "Guide Line";
         ColorLabelGuideLineActive = "Guide Line Highlight";
         ColorLabelExpander = "Expand Arrow";

@@ -162,6 +162,19 @@
                 Color="#FFA8AAAE"/>
         <SolidColorBrush x:Key="FileNameHoverForeground"
                 Color="#FFA8AAAE"/>
+        <!-- 즐겨찾기·북마크 패널의 행 이름, the same three states
+             (AppSettings.PanelNameColorHex and its two neighbours). Used ONLY
+             by the two panel row styles below - the tree keeps FolderName*.
+             The panel used to draw the folder brushes directly, so the list
+             above the tree could not be told apart from the tree by any
+             palette; defaults are those same folder values, which is what
+             keeps an upgrade invisible. -->
+        <SolidColorBrush x:Key="PanelNameForeground"
+                Color="#FFA8AAAE"/>
+        <SolidColorBrush x:Key="PanelNameHighlightForeground"
+                Color="#FFF0F2F6"/>
+        <SolidColorBrush x:Key="PanelNameHoverForeground"
+                Color="#FFA8AAAE"/>
         <!-- The "…더 보기 (N개)" overflow row's own text color
              (AppSettings.ShowMoreColorHex) - previously just inherited
              FolderNameForeground at reduced opacity (see ShowMoreText's own
@@ -4141,10 +4154,17 @@
                                 <!-- FontSize intentionally not set here - inherits down
                                      from FavoritesList, same reasoning as the tree's row
                                      TextBlock (see the HierarchicalDataTemplate above). -->
+                                <!-- The PANEL's name brush, not the tree's
+                                     (2026-08-17): this row is in a different
+                                     list from the tree under it, and until now
+                                     no palette could say so. FontWeight still
+                                     follows the tree's 폴더 이름 굵기 - that is a
+                                     taste about folder names as such, and a
+                                     favourite is always a folder. -->
                                 <TextBlock x:Name="FavoriteNameText"
                                         Grid.Column="2"
                                         Text="{Binding DisplayName}"
-                                        Foreground="{DynamicResource FolderNameForeground}"
+                                        Foreground="{DynamicResource PanelNameForeground}"
                                         FontWeight="{DynamicResource FolderNameFontWeight}"
                                         VerticalAlignment="Center"
                                         LineHeight="{DynamicResource RowLineHeight}"
@@ -4163,7 +4183,7 @@
                                      directly rather than setting ListBoxItem.Foreground. -->
                                 <Setter TargetName="FavoriteNameText"
                                         Property="Foreground"
-                                        Value="{DynamicResource FolderNameHoverForeground}"/>
+                                        Value="{DynamicResource PanelNameHoverForeground}"/>
                             </Trigger>
                             <Trigger Property="IsSelected"
                                     Value="True">
@@ -4178,7 +4198,7 @@
                                      own Foreground would beat inheritance. -->
                                 <Setter TargetName="FavoriteNameText"
                                         Property="Foreground"
-                                        Value="{DynamicResource FolderNameHighlightForeground}"/>
+                                        Value="{DynamicResource PanelNameHighlightForeground}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -4331,56 +4351,36 @@
                                          hover, then selection: the last match
                                          wins, so a selected row keeps its
                                          colour while the pointer crosses it. -->
+                                    <!-- ONE COLOUR FOR THE WHOLE PANEL, folder or
+                                         file (2026-08-17). The five states here
+                                         used to be the folder/file pair at each
+                                         of the three roles, because the panel
+                                         was drawing the TREE's brushes and the
+                                         tree splits that way. Now that the panel
+                                         has three rows of its own, the split
+                                         costs six palette rows to say what the
+                                         row's ICON already says - and what the
+                                         three rows are for is telling this list
+                                         apart from the tree under it, which a
+                                         bookmarked FILE still reading as a tree
+                                         file would half undo. FontWeight keeps
+                                         the split: 폴더만 굵게 is about folder
+                                         names as such. -->
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Foreground"
-                                                    Value="{DynamicResource FolderNameForeground}"/>
+                                                    Value="{DynamicResource PanelNameForeground}"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsDirectory}"
-                                                        Value="False">
+                                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                        Value="True">
                                                     <Setter Property="Foreground"
-                                                            Value="{DynamicResource FileNameForeground}"/>
+                                                            Value="{DynamicResource PanelNameHoverForeground}"/>
                                                 </DataTrigger>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
-                                                                Value="True"/>
-                                                        <Condition Binding="{Binding IsDirectory}"
-                                                                Value="True"/>
-                                                    </MultiDataTrigger.Conditions>
+                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                        Value="True">
                                                     <Setter Property="Foreground"
-                                                            Value="{DynamicResource FolderNameHoverForeground}"/>
-                                                </MultiDataTrigger>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
-                                                                Value="True"/>
-                                                        <Condition Binding="{Binding IsDirectory}"
-                                                                Value="False"/>
-                                                    </MultiDataTrigger.Conditions>
-                                                    <Setter Property="Foreground"
-                                                            Value="{DynamicResource FileNameHoverForeground}"/>
-                                                </MultiDataTrigger>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
-                                                                Value="True"/>
-                                                        <Condition Binding="{Binding IsDirectory}"
-                                                                Value="True"/>
-                                                    </MultiDataTrigger.Conditions>
-                                                    <Setter Property="Foreground"
-                                                            Value="{DynamicResource FolderNameHighlightForeground}"/>
-                                                </MultiDataTrigger>
-                                                <MultiDataTrigger>
-                                                    <MultiDataTrigger.Conditions>
-                                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
-                                                                Value="True"/>
-                                                        <Condition Binding="{Binding IsDirectory}"
-                                                                Value="False"/>
-                                                    </MultiDataTrigger.Conditions>
-                                                    <Setter Property="Foreground"
-                                                            Value="{DynamicResource FileNameHighlightForeground}"/>
-                                                </MultiDataTrigger>
+                                                            Value="{DynamicResource PanelNameHighlightForeground}"/>
+                                                </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </TextBlock.Style>

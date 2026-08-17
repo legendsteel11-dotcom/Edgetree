@@ -126,6 +126,9 @@ public partial class ColorSettingsWindow : Window
         FolderNameHoverFontSwatch.Background = ParseBrush(CurrentFolderNameHoverColorHex);
         FileNameHoverFontSwatch.Background = ParseBrush(CurrentFileNameHoverColorHex);
         ShowMoreFontSwatch.Background = ParseBrush(CurrentShowMoreColorHex);
+        PanelNameFontSwatch.Background = ParseBrush(CurrentPanelNameColorHex);
+        PanelNameHighlightFontSwatch.Background = ParseBrush(CurrentPanelNameHighlightColorHex);
+        PanelNameHoverFontSwatch.Background = ParseBrush(CurrentPanelNameHoverColorHex);
         GuideLineSwatch.Background = ParseBrush(CurrentGuideLineColorHex);
         ExpanderSwatch.Background = ParseBrush(CurrentExpanderColorHex);
         FilterChipCheckedSwatch.Background = ParseBrush(CurrentFilterChipCheckedColorHex);
@@ -183,32 +186,40 @@ public partial class ColorSettingsWindow : Window
         LabelFileName.Foreground = ParseBrush(CurrentFileNameColorHex);
         LabelFileNameHighlight.Foreground = ParseBrush(CurrentFileNameHighlightColorHex);
         LabelShowMore.Foreground = ParseBrush(CurrentShowMoreColorHex);
+        LabelPanelName.Foreground = ParseBrush(CurrentPanelNameColorHex);
+        LabelPanelNameHighlight.Foreground = ParseBrush(CurrentPanelNameHighlightColorHex);
 
-        // The three hover rows demonstrate rather than state, and they do it
+        // The hover rows demonstrate rather than state, and they do it
         // TOGETHER: in the tree, pointing at a row changes its background and
         // its name colour in the same instant, so a label showing one third of
         // that would be honest about the setting and misleading about the
         // result. At rest they look ordinary - pointing at one is the whole of
         // the difference, which is what a hover colour is.
         //
-        // While any of the three is being picked they all hold the hovered
-        // look, because a colour being dragged has to be visible without also
-        // keeping the pointer somewhere else.
+        // While any of them is being picked they all hold the hovered look,
+        // because a colour being dragged has to be visible without also
+        // keeping the pointer somewhere else. The panel's hover row joins them
+        // even though its own background is the favourites panel's rather than
+        // the tree's - the row that PAINTS that ground is 마우스 오버 배경, one
+        // colour shared by both lists, so the demonstration is the same one.
         bool pickingHover =
             ReferenceEquals(_pickerSwatch, FolderNameHoverFontSwatch) ||
             ReferenceEquals(_pickerSwatch, FileNameHoverFontSwatch) ||
+            ReferenceEquals(_pickerSwatch, PanelNameHoverFontSwatch) ||
             ReferenceEquals(_pickerSwatch, HoverBackgroundSwatch);
 
         if (pickingHover)
         {
             ShowHovered(LabelFolderNameHover, CurrentFolderNameHoverColorHex);
             ShowHovered(LabelFileNameHover, CurrentFileNameHoverColorHex);
+            ShowHovered(LabelPanelNameHover, CurrentPanelNameHoverColorHex);
             ShowHovered(LabelHoverBackground, CurrentFolderNameHoverColorHex);
             return;
         }
 
         ShowAtRest(LabelFolderNameHover, CurrentFolderNameColorHex);
         ShowAtRest(LabelFileNameHover, CurrentFileNameColorHex);
+        ShowAtRest(LabelPanelNameHover, CurrentPanelNameColorHex);
         LabelHoverBackground.Background = System.Windows.Media.Brushes.Transparent;
         LabelHoverBackground.Foreground = (Brush)FindResource("DialogForeground");
     }
@@ -231,6 +242,7 @@ public partial class ColorSettingsWindow : Window
     {
         WireHoverPreview(LabelFolderNameHover, () => CurrentFolderNameHoverColorHex);
         WireHoverPreview(LabelFileNameHover, () => CurrentFileNameHoverColorHex);
+        WireHoverPreview(LabelPanelNameHover, () => CurrentPanelNameHoverColorHex);
         WireHoverPreview(LabelHoverBackground, () => CurrentFolderNameHoverColorHex);
     }
 
@@ -304,6 +316,21 @@ public partial class ColorSettingsWindow : Window
     {
         get => _settings.IsLightMode ? _settings.LightShowMoreColorHex : _settings.ShowMoreColorHex;
         set { if (_settings.IsLightMode) _settings.LightShowMoreColorHex = value; else _settings.ShowMoreColorHex = value; }
+    }
+    private string CurrentPanelNameColorHex
+    {
+        get => _settings.IsLightMode ? _settings.LightPanelNameColorHex : _settings.PanelNameColorHex;
+        set { if (_settings.IsLightMode) _settings.LightPanelNameColorHex = value; else _settings.PanelNameColorHex = value; }
+    }
+    private string CurrentPanelNameHighlightColorHex
+    {
+        get => _settings.IsLightMode ? _settings.LightPanelNameHighlightColorHex : _settings.PanelNameHighlightColorHex;
+        set { if (_settings.IsLightMode) _settings.LightPanelNameHighlightColorHex = value; else _settings.PanelNameHighlightColorHex = value; }
+    }
+    private string CurrentPanelNameHoverColorHex
+    {
+        get => _settings.IsLightMode ? _settings.LightPanelNameHoverColorHex : _settings.PanelNameHoverColorHex;
+        set { if (_settings.IsLightMode) _settings.LightPanelNameHoverColorHex = value; else _settings.PanelNameHoverColorHex = value; }
     }
     private string CurrentGuideLineColorHex
     {
@@ -490,6 +517,9 @@ public partial class ColorSettingsWindow : Window
             && CurrentFolderNameHoverColorHex == GetDefault(defaults, s => s.FolderNameHoverColorHex, s => s.LightFolderNameHoverColorHex)
             && CurrentFileNameHoverColorHex == GetDefault(defaults, s => s.FileNameHoverColorHex, s => s.LightFileNameHoverColorHex)
             && CurrentShowMoreColorHex == GetDefault(defaults, s => s.ShowMoreColorHex, s => s.LightShowMoreColorHex)
+            && CurrentPanelNameColorHex == GetDefault(defaults, s => s.PanelNameColorHex, s => s.LightPanelNameColorHex)
+            && CurrentPanelNameHighlightColorHex == GetDefault(defaults, s => s.PanelNameHighlightColorHex, s => s.LightPanelNameHighlightColorHex)
+            && CurrentPanelNameHoverColorHex == GetDefault(defaults, s => s.PanelNameHoverColorHex, s => s.LightPanelNameHoverColorHex)
             && CurrentGuideLineColorHex == GetDefault(defaults, s => s.GuideLineColorHex, s => s.LightGuideLineColorHex)
             && CurrentGuideLineActiveColorHex == GetDefault(defaults, s => s.GuideLineActiveColorHex, s => s.LightGuideLineActiveColorHex)
             && CurrentExpanderColorHex == GetDefault(defaults, s => s.ExpanderColorHex, s => s.LightExpanderColorHex)
@@ -831,6 +861,14 @@ public partial class ColorSettingsWindow : Window
         CurrentFolderNameHighlightColorHex = Write(palette.Highlight);
         CurrentFileNameHighlightColorHex = Write(palette.Highlight);
         CurrentShowMoreColorHex = Write(palette.ShowMore);
+        // The panel's three take the SAME three inks the names below them do,
+        // rather than a roll of their own. A roll answers "show me a palette",
+        // and inventing a second text colour for the panel would be the roll
+        // making a design decision the user makes with these rows - the three
+        // exist so the two lists CAN differ, not so they always do.
+        CurrentPanelNameColorHex = Write(palette.Text);
+        CurrentPanelNameHoverColorHex = Write(palette.TextHover);
+        CurrentPanelNameHighlightColorHex = Write(palette.Highlight);
         // 펼침기호 takes the ACTIVE guide line, not the resting one: both are
         // marks the tree draws for structure rather than content, and the arrow
         // is the one of the pair the eye is meant to find - the same step up the
@@ -1265,6 +1303,9 @@ public partial class ColorSettingsWindow : Window
         CurrentFolderNameHoverColorHex = defaults.IsLightMode ? defaults.LightFolderNameHoverColorHex : defaults.FolderNameHoverColorHex;
         CurrentFileNameHoverColorHex = defaults.IsLightMode ? defaults.LightFileNameHoverColorHex : defaults.FileNameHoverColorHex;
         CurrentShowMoreColorHex = defaults.IsLightMode ? defaults.LightShowMoreColorHex : defaults.ShowMoreColorHex;
+        CurrentPanelNameColorHex = defaults.IsLightMode ? defaults.LightPanelNameColorHex : defaults.PanelNameColorHex;
+        CurrentPanelNameHighlightColorHex = defaults.IsLightMode ? defaults.LightPanelNameHighlightColorHex : defaults.PanelNameHighlightColorHex;
+        CurrentPanelNameHoverColorHex = defaults.IsLightMode ? defaults.LightPanelNameHoverColorHex : defaults.PanelNameHoverColorHex;
         CurrentGuideLineColorHex = defaults.IsLightMode ? defaults.LightGuideLineColorHex : defaults.GuideLineColorHex;
         CurrentGuideLineActiveColorHex = defaults.IsLightMode ? defaults.LightGuideLineActiveColorHex : defaults.GuideLineActiveColorHex;
         CurrentExpanderColorHex = defaults.IsLightMode ? defaults.LightExpanderColorHex : defaults.ExpanderColorHex;
@@ -1337,6 +1378,15 @@ public partial class ColorSettingsWindow : Window
     private void FilterChipExcludeCheckedSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(FilterChipExcludeCheckedSwatch, () => CurrentFilterChipExcludeCheckedColorHex, hex => CurrentFilterChipExcludeCheckedColorHex = hex);
 
+    private void PanelNameFontSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => PickColor(PanelNameFontSwatch, () => CurrentPanelNameColorHex, hex => CurrentPanelNameColorHex = hex);
+
+    private void PanelNameHighlightFontSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => PickColor(PanelNameHighlightFontSwatch, () => CurrentPanelNameHighlightColorHex, hex => CurrentPanelNameHighlightColorHex = hex);
+
+    private void PanelNameHoverFontSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => PickColor(PanelNameHoverFontSwatch, () => CurrentPanelNameHoverColorHex, hex => CurrentPanelNameHoverColorHex = hex);
+
     private void GuideLineActiveSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(GuideLineActiveSwatch, () => CurrentGuideLineActiveColorHex, hex => CurrentGuideLineActiveColorHex = hex);
 
@@ -1388,6 +1438,7 @@ public partial class ColorSettingsWindow : Window
     {
         FolderNameFontSwatch, FolderNameHighlightFontSwatch, FolderNameHoverFontSwatch,
         FileNameFontSwatch, FileNameHighlightFontSwatch, FileNameHoverFontSwatch,
+        PanelNameFontSwatch, PanelNameHighlightFontSwatch, PanelNameHoverFontSwatch,
         ShowMoreFontSwatch, HeaderSwatch, HistorySwatch, BackgroundSwatch,
         ViewerBackgroundSwatch, SelectionSwatch, HoverBackgroundSwatch,
         GuideLineSwatch, GuideLineActiveSwatch, PanelDividerSwatch,
@@ -1490,6 +1541,12 @@ public partial class ColorSettingsWindow : Window
             return (() => CurrentFileNameHoverColorHex, hex => CurrentFileNameHoverColorHex = hex);
         if (ReferenceEquals(swatch, ShowMoreFontSwatch))
             return (() => CurrentShowMoreColorHex, hex => CurrentShowMoreColorHex = hex);
+        if (ReferenceEquals(swatch, PanelNameFontSwatch))
+            return (() => CurrentPanelNameColorHex, hex => CurrentPanelNameColorHex = hex);
+        if (ReferenceEquals(swatch, PanelNameHighlightFontSwatch))
+            return (() => CurrentPanelNameHighlightColorHex, hex => CurrentPanelNameHighlightColorHex = hex);
+        if (ReferenceEquals(swatch, PanelNameHoverFontSwatch))
+            return (() => CurrentPanelNameHoverColorHex, hex => CurrentPanelNameHoverColorHex = hex);
         if (ReferenceEquals(swatch, SelectionSwatch))
             return (() => CurrentSelectionColorHex, hex => CurrentSelectionColorHex = hex);
         if (ReferenceEquals(swatch, HistorySwatch))

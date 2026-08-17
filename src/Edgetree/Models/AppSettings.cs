@@ -413,6 +413,17 @@ public class AppSettings
     public string FolderNameHoverColorHex { get; set; } = "#FFA8AAAE";
     public string FileNameHoverColorHex { get; set; } = "#FFA8AAAE";
 
+    // 즐겨찾기·북마크 패널의 행 이름, at the same three states a folder name has.
+    // The panel drew FolderName* until 2026-08-17, which meant a palette could
+    // not tell the two lists apart - and the panel is a different list sitting
+    // directly above the tree, not more of it.
+    //
+    // Defaults are the folder name's own values in both themes, so an upgrade
+    // looks identical until one of the three is picked.
+    public string PanelNameColorHex { get; set; } = "#FFA8AAAE";
+    public string PanelNameHighlightColorHex { get; set; } = "#FFF0F2F6";
+    public string PanelNameHoverColorHex { get; set; } = "#FFA8AAAE";
+
     // The "…더 보기 (N개)" overflow row's own text color - previously just
     // inherited FolderNameColorHex at reduced opacity, same default here so
     // existing users see no change until they customize it separately.
@@ -535,6 +546,10 @@ public class AppSettings
     public string LightHoverBackgroundColorHex { get; set; } = "#FFE8E8E8";
     public string LightFolderNameHoverColorHex { get; set; } = "#FF3B3B3B";
     public string LightFileNameHoverColorHex { get; set; } = "#FF3B3B3B";
+    // The panel's three, light twins - see PanelNameColorHex above.
+    public string LightPanelNameColorHex { get; set; } = "#FF3B3B3B";
+    public string LightPanelNameHighlightColorHex { get; set; } = "#FF000000";
+    public string LightPanelNameHoverColorHex { get; set; } = "#FF3B3B3B";
     public string LightShowMoreColorHex { get; set; } = "#FF6E6E6E";
     public string LightGuideLineColorHex { get; set; } = "#FFD9D9D9";
     public string LightGuideLineActiveColorHex { get; set; } = "#FFA0A0A0";
