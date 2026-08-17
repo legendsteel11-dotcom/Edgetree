@@ -537,8 +537,20 @@ public partial class MainWindow : Window
         return timer;
     }
 
-    // 화면 좌표로 물어본다 - 이 표시가 사는 상태(창 모드 + 앱 전체화면)에서는
-    // 창의 위쪽 끝이 곧 캡션이고, 그 띠에 커서가 있는지만 답하면 된다.
+    // 커서가 캡션 띠에 있는지 - 이 표시가 사는 상태(창 모드 + 앱 전체화면)에서는
+    // 창의 위쪽 끝이 곧 캡션이므로, 창 좌표로 옮겨서 그 띠 안인지만 보면 된다.
+    //
+    // 변환은 WPF에 넘긴다. Left/Top으로 직접 재던 자리였고, 그것이 이 표시가 사는
+    // 상태 그 자체에서 틀렸다 (2026-08-17, 사용자 확인): **WPF는 WindowState가
+    // Normal일 때만 실제 위치를 Left/Top에 밀어 넣으므로**(Window.WmMoveChanged)
+    // 최대화된 동안 그 둘은 최대화 이전 값을 들고 있다. 그런데 바탕화면 전체는 창을
+    // 최대화하는 것이고 그쪽이 기본값이라, 타이머가 "커서가 아직 띠에 있나"를 물을
+    // 때 복원 위치의 사각형과 견주었다 - 손을 얹고 있는데 표시가 사라지는, 이 검사가
+    // 막으려고 생긴 바로 그 신고가 최대화된 경우에만 그대로 남아 있었다.
+    //
+    // 덤으로 DPI 나눗셈이 없어진다. Cursor.Position은 물리 픽셀이고 PointFromScreen이
+    // 그 변환을 자기 안에서 하므로, 모니터마다 배율이 다른 구성에서도 이 창의 배율을
+    // 빌려 쓰지 않는다 - 손으로 나누던 식은 그 경우에도 어긋났다.
     private bool CursorIsOnCaptionStrip()
     {
         if (!_viewerOpen || !_viewerFullscreen || _isDocked)
@@ -546,13 +558,18 @@ public partial class MainWindow : Window
             return false;
         }
 
-        var cursor = System.Windows.Forms.Cursor.Position;
-        var dpi = VisualTreeHelper.GetDpi(this);
-        double x = cursor.X / dpi.DpiScaleX;
-        double y = cursor.Y / dpi.DpiScaleY;
+        // 변환은 이 창이 화면에 붙어 있어야 성립한다. 위의 조건이 이미 그것을
+        // 말하지만, PointFromScreen은 아니면 던지는 쪽이라 물어보고 간다.
+        if (PresentationSource.FromVisual(this) is null)
+        {
+            return false;
+        }
 
-        return x >= Left && x <= Left + ActualWidth &&
-            y >= Top && y <= Top + HeaderHeight;
+        var cursor = System.Windows.Forms.Cursor.Position;
+        var point = PointFromScreen(new System.Windows.Point(cursor.X, cursor.Y));
+
+        return point.X >= 0 && point.X <= ActualWidth &&
+            point.Y >= 0 && point.Y <= HeaderHeight;
     }
 
     // The markers mean one thing: "this is on the clipboard, waiting to move".
