@@ -28260,6 +28260,21 @@ public partial class MainWindow : Window
         // transport row's own.
         ViewerCaptionPanel.Margin = new Thickness(0);
         ViewerMediaBar.Margin = new Thickness(16, 10, 16, 14);
+        // And the ROW ABOVE the transport has to carry the plate's top air for
+        // the same reason (2026-08-17). A StackPanel has no Padding, so the top
+        // of the plate is whatever the first visible row's own margin is - and
+        // that margin is ViewerCaptionChipRowGap, i.e. the TREE's row padding,
+        // which 행 간격 can take all the way to zero. Anyone who tightens their
+        // rows got the picture controls flush against the top edge of the band
+        // while the transport below kept its 14 (reported with a screenshot).
+        //
+        // 14 is that same bottom air, so the band has as much room above its
+        // first row as below its last. The gap DOWN to the transport is left
+        // alone: it is the transport's own 10, and it separates two groups of
+        // controls rather than lining a plate.
+        var chipRowGap = (Thickness)FindResource("ViewerCaptionChipRowGap");
+        ViewerZoomBar.Margin = new Thickness(
+            chipRowGap.Left, FullScreenPlateTopAir, chipRowGap.Right, chipRowGap.Bottom);
         ViewerCaptionPanel.Visibility = Visibility.Visible;
 
         // ONLY the transport. The name, the metadata and the counter are the
@@ -28280,6 +28295,12 @@ public partial class MainWindow : Window
     }
 
     private const double FullScreenSubtitleLift = 64;
+
+    // The full-screen band's own air above its first row - the twin of the 14 in
+    // ViewerMediaBar's full-screen margin above. Not on the compact curve: this
+    // is the plate's edge, not a gap between two lines of text, and the whole
+    // point is that it must not follow a setting that can reach zero.
+    private const double FullScreenPlateTopAir = 14;
 
     private void HideFullScreenTransport()
     {
@@ -28303,6 +28324,10 @@ public partial class MainWindow : Window
         // picture's description (2026-08-11). Zero here put it back against the
         // caption for the rest of the session after one full screen.
         ViewerMediaBar.Margin = ViewerMediaBarMargin;
+        // Back to the RESOURCE, not to a copy of today's value: the row follows
+        // 행 간격 and Ctrl +/- through ViewerCaptionChipRowGap, and a plain
+        // assignment here would pin the number this session was started with.
+        ViewerZoomBar.SetResourceReference(MarginProperty, "ViewerCaptionChipRowGap");
         ViewerCaptionPanel.Visibility = _viewerFullscreen
             ? Visibility.Collapsed
             : Visibility.Visible;
