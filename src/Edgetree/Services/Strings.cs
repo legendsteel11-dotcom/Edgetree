@@ -58,6 +58,10 @@ public static class Strings
     // The default name for slot N. Deliberately dull - the user renames it to
     // what the shape is for, and a clever default would get in the way of that.
     public static string PresetDefaultName = "프리셋{0}";
+    // Ctrl+Shift+S가 조용히 끝난 뒤 트레이가 말하는 것. 제목이 사실이고 본문은
+    // 어느 프리셋이었는지다 - 그 키는 "지금 들어 있는" 칸에 쓰므로 어느 칸이었나가
+    // 실제로 궁금한 것이다.
+    public static string PresetSavedToast = "프리셋을 저장했습니다";
     // Ctrl+Shift+1~5가 아직 없는 칸에 닿았을 때. 번호를 되읽어 주는 것이 이
     // 물음의 반이다 - 3을 눌렀는데 4번이 만들어지면 그건 다른 일이 일어난 것이고,
     // 슬롯은 목록 순서대로 채워지므로 그럴 수 있다.
@@ -839,6 +843,7 @@ public static class Strings
         PresetNameTitle = "Preset name";
         PresetNameHint = "Saves position, size, docking, colours, file types and the current folder";
         PresetDefaultName = "Preset {0}";
+        PresetSavedToast = "Preset saved";
         PlaceMissingTitle = "Folder not found";
         PlaceMissingBody = "This folder cannot be found.\n\n{0}\n\nRemove it from the list?";
         PresetSlotEmptyTitle = "Presets";

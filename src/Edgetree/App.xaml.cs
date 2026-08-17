@@ -360,6 +360,24 @@ public partial class App : Application
 
     internal void ShowAboutFromTray() => ShowAboutCentered();
 
+    // THE TRAY SAYS SOMETHING HAPPENED, for an action that leaves no mark on
+    // screen (2026-08-17, on request). The app does not otherwise interrupt with
+    // dialogs to confirm what it just did, and this is not one: the balloon is
+    // out of the way, dismisses itself, and nothing waits on it.
+    //
+    // Here rather than in MainWindow because the NotifyIcon is the
+    // application's, and it is also the only surface that can speak while the
+    // window is hidden in the tray - which the preset shortcut can be pressed
+    // from, since it is not a window-scoped key.
+    //
+    // The timeout is passed and ignored: modern Windows shows these as toasts
+    // and picks the duration itself. Kept at a plausible value rather than 0,
+    // which older shells read as "forever".
+    internal void ShowTrayMessage(string title, string text)
+    {
+        _trayIcon?.ShowBalloonTip(3000, title, text, System.Windows.Forms.ToolTipIcon.None);
+    }
+
     // Same open/hide split the title bar's own "_" button and tray click use
     // (see MainWindow.MinimizeButton_Click / RestoreMainWindow) - just picks
     // which of the two applies based on current visibility, per the TODO

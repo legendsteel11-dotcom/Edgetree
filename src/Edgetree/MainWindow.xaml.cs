@@ -11116,6 +11116,17 @@ public partial class MainWindow : Window
         NoteCurrentPlace();
         active.Overwrite(_settings);
         _settingsService.Save(_settings);
+
+        // AND IT SAYS SO, because nothing else does (2026-08-17, on request).
+        // Every other way into this writes something visible - the menu row asks
+        // for the name first, an empty slot asks whether to make one - while the
+        // shortcut changes nothing on screen at all, and what it changed is a
+        // shape the user spent time on.
+        //
+        // The NAME is the message, not the fact: Ctrl+Shift+S writes to whichever
+        // preset the app is currently in, so "which one did I just overwrite" is
+        // the question worth answering. The heading carries the fact.
+        (Application.Current as App)?.ShowTrayMessage(Strings.PresetSavedToast, active.Name);
     }
 
     private void PresetDelete_Click(object sender, RoutedEventArgs e)
