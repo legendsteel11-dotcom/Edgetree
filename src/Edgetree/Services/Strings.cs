@@ -76,7 +76,7 @@ public static class Strings
     // 경우 목록에서 지우는 것은 되돌릴 수 없다. 경로를 그대로 보여 주는 것이
     // 어느 쪽인지 판단할 유일한 재료다.
     public static string PlaceMissingTitle = "폴더 없음";
-    public static string PlaceMissingBody = "이 폴더를 찾을 수 없습니다.\n\n{0}\n\n목록에서 지울까요?";
+    public static string PlaceMissingBody = "이 폴더를 찾을 수 없습니다.\n\n{0}\n\n목록에서 삭제할까요?";
     public static string PresetSlotEmptyTitle = "프리셋";
     public static string PresetSlotEmptyBody = "{0}번 프리셋이 아직 없습니다.\n지금 상태를 저장할까요?";
 
@@ -374,7 +374,15 @@ public static class Strings
     // Viewer zoom strip - a few chips wide, so all stay short in every language.
     public static string ViewerZoomFit = "맞춤";
     public static string ViewerZoomActual = "1:1";
-    public static string ViewerZoomFill = "자름맞춤";
+    // 채우기 (2026-08-17). 자름맞춤이었고, 순화어를 쓰지 않는다는 문체 규칙에서
+    // 사용자가 직접 지정한 대체어다. 이름을 바꾸는 것이 라벨 한 줄로 끝나지 않는
+    // 이유는 F1이 이 말을 세 곳에서 다시 쓰기 때문 - 화면과 도움말이 서로 다른
+    // 이름을 부르면 두 기능으로 읽힌다. 저장되는 값은 "fill"이라 이 변경은
+    // 설정 파일에 닿지 않는다(AppSettings.ViewerRest).
+    //
+    // 이미 나간 릴리즈 노트와 랜딩의 변경 이력에는 자름맞춤이 그대로 남는다.
+    // 그때의 기록이라 소급하지 않는다.
+    public static string ViewerZoomFill = "채우기";
     public static string ViewerNavigator = "내비게이터";
     public static string ViewerClose = "멀티미디어 패널 닫기";
     // The footer's now-playing row, which only exists while the viewer is shut
@@ -693,7 +701,7 @@ public static class Strings
     // 앱은 그중 무엇인지 모른다. 경로가 그 자리에서 유일하게 확인 가능한 것이다.
     public static string SettingsSaveFailedTitle = "설정 저장";
     public static string SettingsSaveFailedBody =
-        "설정을 저장하지 못했습니다. 지금 바꾼 것은 앱을 닫으면 사라집니다.\n\n{0}";
+        "설정을 저장하지 못했습니다. 지금 변경한 내용은 앱을 닫으면 사라집니다.\n\n{0}";
     // The moon and sun emoji that used to lead these are gone (2026-08-11):
     // they were the only pictures in a window of text buttons, they came from
     // the system's emoji font rather than from the app's own marks, and the
@@ -724,7 +732,12 @@ public static class Strings
     // "되돌리기" over the more precise "랜덤 전으로", which read oddly
     // (2026-08-09); the button lives beside 랜덤, which carries the
     // context the label dropped.
-    public static string ButtonUndoRandom = "되돌리기";
+    //
+    // 복원 (2026-08-17). 문체 규칙의 되돌리다 → 취소·복원 중 뒤쪽을 고른 이유는
+    // 앞쪽이 쓸 수 없기 때문이다 - 이 창에는 ButtonCancel("취소")이 이미 있고,
+    // 나란히 놓이면 "취소"가 창을 닫는 것인지 색을 되돌리는 것인지 갈리지 않는다.
+    // 표의 두 후보 중 하나가 다른 라벨과 충돌하면 남은 하나가 답이다.
+    public static string ButtonUndoRandom = "복원";
     // Plain (no emoji) versions for use inside a sentence - see
     // ColorResetConfirmBody.
     public static string ColorThemeDarkLabel = "다크 모드";
@@ -794,9 +807,9 @@ public static class Strings
     // place, and it is the fact that makes the rest true.
     public static string DeleteNoRecycleBinTitle = "네트워크 위치에서 삭제";
     public static string DeleteNoRecycleBinBody =
-        "'{0}'을(를) 삭제할까요?\n\n네트워크 위치에는 휴지통이 없어 되돌릴 수 없습니다.";
+        "'{0}'을(를) 삭제할까요?\n\n네트워크 위치에는 휴지통이 없어 복구할 수 없습니다.";
     public static string DeleteNoRecycleBinBodyMultiple =
-        "네트워크 위치의 {0}개 항목을 삭제할까요?\n\n휴지통이 없어 되돌릴 수 없습니다.";
+        "네트워크 위치의 {0}개 항목을 삭제할까요?\n\n휴지통이 없어 복구할 수 없습니다.";
     public static string DeleteFailedTitle = "삭제 실패";
     public static string CompressFailedTitle = "압축 실패";
     public static string ExtractFailedTitle = "압축 풀기 실패";
@@ -815,7 +828,7 @@ public static class Strings
     public static string SettingsImportedBody = "설정을 가져왔습니다. 적용하려면 앱을 다시 시작해야 합니다. 지금 다시 시작할까요?";
 
     public static string ResetSettingsConfirmTitle = "설정 초기화";
-    public static string ResetSettingsConfirmBody = "모든 설정과 북마크가 앱 기본 상태로 초기화됩니다. 이 작업은 되돌릴 수 없습니다.\n\n초기화 후 적용을 위해 앱을 다시 시작합니다. 계속할까요?";
+    public static string ResetSettingsConfirmBody = "모든 설정과 북마크가 앱 기본 상태로 초기화됩니다. 이 작업은 복구할 수 없습니다.\n\n초기화 후 적용을 위해 앱을 다시 시작합니다. 계속할까요?";
 
     // Which language the fields below ended up in. Almost nothing needs to ask
     // - the point of this class is that callers just read a string - but a

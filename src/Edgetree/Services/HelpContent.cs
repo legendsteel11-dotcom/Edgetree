@@ -51,7 +51,7 @@ public static class HelpContent
         T("자주 쓰는 파일 종류(확장자) 지정하기 (제외 확장자 입력시 최우선 적용)",
           "Set the file kinds you work with - anything you type as excluded wins over the rest"),
         T("자주 가는 곳은 북마크로", "Bookmark the places you keep going back to"),
-        T("썸네일 캐싱 켜고 이미지 많은 폴더 빠르게 관리",
+        T("썸네일 캐싱 활성화로 이미지 많은 폴더 빠르게 관리",
           "Turn thumbnail caching on and move through big image folders fast"),
         T("원하는 색상 선택", "Pick the colours you want"),
         T("설정한 상태를 프리셋으로 저장 (제목 표시줄 우클릭 메뉴)",
@@ -234,7 +234,7 @@ public static class HelpContent
                     // 번호가 화면에 있으니 "순서가 바뀐다"는 라벨이 말해 준다.
                     // 여기 적을 값어치가 있는 것은 그 순서가 단축키의 순서이기도
                     // 하다는 것 - 목록만 보면 알 길이 없다.
-                    R("북마크 패널에서 행 드래그", "순서 바꾸기 · 번호가 곧 Ctrl+Alt+L 순서",
+                    R("북마크 패널에서 행 드래그", "순서 변경 · 번호가 곧 Ctrl+Alt+L 순서",
                       "Drag a row in the bookmark panel",
                       "Reorders it - the numbers are the Ctrl+Alt+L order"),
                     // The parenthesis is the part a menu label cannot say, and
@@ -327,7 +327,7 @@ public static class HelpContent
                       "How many results show", "1,000 at a time - \"Show more\" at the end adds another 1,000"),
                     // The dot is the half a label cannot say: the button names
                     // the act, nothing names the reason to press it.
-                    R("상태줄 오른쪽 ↻", "다시 인덱싱 — 변경된 내용이 있을 경우 파란 점 표시",
+                    R("상태줄 오른쪽 ↻", "다시 인덱싱, 변경된 내용이 있을 경우 파란 점 표시",
                       "The ↻ on the status line", "Reindex - a blue dot means the folder has changed"),
                     R("Esc · Ctrl+E", "검색 닫기", "Esc · Ctrl+E", "Close search"),
                 }),
@@ -383,7 +383,7 @@ public static class HelpContent
                     // 2026-08-17: 창 모드에서만 나오는 줄이라 조건을 앞에 적었다 -
                     // 부착 상태에서 찾다가 없다고 읽으면 그게 더 나쁘다.
                     R("창 모드 · 전체 화면에서 우클릭 → 바탕화면 전체",
-                      "끄면 창 크기 그대로 그림만 꽉 채움 (기본은 창을 화면 전체로)",
+                      "비활성화하면 창 크기 그대로 그림만 꽉 채움 (기본은 창을 화면 전체로)",
                       "Window mode · right-click in full screen → Fill the desktop",
                       "Off keeps the window's own size and fills that instead; on (the default) grows the window to the screen"),
                     // 이미 되는 것을 적는 줄. 헤더가 사라져도 그 자리는 제목
@@ -391,7 +391,7 @@ public static class HelpContent
                     // 방법이 없었음 (2026-08-17, 창 크기를 유지하는 전체화면이
                     // 생기면서 실제로 필요해짐). 대가를 같은 줄에 적은 이유는 그것이
                     // "위에서는 휠이 안 먹는다"의 답이기도 하기 때문.
-                    R("창 모드 · 전체 화면에서 위쪽 띠 드래그", "창 이동 — 그 띠는 제목 표시줄이라 그림에는 닿지 않음",
+                    R("창 모드 · 전체 화면에서 위쪽 띠 드래그", "창 이동, 그 띠는 제목 표시줄이라 그림에는 닿지 않음",
                       "Window mode · drag the top strip in full screen",
                       "Moves the window - that strip is still the title bar, so it does not reach the picture"),
                 }),
@@ -428,7 +428,7 @@ public static class HelpContent
                     // Says what it gives up, because that is the whole choice
                     // between it and 맞춤: one shows all of the picture, the
                     // other fills the panel.
-                    R("자름맞춤", "패널을 꽉 채우고 넘치는 부분은 자름 (다음 그림에도 이어짐)",
+                    R("채우기", "패널을 꽉 채우고 넘치는 부분은 잘라냄 (다음 그림에도 이어짐)",
                       "Fill", "Fills the panel and crops the overflow - and stays on for the next picture"),
                     R("휠클릭 · Enter", "전체 화면 (우클릭 메뉴에서 방식 선택)",
                       "Wheel click · Enter", "Full screen (pick which kind in the right-click menu)"),
@@ -441,7 +441,7 @@ public static class HelpContent
                     // photo gives no clue the feature exists at all.
                     R("F8 · 우클릭 → 슬라이드 쇼", "폴더의 이미지를 차례로 표시 (2장 이상일 때)",
                       "F8 · Right-click → Slideshow", "Turn the folder's images over, one by one (needs two or more)"),
-                    R("슬라이드 쇼 중 클릭 · ↑ ↓ · 트리 선택", "쇼 종료 — 보고 있던 사진에서 멈춤",
+                    R("슬라이드 쇼 중 클릭 · ↑ ↓ · 트리 선택", "쇼 종료, 보고 있던 사진에서 멈춤",
                       "Click, ↑ ↓, or pick a row while it runs", "Ends the show, staying on the picture you were looking at"),
                     R("F9 · ⋯ → 멀티미디어 패널 → 시계와 날짜", "패널 위에 시각·날짜·요일을 표시",
                       "F9 · ⋯ → Multimedia panel → Clock and date", "Puts the time, date and day over the panel"),
@@ -479,10 +479,10 @@ public static class HelpContent
                     // had all along. Says it does NOT carry over, because the
                     // picture's does and someone who met it there will expect
                     // the same.
-                    R("우클릭 → 영상 크기 → 자름맞춤", "패널을 꽉 채우고 넘치는 부분은 자름 (다음 영상은 맞춤으로 시작)",
+                    R("우클릭 → 영상 크기 → 채우기", "패널을 꽉 채우고 넘치는 부분은 잘라냄 (다음 영상은 맞춤으로 시작)",
                       "Right-click → Video size → Fill",
                       "Fills the panel and crops the overflow - the next film starts fitted again"),
-                    R("우클릭 → 자막", "켜기 · 크기 · 싱크 조절", "Right-click → Subtitles", "On, size, and sync"),
+                    R("우클릭 → 자막", "활성화 · 크기 · 싱크 조절", "Right-click → Subtitles", "On, size, and sync"),
                     // 컨트롤 패널, not 재생 막대 (2026-08-16). The strip is what
                     // a reader calls it, and the app had two names for it in
                     // its own text - this row and the music group below. The
@@ -539,12 +539,12 @@ public static class HelpContent
                     // 2026-08-17: 앨범아트도 그림과 같은 조절 줄을 받게 되면서
                     // 필요해진 줄. 앞의 줄이 "클릭은 재생"이라고 말하므로 크기를
                     // 어디서 바꾸는지는 바로 옆에 있는 것이 맞다.
-                    R("앨범아트 크기", "그림과 같은 줄에서 맞춤 · 1:1 · 자름맞춤 · 확대 축소",
+                    R("앨범아트 크기", "그림과 같은 줄에서 맞춤 · 1:1 · 채우기 · 확대 축소",
                       "Album art size",
                       "The same row a picture gets - fit, 1:1, crop to fill, and the zoom stepper"),
                     R("컨트롤 패널 왼쪽 두 칩", "백그라운드 재생 · 이어서 재생",
                       "The two chips at the left of the playback controls", "Background play · keep playing"),
-                    R("백그라운드 재생", "다른 폴더 이동해도 계속 (끄면 정지 · 파일 해제)",
+                    R("백그라운드 재생", "다른 폴더 이동해도 계속 (비활성화하면 정지 · 파일 해제)",
                       "Background play", "Carries on in other folders - switching it off stops it and frees the file"),
                     R("이어서 재생 우클릭", "폴더 반복 · 한 곡 반복 · 셔플 반복",
                       "Right-click the keep-playing chip", "Repeat folder · repeat one · repeat shuffled"),
@@ -561,7 +561,7 @@ public static class HelpContent
 
                 new Group(T("썸네일 바", "The thumbnail bar"), new[]
                 {
-                    R("장수 표시 옆 ▤ 버튼", "아래에 해당 폴더 이미지 목록 표시 — 검색 중이면 검색 결과",
+                    R("장수 표시 옆 ▤ 버튼", "아래에 해당 폴더 이미지 목록 표시, 검색 중이면 검색 결과",
                       "The ▤ button beside the counter", "The folder's images as a row - or the results, while searching"),
                     R("칸을 밖으로 드래그", "다른 앱으로 드롭", "Drag a cell out", "Drop it into another app"),
                     R("바 위쪽 가장자리 드래그", "칸 크기 조절", "Drag the bar's top edge", "Cell size"),
@@ -589,7 +589,7 @@ public static class HelpContent
                     // behaviour toggles the word reads as a shadow around the
                     // whole app), and the cost of that choice is that anyone
                     // hunting the options menu for it never finds it.
-                    R("색상 설정 → 행의 고리", "색을 묶어 함께 변경 — 함께 켠 줄끼리 같은 색",
+                    R("색상 설정 → 행의 고리", "색을 묶어 함께 변경, 함께 활성화한 줄끼리 같은 색",
                       "Colours → the link on a row", "Ties rows together - the ones lit together share a colour"),
                     R("색상 설정 → 모노", "팔레트 전체를 회색톤으로 한 번에",
                       "Colours → Mono", "The whole palette to greyscale in one press"),
@@ -602,13 +602,13 @@ public static class HelpContent
                     // help has to say the same - a reader who took the row above
                     // at its word would go looking for a switch that is already
                     // there under a name it does not use.
-                    R("옵션 → 기본 설정 → 아이콘", "폴더 · 파일 · 드라이브를 따로따로 켜고 끔",
+                    R("옵션 → 기본 설정 → 아이콘", "폴더 · 파일 · 드라이브를 따로따로 활성화/비활성화",
                       "Options → General → Icons", "Folders, files and drives switch on and off separately"),
-                    R("옵션 → 기본 설정 → 드래그로 이동", "끄면 드래그는 항상 복사, 이동은 Shift",
+                    R("옵션 → 기본 설정 → 드래그로 이동", "비활성화하면 드래그는 항상 복사, 이동은 Shift",
                       "Options → General → Drag Moves", "Off, a drag always copies and Shift is the way to move"),
                     // The cost goes on the row, not in a paragraph: it is the
                     // one setting here that can make the tree slower.
-                    R("옵션 → 한 번에 표시할 개수 → 전체 표시", "더 보기 없이 전부 — 큰 폴더에서는 느려짐",
+                    R("옵션 → 한 번에 표시할 개수 → 전체 표시", "더 보기 없이 전부, 큰 폴더에서는 느려짐",
                       "Options → Items per Folder → Show All", "No 더 보기 row at all - a big folder will feel it"),
                     R("옵션 → 네트워크 위치", "드라이브 문자 없는 공유 추가 (\\\\서버\\공유)",
                       "Options → Network Locations", "Add a share with no drive letter (\\\\server\\share)"),
