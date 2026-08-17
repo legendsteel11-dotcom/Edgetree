@@ -509,10 +509,50 @@ public partial class MainWindow : Window
         };
         timer.Tick += (_, _) =>
         {
+            // THE TIMER ASKS THE CURSOR, IT DOES NOT JUST FIRE (2026-08-17, on
+            // report: 표시가 저절로 사라지면 안 된다).
+            //
+            // It used to take the wash away outright after the pointer had been
+            // still for a moment, so a hand resting on the strip watched the
+            // mark it was reading fade out from under it - and read as the same
+            // kind of thing as the file-name line that used to flash at the
+            // bottom, which is what made it confusing.
+            //
+            // Simply removing the timeout is not the fix: it is the backstop for
+            // a leave message that never comes (WM_NCMOUSELEAVE has to be ASKED
+            // for, and anything that costs a request can be missed), and without
+            // it the wash would stick over the picture. So the timer stays and
+            // the QUESTION changes - is the pointer still on the strip? If it
+            // is, the wash has not outstayed anything and the countdown starts
+            // again. The same rule the auto-hide's own dwell timers follow: do
+            // not trust a leave, look at where the cursor actually is.
+            if (CursorIsOnCaptionStrip())
+            {
+                return;
+            }
+
             timer.Stop();
             SetMoveHint(false);
         };
         return timer;
+    }
+
+    // 화면 좌표로 물어본다 - 이 표시가 사는 상태(창 모드 + 앱 전체화면)에서는
+    // 창의 위쪽 끝이 곧 캡션이고, 그 띠에 커서가 있는지만 답하면 된다.
+    private bool CursorIsOnCaptionStrip()
+    {
+        if (!_viewerOpen || !_viewerFullscreen || _isDocked)
+        {
+            return false;
+        }
+
+        var cursor = System.Windows.Forms.Cursor.Position;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double x = cursor.X / dpi.DpiScaleX;
+        double y = cursor.Y / dpi.DpiScaleY;
+
+        return x >= Left && x <= Left + ActualWidth &&
+            y >= Top && y <= Top + HeaderHeight;
     }
 
     // The markers mean one thing: "this is on the clipboard, waiting to move".
