@@ -25579,12 +25579,25 @@ public partial class MainWindow : Window
         // 바탕화면 전체 is still absent while DOCKED, and that is not the old rule
         // returning - a docked window is a parked band with a clip region, so
         // there is no second answer to offer there rather than one being hidden.
-        bool fillsDesktop = _settings.ViewerFullscreenFillsDesktop;
+        // TWO PLAIN CHECKS, EACH ANSWERING ITS OWN QUESTION (2026-08-17). The
+        // first is the mode - on or off, the same thing 휠클릭 does, which is why
+        // the key is written beside it. The second is how far the mode reaches
+        // while floating, and it is an option rather than a state: it can be set
+        // before ever entering, and it stays set afterwards.
+        //
+        // A radio pair was tried in between and taken back out the same evening.
+        // It was true to the machinery - exactly one kind is in force at a time -
+        // and it made the two rows harder to read, because a check that means
+        // "this is the kind" sits next to nothing that means "and it is on now".
+        // Two switches that each say one thing beat one control that says two.
         ViewerFullscreenItem.Visibility = Visibility.Visible;
-        ViewerFullscreenItem.IsChecked = _viewerFullscreen && (_isDocked || !fillsDesktop);
+        ViewerFullscreenItem.IsChecked = _viewerFullscreen;
 
+        // 도킹 중에는 물을 것이 없다 - 파킹된 띠는 최대화할 대상이 아니다. 모드
+        // 밖에서도 보이는 것은 일부러다: 미리 정해 두고 휠클릭만 쓰는 순서가
+        // 자연스럽고, 전에는 먼저 모드에 들어가야만 이 줄이 보였다.
         ViewerFullDesktopItem.Visibility = _isDocked ? Visibility.Collapsed : Visibility.Visible;
-        ViewerFullDesktopItem.IsChecked = _viewerFullscreen && !_isDocked && fillsDesktop;
+        ViewerFullDesktopItem.IsChecked = _settings.ViewerFullscreenFillsDesktop;
         ViewerMarkAddItem.Visibility = playbackRows;
         // The FILE's bookmark, on every kind of file the panel opens. One row
         // that says which way it goes, the same swap the tree's own menu makes -
@@ -27694,48 +27707,33 @@ public partial class MainWindow : Window
     // Only the window state is touched. Everything else about the mode - the
     // chrome, the tree's share, the margins - is the same whichever way this goes,
     // which is why entering full screen and this switch can share one path.
-    // 두 행이 하나의 질문에 답한다 - 아래 ChooseViewerFullscreen이 그 답을 받는
-    // 한 자리다. 메뉴가 세 번째 길이 되는 것이 아니라, 휠클릭·Escape가 쓰는 같은
-    // 길에 손잡이가 하나 더 붙는 것이다.
+    // 같은 문을 지난다 - 휠클릭도 Escape도 이 메서드를 부르므로, 메뉴가 세 번째
+    // 길이 되는 것이 아니라 같은 길의 손잡이 하나가 더 생기는 것이다.
     private void ViewerFullscreenMenuItem_Click(object sender, RoutedEventArgs e)
-        => ChooseViewerFullscreen(fillsDesktop: false, wasChecked: !_viewerFullscreen
-            || (!_isDocked && _settings.ViewerFullscreenFillsDesktop));
+    {
+        if (sender is MenuItem item)
+        {
+            SetViewerFullscreen(item.IsChecked);
+        }
+    }
 
     private void ViewerFullDesktopMenuItem_Click(object sender, RoutedEventArgs e)
-        => ChooseViewerFullscreen(fillsDesktop: true, wasChecked: !_viewerFullscreen
-            || _isDocked || !_settings.ViewerFullscreenFillsDesktop);
-
-    // wasChecked는 "이 행이 눌리기 전에 꺼져 있었나"이다. 체크돼 있던 행을 다시
-    // 누르면 모드를 나가고, 꺼져 있던 행을 누르면 그 답으로 간다(모드 밖이었다면
-    // 들어가면서). IsCheckable 행이 스스로 체크를 뒤집은 뒤에 여기로 오므로 상태를
-    // 다시 계산하지 않고 부르는 쪽에서 눌리기 전의 답을 넘긴다.
-    private void ChooseViewerFullscreen(bool fillsDesktop, bool wasChecked)
     {
-        if (!wasChecked)
+        if (sender is not MenuItem item)
         {
-            SetViewerFullscreen(false);
             return;
         }
 
-        // 범위를 먼저 정하고 모드에 들어간다 - SetViewerFullscreen이 들어가면서
-        // 이 값을 읽어 창을 최대화할지 정한다. 이미 모드 안이면 그 호출이 아무
-        // 일도 안 하므로 아래에서 창을 직접 맞춘다.
-        bool wasFullscreen = _viewerFullscreen;
-        _settings.ViewerFullscreenFillsDesktop = fillsDesktop;
+        _settings.ViewerFullscreenFillsDesktop = item.IsChecked;
         _settingsService.Save(_settings);
 
-        if (!wasFullscreen)
-        {
-            SetViewerFullscreen(true);
-            return;
-        }
-
-        if (_isDocked)
+        // 모드 밖에서는 정해 두기만 한다 - 다음에 들어갈 때 이 값이 쓰인다.
+        if (_isDocked || !_viewerFullscreen)
         {
             return;
         }
 
-        if (fillsDesktop)
+        if (item.IsChecked)
         {
             // Same guard as the way in: a window the user maximized themselves is
             // theirs, so there is nothing to remember and nothing to put back.

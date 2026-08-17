@@ -419,7 +419,16 @@ public static class Strings
     // 이 모드가 있다는 사실 자체가 안 보였다 (2026-08-17). 단축키를 아는 사람은
     // 계속 그걸 쓰면 되고, 이 행은 처음 쓰는 사람을 위한 것이다. 바로 아래
     // 바탕화면 전체와 짝이 되도록 그 위에 둔다 - 위가 모드, 아래가 그 범위.
-    public static string ViewerFullscreen = "앱 전체화면";
+    //
+    // `앱 전체화면`이었다가 `전체화면 보기`로 바꿈. 바로 아래 줄과 나란히 놓으면
+    // `앱`과 `바탕화면`이 서로 견주는 말로 읽혀서, 두 줄이 같은 종류의 선택으로
+    // 보였다 - 실제로는 위가 켜고 끄는 것이고 아래는 그 범위인데. `보기`는 이 줄이
+    // 동작이라고 말한다. 코드와 주석은 개념 이름으로 계속 `앱 전체화면`을 쓴다:
+    // 바탕화면까지 덮는 쪽과 구분해야 하는 자리가 있고, 그건 화면에 안 나온다.
+    public static string ViewerFullscreen = "전체화면 보기";
+    // 사용자가 부르는 이름 그대로. F1도 이 말로 맞췄다 - 같은 동작을 두 이름으로
+    // 부르면 두 기능으로 읽힌다(펼침기호와 같은 계열).
+    public static string GestureWheelClick = "휠클릭";
     public static string MenuImageViewer = "멀티미디어 패널";
     // 캐싱 rather than 미리 불러오기, reversing the earlier choice to name it for
     // what it does instead of for the machinery: 캐싱 is the word Korean users
@@ -1028,6 +1037,7 @@ public static class Strings
         ViewerNextImage = "Next image";
         ViewerFilmstrip = "Thumbnail bar";
         ViewerFullscreen = "Full screen";
+        GestureWheelClick = "Wheel click";
         ViewerFullDesktop = "Fill the desktop";
         MenuImageViewer = "Multimedia panel";
         MenuPrecacheThumbnails = "Preload image thumbnails";

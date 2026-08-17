@@ -6646,6 +6646,7 @@
                                      far it reaches. -->
                                 <MenuItem x:Name="ViewerFullscreenItem"
                                         Header="{x:Static services:Strings.ViewerFullscreen}"
+                                        InputGestureText="{x:Static services:Strings.GestureWheelClick}"
                                         IsCheckable="True"
                                         Visibility="Collapsed"
                                         Click="ViewerFullscreenMenuItem_Click"/>
