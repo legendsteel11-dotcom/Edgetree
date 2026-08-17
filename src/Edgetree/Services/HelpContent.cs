@@ -365,6 +365,20 @@ public static class HelpContent
                     R("전체 화면에서 우클릭", "파일 항목 대신 그림 크기 · 내비게이터 · 썸네일 바와 제목 표시줄 메뉴 (프리셋 · 도움말 · 다시 시작 · 종료)",
                       "Right-click in full screen",
                       "Picture size, navigator and thumbnail bar instead of the file items, plus the title bar's menu - presets, help, restart, quit"),
+                    // 2026-08-17: 창 모드에서만 나오는 줄이라 조건을 앞에 적었다 -
+                    // 부착 상태에서 찾다가 없다고 읽으면 그게 더 나쁘다.
+                    R("창 모드 · 전체 화면에서 우클릭 → 바탕화면 전체",
+                      "끄면 창 크기 그대로 그림만 꽉 채움 (기본은 창을 화면 전체로)",
+                      "Window mode · right-click in full screen → Fill the desktop",
+                      "Off keeps the window's own size and fills that instead; on (the default) grows the window to the screen"),
+                    // 이미 되는 것을 적는 줄. 헤더가 사라져도 그 자리는 제목
+                    // 표시줄이라 창이 끌리는데, 화면에 아무 표시가 없어서 아는
+                    // 방법이 없었음 (2026-08-17, 창 크기를 유지하는 전체화면이
+                    // 생기면서 실제로 필요해짐). 대가를 같은 줄에 적은 이유는 그것이
+                    // "위에서는 휠이 안 먹는다"의 답이기도 하기 때문.
+                    R("창 모드 · 전체 화면에서 위쪽 띠 드래그", "창 이동 — 그 띠는 제목 표시줄이라 그림에는 닿지 않음",
+                      "Window mode · drag the top strip in full screen",
+                      "Moves the window - that strip is still the title bar, so it does not reach the picture"),
                 }),
 
                 new Group(T("이미지", "Images"), new[]

@@ -408,6 +408,10 @@ public static class Strings
     // label admitting it needs a translation. The English keeps its own name
     // rather than being translated back.
     public static string ViewerFilmstrip = "썸네일 바";
+    // 앱 전체화면이 창 모드에서 어디까지 가는지. 사용자가 고른 말이고, "화면 전체"
+    // 대신 `바탕화면`인 것이 요점 - 앱 전체화면 자체가 이미 "화면"을 쓰고 있어서
+    // 그 말로는 둘이 구분되지 않는다.
+    public static string ViewerFullDesktop = "바탕화면 전체";
     public static string MenuImageViewer = "멀티미디어 패널";
     // 캐싱 rather than 미리 불러오기, reversing the earlier choice to name it for
     // what it does instead of for the machinery: 캐싱 is the word Korean users
@@ -1024,6 +1028,7 @@ public static class Strings
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
         ViewerFilmstrip = "Thumbnail bar";
+        ViewerFullDesktop = "Fill the desktop";
         MenuImageViewer = "Multimedia panel";
         MenuPrecacheThumbnails = "Preload image thumbnails";
         MenuOpenMediaInViewer = "Open on double-click";

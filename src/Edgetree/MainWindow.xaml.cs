@@ -24870,9 +24870,18 @@ public partial class MainWindow : Window
 
         _viewerFullscreen = on;
 
+        // The window itself is only touched while FLOATING, and only if 바탕화면
+        // 전체 is on (2026-08-17). Off, the picture fills the window the user
+        // placed and sized instead of the desktop - the whole of the request - and
+        // the state below stays null so leaving has nothing to put back.
+        //
+        // A window the user had ALREADY maximized is not ours either way: the
+        // guard was there before this switch and stays, so full screen fills the
+        // screen in that case simply because the window is that big.
         if (on)
         {
-            if (!_isDocked && WindowState != WindowState.Maximized)
+            if (!_isDocked && _settings.ViewerFullscreenFillsDesktop &&
+                WindowState != WindowState.Maximized)
             {
                 _viewerFullscreenPreviousState = WindowState;
                 WindowState = WindowState.Maximized;
@@ -25386,6 +25395,13 @@ public partial class MainWindow : Window
         ViewerNavigatorItem.IsChecked = _settings.ViewerNavigator;
         ViewerFilmstripItem.Visibility = _viewerFullscreen ? Visibility.Visible : Visibility.Collapsed;
         ViewerFilmstripItem.IsChecked = _settings.ViewerFilmstrip;
+        // 바탕화면 전체 - only while full screen is ON and the window is FLOATING.
+        // Docked has no choice to offer (the window is the band), and outside full
+        // screen the row would be a setting about a state nobody is in.
+        ViewerFullDesktopItem.Visibility = _viewerFullscreen && !_isDocked
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ViewerFullDesktopItem.IsChecked = _settings.ViewerFullscreenFillsDesktop;
         ViewerMarkAddItem.Visibility = playbackRows;
         // The FILE's bookmark, on every kind of file the panel opens. One row
         // that says which way it goes, the same swap the tree's own menu makes -
@@ -27487,6 +27503,52 @@ public partial class MainWindow : Window
 
     private void ViewerFilmstripMenuItem_Click(object sender, RoutedEventArgs e)
         => SetViewerFilmstrip(sender is MenuItem { IsChecked: true });
+
+    // 바탕화면 전체. Takes effect WHILE full screen is up rather than at the next
+    // crossing: the row sits in front of the picture it changes, so the window has
+    // to grow or come back under the hand that pressed it.
+    //
+    // Only the window state is touched. Everything else about the mode - the
+    // chrome, the tree's share, the margins - is the same whichever way this goes,
+    // which is why entering full screen and this switch can share one path.
+    private void ViewerFullDesktopMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem item)
+        {
+            return;
+        }
+
+        _settings.ViewerFullscreenFillsDesktop = item.IsChecked;
+        _settingsService.Save(_settings);
+
+        if (_isDocked || !_viewerFullscreen)
+        {
+            return;
+        }
+
+        if (item.IsChecked)
+        {
+            // Same guard as the way in: a window the user maximized themselves is
+            // theirs, so there is nothing to remember and nothing to put back.
+            if (WindowState != WindowState.Maximized)
+            {
+                _viewerFullscreenPreviousState = WindowState;
+                WindowState = WindowState.Maximized;
+            }
+
+            return;
+        }
+
+        // Only OUR maximize is undone. If the window was already maximized when
+        // full screen started, _viewerFullscreenPreviousState is null and the
+        // window stays as the user left it - switching this off cannot shrink a
+        // window this mode never grew.
+        if (_viewerFullscreenPreviousState is { } previous)
+        {
+            _viewerFullscreenPreviousState = null;
+            WindowState = previous;
+        }
+    }
 
     private void SetViewerFilmstrip(bool on)
     {

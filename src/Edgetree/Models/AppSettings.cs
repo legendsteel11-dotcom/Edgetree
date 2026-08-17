@@ -221,6 +221,22 @@ public class AppSettings
     // is the point of it, so there is nothing to carry.
     public bool ViewerBackgroundPlay { get; set; } = false;
 
+    // HOW FAR 앱 전체화면 REACHES while the window is FLOATING (2026-08-17). On,
+    // the window is maximized on the way in and put back on the way out, which is
+    // what the mode has always done; off, the window is left exactly where and as
+    // big as it is and the picture fills it instead.
+    //
+    // The request was for the second, and the reason it is a switch rather than a
+    // replacement is that both are real: a photo in a small floating window wants
+    // the desktop, and a window someone sized and placed on purpose does not want
+    // to be moved by a middle-click. Docked never asks - there the window IS the
+    // band, and maximizing it would take the docking apart.
+    //
+    // Default ON, i.e. what it did before, so nobody's middle-click changes
+    // meaning on upgrade. Not in a preset, for the same reason full screen itself
+    // is not: it says what a gesture does, not what the app looks like.
+    public bool ViewerFullscreenFillsDesktop { get; set; } = true;
+
     // Collapsed to a bare sliver at the screen edge that peeks open on
     // mouse-over - see MainWindow.xaml.cs's EnterAutoHide/ExitAutoHide.
     // Entered by a single click on the app icon while docked and expanded.

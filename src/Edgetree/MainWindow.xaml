@@ -6869,6 +6869,23 @@
                                         IsCheckable="True"
                                         Visibility="Collapsed"
                                         Click="ViewerFilmstripMenuItem_Click"/>
+                                <!-- HOW FAR 앱 전체화면 REACHES, in the mode where
+                                     there is a choice (2026-08-17, the author's
+                                     shape: keep the key, put the SCOPE on a
+                                     toggle). A floating window can either give
+                                     the picture the whole desktop or keep the
+                                     window it is in; docked there is nothing to
+                                     ask, so the row is not there.
+                                     It takes effect at once rather than at the
+                                     next crossing - the window grows or comes
+                                     back while full screen stays on, which is
+                                     what a toggle in front of the thing it
+                                     changes should do. -->
+                                <MenuItem x:Name="ViewerFullDesktopItem"
+                                        Header="{x:Static services:Strings.ViewerFullDesktop}"
+                                        IsCheckable="True"
+                                        Visibility="Collapsed"
+                                        Click="ViewerFullDesktopMenuItem_Click"/>
                                 <!-- Both rows appear only when a subtitle file
                                      was actually found beside the film - there
                                      is nothing to switch on or size otherwise,
