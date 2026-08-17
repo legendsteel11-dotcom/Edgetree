@@ -11977,6 +11977,21 @@ public partial class MainWindow : Window
         // ExpanderInkOverhang을 통해 이미 반영한다.
         Resources["ExpanderGlyphSize"] = 16.0 * ExpanderGlyphScale;
 
+        // 꺽쇠 상자가 들여쓰기 열보다 넓으면 넘치는 만큼을 음수 여백으로 되돌려
+        // 준다 (2026-08-17). WPF는 칸보다 큰 자식에게 칸을 클립으로 씌우고
+        // HorizontalAlignment도 무시하므로(안 맞으면 Left), 상자는 열 왼쪽에
+        // 붙고 열 폭을 넘는 부분이 잘려 나갔다. 아래로 돈 꺽쇠가 그것을 드러낸
+        // 이유는 회전이 폭↔높이를 맞바꿔 잉크가 ±0.325×상자까지 나가기 때문이고
+        // (접힌 쪽은 ±0.197), 14pt·탭간격 10에서 오른팔 2.4px이 잘렸다.
+        // 기본값(12pt·12)에서도 1.2px 잘리고 있었다.
+        //
+        // 여백은 부모 좌표에서 잼 - LayoutTransform 바깥이라 rowGlyphBox 단위를
+        // 그대로 쓴다(오프스크린 렌더로 확인). 열이 상자보다 넓으면 0이 되어
+        // 그 구간 화면은 한 픽셀도 안 변한다.
+        double expanderOverhang = Math.Max(0.0, rowGlyphBox - tabSpacing) / 2.0;
+        Resources["ExpanderBoxOverhang"] =
+            new Thickness(-expanderOverhang, 0, -expanderOverhang, 0);
+
         var plainMargin = new Thickness(0, 0, 6 * scale, 0);
         Resources["FolderRowIconMargin"] = plainMargin;
 
@@ -12027,11 +12042,14 @@ public partial class MainWindow : Window
         // 그래서 대가는 트리 전체가 한 번 오른쪽으로 밀리는 것뿐이고, 두 단계만
         // 내려가도 좁은 들여쓰기가 아낀 폭이 더 크다.
         //
-        // 덤으로 같이 없어지는 것: 아래로 돌아간 꺽쇠는 잉크가 0.25까지 나가므로
-        // 상자가 들여쓰기의 두 배를 넘으면(큰 글꼴 + 좁은 들여쓰기) 끝이 아이콘
-        // 밑으로 들어갔다 - 아이콘 열이 나중에 그려져 위를 덮기 때문이다. 오른쪽
-        // 꺽쇠는 0.15라 3.3배까지 버티므로 접었을 때만 작아 보였다. 간격이
-        // 생기면 그 조건이 성립하지 않는다.
+        // 이 식은 상자가 열 가운데에 놓인다는 전제인데, 2026-08-17까지는 좁은
+        // 들여쓰기에서 그렇지 않았다 - 상자가 칸보다 크면 WPF가 왼쪽에 붙이고
+        // 잘라냈다(ExpanderBoxOverhang을 볼 것). 음수 여백으로 중앙이 실제로
+        // 지켜지면서 이 계산이 뜻하던 그대로가 됐다.
+        //
+        // 덤으로 같이 없어지는 것: 아래로 돌아간 꺽쇠는 잉크가 상자의 ±0.325까지
+        // 나가므로 좁은 들여쓰기에서 끝이 이름 쪽으로 들어갔다. 오른쪽 꺽쇠는
+        // ±0.197이라 훨씬 늦게 걸리므로 접었을 때는 안 보였다.
         double gapNow = tabSpacing / 2.0 - ExpanderInkOverhang * rowGlyphBox;
         double wantedGap = Math.Max(ExpanderNameGapFloor, ExpanderNameGapTarget * compact);
         double nameGap = Math.Round(Math.Max(0.0, wantedGap - gapNow));

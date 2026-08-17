@@ -412,6 +412,13 @@
              mark inside grows, centered, so nothing moves. -->
         <system:Double x:Key="ExpanderGlyphSize">20.8</system:Double>
 
+        <!-- How far the arrow's box is allowed to hang out of the indent column
+             on each side, as a negative margin - see the Expander's own comment
+             in ExplorerTreeViewItemStyle for what it fixes. Replaced from
+             ApplyLayoutMetrics; -2 is what the default 12pt/탭간격 12 works out
+             to ((16 - 12) / 2). -->
+        <Thickness x:Key="ExpanderBoxOverhang">-2,0,-2,0</Thickness>
+
         <!-- The column a file row's TreeViewItem template always reserves
              for the expand arrow it never shows (folders alone can expand) -
              only collapsed to 0 when BOTH folder and file icons are off, so a
@@ -2602,11 +2609,35 @@
                                          for why this needed to move at all -
                                          it was the one thing in a row that had
                                          never followed the font. -->
+                                    <!-- The negative margin is what lets the box
+                                         be WIDER than the indent column it sits
+                                         in (2026-08-17). Without it WPF hands an
+                                         oversized child the cell as a clip AND
+                                         ignores the Center below - the fallback
+                                         for a child that does not fit is
+                                         Left/Top - so the box landed at the
+                                         column's left edge and everything past
+                                         its width was cut off. The down chevron
+                                         is the one that showed it: rotating
+                                         swaps ink width for height, so its ink
+                                         runs ±0.325 of the box against the right
+                                         chevron's ±0.197, and 2.4px of its right
+                                         arm was being sliced (reported
+                                         2026-08-16; the default indent was
+                                         losing 1.2px too).
+                                         Giving the overflow back as margin
+                                         removes the clip and makes Center true
+                                         again, so the mark is centred on the
+                                         column - which is where the guide line
+                                         under it is drawn, and what the
+                                         arrow-to-name gap arithmetic in
+                                         ApplyLayoutMetrics already assumed. -->
                                     <ToggleButton x:Name="Expander"
                                             Grid.Column="0"
                                                   Style="{StaticResource ExpanderToggleButtonStyle}"
                                                   ClickMode="Press"
                                                   HorizontalAlignment="Center"
+                                                  Margin="{DynamicResource ExpanderBoxOverhang}"
                                                   LayoutTransform="{DynamicResource ExpanderArrowScale}"
                                                   IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
                                     <!-- The arrow sits CENTERED in a column as wide as
