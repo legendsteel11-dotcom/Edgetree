@@ -172,6 +172,31 @@ public class SettingsService
         {
             return NoteFailed(ex);
         }
+        // ----- 직렬화가 실패하는 경우 (2026-08-17) -------------------------------
+        //
+        // 위의 둘은 디스크 쪽이고 이것은 그 전, Serialize가 던지는 쪽이다. 잡는
+        // 이유는 **저장이 클릭마다 돌기 때문**이다 - 여기서 던지면 사용자가 아무
+        // 관계 없는 것을 누른 순간에 앱이 끝나고, 부르는 자리가 수십 곳이라 어디에도
+        // 받아 줄 곳이 없다. 실패로 접으면 이미 있는 통보 경로(SaveFailed)를 타고
+        // "설정을 저장하지 못했습니다"가 뜬다.
+        //
+        // 예외 셋은 AppPreset.ApplyTo가 같은 이유로 잡는 것과 같은 묶음이다.
+        // 실제로 여기 오는 길로 알고 있는 것은 하나뿐이다: System.Text.Json은
+        // NaN·무한을 유효한 JSON으로 쓸 수 없다며 거부한다. 창 기하 넷이 살아 있는
+        // 창에서 바로 오는 값이라 그 자리에서도 걸러 두었다
+        // (MainWindow.StoreFloatingState) - 이것은 그 뒤에 서는 두 번째 겹이고,
+        // 두 겹이 같은 이유로 함께 고장나지 않도록 서로 다른 것을 본다: 저쪽은
+        // 값을, 이쪽은 던져진 예외를.
+        //
+        // 이 장치가 가리는 것: 설정 개체에 직렬화할 수 없는 것이 새로 들어오면
+        // (변환기 없는 타입, 순환 참조) 크래시가 아니라 **"저장 실패" 안내로**
+        // 나타난다. 즉 새 필드를 추가한 뒤 그 안내가 뜨면 디스크를 보기 전에
+        // 필드부터 의심해야 한다. 삼키지는 않는다 - NoteFailed가 말하고 기록한다.
+        catch (Exception ex) when (
+            ex is JsonException or ArgumentException or NotSupportedException)
+        {
+            return NoteFailed(ex);
+        }
     }
 
     private bool NoteSaved()

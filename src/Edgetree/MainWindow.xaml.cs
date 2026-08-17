@@ -12805,11 +12805,23 @@ public partial class MainWindow : Window
     // a real tree gesture; anything else keeps children loading but leaves the
     // rest of the tree alone (and logs, in debug builds - see
     // LogAutoCollapseSuppressed - so the theory is checkable next time).
-    private long _lastTreeUserInputTicks = long.MinValue / 2;
+    // Halved rather than long.MinValue outright so the subtraction against
+    // TickCount64 cannot overflow - the age is only ever compared, never read.
+    private const long TreeInputNever = long.MinValue / 2;
+
+    private long _lastTreeUserInputTicks = TreeInputNever;
 
     // Debug companion to the stamp above: which site wrote it last, so the
     // gate instrument can say what opened the window (see LogAccordionGate).
     private string _lastTreeInputSource = "-";
+
+    // Named for the log rather than for the logic: the sentinel above makes an
+    // untouched tree read as sinceInput=4611686018466035997ms, which is a number
+    // with no meaning that has to be counted digit by digit before it can be
+    // dismissed. The gate's own comparison is unaffected either way - a
+    // sentinel-aged stamp is outside any window - so this exists purely so
+    // startup lines say "never" (see LogAccordionGate).
+    private bool TreeInputEverHappened => _lastTreeUserInputTicks != TreeInputNever;
 
     private const long TreeGestureWindowMs = 1000;
 
@@ -12960,7 +12972,8 @@ public partial class MainWindow : Window
             File.AppendAllText(
                 Path.Combine(dir, "autocollapse.log"),
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}  gate: {(applied ? "APPLIED " : "suppressed")} {path}  " +
-                $"sinceInput={sinceInput}ms  stampedBy={_lastTreeInputSource}" +
+                $"sinceInput={(TreeInputEverHappened ? $"{sinceInput}ms" : "never")}  " +
+                $"stampedBy={_lastTreeInputSource}" +
                 $"{(reason is null ? string.Empty : $"  why={reason}")}{Environment.NewLine}");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -18181,6 +18194,16 @@ public partial class MainWindow : Window
     {
         base.OnDeactivated(e);
 
+        // A move/size loop cannot still be ours once activation has gone
+        // elsewhere (2026-08-17). _inCaptionDrag is raised by WM_ENTERSIZEMOVE
+        // and lowered only by WM_EXITSIZEMOVE, and while it is up SetMoveHint
+        // refuses to take the wash down - so a loop that ends without its exit
+        // message (the window destroyed under it, activation stolen mid-drag)
+        // would leave the mark standing over the picture for the rest of the
+        // session, with nothing able to clear it. This is the second way out,
+        // and it answers a different question than the message does.
+        _inCaptionDrag = false;
+
         CancelPendingRename();
         if (_inlineRenameItem is { IsEditing: true } editing)
         {
@@ -19469,12 +19492,25 @@ public partial class MainWindow : Window
     {
         _settings.IsFloating = !_isDocked;
 
+        // FILTERED ON THE WAY IN, because these four are the only numbers in
+        // settings.json written straight off a live WPF window (2026-08-17).
+        // Left/Top/Width/Height are NaN until a window has been given a size and
+        // a place - that is their declared default - and System.Text.Json REFUSES
+        // NaN and infinity, throwing rather than writing them. Save runs on
+        // nearly every click and catches only the two file exceptions, so a
+        // single NaN reaching it would be an unhandled throw at an arbitrary
+        // moment. No live path produces one today; this is here so the answer
+        // does not depend on that staying true.
+        //
+        // Falling back to the LAST KNOWN value rather than to null, which is the
+        // same choice the WindowState guard above makes: an unusable reading is
+        // not news that the window has no place, it is a reading to skip.
         if (!_isDocked && WindowState == WindowState.Normal)
         {
-            _floatingLeft = Left;
-            _floatingTop = Top;
-            _floatingWidth = Width;
-            _floatingHeight = Height;
+            _floatingLeft = Usable(Left) ?? _floatingLeft;
+            _floatingTop = Usable(Top) ?? _floatingTop;
+            _floatingWidth = Usable(Width) ?? _floatingWidth;
+            _floatingHeight = Usable(Height) ?? _floatingHeight;
         }
 
         _settings.FloatingLeft = _floatingLeft;
@@ -19482,6 +19518,13 @@ public partial class MainWindow : Window
         _settings.FloatingWidth = _floatingWidth;
         _settings.FloatingHeight = _floatingHeight;
     }
+
+    // "이 수를 저장에 실어 보낼 수 있는가" - 유한하면 그대로, 아니면 없음.
+    //
+    // 0과 음수는 통과시킨다. 자리 쪽은 음수가 정상이고(왼쪽 모니터), 크기 쪽의
+    // 범위는 AdoptStoredFloatingBounds가 지금 화면에 맞춰 다시 정한다. 여기서
+    // 거르는 것은 값의 크기가 아니라 JSON으로 나갈 수 있는지 하나뿐이다.
+    private static double? Usable(double value) => double.IsFinite(value) ? value : null;
 
     // ===================================================================
     // Image viewer panel (round 1: open/close geometry + selection-follow
@@ -25258,6 +25301,13 @@ public partial class MainWindow : Window
             // The caption strip stops being the only way to move the window the
             // moment the header comes back, and a wash left standing would sit on
             // top of it.
+            //
+            // The drag hold is dropped FIRST, or this call is refused: SetMoveHint
+            // ignores every request to hide while _inCaptionDrag is up, which is
+            // right for a drag and wrong for leaving the mode the drag was in.
+            // Leaving is the answer to that question, whatever the move/size loop
+            // still thinks.
+            _inCaptionDrag = false;
             SetMoveHint(false);
         }
 
@@ -28724,7 +28774,17 @@ public partial class MainWindow : Window
         // first row as below its last. The gap DOWN to the transport is left
         // alone: it is the transport's own 10, and it separates two groups of
         // controls rather than lining a plate.
-        var chipRowGap = (Thickness)FindResource("ViewerCaptionChipRowGap");
+        // TryFindResource, not FindResource: this key has no XAML declaration -
+        // ApplyLayoutMetrics creates it at runtime - and FindResource THROWS on a
+        // key that is not there yet, where every XAML reader of the same key uses
+        // DynamicResource and simply waits. Today the metrics always run first,
+        // at startup, so the throw is unreachable; it is the same shape as the
+        // GridLength fallback that did crash the help window, and the fallback
+        // costs one line. Zero is the right stand-in - the number this replaces
+        // is a gap, and no gap is a worse-looking band rather than a broken one.
+        var chipRowGap = TryFindResource("ViewerCaptionChipRowGap") is Thickness gap
+            ? gap
+            : default;
         ViewerZoomBar.Margin = new Thickness(
             chipRowGap.Left, FullScreenPlateTopAir, chipRowGap.Right, chipRowGap.Bottom);
         ViewerCaptionPanel.Visibility = Visibility.Visible;
