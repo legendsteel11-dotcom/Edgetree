@@ -33,6 +33,52 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // THE AUTHOR'S OWN WORDING, used verbatim (2026-08-17). The draft handed to
+    // them was rewritten line by line into one register - plain declaratives,
+    // none of the em-dash asides the draft leaned on - and that register is the
+    // point rather than a preference: seven lines read as one list instead of
+    // seven separate remarks. When the author hands back a list, it goes in as
+    // given.
+    //
+    // TWO LINES FOR THE MERGE, and the first of them exists for the fear rather
+    // than the feature. "즐겨찾기가 북마크로 통합" on its own reads as favourites
+    // being GONE, and this card sits directly above a download button - that one
+    // misreading is the most expensive thing on the page. So the carry-over is
+    // on the same line as the merge, and the reorder gets its own; folding them
+    // together buries the half that reassures.
+    //
+    // SEVEN IS THE UPPER END of what this card should carry. It is a glance, and
+    // the ceiling held because line 5 absorbed a second item: the picture size
+    // persisting was drafted as its own line and failed 당연함 - a reader who has
+    // not used the app assumes it already did that, and saying so invites the
+    // thought that it could not. Merged into the album-art line, where it reads
+    // as the same subject.
+    //
+    // LINE 7 IS THE ONLY ONE THAT NAMES A SYMPTOM, which this file's rules allow
+    // for an intermittent fix: the person who hit it knows it by "폴더가 접혀
+    // 있다" and by nothing else. It stays because it frightens nobody who did not
+    // hit it - nothing is lost, a view is.
+    version: 'v2.4.0',
+    ko: [
+      '즐겨찾기가 북마크로 통합되었습니다. 기존에 저장한 항목은 그대로 유지됩니다.',
+      '북마크 패널에서 항목을 드래그해 순서를 변경할 수 있습니다.',
+      '프리셋에 창 모드가 저장되며, 종료할 때의 모드로 실행됩니다.',
+      '전체 화면 전환 시 창 크기를 그대로 유지하는 옵션이 추가되었습니다.',
+      '앨범아트에 맞춤 · 1:1 · 채우기 옵션이 추가되었으며, 선택한 크기는 재시작 후에도 유지됩니다.',
+      '이미 열려 있는 폴더를 클릭하면 선택만 되고, 접기는 한 번 더 클릭해야 동작합니다.',
+      '폴더가 임의로 접히거나 트리가 C: 드라이브로 초기화되던 문제를 수정했습니다.',
+    ],
+    en: [
+      'Favorites are now merged into Bookmarks, and your saved items carry over.',
+      'Drag rows in the Bookmarks panel to reorder them.',
+      'Presets now store the window mode, and the app reopens in the mode it was closed in.',
+      'Added an option to keep the current window size when entering full screen.',
+      'Album art now supports Fit, 1:1, and Fill, and the selected size persists across restarts.',
+      'Clicking an already-open folder now only selects it; a second click collapses it.',
+      'Fixed folders collapsing on their own and the tree resetting to C:.',
+    ],
+  },
+  {
     // THREE LINES, and a patch release is where the rules below are easiest to
     // keep: there is no room to pad. Each of these changes what a person can do
     // or removes something they ran into, which is the whole test.
