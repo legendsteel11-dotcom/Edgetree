@@ -604,6 +604,20 @@ public partial class MainWindow : Window
             FileSystemService.BookmarkedPaths.Add(path);
         }
 
+        // 그림이 도착할 때의 크기(맞춤·1:1·자름맞춤). 패널이 열리기 전에 세워야
+        // 첫 그림부터 그 상태로 온다 - 위의 필터·정렬을 첫 폴더 읽기 전에 세우는
+        // 것과 같은 이유.
+        _viewerRest = ParseViewerRest(_settings.ViewerRest);
+
+        // 지난 세션의 창 모드 기하를 이 세션의 것으로 들인다 (2026-08-17).
+        //
+        // 앱은 여전히 도킹으로 시작한다 - 이 줄은 창 모드로 열지 않는다. 하는 일은
+        // "이 세션에서 처음 도킹을 풀 때 어디로 갈지"를 채워 두는 것이고, 그것이
+        // 없으면 프리셋에 담긴 창 모드가 재시작 뒤에 기하 없는 껍데기가 된다.
+        // 부수적으로, 지난번에 놓아 둔 자리로 돌아가게 된다 - 전에는 세션마다
+        // 시작 모양부터 다시 시작했다.
+        AdoptStoredFloatingBounds();
+
         FileSystemService.HiddenPaths.Clear();
         foreach (var path in _settings.HiddenFolderPaths)
         {
@@ -11155,6 +11169,11 @@ public partial class MainWindow : Window
         // ---- 2. The values ---------------------------------------------------
         preset.ApplyTo(_settings);
 
+        // 그림 크기는 값이 아니라 상태로도 들고 있으므로 함께 옮긴다. 패널이 지금
+        // 닫혀 있어도 세워 두어야 - 아래에서 열리는 경우 첫 그림이 이 상태로 온다.
+        // 화면에 이미 그림이 있는 경우는 아래 viewerLook 갈래가 다시 맞춘다.
+        _viewerRest = ParseViewerRest(_settings.ViewerRest);
+
         // THE WINDOW IS ON SCREEN FOR THE WHOLE OF THE REST OF THIS, and the
         // setting has to say so. Everything below is applied to a visible
         // window and the hiding is put back on at the very end - but the line
@@ -11279,6 +11298,11 @@ public partial class MainWindow : Window
             _filmstripBuiltFor = default;
             UpdateViewerCarousel();
             ApplyFilmstripCellSize();
+
+            // 화면에 있는 그림을 프리셋이 말한 크기로 다시 맞춘다. ByHand가 아닌
+            // 것은 이것이 손이 아니라 프리셋이고, 값은 ApplyTo가 이미 적었기
+            // 때문 - 여기서 또 적으면 프리셋이 자기 값을 자기에게 되쓴다.
+            SetViewerRest(_viewerRest);
         }
 
         // ---- 6. The folder it was saved in ------------------------------------
@@ -28347,7 +28371,14 @@ public partial class MainWindow : Window
             // the remembered rest state with them.
             // At fit it goes to 1:1; from anywhere else - a wheel zoom, and
             // fill too - it comes back to fit, which is the behaviour it had.
-            SetViewerRest(_viewerZoom is null && !_viewerFill
+            //
+            // THROUGH THE SAME DOOR AS THE CHIPS (2026-08-17). It called
+            // SetViewerRest directly, which is the mechanism rather than the
+            // gesture - so this one hand movement neither overruled a running
+            // slideshow nor was remembered, while the chips beside it did both.
+            // Two ways to the same two states behaving differently is what made
+            // "the size does not save" look true in a session where it did.
+            SetViewerRestByHand(_viewerZoom is null && !_viewerFill
                 ? ViewerRestMode.Actual
                 : ViewerRestMode.Fit);
             e.Handled = true;
@@ -28873,11 +28904,36 @@ public partial class MainWindow : Window
     // would otherwise undo their press the moment the show ended. The chips do
     // not stop the show (nothing on the zoom row does; the hand-arrives rule is
     // about the picture and the tree), which is what makes this reachable.
+    // 사람이 고른 경우. 두 가지가 여기서만 일어난다: 슬라이드쇼가 되돌리려고
+    // 들고 있던 값을 버리는 것(쇼가 도는 중에 골랐다면 그 선택이 이긴다), 그리고
+    // 설정에 적는 것.
+    //
+    // 담는 일이 여기 하나뿐인 것이 요점이다 (2026-08-17). 아래 SetViewerRest는
+    // 쇼가 자름맞춤을 빌리고 돌려줄 때도 지나가므로, 거기서 담으면 쇼를 한 번
+    // 돌린 것이 취향으로 굳는다. **반대로 쇼가 도는 중에 사람이 고른 것은
+    // 담긴다** - 그때 고른 것도 "앞으로 이렇게 보겠다"는 말이기 때문.
     private void SetViewerRestByHand(ViewerRestMode rest)
     {
         _slideshowRestBefore = null;
         SetViewerRest(rest);
+
+        _settings.ViewerRest = rest switch
+        {
+            ViewerRestMode.Actual => "actual",
+            ViewerRestMode.Fill => "fill",
+            _ => "fit",
+        };
+        _settingsService.Save(_settings);
     }
+
+    // 저장된 말을 상태로. 모르는 말은 맞춤으로 - 손으로 고친 파일이나 이 빌드가
+    // 모르는 새 값이 앱을 못 열게 할 이유가 없고, 맞춤은 이 셋의 기본이다.
+    private static ViewerRestMode ParseViewerRest(string? stored) => stored?.ToLowerInvariant() switch
+    {
+        "actual" => ViewerRestMode.Actual,
+        "fill" => ViewerRestMode.Fill,
+        _ => ViewerRestMode.Fit,
+    };
 
     private void SetViewerRest(ViewerRestMode rest)
     {

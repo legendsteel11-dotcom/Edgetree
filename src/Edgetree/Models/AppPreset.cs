@@ -125,6 +125,11 @@ public class AppPreset
         // SizeFields.
         nameof(AppSettings.ViewerClock),
         nameof(AppSettings.ViewerClockScale),
+
+        // 그림이 도착할 때의 크기 (2026-08-17). 여기 오는 이유는 위의 셋과 같다 -
+        // 패널의 표시 스위치이고 적용에 값이 안 들고, 사진을 보려고 만든 프리셋이
+        // 자름맞춤으로 열리는 것은 그 프리셋이 하려던 말 그 자체다.
+        nameof(AppSettings.ViewerRest),
     };
 
     internal static readonly string[] LookFields =
