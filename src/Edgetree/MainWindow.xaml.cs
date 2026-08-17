@@ -8101,7 +8101,13 @@ public partial class MainWindow : Window
     // clears it) while the others multi-select freely. That asymmetry is the
     // user's own specification, and it falls out of the storage rather than
     // being enforced on top of it: an empty list means no filter.
-    private void ApplyFileFilter()
+    // foldTree: 이 호출이 사용자가 필터를 만진 것인가. 그 경우에만 트리를 접는다
+    // (아래 긴 주석). 프리셋은 false로 부른다 - 모양을 통째로 갈아 끼우는 중이고,
+    // 갈 곳이 있으면 자기 걸음으로 간다. 프리셋에서도 접었더니 **재시작 직후에
+    // 트리가 C:만 남았다**(2026-08-17 신고): 저장된 위치와 프리셋의 위치가 같아
+    // 걸음이 생략되는데, 접기는 그것과 상관없이 일어나므로 되펼칠 것이 아무것도
+    // 없었다. 접기는 손으로 칩을 누르는 자리의 답이지 여기의 답이 아니다.
+    private void ApplyFileFilter(bool foldTree = true)
     {
         FileTypeFilter.SelectedCategories.Clear();
         foreach (string category in _settings.FileFilterCategories)
@@ -8156,10 +8162,16 @@ public partial class MainWindow : Window
         // extent and the offset is only clamped once the panel has heard about
         // it.
         LogFilterLayout("before");
-        CollapseEverything();
+        if (foldTree)
+        {
+            CollapseEverything();
+        }
         RefreshAllLoadedFolders(pinSelectionToTop: false);
-        Dispatcher.BeginInvoke(
-            System.Windows.Threading.DispatcherPriority.Loaded, new Action(ScrollTreeToTop));
+        if (foldTree)
+        {
+            Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Loaded, new Action(ScrollTreeToTop));
+        }
         LogFilterLayoutAfterLayout();
     }
 
@@ -11177,7 +11189,10 @@ public partial class MainWindow : Window
             // takes the old chips off the panel first, by the list that tracks
             // them - the panel itself also holds the version text.
             RebuildFooterFilterChips();
-            ApplyFileFilter();
+            // NOT folding the tree, unlike a chip press - see ApplyFileFilter's
+            // own parameter. A preset either walks somewhere of its own further
+            // down, or is meant to leave the tree where it stands.
+            ApplyFileFilter(foldTree: false);
         }
 
         // ---- 5. Shape ---------------------------------------------------------
