@@ -346,6 +346,18 @@ public partial class MainWindow : Window
     private const int WM_LBUTTONDOWN = 0x0201;
     private const int WM_LBUTTONUP = 0x0202;
     private const int WM_WINDOWPOSCHANGED = 0x0047;
+    // The caption strip's own mouse messages. WPF raises nothing for the
+    // non-client area - that is what makes the top of a full-screen picture
+    // behave differently - so the hint that marks it has to be driven from here.
+    private const int WM_MOUSEMOVE = 0x0200;
+    private const int WM_NCMOUSEMOVE = 0x00A0;
+    private const int WM_NCMOUSELEAVE = 0x02A2;
+    // The modal move/size loop's own pair. A caption DRAG runs inside it, and
+    // while it does no mouse message reaches us at all - which is why the hint
+    // needs to be told to hold rather than left to the messages.
+    private const int WM_ENTERSIZEMOVE = 0x0231;
+    private const int WM_EXITSIZEMOVE = 0x0232;
+    private const int HTCAPTION = 2;
 
     private IntPtr SingleInstanceWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
@@ -367,6 +379,51 @@ public partial class MainWindow : Window
             // window at all (a popup's own hwnd took it).
             LogClick(msg == WM_LBUTTONDOWN ? "win press" : "win up", null);
         }
+        else if (msg == WM_NCMOUSEMOVE)
+        {
+            // HTCAPTION only. The frame's other regions - the resize borders, the
+            // corners - do something else entirely, and a hint over them would
+            // promise a move where the window is about to be resized.
+            if (wParam.ToInt32() == HTCAPTION)
+            {
+                SetMoveHint(true);
+                NativeMethods.TrackNonClientMouseLeave(hwnd);
+            }
+            else
+            {
+                SetMoveHint(false);
+            }
+        }
+        else if (msg == WM_NCMOUSELEAVE)
+        {
+            SetMoveHint(false);
+        }
+        else if (msg == WM_MOUSEMOVE)
+        {
+            // Coming back into the picture is the ordinary way out of the strip,
+            // and it arrives long before the frame's own leave message would.
+            SetMoveHint(false);
+        }
+        else if (msg == WM_ENTERSIZEMOVE)
+        {
+            // THE HINT STAYS THROUGH THE DRAG (2026-08-17, the author's call:
+            // "클릭했을때 꼭 지워야 하나요"). It marks the strip being used, so
+            // taking it away at the very moment the hand acts on it is the one
+            // time it should not go. Nothing else can keep it: the loop below
+            // starves every message the hint answers to.
+            _inCaptionDrag = true;
+            _moveHintTimer?.Stop();
+        }
+        else if (msg == WM_EXITSIZEMOVE)
+        {
+            _inCaptionDrag = false;
+            // Let go the same way an idle hover does, rather than vanishing the
+            // instant the button comes up - the pointer is still on the strip.
+            if (ViewerMoveHint.Visibility == Visibility.Visible)
+            {
+                RestartMoveHintTimer();
+            }
+        }
         else if (msg == NativeMethods.WM_CLIPBOARDUPDATE)
         {
             // One hop late: this arrives while the process that wrote the
@@ -376,6 +433,86 @@ public partial class MainWindow : Window
                 System.Windows.Threading.DispatcherPriority.Background);
         }
         return IntPtr.Zero;
+    }
+
+    // THE WASH OVER THE CAPTION STRIP, and the one state it belongs to: a
+    // FLOATING window in 앱 전체화면 (2026-08-17). Docked, the caption height is 0
+    // and nothing up there drags, so a hint would be a lie; out of full screen the
+    // header is drawn there and says it itself.
+    //
+    // Height is taken from the caption at the moment of showing rather than left
+    // at the XAML's 36: the header follows the font (see HeaderHeight), and a wash
+    // that marked the wrong number of pixels would be pointing at the wrong strip.
+    private void SetMoveHint(bool on)
+    {
+        // A drag holds it up regardless of what any message says - see
+        // WM_ENTERSIZEMOVE.
+        if (!on && _inCaptionDrag)
+        {
+            return;
+        }
+
+        bool want = on && _viewerOpen && _viewerFullscreen && !_isDocked;
+
+        if (want)
+        {
+            // Restarted on every movement across the strip, so the countdown
+            // measures how long the pointer has been STILL rather than how long
+            // the hint has been up.
+            RestartMoveHintTimer();
+        }
+        else
+        {
+            _moveHintTimer?.Stop();
+        }
+
+        var visibility = want ? Visibility.Visible : Visibility.Collapsed;
+        if (ViewerMoveHint.Visibility == visibility)
+        {
+            return;
+        }
+
+        if (want)
+        {
+            ViewerMoveHint.Height = HeaderHeight;
+        }
+
+        ViewerMoveHint.Visibility = visibility;
+    }
+
+    private bool _inCaptionDrag;
+    private System.Windows.Threading.DispatcherTimer? _moveHintTimer;
+
+    // IT ALSO LEAVES ON ITS OWN, quickly (2026-08-17, on request: "살짝 빨리
+    // 없어지게"). Two things made the wash outstay its welcome: leaving the window
+    // at the top is reported by a frame message that is not in a hurry, and a
+    // pointer resting on the strip had nothing to end it at all.
+    //
+    // 500ms from the last movement. Short enough to read as the app tidying up
+    // after itself, long enough that crossing the strip on the way to somewhere
+    // else does not flash it. Moving again brings it straight back, which is what
+    // makes a short one safe.
+    private const int MoveHintIdleMs = 500;
+
+    private void RestartMoveHintTimer()
+    {
+        _moveHintTimer ??= CreateMoveHintTimer();
+        _moveHintTimer.Stop();
+        _moveHintTimer.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateMoveHintTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(MoveHintIdleMs),
+        };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            SetMoveHint(false);
+        };
+        return timer;
     }
 
     // The markers mean one thing: "this is on the clipboard, waiting to move".

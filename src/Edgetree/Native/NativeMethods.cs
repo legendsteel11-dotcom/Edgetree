@@ -354,6 +354,40 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TRACKMOUSEEVENT
+    {
+        public int cbSize;
+        public int dwFlags;
+        public IntPtr hwndTrack;
+        public int dwHoverTime;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool TrackMouseEvent(ref TRACKMOUSEEVENT eventTrack);
+
+    private const int TME_LEAVE = 0x0002;
+    private const int TME_NONCLIENT = 0x0010;
+
+    // ASK WINDOWS TO SAY WHEN THE CURSOR LEAVES THE FRAME. WM_NCMOUSELEAVE is
+    // not sent unless it has been requested, and without it a hint drawn on the
+    // caption strip would stay up after the pointer had gone somewhere else
+    // entirely - there is no other message that reports it (the client area's
+    // own WM_MOUSEMOVE only covers the pointer coming back INTO the window).
+    //
+    // Requested again on every NCMOUSEMOVE: the subscription is one-shot, spent
+    // by the leave message it produces.
+    public static void TrackNonClientMouseLeave(IntPtr hwnd)
+    {
+        var track = new TRACKMOUSEEVENT
+        {
+            dwFlags = TME_LEAVE | TME_NONCLIENT,
+            hwndTrack = hwnd,
+        };
+        track.cbSize = Marshal.SizeOf(track);
+        TrackMouseEvent(ref track);
+    }
+
     // Bitmap.GetHicon hands out a handle the caller owns; disposing the Icon
     // wrapped around it does not free it.
     [DllImport("user32.dll")]

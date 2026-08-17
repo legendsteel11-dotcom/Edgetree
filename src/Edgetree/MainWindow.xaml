@@ -9034,6 +9034,46 @@
              while floating: docked, ResizeBorderThickness is 0 and this would do
              nothing but eat the top of the header's own mouse handling.
              Height matches MainWindow.FloatingResizeBorder. -->
+        <!-- WHERE THE WINDOW CAN STILL BE GRABBED WHILE THE HEADER IS GONE
+             (2026-08-17, the author's shape). 앱 전체화면 takes the header away,
+             and while FLOATING the top strip is still the caption - so the window
+             moves if you drag there, and nothing on screen said so. Full screen
+             that keeps the window's own size is what made that worth showing: a
+             window you can no longer move is a window stuck where it happened to
+             be.
+             A wash rather than the header coming back: bringing the header back
+             would either shift the picture down by its height or need a second
+             overlay of the whole bar, and what is being answered is only "this
+             strip is not the picture". It marks exactly the caption's height, so
+             it also explains why the wheel and a click do not reach the picture
+             up there.
+             IsHitTestVisible="False" is load-bearing - the whole point of the
+             strip is that the drag reaches WINDOWS, and a Border with a
+             Background would answer it first. Fixed black rather than a theme
+             brush, for the reason the full-screen transport's plate gives: what
+             shows through it is the picture, not the app. -->
+        <Border x:Name="ViewerMoveHint"
+                VerticalAlignment="Top"
+                Height="36"
+                Background="#59000000"
+                IsHitTestVisible="False"
+                Visibility="Collapsed">
+            <!-- Material Symbols "arrows_output" (the author's pick), four arrows
+                 out of a centre dot - "this thing can be taken anywhere" rather
+                 than a direction. No 960-box tail: it stands alone in the strip
+                 rather than beside other marks, which is the case that gains
+                 nothing from the box (see the icon rules this app keeps).
+                 White with its own alpha, like the strip: both are drawn over a
+                 picture, so neither can take a theme brush. -->
+            <Path Data="M144-144v-192h72v69l117-117 51 51-117 117h69v72H144Zm480 0v-72h69L576-333l51-51 117 117v-69h72v192H624ZM333-576 216-693v69h-72v-192h192v72h-69l117 117-51 51Zm294 0-51-51 117-117h-69v-72h192v192h-72v-69L627-576ZM479.79-408Q450-408 429-429.21t-21-51Q408-510 429.21-531t51-21Q510-552 531-530.79t21 51Q552-450 530.79-429t-51 21Z"
+                    Fill="#D9FFFFFF"
+                    Stretch="Uniform"
+                    Width="16"
+                    Height="16"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"/>
+        </Border>
+
         <Border x:Name="TopResizeStrip"
                 VerticalAlignment="Top"
                 Height="6"
