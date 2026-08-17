@@ -25047,16 +25047,12 @@ public partial class MainWindow : Window
         // the panel's divider line go for the same reason - a 1px border is
         // still 1px the picture doesn't get. The way out is Esc, Enter or
         // middle-click; that is what every other viewer offers too.
-        // The bottom line comes and goes with the mode. ON ENTERING it is shown
-        // unasked, which is the one time it is certainly wanted: the way out of
-        // this mode is a key, the header that would have said so has just gone,
-        // and nobody moves the mouse to find out how to leave something they
-        // have only now entered. On leaving it is cut rather than faded - the
-        // caption is back and a line fading over it belongs to a state that no
-        // longer exists.
         if (!on)
         {
-            HideViewerInfoLine(fade: false);
+            // The caption strip stops being the only way to move the window the
+            // moment the header comes back, and a wash left standing would sit on
+            // top of it.
+            SetMoveHint(false);
         }
 
         var chrome = on ? Visibility.Collapsed : Visibility.Visible;
@@ -25206,15 +25202,6 @@ public partial class MainWindow : Window
             ExplorerTree.Focus();
         }));
 
-        // AFTER the layout above, because the line measures the subtitle plate
-        // to decide how high to sit and reads the panel's current file - both
-        // of which this method has just been changing.
-        if (on)
-        {
-            Dispatcher.BeginInvoke(
-                new Action(ShowViewerInfoLine),
-                System.Windows.Threading.DispatcherPriority.Loaded);
-        }
     }
 
     private void ViewerImageHost_MouseDown(object sender, MouseButtonEventArgs e)
@@ -25250,126 +25237,6 @@ public partial class MainWindow : Window
     // multi-selection is collapsed to the shown file rather than blocking
     // the menu (2026-08-09): the hand that right-clicked one
     // picture means that one, and the rows un-highlighting says so.
-    // ----- 전체 덮기의 아래 줄 ---------------------------------------------------
-    //
-    // 덮개가 올라가면 헤더가 사라지고 캡션도 함께 사라진다 - 이 앱이 파일을
-    // 보여 주면서 이름을 말하지 않는 유일한 상태다. 키 쪽도 같은 모양의 구멍인데
-    // 방향이 반대다: 그 안에서 시계와 쇼에 닿는 길은 F9와 F8뿐인데 화면에 그렇게
-    // 적힌 데가 없다. 한 줄이 둘 다 답한다.
-    //
-    // 겨냥하지 않아도 나타나는 것이 요점이다. 툴팁은 설명할 대상을 정확히 짚어야
-    // 뜨는데, 어디를 짚을지 아는 사람은 이미 그 키를 아는 사람이다.
-    private System.Windows.Threading.DispatcherTimer? _viewerInfoTimer;
-
-    // 2.5초. 읽고도 남고, 사진을 오래 가리지도 않는다.
-    private const int ViewerInfoHoldMs = 2500;
-    private const int ViewerInfoFadeInMs = 140;
-    private const int ViewerInfoFadeOutMs = 420;
-
-    private void ShowViewerInfoLine()
-    {
-        if (!_viewerFullscreen)
-        {
-            return;
-        }
-
-        // 그림일 때만 (2026-08-16). 영상에는 이 줄이 할 일이 없다 - F8은 영상과
-        // 무관하고, 이름은 아래쪽을 가리키면 나오는 재생 막대가 이미 대고 있으며,
-        // 자막이 켜져 있으면 둘이 같은 자리를 두고 다툰다. 소리도 같이 빠진다:
-        // 미디어가 화면의 그 파일을 쥐고 있으면 이 줄은 안 뜬다.
-        if (ViewerMediaIsSelection)
-        {
-            HideViewerInfoLine(fade: false);
-            return;
-        }
-
-        // 쇼는 트리를 움직이지 않으므로 선택이 화면의 그림이 아니다. 패널이 지금
-        // 무엇을 들고 있는지를 아는 것은 _pendingViewerPath 하나뿐이고, 이름을
-        // 대야 하는 파일이 그것이다.
-        ViewerInfoName.Text = _pendingViewerPath is { Length: > 0 } path
-            ? System.IO.Path.GetFileName(path)
-            : string.Empty;
-        ViewerInfoName.Visibility = ViewerInfoName.Text.Length > 0
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        ViewerInfoKeys.Text = IsSlideshowRunning
-            ? Strings.ViewerInfoKeysRunning
-            : Strings.ViewerInfoKeysIdle;
-
-        // 트리의 Ctrl +/- 를 따라간다. 키 줄은 한 단계 작게 - 이 앱이 부차적인
-        // 것을 표시하는 방법이 크기이고, 흐리게 하는 것은 쓰지 않는다.
-        double nameSize = ExplorerTree.FontSize;
-        ViewerInfoName.FontSize = nameSize;
-        ViewerInfoKeys.FontSize = SecondaryFontSize(nameSize, stepsDown: 1, floor: 8.0);
-
-        // 자막이 떠 있으면 그 위로 비켜선다. 둘 다 아래 가운데에 놓이는데, 자막은
-        // 영상에 붙은 것이고 이 줄은 그 위를 잠깐 지나가는 것이다.
-        double bottom = ViewerSubtitlePlate.Visibility == Visibility.Visible
-            ? 18 + ViewerSubtitlePlate.ActualHeight + 8
-            : 18;
-        ViewerInfoPlate.Margin = new Thickness(16, 0, 16, bottom);
-
-        ViewerInfoPlate.Visibility = Visibility.Visible;
-        // 이미 올라와 있으면 다시 띄우지 않는다. 마우스가 움직이는 내내 페이드를
-        // 새로 걸면 줄이 깜빡인다 - 움직임마다 새로 하는 것은 사라질 시각뿐이다.
-        if (ViewerInfoPlate.Opacity < 1.0)
-        {
-            ViewerInfoPlate.BeginAnimation(OpacityProperty, new DoubleAnimation
-            {
-                To = 1.0,
-                Duration = TimeSpan.FromMilliseconds(ViewerInfoFadeInMs),
-            });
-        }
-
-        _viewerInfoTimer ??= CreateViewerInfoTimer();
-        _viewerInfoTimer.Stop();
-        _viewerInfoTimer.Interval = TimeSpan.FromMilliseconds(ViewerInfoHoldMs);
-        _viewerInfoTimer.Start();
-    }
-
-    private System.Windows.Threading.DispatcherTimer CreateViewerInfoTimer()
-    {
-        var timer = new System.Windows.Threading.DispatcherTimer();
-        timer.Tick += (_, _) =>
-        {
-            _viewerInfoTimer?.Stop();
-            HideViewerInfoLine(fade: true);
-        };
-        return timer;
-    }
-
-    // fade가 false면 그 자리에서 치운다 - 덮개를 나가는 순간이 그렇다. 나가면서
-    // 페이드가 계속 돌면 헤더가 돌아온 창 위에 남은 줄이 마저 사라진다.
-    private void HideViewerInfoLine(bool fade)
-    {
-        _viewerInfoTimer?.Stop();
-
-        if (!fade)
-        {
-            ViewerInfoPlate.BeginAnimation(OpacityProperty, null);
-            ViewerInfoPlate.Opacity = 0;
-            ViewerInfoPlate.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        var fadeOut = new DoubleAnimation
-        {
-            To = 0.0,
-            Duration = TimeSpan.FromMilliseconds(ViewerInfoFadeOutMs),
-        };
-        // Visibility는 애니메이션이 끝난 뒤에 접는다. 투명한 채로 남겨 두면
-        // 레이아웃에 자리를 계속 차지한다 - 여기서는 겹쳐 놓인 것이라 눈에
-        // 보이지 않지만, 다음에 이 줄을 다른 자리에 두려는 사람이 밟는다.
-        fadeOut.Completed += (_, _) =>
-        {
-            if (ViewerInfoPlate.Opacity <= 0.01)
-            {
-                ViewerInfoPlate.Visibility = Visibility.Collapsed;
-            }
-        };
-        ViewerInfoPlate.BeginAnimation(OpacityProperty, fadeOut);
-    }
-
     private void ViewerImageHost_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         // A PLAYING film qualifies too, and it has to: the media element covers
@@ -28778,13 +28645,6 @@ public partial class MainWindow : Window
 
     private void ViewerImageHost_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
-        // FIRST, and before every early return below. The line is about the
-        // cover rather than about the gesture, so a move that turns out to be a
-        // flick or a pan still counts as the hand arriving - and the two
-        // returns underneath would otherwise swallow exactly the moves someone
-        // makes while looking for a way out.
-        ShowViewerInfoLine();
-
         if (_viewerFlicking)
         {
             UpdateViewerFlick(e);

@@ -7396,50 +7396,19 @@
                                 TextAlignment="Center"
                                 TextWrapping="Wrap"/>
                     </Border>
-                    <!-- WHAT IS ON SCREEN AND HOW TO LEAVE IT, on a mouse move
-                         while the cover is up (2026-08-16).
-                         The full cover takes the header away and with it the
-                         caption, so it is the one state where the app shows a
-                         file and never names it. The keys have the same
-                         problem from the other end: F9 and F8 are the only way
-                         to reach the clock and the show in there, and nothing
-                         on screen says so.
-                         A LINE THAT COMES TO YOU rather than a tooltip. A
-                         tooltip has to be aimed at the thing it explains, and
-                         anyone who knows where to aim already knows the key -
-                         which is the half of the audience that does not need
-                         telling. This is the shape every full-screen viewer
-                         uses for the same reason.
-                         The subtitle plate's own treatment, deliberately: this
-                         is a line of words over a picture, which is exactly
-                         what that plate was built for and what the clock's
-                         comment says a plate is right for. The clock keeps its
-                         shadow because a clock is a face on a wall.
-                         Two sizes, not two opacities - this app marks
-                         something secondary by making it smaller, never by
-                         fading it. Sizes and the fade are set in code. -->
-                    <Border x:Name="ViewerInfoPlate"
-                            Grid.Row="0"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Bottom"
-                            Margin="16,0,16,18"
-                            Padding="12,6"
-                            CornerRadius="3"
-                            Background="#A6000000"
-                            IsHitTestVisible="False"
-                            Opacity="0"
-                            Visibility="Collapsed">
-                        <StackPanel>
-                            <TextBlock x:Name="ViewerInfoName"
-                                    Foreground="#FFFFFFFF"
-                                    TextAlignment="Center"
-                                    TextTrimming="CharacterEllipsis"/>
-                            <TextBlock x:Name="ViewerInfoKeys"
-                                    Foreground="#FFFFFFFF"
-                                    TextAlignment="Center"
-                                    Margin="0,2,0,0"/>
-                        </StackPanel>
-                    </Border>
+                    <!-- A LINE NAMING THE FILE AND THE TWO KEYS lived here from
+                         2026-08-16 to 2026-08-17, shown on a mouse move while
+                         the cover was up. Taken out on the author's call: it
+                         appeared on the smallest movement, which made it feel
+                         like something to get rid of rather than something
+                         offered, and it could not be dismissed by hand either -
+                         a click over the picture already means play or pan.
+                         What settled it is that the file's name is answered in
+                         several places already (the caption, the 지금 재생 중 line,
+                         the footer's chip, the tree row), so the line was adding
+                         a fourth answer rather than a missing one. The keys keep
+                         their home in F1. The same reasoning retired the
+                         slideshow's track-name overlay the same day. -->
                     <!-- The one affordance that turns a still frame into a
                          promise the panel can keep. Only up for a video that
                          isn't playing; clicking the picture itself is left
