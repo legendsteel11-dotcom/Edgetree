@@ -211,7 +211,10 @@ public static class Strings
     // 분명해야 해서 "드라이브 아이콘" 그대로다 - 이 셋은 서로의 예외가 아니라
     // 각자 한 종류의 행을 맡는다.
     public static string MenuShowDriveIcons = "드라이브 아이콘";
-    public static string MenuHideTitleBarTitle = "제목 표시줄 타이틀 제거";
+    // 2026-08-17: `제목 표시줄 타이틀 제거`였음. 이 묶음의 다른 줄은 전부 켜면
+    // 보이는 쪽(`폴더 아이콘`·`드라이브 아이콘`·`영역 구분선`)인데 이 줄만 반대라,
+    // 체크가 무엇을 뜻하는지 줄마다 다시 읽어야 했음.
+    public static string MenuTitleBarTitle = "제목 표시줄 타이틀";
     // Names the way BACK, because that is what someone looks for first when a
     // drag did something they did not expect. The other half of the rule -
     // across drives it copies - is on the row in the help rather than here,
@@ -938,7 +941,7 @@ public static class Strings
         MenuShowFolderIcons = "Show Folder Icons";
         MenuShowFileIcons = "Show File Icons";
         MenuShowDriveIcons = "Show Drive Icons";
-        MenuHideTitleBarTitle = "Hide Title Bar Text";
+        MenuTitleBarTitle = "Title Bar Text";
         MenuDragMoves = "Drag Moves (hold Ctrl to copy)";
         MenuShowPanelDividers = "Panel Dividers";
         MenuFavoritesAtBottom = "Show at Bottom";

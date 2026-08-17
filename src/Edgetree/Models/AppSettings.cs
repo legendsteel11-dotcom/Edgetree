@@ -666,6 +666,23 @@ public class AppSettings
     // Strings.Initialize) - that's a separate, unrelated concern.
     public bool HideTitleBarTitle { get; set; } = false;
 
+    // WHAT THE MENU ASKS, which is the opposite (2026-08-17). Every other row in
+    // 기본 설정 is a thing that is THERE when the box is ticked - 폴더 아이콘,
+    // 드라이브 아이콘, 영역 구분선 - and this one row asked to REMOVE something, so
+    // reading the group meant re-deciding what a tick meant line by line.
+    //
+    // The stored field above keeps its name and its polarity on purpose. Flipping
+    // what is written to settings.json would have flipped every existing user's
+    // title bar on the next launch, and there is nothing to gain from that: the
+    // inversion belongs at the one place the question is asked. The label and the
+    // tick now agree, and nobody has to touch anything.
+    [JsonIgnore]
+    public bool ShowTitleBarTitle
+    {
+        get => !HideTitleBarTitle;
+        set => HideTitleBarTitle = !value;
+    }
+
     // The path strip above the footer's filter chips: shows the folder the
     // selection is in, and takes a pasted path + Enter to jump there.
     //

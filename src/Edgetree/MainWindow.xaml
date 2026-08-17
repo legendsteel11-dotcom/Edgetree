@@ -1792,10 +1792,15 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="showDriveIcons"
                         Click="ShowDriveIconsMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuHideTitleBarTitle}"
+                <!-- Reads the same way round as its neighbours since 2026-08-17:
+                     checked means the text is THERE. The stored setting is still
+                     the "hide" one, inverted once at this boundary - see
+                     AppSettings.ShowTitleBarTitle for why the file keeps its
+                     polarity. -->
+                <MenuItem Header="{x:Static services:Strings.MenuTitleBarTitle}"
                         IsCheckable="True"
-                        AutomationProperties.AutomationId="hideTitleBarTitle"
-                        Click="HideTitleBarTitleMenuItem_Click"/>
+                        AutomationProperties.AutomationId="titleBarTitle"
+                        Click="TitleBarTitleMenuItem_Click"/>
                 <!-- Beside the two icon toggles because it answers the same kind
                      of question - what the window DRAWS - rather than what it
                      does. The colour rows for the line stay in 색상 설정; this is

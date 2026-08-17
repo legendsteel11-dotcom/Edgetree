@@ -8090,7 +8090,7 @@ public partial class MainWindow : Window
                 FindMenuItem(generalSettings, "showFolderIcons") is { } showFolderIcons &&
                 FindMenuItem(generalSettings, "showFileIcons") is { } showFileIcons &&
                 FindMenuItem(generalSettings, "showDriveIcons") is { } showDriveIcons &&
-                FindMenuItem(generalSettings, "hideTitleBarTitle") is { } hideTitleBarTitle &&
+                FindMenuItem(generalSettings, "titleBarTitle") is { } titleBarTitle &&
                 FindMenuItem(generalSettings, "showPanelDividers") is { } showPanelDividers &&
                 // showPathBar left the menu on 2026-08-11 and had to leave this
                 // chain in the same edit: an id that no longer exists fails the
@@ -8110,7 +8110,7 @@ public partial class MainWindow : Window
                 showFolderIcons.IsChecked = _settings.ShowFolderIcons;
                 showFileIcons.IsChecked = _settings.ShowFileIcons;
                 showDriveIcons.IsChecked = _settings.ShowDriveIcons;
-                hideTitleBarTitle.IsChecked = _settings.HideTitleBarTitle;
+                titleBarTitle.IsChecked = _settings.ShowTitleBarTitle;
                 showPanelDividers.IsChecked = _settings.ShowPanelDividers;
                 autoCollapse.IsChecked = _settings.AutoCollapseFolders;
                 dragMoves.IsChecked = _settings.DragMovesInsideTree;
@@ -9966,11 +9966,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private void HideTitleBarTitleMenuItem_Click(object sender, RoutedEventArgs e)
+    private void TitleBarTitleMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem menuItem)
         {
-            _settings.HideTitleBarTitle = menuItem.IsChecked;
+            // Through the SHOW property, so the one place that knows the stored
+            // field is written the other way round stays one place.
+            _settings.ShowTitleBarTitle = menuItem.IsChecked;
             _settingsService.Save(_settings);
             ApplyTitleTextVisibility();
         }
@@ -10736,7 +10738,7 @@ public partial class MainWindow : Window
     // wants it hidden.
     private void UpdateRootPathTextVisibility(Visibility contentVisibility)
     {
-        RootPathText.Visibility = contentVisibility == Visibility.Visible && !_settings.HideTitleBarTitle
+        RootPathText.Visibility = contentVisibility == Visibility.Visible && _settings.ShowTitleBarTitle
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
