@@ -103,6 +103,22 @@ public class FileSystemItem : INotifyPropertyChanged
         set
         {
             bool changed = _isExpanded != value;
+
+            // RECORDED BEFORE THE NOTIFICATION, and that ordering is the whole
+            // point (measured 2026-08-17): SetField raises PropertyChanged, the
+            // TwoWay binding pushes the value into the row's container, and the
+            // container raises Expanded - all inside that one call. So the
+            // accordion's reader runs before this setter's own tail. Written at
+            // the tail it was one step late every single time, and every real
+            // expansion was refused as a phantom (autocollapse.log 16:36:14 had
+            // the gate line one millisecond BEFORE the write it was asking
+            // about).
+            if (changed && value)
+            {
+                LastModelExpand = this;
+                LastModelExpandTicks = Environment.TickCount64;
+            }
+
             if (SetField(ref _isExpanded, value) && IsDirectory)
             {
                 OnPropertyChanged(nameof(Icon));
@@ -114,6 +130,22 @@ public class FileSystemItem : INotifyPropertyChanged
             }
         }
     }
+
+    // THE LAST FOLDER WHOSE MODEL ACTUALLY WENT FROM CLOSED TO OPEN, and when
+    // (2026-08-17). Not an instrument - MainWindow's accordion reads it to tell
+    // a real expansion from the Expanded event WPF raises when a container is
+    // built (or rebound) for a row that was already expanded. That event carries
+    // no model transition, because there is nothing to change; see
+    // TreeViewItem_Expanded for the incident that made this necessary.
+    //
+    // Static, and only ever the LAST one: the reader wants "did this item just
+    // change", asked microseconds later in the same call stack, so one slot is
+    // the whole requirement. A per-item flag would go stale instead - a folder
+    // expanded off-screen at startup would still be carrying it minutes later,
+    // which is exactly the case being defended against.
+    internal static FileSystemItem? LastModelExpand { get; private set; }
+
+    internal static long LastModelExpandTicks { get; private set; }
 
     // Debug instrument (2026-08-14): folders collapse with no hand on the
     // tree - during a window resize with a slideshow running, the whole

@@ -12790,6 +12790,52 @@ public partial class MainWindow : Window
             return;
         }
 
+        // AN EXPANDED EVENT IS NOT PROOF THAT ANYTHING EXPANDED (2026-08-17).
+        // WPF raises it whenever a CONTAINER's IsExpanded goes true - including
+        // the moment a container is built for a row whose model was already
+        // expanded and the TwoWay binding pushes that true into the fresh
+        // element. Nothing opened; a row that was already open merely came into
+        // existence. The old gate could not see the difference and asked a
+        // question about TIME instead ("was the tree touched in the last
+        // second"), so a phantom landing just after a click was read as the
+        // click's own doing.
+        //
+        // Measured, and it cost the user the tree they were working in
+        // (click.log + autocollapse.log 16:24:01): a second click collapsed
+        // C:\...\Pictures\4k, which removed 21 rows, which realised rows further
+        // down - and a container for D:\...\ANI, expanded at startup and never
+        // on screen since, raised Expanded 9ms later. The accordion took ANI for
+        // the folder just opened and collapsed everything off its path: the whole
+        // C: chain the user was in, with the selection falling back to C:. The
+        // same phantom was recorded on 2026-08-14 during a window RESIZE, which
+        // realises containers the same way; the instrument added then is what
+        // named the stamp this time.
+        //
+        // So ask the MODEL instead. A real expansion is a transition on the item
+        // itself, and the two orders it can arrive in are both accepted:
+        //   · model first, container after (a row click sets item.IsExpanded) -
+        //     the transition is on record, microseconds old.
+        //   · container first, model after (the chevron, and the keyboard, write
+        //     the container's property; the binding pushes it to the model) - at
+        //     this instant the model can still read false.
+        // A phantom is neither: the model was ALREADY true before the container
+        // existed, so there is no transition and nothing is pending.
+        //
+        // The time gate STAYS as well, and the pair is deliberate - it is the one
+        // that keeps startup restore and other app-driven expansions (which do
+        // produce real transitions) from collapsing anything. Two conditions that
+        // fail for different reasons, rather than one doing both jobs badly.
+        bool modelJustChanged =
+            ReferenceEquals(FileSystemItem.LastModelExpand, item) &&
+            Environment.TickCount64 - FileSystemItem.LastModelExpandTicks <= ModelExpandPairingMs;
+        bool modelNotCaughtUpYet = !item.IsExpanded;
+
+        if (!modelJustChanged && !modelNotCaughtUpYet)
+        {
+            LogAccordionGate(item.FullPath, sinceInput, applied: false, reason: "no model transition");
+            return;
+        }
+
         if (IsWithinTreeGestureWindow)
         {
             LogAccordionGate(item.FullPath, sinceInput, applied: true);
@@ -12803,8 +12849,18 @@ public partial class MainWindow : Window
         }
     }
 
+    // How long after a model-side expansion its own Expanded event may still
+    // arrive. It is raised synchronously by the binding, so this is slack for a
+    // busy dispatcher rather than a window anything can slip through - a phantom
+    // for the same item would have to land inside it, and the transition it would
+    // need has not happened for minutes by then.
+    private const long ModelExpandPairingMs = 250;
+
+    // reason names WHICH gate refused, since there are now two and they refuse
+    // for unrelated causes - a log line that only said "suppressed" would send
+    // the next reader looking at the timing when the answer was the phantom.
     [System.Diagnostics.Conditional("DEBUG")]
-    private void LogAccordionGate(string path, long sinceInput, bool applied)
+    private void LogAccordionGate(string path, long sinceInput, bool applied, string? reason = null)
     {
         try
         {
@@ -12814,7 +12870,8 @@ public partial class MainWindow : Window
             File.AppendAllText(
                 Path.Combine(dir, "autocollapse.log"),
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}  gate: {(applied ? "APPLIED " : "suppressed")} {path}  " +
-                $"sinceInput={sinceInput}ms  stampedBy={_lastTreeInputSource}{Environment.NewLine}");
+                $"sinceInput={sinceInput}ms  stampedBy={_lastTreeInputSource}" +
+                $"{(reason is null ? string.Empty : $"  why={reason}")}{Environment.NewLine}");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
