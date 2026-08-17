@@ -765,6 +765,20 @@ public partial class MainWindow : Window
         // disk work happens on a thread pool anyway (see the method).
         Dispatcher.BeginInvoke(PruneMissingBookmarks, System.Windows.Threading.DispatcherPriority.Background);
 
+        // 창 모드로 닫혔으면 창 모드로 열린다 (2026-08-17). 앱은 언제나 도킹으로
+        // 시작했고, 그 자리에 담을 값이 없었기 때문이지 그러기로 정한 것이 아니었다.
+        //
+        // 트리 복원 뒤에 줄을 세운다 - 같은 우선순위이므로 위에 넣은 것이 먼저
+        // 돌고, 그것은 폴더를 동기로 읽어 돌아온다. 순서가 이래야 하는 이유는
+        // 프리셋에서 이 단계를 맨 끝에 둔 것과 같다: 폴더를 걸어 들어가는 도중에
+        // 창의 기하를 바꾸면 걸음이 그 위에서 흔들린다.
+        if (_settings.IsFloating)
+        {
+            Dispatcher.BeginInvoke(
+                new Action(RestoreFloatingWindowMode),
+                System.Windows.Threading.DispatcherPriority.Background);
+        }
+
         StartStuckCaptureWatchdog();
         StartNetworkRootStatusWatch();
 
@@ -4769,6 +4783,11 @@ public partial class MainWindow : Window
 
         UpdateResizeThumbVisibility();
         UpdatePinButtonVisibility();
+
+        // 여기까지 와야 Left/Top/Width/Height가 이 창의 진짜 값이다 - 위에서
+        // 하나씩 쓰이는 중이었다. 저장은 안 한다: 도킹을 푸는 것은 저장할 만한
+        // 일이 아니고, 다음 저장에 실려 나간다.
+        StoreFloatingState();
     }
 
     private void Dock()
@@ -4793,6 +4812,11 @@ public partial class MainWindow : Window
         _floatingHeight = Height;
 
         _isDocked = true;
+
+        // 방금 찍은 기하와 "이제 도킹"을 설정에 옮긴다. 창 모드에서 크기를 잡아
+        // 두고 곧바로 도킹한 뒤 프리셋을 저장하는 것이 흔한 순서인데, 그때 담기는
+        // 것이 바로 이 값들이다.
+        StoreFloatingState();
 
         // The floating floors off again - every docked size is programmatic,
         // and the auto-hide sliver/handle sit far below them (see Undock).
@@ -10881,7 +10905,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        NoteCurrentPlace();
+        NoteLiveWindowState();
         _settings.Presets.Add(AppPreset.Capture(_settings, name));
         // A slot just filled with what the app looks like right now IS what the
         // app is in - the mark would be wrong for the one press where it is
@@ -10931,7 +10955,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        NoteCurrentPlace();
+        NoteLiveWindowState();
         preset.Name = name;
         preset.Overwrite(_settings);
         // Same reasoning as adding one: this slot now holds exactly what is on
@@ -10985,7 +11009,7 @@ public partial class MainWindow : Window
         // 이름은 묻지 않는다. 이 자리에서 사용자가 말한 것은 번호이지 이름이
         // 아니고, 이름은 나중에 목록에서 바꿀 수 있다 - 여기서 상자를 하나 더
         // 여는 것은 방금 "예"라고 답한 사람에게 또 묻는 일이다.
-        NoteCurrentPlace();
+        NoteLiveWindowState();
         string name = string.Format(Strings.PresetDefaultName, _settings.Presets.Count + 1);
         _settings.Presets.Add(AppPreset.Capture(_settings, name));
         _settings.ActivePreset = name;
@@ -11010,7 +11034,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        NoteCurrentPlace();
+        NoteLiveWindowState();
         active.Overwrite(_settings);
         _settingsService.Save(_settings);
 
@@ -11047,8 +11071,19 @@ public partial class MainWindow : Window
     // to be taken from. Without this a preset would record whatever the last
     // shutdown wrote there: LastSelectedPath is normally only filled in on the
     // way out, so mid-session it is either stale or empty.
-    private void NoteCurrentPlace()
-        => _settings.LastSelectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
+    // 화면에는 있는데 설정에는 아직 없는 것을 적어 둔다. 프리셋이 무엇을 담을지,
+    // 그리고 무엇이 달라졌는지 묻기 직전마다 불린다.
+    //
+    // 선택 경로만 적던 자리였고, 이름도 그것이었다. 창 모드가 여기 온 것은
+    // 2026-08-17에 겪은 그대로다 - 프리셋에 창 모드를 담게 만들고도 저장된 것은
+    // `IsFloating=false`였는데, 전환할 때 설정에 안 적혀서 스냅샷이 도킹이라고
+    // 읽은 것이었다. **부르는 자리가 다섯이므로 적는 것은 한 자리여야 한다** -
+    // 항목마다 다섯 곳에 손을 대면 여섯 번째를 만들 때 하나를 빠뜨린다.
+    private void NoteLiveWindowState()
+    {
+        _settings.LastSelectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
+        StoreFloatingState();
+    }
 
     // The app's ONE line-prompt. Named for presets when it was only theirs;
     // 네트워크 위치 추가 asks the same question with different words, and it
@@ -11077,10 +11112,10 @@ public partial class MainWindow : Window
         bool contentChanged = preset.Differs(_settings, AppPreset.ContentFields);
         bool viewerLookChanged = preset.Differs(_settings, AppPreset.ViewerLookFields);
         // Asked against the LIVE selection rather than the stored one, which is
-        // only written on the way out - see NoteCurrentPlace. Without this a
+        // only written on the way out - see NoteLiveWindowState. Without this a
         // preset would walk the tree on every press, including the presses that
         // land where the tree already is.
-        NoteCurrentPlace();
+        NoteLiveWindowState();
         bool placeChanged = preset.Differs(_settings, AppPreset.PlaceFields);
         // The panel only has to be closed and reopened when a WIDTH moves - that
         // is the only reason it is taken down at all. Left open otherwise, which
@@ -11091,6 +11126,15 @@ public partial class MainWindow : Window
         // depends on both and neither can be asked for afterwards.
         bool wantsViewer = preset.ValueOr(nameof(AppSettings.ViewerOpen), _settings.ViewerOpen);
         bool wantsAutoHide = preset.ValueOr(nameof(AppSettings.IsAutoHidden), _settings.IsAutoHidden);
+
+        // FALLING BACK TO FALSE, not to the current state, unlike the two above.
+        // A preset saved before 2026-08-17 carries no answer here, and every one
+        // of those was taken on a docked window because floating could not be
+        // stored at all. Falling back to "docked" is therefore what those presets
+        // have always done; falling back to the live state would make an old
+        // preset start behaving differently depending on what the window happened
+        // to be doing when it was pressed.
+        bool wantsFloating = preset.ValueOr(nameof(AppSettings.IsFloating), false);
 
         // ---- 1. Down to a plain docked window first --------------------------
         // Each of these changes what the window's own Width and Left mean, and
@@ -11257,11 +11301,43 @@ public partial class MainWindow : Window
             NavigateToPath(place, source: "preset");
         }
 
-        // Last, because it is the one that takes the window away: everything
-        // above has to have landed on a window that is still on screen, or the
-        // reveal would come back to a shape nothing ever applied.
-        if (wantsAutoHide)
+        // ---- 7. 창 모드 --------------------------------------------------------
+        //
+        // LAST, AND THAT IS THE WHOLE OF WHY THIS TOOK A ROUND. Step 1 docks,
+        // deliberately: auto-hide and the band's margin-and-clip each change what
+        // the window's own Width and Left MEAN, and none of them can be crossed
+        // by writing settings. So the order is not reversed - a step is added at
+        // the end, where the window is a plain docked one that everything above
+        // has already been applied to.
+        //
+        // After the walk rather than before it: the walk expands folders and
+        // scrolls, and rewriting the window's bounds underneath it is the shape
+        // of the crash that took 전체 덮기 out of presets on 2026-08-16. This is
+        // the milder half of that problem - undocking resizes the window, it does
+        // not drop the tree's viewport to zero - and it sits exactly where
+        // EnterAutoHide already sits, which takes the window away entirely and
+        // has been safe there.
+        //
+        // The stored bounds are fitted to the monitor the window is on right now
+        // before they are used: a preset can be older than the current display
+        // setup, and DIP coordinates saved at another scale do not mean the same
+        // place. See AdoptStoredFloatingBounds.
+        if (wantsFloating)
         {
+            AdoptStoredFloatingBounds();
+            Undock(offsetFromCorner: true);
+        }
+        else if (wantsAutoHide)
+        {
+            // Last of the docked paths, because it is the one that takes the
+            // window away: everything above has to have landed on a window that
+            // is still on screen, or the reveal would come back to a shape
+            // nothing ever applied.
+            //
+            // ELSE, not a second if: auto-hide is a docked-only state (Undock
+            // cancels it outright), so a preset asking for both is asking for a
+            // window that cannot exist. Floating wins because it is the one the
+            // press was for - the other is reachable in one click afterwards.
             EnterAutoHide();
         }
 
@@ -19209,8 +19285,99 @@ public partial class MainWindow : Window
 
         _settings.ExpandedFolderPaths = CollectAllExpandedPaths();
         _settings.LastSelectedPath = (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath;
+        StoreFloatingState();
 
         _settingsService.Save(_settings);
+    }
+
+    // 시작할 때 한 번. 기하를 여기서 다시 들이는 것은 낭비가 아니다 - Loaded의
+    // 첫 호출은 창 핸들이 아직 없어 주 모니터로 물어보게 되고, 여기서는 창이
+    // 실제로 올라와 있으므로 그 창이 있는 모니터에 맞춰진다.
+    private void RestoreFloatingWindowMode()
+    {
+        if (!_isDocked)
+        {
+            return;
+        }
+
+        AdoptStoredFloatingBounds();
+        Undock(offsetFromCorner: true);
+    }
+
+    // ----- 저장에서 들어온 창 기하를 지금 화면에 맞추기 ------------------------
+    //
+    // 세션 안의 도킹↔창 모드 왕복은 방금 이 화면에서 만든 값이라 손댈 것이 없다.
+    // 설정에서 오는 값은 다르다 - 그 사이에 모니터를 빼거나 배율을 바꿨을 수 있고,
+    // **좌표와 크기가 DIP이므로 배율이 달라지면 같은 숫자가 다른 크기를 뜻한다.**
+    // 150%에서 화면의 3분의 1이던 창은 100% 화면에서 같은 숫자로 3분의 2가 된다.
+    //
+    // 그래서 저장값이 세션에 들어오는 자리에서만 지금 모니터의 작업 영역에 맞춘다:
+    // 폭과 높이를 작업 영역보다 크지 않게 자르고, 그 크기로 창 전체가 안에 들어오도록
+    // 왼쪽·위를 물린다. **폭이 빠져 있던 자리다** - Undock은 Left/Top과 높이만 보고
+    // 폭은 기억한 값을 그대로 썼으므로, 넓은 화면에서 맞춰 둔 창이 좁은 화면에서
+    // 오른쪽으로 넘쳐 나갔다.
+    //
+    // 배율이 바뀌어도 "보이던 그 크기"를 지키는 것은 여기서 하지 않는다. 그러려면
+    // 저장할 때의 배율까지 함께 적어야 하고, 지금 필요한 약속은 그것이 아니라
+    // **화면 밖으로 나가지 않는다**이다.
+    private void AdoptStoredFloatingBounds()
+    {
+        var workArea = GetCurrentMonitorWorkArea();
+
+        double width = _settings.FloatingWidth is { } w && w > 0
+            ? Math.Min(w, workArea.Width)
+            : double.NaN;
+        double height = _settings.FloatingHeight is { } h && h > 0
+            ? Math.Min(h, workArea.Height)
+            : double.NaN;
+
+        _floatingWidth = double.IsNaN(width) ? null : width;
+        _floatingHeight = double.IsNaN(height) ? null : height;
+
+        // 자리는 크기가 정해진 뒤에 물린다 - 창의 오른쪽·아래가 작업 영역을 넘지
+        // 않게 하려면 그 크기를 알아야 한다. 크기를 모르는 경우(한 번도 안 띄워 봤음)
+        // 자리도 쓰지 않는다: 반쪽만 복원하면 Undock의 시작 모양이 엉뚱한 자리에 선다.
+        // 유한한지 먼저 묻는다. 크기 쪽은 `> 0`이 NaN을 이미 걸러 내지만 자리는
+        // 음수도 정상이라(왼쪽 모니터) 그 검사를 쓸 수 없고, Math.Clamp는 NaN을
+        // 그대로 돌려주며 Left = NaN은 예외다. 손으로 고친 파일이 이유다 -
+        // AppSettings.Normalize가 같은 자리에서 같은 이유로 하는 일과 짝이다.
+        if (_settings.FloatingLeft is { } left && double.IsFinite(left) &&
+            _settings.FloatingTop is { } top && double.IsFinite(top) &&
+            _floatingWidth is { } fw && _floatingHeight is { } fh)
+        {
+            _floatingLeft = Math.Clamp(left, workArea.Left, Math.Max(workArea.Left, workArea.Right - fw));
+            _floatingTop = Math.Clamp(top, workArea.Top, Math.Max(workArea.Top, workArea.Bottom - fh));
+        }
+        else
+        {
+            _floatingLeft = null;
+            _floatingTop = null;
+        }
+    }
+
+    // 창 모드와 그 기하를 설정으로 옮긴다 (2026-08-17). 도킹 중이면 Dock()이
+    // 마지막으로 찍어 둔 값이 최신이고, 창 모드면 화면에 있는 지금 것이 최신이다.
+    //
+    // WindowState를 보는 것은 Dock()이 스냅샷 전에 Normal로 되돌리는 것과 같은
+    // 이유다 - 최대화된 창의 Left/Top/Width/Height는 사용자가 정한 모양이 아니라
+    // 화면 크기이고, 그것을 저장하면 다음에 그 크기로 복원된다. 최대화 상태에서는
+    // 마지막으로 알던 값을 그대로 둔다.
+    private void StoreFloatingState()
+    {
+        _settings.IsFloating = !_isDocked;
+
+        if (!_isDocked && WindowState == WindowState.Normal)
+        {
+            _floatingLeft = Left;
+            _floatingTop = Top;
+            _floatingWidth = Width;
+            _floatingHeight = Height;
+        }
+
+        _settings.FloatingLeft = _floatingLeft;
+        _settings.FloatingTop = _floatingTop;
+        _settings.FloatingWidth = _floatingWidth;
+        _settings.FloatingHeight = _floatingHeight;
     }
 
     // ===================================================================

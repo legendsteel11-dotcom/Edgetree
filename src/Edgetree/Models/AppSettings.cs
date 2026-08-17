@@ -779,6 +779,23 @@ public class AppSettings
     // is skipped when cycling, not an error.
     public List<string> BookmarkPaths { get; set; } = new();
 
+    // ----- 창 모드 -------------------------------------------------------------
+    //
+    // 도킹을 풀고 자유롭게 놓아 둔 창인지, 그리고 그때의 자리와 크기.
+    // 2026-08-17까지 이 다섯은 실행 중 필드로만 있었고, 그래서 두 가지가 함께
+    // 안 됐다 - 앱을 다시 켜면 언제나 도킹으로 시작했고, 프리셋은 창 모드를 담을
+    // 값이 없어서 "목록에서 빠진" 것처럼 보였다. 같은 빈자리를 둘이 나눠 쓴 것.
+    //
+    // 기하는 nullable이다. "아직 한 번도 안 띄워 봤다"와 "0,0에 띄웠다"는 다른
+    // 말이고, 앞의 경우에는 Undock이 자기 시작 모양(패널 960 등)을 쓰게 두어야
+    // 한다. 화면 밖에 있으면 Undock 쪽에서 현재 모니터 안으로 물린다 - 모니터
+    // 구성이 바뀐 채로 다시 켜는 경우가 있으므로 그 판단은 쓰는 자리에 둔다.
+    public bool IsFloating { get; set; } = false;
+    public double? FloatingLeft { get; set; }
+    public double? FloatingTop { get; set; }
+    public double? FloatingWidth { get; set; }
+    public double? FloatingHeight { get; set; }
+
     // What the panel above (or below) the tree shows: "bookmarks" or "none".
     // "favorites" was the third value and is migrated away on load - see
     // MergeFavoritesIntoBookmarks below.

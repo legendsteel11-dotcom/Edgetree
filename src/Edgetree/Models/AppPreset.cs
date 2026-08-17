@@ -55,6 +55,21 @@ public class AppPreset
         nameof(AppSettings.IsAutoHidden),
         nameof(AppSettings.AlwaysOnTop),
 
+        // 창 모드와 그때의 기하 (2026-08-17). Reported as "the preset does not
+        // carry 창 모드", and it was not a missing line here - there was no
+        // field to name, and the apply path opens by docking. The four bounds
+        // travel with the flag because a floating window without them is a
+        // window at whatever size the last float happened to leave, which is
+        // not a SHAPE and so not a preset.
+        //
+        // 도킹된 띠의 기하는 위의 두 ratio가 말하고, 이 넷은 창 모드일 때만
+        // 쓰인다. 둘이 같은 창을 서로 다른 말로 적는 것이라 섞이지 않는다.
+        nameof(AppSettings.IsFloating),
+        nameof(AppSettings.FloatingLeft),
+        nameof(AppSettings.FloatingTop),
+        nameof(AppSettings.FloatingWidth),
+        nameof(AppSettings.FloatingHeight),
+
         // 자동 숨김이 어떻게 동작하는지. The state above is which one it is in;
         // these are the terms it is in it on.
         nameof(AppSettings.AutoHideSliverWidth),
