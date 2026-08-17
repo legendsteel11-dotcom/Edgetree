@@ -22,7 +22,7 @@ Grab the latest build from the [Releases page](https://github.com/legendsteel11/
   already on the machine.
 
 Settings live in `%AppData%\Edgetree` and all three share them, so moving from
-one to another keeps your favorites, bookmarks and colours — and uninstalling
+one to another keeps your bookmarks and colours — and uninstalling
 leaves them where they are.
 
 ## Screenshots
@@ -84,10 +84,12 @@ leaves them where they are.
 - **Drag files out** into Explorer or any other app — a standard Windows
   file drag.
 
-### Favorites and search
+### Bookmarks and search
 
-- **Favorites panel**: pin your folders and jump to any of them with one
-  click — the tree expands and scrolls straight there, even across drives.
+- **Bookmark panel**: keep the folders and files you go back to, and reach any
+  of them with one click — the tree expands and scrolls straight there, even
+  across drives. Every row is numbered, and that number is its place in the
+  `Ctrl+Alt+L`/`J` cycle; drag a row to change it.
 - **Folder search** (`Ctrl+F`): pick a folder and find files by name, with
   substring or `*`/`?` wildcard matching. Results are grouped by folder;
   click one to jump to it in the tree, or drag it into another app.
@@ -107,7 +109,7 @@ leaves them where they are.
 - **Sharp at any display scale** (125%, 150%, 200%…): rendered at the
   actual scale instead of being stretched.
 - **Korean and English UI.**
-- **Settings export/import** as a JSON file, favorites included.
+- **Settings export/import** as a JSON file, bookmarks included.
 - The rest lives in the options ("...") menu: start with Windows, always on
   top, minimize to tray, update notification, and more. An update dot on the
   options button tells you when a new release is out.

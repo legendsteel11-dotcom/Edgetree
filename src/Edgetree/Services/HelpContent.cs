@@ -231,6 +231,12 @@ public static class HelpContent
                       "Shift · Ctrl while dragging", "Force a move · force a copy"),
                     R("Ctrl+Alt+K", "북마크 표시 · 해제", "Ctrl+Alt+K", "Bookmark, or take it back"),
                     R("Ctrl+Alt+L · J", "다음 · 이전 북마크로 이동", "Ctrl+Alt+L · J", "Next · previous bookmark"),
+                    // 번호가 화면에 있으니 "순서가 바뀐다"는 라벨이 말해 준다.
+                    // 여기 적을 값어치가 있는 것은 그 순서가 단축키의 순서이기도
+                    // 하다는 것 - 목록만 보면 알 길이 없다.
+                    R("북마크 패널에서 행 드래그", "순서 바꾸기 · 번호가 곧 Ctrl+Alt+L 순서",
+                      "Drag a row in the bookmark panel",
+                      "Reorders it - the numbers are the Ctrl+Alt+L order"),
                     // The parenthesis is the part a menu label cannot say, and
                     // it is what a whole paragraph used to say instead.
                     R("우클릭 → 폴더 숨기기", "트리에서 폴더를 감춤, 검색에서는 보이나 작업 시 폴더 숨김 해제 필요",

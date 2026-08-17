@@ -94,10 +94,10 @@ Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 ; someone: the tray icon's 종료. The settings reassurance earns its line - being told to quit
 ; for an installer is the moment people expect to lose what they set up.
 [Messages]
-english.SetupAppRunningError={#MyAppName} is running.%n%nRight-click the {#MyAppName} icon in the notification area and choose "Exit". Your favorites, bookmarks and settings are kept.%n%nThen click OK to continue installing, or Cancel to stop.
-english.UninstallAppRunningError={#MyAppName} is running.%n%nRight-click the {#MyAppName} icon in the notification area and choose "Exit". Your favorites, bookmarks and settings are kept.%n%nThen click OK to continue removing it, or Cancel to stop.
-korean.SetupAppRunningError={#MyAppName}가 실행 중입니다.%n%n알림 영역(트레이)의 {#MyAppName} 아이콘을 마우스 오른쪽 버튼으로 눌러 [종료]를 선택해 주세요. 즐겨찾기·북마크·설정은 그대로 유지됩니다.%n%n종료한 뒤 [확인]을 누르면 설치를 계속하고, [취소]를 누르면 설치를 그만둡니다.
-korean.UninstallAppRunningError={#MyAppName}가 실행 중입니다.%n%n알림 영역(트레이)의 {#MyAppName} 아이콘을 마우스 오른쪽 버튼으로 눌러 [종료]를 선택해 주세요. 즐겨찾기·북마크·설정은 그대로 유지됩니다.%n%n종료한 뒤 [확인]을 누르면 제거를 계속하고, [취소]를 누르면 제거를 그만둡니다.
+english.SetupAppRunningError={#MyAppName} is running.%n%nRight-click the {#MyAppName} icon in the notification area and choose "Exit". Your bookmarks and settings are kept.%n%nThen click OK to continue installing, or Cancel to stop.
+english.UninstallAppRunningError={#MyAppName} is running.%n%nRight-click the {#MyAppName} icon in the notification area and choose "Exit". Your bookmarks and settings are kept.%n%nThen click OK to continue removing it, or Cancel to stop.
+korean.SetupAppRunningError={#MyAppName}가 실행 중입니다.%n%n알림 영역(트레이)의 {#MyAppName} 아이콘을 마우스 오른쪽 버튼으로 눌러 [종료]를 선택해 주세요. 북마크·설정은 그대로 유지됩니다.%n%n종료한 뒤 [확인]을 누르면 설치를 계속하고, [취소]를 누르면 설치를 그만둡니다.
+korean.UninstallAppRunningError={#MyAppName}가 실행 중입니다.%n%n알림 영역(트레이)의 {#MyAppName} 아이콘을 마우스 오른쪽 버튼으로 눌러 [종료]를 선택해 주세요. 북마크·설정은 그대로 유지됩니다.%n%n종료한 뒤 [확인]을 누르면 제거를 계속하고, [취소]를 누르면 제거를 그만둡니다.
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
