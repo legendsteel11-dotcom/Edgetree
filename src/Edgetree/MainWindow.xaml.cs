@@ -12907,7 +12907,7 @@ public partial class MainWindow : Window
         // produce real transitions) from collapsing anything. Two conditions that
         // fail for different reasons, rather than one doing both jobs badly.
         bool modelJustChanged =
-            ReferenceEquals(FileSystemItem.LastModelExpand, item) &&
+            FileSystemItem.IsLastModelExpand(item) &&
             Environment.TickCount64 - FileSystemItem.LastModelExpandTicks <= ModelExpandPairingMs;
         bool modelNotCaughtUpYet = !item.IsExpanded;
 

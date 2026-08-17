@@ -127,7 +127,15 @@ public class FileSystemItem : INotifyPropertyChanged
             // about).
             if (changed && value)
             {
-                LastModelExpand = this;
+                if (_lastModelExpand is null)
+                {
+                    _lastModelExpand = new WeakReference<FileSystemItem>(this);
+                }
+                else
+                {
+                    _lastModelExpand.SetTarget(this);
+                }
+
                 LastModelExpandTicks = Environment.TickCount64;
             }
 
@@ -155,7 +163,30 @@ public class FileSystemItem : INotifyPropertyChanged
     // the whole requirement. A per-item flag would go stale instead - a folder
     // expanded off-screen at startup would still be carrying it minutes later,
     // which is exactly the case being defended against.
-    internal static FileSystemItem? LastModelExpand { get; private set; }
+    //
+    // WEAK, and the reason is the file it is in (2026-08-17). Rows here are
+    // thrown away wholesale - ReplaceAll and every refresh discard the old items -
+    // and a static holding one of them by reference holds its Children subtree,
+    // its Parent chain and every row's Icon with it. Those pixels live outside
+    // the GC heap, so one retained subtree is real memory rather than an
+    // accounting curiosity. Superseded by the next expansion either way, so it
+    // was bounded - but "bounded" is not the same as "collected", and this slot
+    // has no business being the reason anything survives.
+    //
+    // Nothing is lost by weakening it: the only question ever asked is identity,
+    // and an item the collector has taken cannot be the one the accordion is
+    // holding. One WeakReference is allocated for the life of the process and
+    // re-pointed with SetTarget, rather than one per expansion.
+    private static WeakReference<FileSystemItem>? _lastModelExpand;
+
+    // Identity only, which is the whole of what the reader wants - see
+    // MainWindow.TreeViewItem_Expanded. A method rather than the reference
+    // itself so the weak slot stays in here: a caller handed the target back
+    // would be holding it strongly again, which is the thing being avoided.
+    internal static bool IsLastModelExpand(FileSystemItem item)
+        => _lastModelExpand is { } slot
+           && slot.TryGetTarget(out var last)
+           && ReferenceEquals(last, item);
 
     internal static long LastModelExpandTicks { get; private set; }
 
