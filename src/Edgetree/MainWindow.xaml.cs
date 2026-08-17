@@ -2151,11 +2151,20 @@ public partial class MainWindow : Window
     {
         _windowIsClosing = true;
 
-        // The window itself going away - the tray "exit" path never comes
-        // through here, and neither does the header's X any more (it hides to
-        // the tray since 2026-08-10). What is left is Alt+F4, a task-manager
-        // end task, or the OS closing us at logoff - none of which announce
-        // themselves, so there is nothing to name.
+        // EVERY GRACEFUL EXIT REACHES HERE, which is what makes the save below
+        // the one place the session's state is persisted from. The header's X is
+        // not among them - it hides to the tray since 2026-08-10 - but 종료 on
+        // the tray menu and on the header menu both are: they call
+        // Application.Shutdown, and that closes windows through InternalClose,
+        // which raises Closing (ignoring cancellation). Measured against
+        // exit.log rather than assumed, because a note here previously claimed
+        // the opposite and a decision was about to be taken on it: every
+        // `header menu: exit` line in that file is followed by the line below.
+        //
+        // The line's wording is about the ones that DON'T announce themselves -
+        // Alt+F4, a task-manager end task, the OS closing us at logoff. The
+        // routes that do stamp their own reason first, so this reads as a second
+        // line under theirs rather than as a claim about them.
         ExitLog.Record("window closing: outside the app's own controls");
 
         // The viewer's measurements are held in memory and written when the
@@ -25186,8 +25195,23 @@ public partial class MainWindow : Window
         }
 
         _viewerFullscreen = on;
+
+        // WRITTEN, NOT SAVED (2026-08-17). The field is set here and carried out
+        // by the exit save - SaveCurrentWidth, which every graceful exit path
+        // reaches (measured against exit.log: Application.Shutdown does raise
+        // Window.Closing, so the tray's 종료 and the header menu's both land
+        // there alongside Alt+F4). Nothing else has to happen for the mode to
+        // come back next launch.
+        //
+        // A Save on this line cost three file operations - temp write, replace,
+        // .bak - on the UI thread, and this method is the door 휠클릭 uses. It is
+        // also passed through by CloseViewer and by every dock, undock and panel
+        // side swap, so a gesture that has nothing to do with full screen paid
+        // for it too. The one thing dropped is the state surviving a HARD kill,
+        // and it now behaves like everything else in that bundle - the expanded
+        // folders, the selection, the floating geometry - which is the answer a
+        // reader would expect it to give.
         _settings.ViewerFullscreen = on;
-        _settingsService.Save(_settings);
 
         // The window itself is only touched while FLOATING, and only if 바탕화면
         // 전체 is on (2026-08-17). Off, the picture fills the window the user
