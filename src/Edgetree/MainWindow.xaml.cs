@@ -5162,6 +5162,18 @@ public partial class MainWindow : Window
         FavoritesRowDef.Height = hasFavorites
             ? SafeGridLength(Math.Min(ComputeFavoritesContentHeight(), _settings.FavoritesPanelHeight))
             : new GridLength(0);
+
+        // AND THE OTHER ROW HAS TO BE LET GO, because these two swap.
+        // Row1/Row3 take turns being the panel, and the three numbers above are
+        // written to whichever is the panel RIGHT NOW - so the one that just
+        // stopped being it was still carrying them (2026-08-17, reported as
+        // "아래로 보내니 아래에 여백이 생긴다"). The ceiling is the one that
+        // shows: the tree inherited the panel's MaxHeight, stopped growing at
+        // the height of a dozen bookmark rows, and left the rest of the window
+        // empty beneath it. Present since the ceiling arrived on 2026-08-15 and
+        // only reachable by turning 아래에 표시 on.
+        TreeRowDef.MinHeight = 0;
+        TreeRowDef.MaxHeight = double.PositiveInfinity;
     }
 
     // Re-runs once the list has had a layout pass, which is when its containers
