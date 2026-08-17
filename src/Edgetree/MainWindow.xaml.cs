@@ -5166,8 +5166,8 @@ public partial class MainWindow : Window
         // AND THE OTHER ROW HAS TO BE LET GO, because these two swap.
         // Row1/Row3 take turns being the panel, and the three numbers above are
         // written to whichever is the panel RIGHT NOW - so the one that just
-        // stopped being it was still carrying them (2026-08-17, reported as
-        // "아래로 보내니 아래에 여백이 생긴다"). The ceiling is the one that
+        // stopped being it was still carrying them (2026-08-17, reported as a
+        // band of empty window below everything). The ceiling is the one that
         // shows: the tree inherited the panel's MaxHeight, stopped growing at
         // the height of a dozen bookmark rows, and left the rest of the window
         // empty beneath it. Present since the ceiling arrived on 2026-08-15 and
@@ -7461,6 +7461,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        CollapseEverything();
+    }
+
+    // Shared by the options menu's one-shot above and by a filter toggle. Both
+    // want the same end state and neither wants the header toggle's remembered
+    // set to survive it: that set describes a shape of the tree, and after this
+    // there is no shape left for it to describe.
+    private void CollapseEverything()
+    {
         foreach (var root in _roots)
         {
             CollapseRecursive(root);
@@ -8113,12 +8122,94 @@ public partial class MainWindow : Window
         // per-folder cap change does - a filter that only took effect on
         // folders opened afterwards would be worse than no filter.
         //
-        // Quietly, though: a filter is a display change like the hidden-folder
-        // toggle, so it has no business moving the view. The footer toggles put
-        // it under the hand, and having the tree jump to the top on every click
-        // reads as the app losing the user's place rather than filtering.
+        // AND THE TREE IS FOLDED FIRST (2026-08-17).
+        //
+        // Holding the view still across a filter change sounds obvious and has
+        // no correct answer. A filter takes rows away and gives rows back ABOVE
+        // the viewport as well as below it, so no row means "where you were" -
+        // every anchor is a guess at what was being looked at, and it is wrong
+        // as often as it is right. There is no centre to hold.
+        //
+        // So the tree folds and the view goes to the top: one state, reachable
+        // from every other, with nothing left to drift. What that costs is the
+        // shape that was open, and the cost is small HERE for two reasons.
+        // These chips are set once and left, not flicked back and forth; and a
+        // shape is cheap to rebuild, because bookmarks reopen any part of the
+        // tree in one click.
+        //
+        // Folding BEFORE the refresh is also what makes the refresh cheap: it
+        // snapshots the expanded folders to put them back afterwards, and by
+        // then there are none. Turning images on used to re-read every open
+        // picture folder and build hundreds of rows nobody had asked to see.
+        //
+        // The attempt before this one is worth not repeating: anchoring on the
+        // top row and restoring it by COUNTED index sent the view 1,744 rows
+        // away - see the note further down for why counting alone cannot land.
+        // THE SELECTION IS LEFT WHERE IT IS. Every row is folded away, so it is
+        // off screen either way - but selection is not only a highlight here:
+        // the multimedia panel follows it (ViewerFollowsSelection) and the path
+        // strip reads from it, so moving it to a drive root would close what is
+        // being viewed. Folding answers the drift; the selection was not part of
+        // the question.
+        //
+        // Scrolled after a layout pass, because the fold is what shrinks the
+        // extent and the offset is only clamped once the panel has heard about
+        // it.
+        LogFilterLayout("before");
+        CollapseEverything();
         RefreshAllLoadedFolders(pinSelectionToTop: false);
+        Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Loaded, new Action(ScrollTreeToTop));
+        LogFilterLayoutAfterLayout();
     }
+
+    // ----- 필터를 껐다 켜면 화면이 밀리던 것 (2026-08-17) ----------------------
+    //
+    // 신고: 이미지 필터를 몇 번 껐다 켜니 "쭉 밀려 내려오다가" 자리를 잡음.
+    // 계측기가 바로 갈랐음 - footer·tree·panel·splitter 높이는 전부 고정이고
+    // 움직인 것은 스크롤 오프셋뿐(90→14, 129→229, … 171에서 고정).
+    //
+    // 원인은 스크롤이 아니라 단위다. 트리는 `ScrollUnit="Item"`이라 오프셋이
+    // 픽셀이 아니라 "지나친 행 수"이고, 필터가 위쪽 파일 행을 지우면 같은 숫자가
+    // 다른 행을 가리킨다. 앱이 시킨 스크롤이 아니므로 RequestBringIntoView 억제가
+    // 닿지 않는다 - 막을 이벤트가 아예 없다. 남은 행보다 오프셋이 크면 잘려 나가고
+    // 그 값은 못 돌아오므로, 껐다 켜기를 반복하면 양쪽에서 모두 유효한 값으로
+    // 걸어가다 멈춘다. 그것이 "몇 번 하더니 고정"이다.
+    //
+    // 접기로 가기 전에 한 수를 시도했다가 접었고, 접은 방식이 기록할 값어치가
+    // 있다. 맨 위 행을 기억했다가 **세어서** 얻은 번호(`VisibleRowIndexOf`)로
+    // 오프셋을 놓는 것이었는데, 그 번호가 스크롤뷰어의 눈금과 안 맞았다 - 계측:
+    // `before offset=70` → `after offset=1814`. 화면이 1,744행 날아갔다.
+    //
+    // 이 파일은 이미 그것을 알고 있었다. `PinRowToTop`이 같은 방식으로 세고, 바로
+    // 뒤에 `SettleRowAtTop`("이건 LOOK한다")을 달아 실제 행 위치를 재서 한 줄씩
+    // 보정한다. 그 보정을 "필터는 조용해야 한다"는 이유로 뺐던 것이고, 빼면 안
+    // 되는 쪽이 그것이었다. **세는 것은 시작점일 뿐이고 맞추는 것은 재는 쪽이다.**
+    //
+    // 그래서 다시 간다면 붙드는 방법이 달라야 한다: 번호가 아니라 그 행 컨테이너의
+    // 화면 위 위치를 재고, 새로고침 뒤 같은 행이 같은 y에 오도록 한 줄씩 옮기는
+    // 것. 컨테이너가 가상화로 사라진 경우에 무엇을 기준 삼을지가 진짜 어려운
+    // 부분이고, 지금 접기를 고른 이유이기도 하다.
+
+    // 아래는 그 라운드에서 남은 계측기. 남겨 두는 것은 이 구역의 신고가
+    // 되풀이되기 때문이고,
+    // Debug 전용이라 배포본에는 없다. footer가 움직이면 칩이 접힌 것, offset만
+    // 움직이면 위의 단위 문제, 셋 다면 다른 것이다.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogFilterLayout(string when)
+    {
+        double offset = FindTreeScrollViewer()?.VerticalOffset ?? -1;
+        LogPanelLine(
+            $"filter {when}: footer={VersionFooterRow.ActualHeight:F1} " +
+            $"tree={TreeRowDef.ActualHeight:F1} panel={FavoritesRowDef.ActualHeight:F1} " +
+            $"splitter={FavoritesSplitterRow.ActualHeight:F1} offset={offset:F1}");
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogFilterLayoutAfterLayout()
+        => Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Loaded,
+            new Action(() => LogFilterLayout("after")));
 
     // The empty-space menu's 북마크 submenu. Deliberately NOT the row menu's:
     // that one leads with 북마크 추가/해제, which acts on the row under the
