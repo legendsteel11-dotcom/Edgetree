@@ -6729,6 +6729,30 @@ public partial class MainWindow : Window
     // anchor is GONE - the viewport was sitting inside the block being taken
     // away, which is the one case that had no correction at all before, and
     // the next reveal anchors the top again.
+    // 접기가 끝난 뒤 그 폴더를 뷰포트 맨 위에 앉힌다.
+    //
+    // 싸게 되는 이유가 셋 다 이미 있어서다: 접기가 그 폴더를 이미 선택해 두고
+    // (03d96e2), 맨 위로 앉히는 코드는 08-14에 픽셀이 아니라 행을 세는 쪽으로
+    // 고쳐져 있고(PinRowToTop), 폴더의 컨테이너는 화면 밖이어도 항상 realize돼
+    // 있다 - 자식이 부모의 ItemsHost 안에 있기 때문이다.
+    //
+    // 못 찾으면 오늘 아침의 동작으로 물러난다. 안 움직이는 것이 엉뚱한 자리로
+    // 뛰는 것보다 낫고, 이 자리는 착지 계산이 네 라운드 걸린 곳이다.
+    private void PinRevealFolderToTop(
+        FileSystemItem? folder, FileSystemItem? anchor, double anchorTop, double pressedTop)
+    {
+        // 접기가 방금 지운 행들이 트리에서 빠진 뒤라야 셈이 맞는다.
+        ExplorerTree.UpdateLayout();
+
+        if (folder is not null && FindRealizedContainer(folder) is { } container)
+        {
+            PinRowToTop(container);
+            return;
+        }
+
+        KeepRevealRowInPlace(anchor, anchorTop, folder, pressedTop);
+    }
+
     private void KeepRevealRowInPlace(
         FileSystemItem? anchor, double anchorTop,
         FileSystemItem? folder, double pressedTop)
@@ -13650,7 +13674,17 @@ public partial class MainWindow : Window
                     () =>
                     {
                         revealFolder?.RecollapseOverflow();
-                        KeepRevealRowInPlace(anchor, anchorTop, revealFolder, pressedTop);
+                        // 접기는 붙드는 것이 아니라 돌아가는 것이다 (2026-08-16,
+                        // 사용자 요청). 아침에 이 자리를 고칠 때는 두 방향을 같게
+                        // 뒀는데 - 뷰포트 맨 위 행을 붙들어 반복해도 화면이 걸어
+                        // 가지 않게 - 써 보니 접기에서만 어긋났다. 긴 목록을 펼친
+                        // 뒤 끝까지 내려가서 접으면, 화면은 제자리에 있고 그 폴더는
+                        // 화면 위쪽 밖으로 사라진다. 접는다는 것은 그 폴더의 내용을
+                        // 다 봤다는 뜻이라, 답은 그 폴더다.
+                        //
+                        // 더 보기는 그대로 붙든다. 펼칠 때는 보고 있던 자리가 남아야
+                        // 하고, 그게 251055e가 고친 것이다. 방향이 다르면 답도 다르다.
+                        PinRevealFolderToTop(revealFolder, anchor, anchorTop, pressedTop);
                     },
                     System.Windows.Threading.DispatcherPriority.Background);
             }
