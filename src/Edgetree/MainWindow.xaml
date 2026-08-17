@@ -4854,13 +4854,18 @@
                         Margin="8,0,6,0"
                         VerticalAlignment="Center"
                         RenderOptions.BitmapScalingMode="HighQuality"/>
+                <!-- FontSize was 15 until 2026-08-17, when it came down two steps
+                     on request: it was the largest text in the window, over a
+                     tree whose own rows are 12. Still a literal rather than a
+                     resource - the header is not on the tree's zoom ladder (see
+                     ApplyLayoutMetrics' note about the sizes left hardcoded). -->
                 <TextBlock x:Name="RootPathText"
                         Grid.Column="1"
                         Text="{x:Static services:Strings.RootPathLabel}"
                         Foreground="{DynamicResource ForegroundText}"
                            VerticalAlignment="Center"
                         Margin="2,0,8,0"
-                        FontSize="15"
+                        FontSize="13"
                         FontWeight="Bold"
                         Opacity="0.75"
                            TextTrimming="CharacterEllipsis"/>
