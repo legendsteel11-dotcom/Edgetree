@@ -162,9 +162,9 @@
                 Color="#FFA8AAAE"/>
         <SolidColorBrush x:Key="FileNameHoverForeground"
                 Color="#FFA8AAAE"/>
-        <!-- 즐겨찾기·북마크 패널의 행 이름, the same three states
+        <!-- 북마크 패널의 행 이름, the same three states
              (AppSettings.PanelNameColorHex and its two neighbours). Used ONLY
-             by the two panel row styles below - the tree keeps FolderName*.
+             by the panel's row style below - the tree keeps FolderName*.
              The panel used to draw the folder brushes directly, so the list
              above the tree could not be told apart from the tree by any
              palette; defaults are those same folder values, which is what
@@ -1262,9 +1262,8 @@
                 </MenuItem.Header>
             </MenuItem>
             <Separator Visibility="Collapsed" Tag="multiInfoSep"/>
-            <MenuItem Header="{x:Static services:Strings.MenuAddFavorite}"
-                    Tag="addFavorite"
-                    Click="AddFavorite_Click"/>
+            <!-- 즐겨찾기에 추가 was here until 2026-08-17. The bookmark submenu
+                 below now does the whole job - see Strings.MenuBookmark. -->
             <!-- A submenu rather than the single toggle it used to be
                  (requested 2026-07-30, from a relayed enquiry): setting one was the
                  only bookmark action reachable by mouse, so the jumps existed
@@ -1643,8 +1642,8 @@
         <!-- Search result rows' own menu. Every action operates on the
              right-clicked result's path (SearchEntry.FullPath) via the same
              ShellFileService/FileOperationService the tree menu uses - no
-             FileSystemItem needed. The tree-only items (즐겨찾기/새 폴더/붙여넣기/
-             정렬/이름 바꾸기) are intentionally absent: they don't apply to a
+             FileSystemItem needed. The tree-only items (새 폴더/붙여넣기/정렬/
+             이름 바꾸기) are intentionally absent: they don't apply to a
              file-only search result. -->
         <ContextMenu x:Key="SearchResultContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
@@ -1999,18 +1998,17 @@
                     </MenuItem.Header>
                 </MenuItem>
             </MenuItem>
-            <!-- Everything about the panel beside the tree in one place: WHAT
-                 it shows, then - past a separator - WHERE it sits. The
-                 position toggle used to be a row of its own out on the menu,
-                 named after favorites; folding it in both drops a line and
-                 stops the name lying now that the panel can hold either list
-                 (2026-08-02).
+            <!-- Everything about the panel beside the tree in one place:
+                 WHETHER it is there, then WHERE it sits. The position toggle
+                 used to be a row of its own out on the menu, named after
+                 favorites; folding it in dropped a line (2026-08-02).
 
-                 Three states rather than a favorites on/off toggle: the panel
-                 only used to disappear when the favorites list was EMPTY, so
-                 giving that row back to the tree meant deleting entries.
-                 Checkable so exactly one mode reads as current;
-                 OptionsMenu_Opened sets which.
+                 Two checks rather than the three modes it had while there were
+                 two lists to choose between (2026-08-17): with one list the
+                 only question left is whether it shows. It is still a state
+                 rather than "empty the list" - the panel used to disappear only
+                 when the list WAS empty, so giving that row back to the tree
+                 meant deleting entries.
 
                  Last in the group, directly above the separator: what follows
                  is the bookmark and hidden-folder lists, which is where
@@ -2018,20 +2016,11 @@
                  (2026-08-04). -->
             <MenuItem Header="{x:Static services:Strings.MenuSidePanel}"
                     AutomationProperties.AutomationId="sidePanel">
-                <MenuItem Header="{x:Static services:Strings.MenuSidePanelFavorites}"
+                <MenuItem Header="{x:Static services:Strings.MenuSidePanelShow}"
                         IsCheckable="True"
-                        AutomationProperties.AutomationId="sidePanelFavorites"
-                        Click="SidePanelModeMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuSidePanelBookmarks}"
-                        IsCheckable="True"
-                        AutomationProperties.AutomationId="sidePanelBookmarks"
-                        Click="SidePanelModeMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuSidePanelNone}"
-                        IsCheckable="True"
-                        AutomationProperties.AutomationId="sidePanelNone"
-                        Click="SidePanelModeMenuItem_Click"/>
-                <Separator/>
-                <MenuItem Header="{x:Static services:Strings.MenuFavoritesAtBottom}"
+                        AutomationProperties.AutomationId="sidePanelShow"
+                        Click="SidePanelShowMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSidePanelAtBottom}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="favoritesAtBottom"
                         Click="FavoritesAtBottomMenuItem_Click"/>
@@ -4110,175 +4099,6 @@
             </HierarchicalDataTemplate.Triggers>
         </HierarchicalDataTemplate>
 
-        <ContextMenu x:Key="FavoriteItemContextMenu"
-                Style="{StaticResource DarkContextMenuStyle}"
-                Opened="AnyMenu_Opened"
-                Closed="AnyMenu_Closed"
-                PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
-            <MenuItem Header="{x:Static services:Strings.MenuRemoveFavorite}"
-                    Click="RemoveFavorite_Click"/>
-            <!-- 전체 해제 lives on the ROW menu, not on the panel's empty
-                 space, because the panel is only as tall as its rows: once
-                 there are enough favorites for clearing them all to be worth
-                 asking for, there is no empty space left to right-click. The
-                 separator is what keeps a one-row action and an all-rows one
-                 from sitting together like two of the same kind. -->
-            <Separator/>
-            <MenuItem Header="{x:Static services:Strings.MenuBookmarkClearAll}"
-                    Click="ClearAllFavorites_Click"/>
-        </ContextMenu>
-
-        <Style x:Key="FavoriteListBoxItemStyle"
-                TargetType="ListBoxItem">
-            <!-- A favorite row has to line up with the tree rows directly
-                 beneath it, so it mirrors ExplorerTreeViewItemStyle's metrics
-                 by sharing the very same resources rather than restating their
-                 default values: RowPadding (Ctrl+/- zoom and "행 간격"),
-                 TabSpacingWidth for the expander stand-in column ("들여쓰기 간격"),
-                 and IconSize/FolderRowIconMargin for the folder icon. Those
-                 last three used to be hardcoded here at their defaults (16 /
-                 16 / 6), which held only while the user left every metric
-                 alone - change the indent width, or zoom the font, and the
-                 favorites panel alone stayed put while the tree moved. -->
-            <!-- ApplyLayoutMetrics in MainWindow.xaml.cs is what recomputes all
-                 of them; everything here is DynamicResource so it lands live. -->
-            <Setter Property="Padding"
-                    Value="{DynamicResource RowPadding}"/>
-            <Setter Property="Background"
-                    Value="Transparent"/>
-            <Setter Property="BorderThickness"
-                    Value="0"/>
-            <Setter Property="HorizontalContentAlignment"
-                    Value="Stretch"/>
-            <Setter Property="Cursor"
-                    Value="Hand"/>
-            <Setter Property="ContextMenu"
-                    Value="{StaticResource FavoriteItemContextMenu}"/>
-            <EventSetter Event="PreviewMouseRightButtonDown"
-                    Handler="FavoriteListBoxItem_PreviewMouseRightButtonDown"/>
-            <EventSetter Event="PreviewMouseLeftButtonDown"
-                    Handler="FavoriteListBoxItem_PreviewMouseLeftButtonDown"/>
-            <!-- Favorites are a flat list of folder NAMES, so several entries
-                 can read identically ("dist", "src", ...) with nothing on
-                 screen to tell them apart - the one place in the app where the
-                 full path is information the window doesn't already show. The
-                 tree deliberately has no such tooltip: its rows sit under
-                 their own parents, so the path is already visible there.
-                 Delay is longer than the WPF default so brushing past a row on
-                 the way somewhere else doesn't pop anything up, and the font
-                 follows the tree's zoom through the placement target (a
-                 tooltip is its own window, outside the tree's visual tree, so
-                 it inherits nothing on its own). -->
-            <Setter Property="ToolTipService.InitialShowDelay"
-                    Value="900"/>
-            <Setter Property="ToolTipService.ShowDuration"
-                    Value="20000"/>
-            <Setter Property="ToolTip">
-                <Setter.Value>
-                    <ToolTip Content="{Binding Path}"
-                            FontSize="{Binding PlacementTarget.FontSize, RelativeSource={RelativeSource Self}}"/>
-                </Setter.Value>
-            </Setter>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                Padding="{TemplateBinding Padding}"
-                                SnapsToDevicePixels="True">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <!-- Stands in for the tree row's own expander column,
-                                         which is a separate column from its icon and so
-                                         never collapses. Split out from the icon's own
-                                         margin so the text after a hidden icon still lines
-                                         up with the tree's text (which starts right after
-                                         its expander) instead of collapsing flush left with
-                                         everything else in it. Shares ExpanderColumn's
-                                         width rather than hardcoding its default, so the
-                                         "들여쓰기 간격" option moves favorites and tree rows
-                                         together - FavoriteGutterWidth being that column
-                                         PLUS the arrow-to-name gap the tree row carries as
-                                         a margin, since there is no arrow here to hang one
-                                         off. -->
-                                    <ColumnDefinition Width="{DynamicResource FavoriteGutterWidth}"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <!-- Favorites are always folders (see AddFavorite's
-                                     IsDirectory check), so this can react to
-                                     FolderIconVisibility unconditionally - no
-                                     IsDirectory check needed the way the tree
-                                     row's icon has one. -->
-                                <!-- Source is a code-set DynamicResource (not the
-                                     folder.png pack URI it used to hardcode) so
-                                     the "아이콘 방식" switch swaps the favorites'
-                                     folder icon along with the tree's - set at
-                                     startup and on every mode change in
-                                     MainWindow.ApplyIconStyle. -->
-                                <Image Grid.Column="1"
-                                        Source="{DynamicResource FavoriteFolderIconSource}"
-                                        Width="{DynamicResource IconSize}"
-                                        Height="{DynamicResource IconSize}"
-                                        Margin="{DynamicResource FolderRowIconMargin}"
-                                        VerticalAlignment="Center"
-                                        Visibility="{DynamicResource FolderIconVisibility}"
-                                        RenderOptions.BitmapScalingMode="HighQuality"/>
-                                <!-- FontSize intentionally not set here - inherits down
-                                     from FavoritesList, same reasoning as the tree's row
-                                     TextBlock (see the HierarchicalDataTemplate above). -->
-                                <!-- The PANEL's name brush, not the tree's
-                                     (2026-08-17): this row is in a different
-                                     list from the tree under it, and until now
-                                     no palette could say so. FontWeight still
-                                     follows the tree's 폴더 이름 굵기 - that is a
-                                     taste about folder names as such, and a
-                                     favourite is always a folder. -->
-                                <TextBlock x:Name="FavoriteNameText"
-                                        Grid.Column="2"
-                                        Text="{Binding DisplayName}"
-                                        Foreground="{DynamicResource PanelNameForeground}"
-                                        FontWeight="{DynamicResource FolderNameFontWeight}"
-                                        VerticalAlignment="Center"
-                                        LineHeight="{DynamicResource RowLineHeight}"
-                                        LineStackingStrategy="BlockLineHeight"
-                                        TextTrimming="CharacterEllipsis"/>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver"
-                                    Value="True">
-                                <Setter TargetName="Bd"
-                                        Property="Background"
-                                        Value="{DynamicResource TreeRowHoverBackground}"/>
-                                <!-- FavoriteNameText's own Foreground binding (above) would
-                                     otherwise win over inheritance, so this has to target it
-                                     directly rather than setting ListBoxItem.Foreground. -->
-                                <Setter TargetName="FavoriteNameText"
-                                        Property="Foreground"
-                                        Value="{DynamicResource PanelNameHoverForeground}"/>
-                            </Trigger>
-                            <Trigger Property="IsSelected"
-                                    Value="True">
-                                <Setter TargetName="Bd"
-                                        Property="Background"
-                                        Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
-                                <!-- The name follows too, as it does in the
-                                     tree. "폴더 이름 강조" says nothing about
-                                     only applying to one of the two places a
-                                     folder name is shown. Same targeting note
-                                     as the hover setter above: the TextBlock's
-                                     own Foreground would beat inheritance. -->
-                                <Setter TargetName="FavoriteNameText"
-                                        Property="Foreground"
-                                        Value="{DynamicResource PanelNameHighlightForeground}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <ContextMenu x:Key="BookmarkPanelItemContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
                 Opened="AnyMenu_Opened"
@@ -5151,29 +4971,10 @@
                 </Button>
             </Grid>
 
-            <ListBox x:Name="FavoritesList"
-                    Grid.Row="1"
-                    Grid.Column="1"
-                    Style="{StaticResource FavoritesListBoxStyle}"
-                    Background="{DynamicResource FavoritesBackground}"
-                    BorderThickness="0"
-                    Padding="4,6,4,4"
-                    FontSize="{Binding FontSize, ElementName=ExplorerTree}"
-                    ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                    ItemContainerStyle="{StaticResource FavoriteListBoxItemStyle}"
-                    PreviewMouseMove="FavoritesList_PreviewMouseMove"
-                    PreviewMouseLeftButtonUp="FavoritesList_PreviewMouseLeftButtonUp"
-                    LostMouseCapture="FavoritesList_LostMouseCapture"/>
-
-            <!-- Shares the row with FavoritesList; exactly one of the two is
-                 ever visible, and in "none" mode neither is (see
-                 MainWindow.xaml.cs's ApplySidePanelMode). A second ListBox
-                 rather than one that swaps its source: the favorites list is
-                 bound straight to the stored entries and carries the whole
-                 drag-to-reorder gesture on top of them, none of which a
-                 bookmark row wants. Deliberately no reorder here - the order
-                 IS the Ctrl+Alt+L/J cycle order, so dragging it would rewire
-                 the shortcuts silently (2026-08-02). -->
+            <!-- The panel's list. It shared this row with FavoritesList until
+                 2026-08-17, when the two lists became one - see
+                 AppSettings.MergeFavoritesIntoBookmarks for why. In "none" mode
+                 it is collapsed (MainWindow.xaml.cs's ApplySidePanelMode). -->
             <ListBox x:Name="BookmarkPanelList"
                     Grid.Row="1"
                     Grid.Column="1"
@@ -5187,22 +4988,6 @@
                     Visibility="Collapsed"
                     PreviewMouseLeftButtonDown="BookmarkPanelList_PreviewMouseLeftButtonDown"
                     PreviewMouseLeftButtonUp="BookmarkPanelList_PreviewMouseLeftButtonUp"/>
-
-            <!-- Where a dragged favorite would land. Sits over the list rather
-                 than inside the item template so it can be drawn BETWEEN two
-                 rows, and never takes a hit-test - the drag needs every mouse
-                 event to keep reaching the list underneath. Positioned from
-                 code (FavoritesReorder region). -->
-            <Border x:Name="FavoriteDropIndicator"
-                    Grid.Row="1"
-                    Grid.Column="1"
-                    Height="2"
-                    Margin="0"
-                    VerticalAlignment="Top"
-                    HorizontalAlignment="Stretch"
-                    Background="{DynamicResource AccentForeground}"
-                    IsHitTestVisible="False"
-                    Visibility="Collapsed"/>
 
             <!-- The splitter row's VISIBLE part is exactly this 1px divider -
                  which is why the tree's scrollbar (and first row) start flush

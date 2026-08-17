@@ -712,9 +712,8 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(new Action(AttachEdgeShades),
             System.Windows.Threading.DispatcherPriority.Loaded);
 
-        // Row sizing for the current favorite count/collapsed state was
-        // already handled above by SetExpandedContentVisibility.
-        FavoritesList.ItemsSource = _settings.Favorites;
+        // Row sizing for the current row count/collapsed state was already
+        // handled above by SetExpandedContentVisibility.
         BookmarkPanelList.ItemsSource = _bookmarkPanelRows;
 
         // After both sources are attached: it decides which of the two is on
@@ -911,9 +910,9 @@ public partial class MainWindow : Window
         ExplorerTree.InvalidateVisual();
         ExplorerTree.UpdateLayout();
 
-        FavoritesList.InvalidateMeasure();
-        FavoritesList.InvalidateArrange();
-        FavoritesList.UpdateLayout();
+        BookmarkPanelList.InvalidateMeasure();
+        BookmarkPanelList.InvalidateArrange();
+        BookmarkPanelList.UpdateLayout();
 
         LogRedraw(reason);
     }
@@ -4980,12 +4979,10 @@ public partial class MainWindow : Window
     // control is on top and whichever is on bottom.
     private void ApplyFavoritesPosition()
     {
-        // BOTH panel lists move, not just the favorites one: they share the
-        // panel's row, and leaving the bookmark list behind in row 1 while the
-        // tree moved into it made the bookmark panel simply vanish under the
-        // tree (reported 2026-08-02, the first thing tried after the mode
-        // switch shipped).
-        Grid.SetRow(FavoritesList, _settings.FavoritesAtBottom ? 3 : 1);
+        // The list and the tree swap rows. While there were two lists this had
+        // to move BOTH of them - leaving one behind in row 1 while the tree
+        // moved into it made that panel simply vanish under the tree (reported
+        // 2026-08-02, the first thing tried after the mode switch shipped).
         Grid.SetRow(BookmarkPanelList, _settings.FavoritesAtBottom ? 3 : 1);
         Grid.SetRow(ExplorerTree, _settings.FavoritesAtBottom ? 1 : 3);
 
@@ -5012,61 +5009,45 @@ public partial class MainWindow : Window
     // handful of favorites don't get stretched across a tall leftover gap
     // (e.g. right after going from 0 to 1) but a manually-enlarged panel is
     // still respected once there are enough favorites to fill it.
-    // ----- 패널 모드 (즐겨찾기 / 북마크 / 표시 안 함) -------------------------
+    // ----- 패널 모드 (북마크 / 표시 안 함) ------------------------------------
     //
-    // The panel above (or below) the tree shows one of two lists, or nothing.
-    // The mode is compared rather than parsed into an enum so a value this
-    // build doesn't know - a newer build's, a hand-edited settings file - falls
-    // back to what the app has always done instead of refusing to load.
-    private bool IsBookmarkPanelMode
-        => string.Equals(_settings.SidePanelMode, "bookmarks", StringComparison.OrdinalIgnoreCase);
-
+    // The panel above (or below) the tree shows the bookmark list, or nothing.
+    // It held one of TWO lists until 2026-08-17 - see
+    // AppSettings.MergeFavoritesIntoBookmarks.
+    //
+    // Only the hidden state is compared; everything else shows the list. That
+    // way a value this build doesn't know - a newer build's, a hand-edited
+    // settings file, the "favorites" of an older one - lands on the panel being
+    // there rather than on the app refusing to load.
     private bool IsPanelHiddenMode
         => string.Equals(_settings.SidePanelMode, "none", StringComparison.OrdinalIgnoreCase);
 
     // Fully qualified: WinForms is referenced here too (Screen, for the work
     // area of the monitor the window is on) and brings its own ListBox.
-    private System.Windows.Controls.ListBox ActivePanelList
-        => IsBookmarkPanelMode ? BookmarkPanelList : FavoritesList;
+    private System.Windows.Controls.ListBox ActivePanelList => BookmarkPanelList;
 
     // What the panel's height is sized against. Zero in "none" mode, which is
-    // what collapses the row - the same path an empty favorites list already
-    // took, so there is only one way for the panel to be absent.
+    // what collapses the row - the same path an empty list already took, so
+    // there is only one way for the panel to be absent.
     private int ActivePanelRowCount
-        => IsPanelHiddenMode
-            ? 0
-            : IsBookmarkPanelMode
-                ? _bookmarkPanelRows.Count
-                : _settings.Favorites.Count;
+        => IsPanelHiddenMode ? 0 : _bookmarkPanelRows.Count;
 
-    // Which of the two lists is on screen, in ONE place. Both callers need the
-    // same answer and neither may set only one of them: a list left visible
-    // under the other still takes the clicks meant for it.
     private void SetSidePanelVisibility(Visibility visibility)
     {
-        if (visibility != Visibility.Visible)
-        {
-            FavoritesList.Visibility = Visibility.Collapsed;
-            BookmarkPanelList.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        bool bookmarks = IsBookmarkPanelMode;
-        bool hidden = IsPanelHiddenMode;
-        FavoritesList.Visibility = !bookmarks && !hidden ? Visibility.Visible : Visibility.Collapsed;
-        BookmarkPanelList.Visibility = bookmarks && !hidden ? Visibility.Visible : Visibility.Collapsed;
+        BookmarkPanelList.Visibility =
+            visibility == Visibility.Visible && !IsPanelHiddenMode
+                ? Visibility.Visible
+                : Visibility.Collapsed;
     }
 
     private void ApplySidePanelMode()
     {
-        bool bookmarks = IsBookmarkPanelMode;
-
         SetSidePanelVisibility(Visibility.Visible);
 
-        // Built only while it is the one on screen: the rows carry an icon each,
-        // and resolving those asks the disk about every bookmarked path - work
-        // nobody asked for while the panel is showing something else.
-        if (bookmarks)
+        // Built only while it is on screen: the rows carry an icon each, and
+        // resolving those asks the disk about every bookmarked path - work
+        // nobody asked for while the panel is put away.
+        if (!IsPanelHiddenMode)
         {
             RebuildBookmarkPanelRows();
         }
@@ -5293,416 +5274,6 @@ public partial class MainWindow : Window
         // doesn't necessarily reset on its own, leaving the top item(s)
         // scrolled past. Scrolling the first item into view forces it back.
         ActivePanelList.ScrollIntoView(ActivePanelList.Items[0]);
-    }
-
-    private void AddFavorite_Click(object sender, RoutedEventArgs e)
-    {
-        if (ExplorerTree.SelectedItem is not FileSystemItem { IsPlaceholder: false, IsDirectory: true } item)
-        {
-            return;
-        }
-
-        bool alreadyExists = _settings.Favorites.Any(f =>
-            string.Equals(f.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
-        if (alreadyExists)
-        {
-            return;
-        }
-
-        var entry = new FavoriteEntry { DisplayName = item.Name, Path = item.FullPath };
-        bool firstFavorite = _settings.Favorites.Count == 0;
-        _settings.Favorites.Add(entry);
-
-        // Before the panel work below, so everything after it measures and
-        // scrolls the list that is actually going to be on screen - see
-        // ShowSidePanelFor for why the panel follows an add at all.
-        ShowSidePanelFor(bookmarks: false);
-
-        // The panel might not have existed at all yet (0 -> 1 favorites), so
-        // the row/splitter need their initial reveal here - FitFavoritesPanel
-        // alone only ever sets FavoritesRowDef's height, not FavoritesSplitterRow.
-        UpdateFavoritesPanelVisibility();
-
-        // Adding does NOT auto-grow the panel anymore (2026-07-24): every
-        // growth shifted the entire tree under the cursor, and adding several
-        // favorites in a row became misclicks on rows that had just moved.
-        // The new entry slides in at the bottom instead - scrolled into view,
-        // older entries rolling up out of sight - and the panel keeps
-        // whatever height it has (the divider double-click still fits it on
-        // demand, as does removing). Only the very first favorite sizes the
-        // panel: it just appeared, so there is no height to disturb yet.
-        if (firstFavorite)
-        {
-            FitFavoritesPanel();
-        }
-        else
-        {
-            // One dispatcher hop so the ListBox has generated the new row
-            // before being asked to bring it on screen.
-            Dispatcher.BeginInvoke(() => FavoritesList.ScrollIntoView(entry),
-                System.Windows.Threading.DispatcherPriority.Loaded);
-        }
-    }
-
-    private void RemoveFavorite_Click(object sender, RoutedEventArgs e)
-    {
-        if (FavoritesList.SelectedItem is FavoriteEntry entry)
-        {
-            _settings.Favorites.Remove(entry);
-            UpdateFavoritesPanelVisibility();
-        }
-    }
-
-    // Favorites were the last list in the app with no way to empty them -
-    // bookmarks and hidden folders have had one for a while, so clearing
-    // favorites meant one right-click per row. The asymmetry had a reason that
-    // expired: favorites were always on screen, so they needed no menu listing
-    // them, and the clear-all came in with that listing everywhere else.
-    private void ClearAllFavorites_Click(object sender, RoutedEventArgs e)
-    {
-        if (_settings.Favorites.Count == 0)
-        {
-            return;
-        }
-
-        // Asked about, exactly as bookmarks are, and for the same reason: the
-        // per-row 제거 above it drops one entry the user is looking straight at,
-        // this throws away a list built over weeks with nothing to undo it. The
-        // count goes in the question because it is the part worth knowing
-        // before answering.
-        var result = MessageBox.Show(
-            this,
-            string.Format(Strings.FavoriteClearAllConfirmBody, _settings.Favorites.Count),
-            Strings.FavoriteClearAllConfirmTitle,
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        _settings.Favorites.Clear();
-        UpdateFavoritesPanelVisibility();
-        // Saved here even though adding and removing a single favorite do not:
-        // those leave something on screen to notice and put back, and this
-        // leaves an empty panel. Whatever closes the app next should not be
-        // able to decide whether the list came back.
-        _settingsService.Save(_settings);
-    }
-
-    private void FavoriteListBoxItem_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (sender is ListBoxItem item)
-        {
-            item.IsSelected = true;
-
-            // Same reasoning as TreeViewItem_PreviewMouseRightButtonDown: open
-            // below the row instead of at the mouse point, so the menu doesn't
-            // cover the very favorite it was opened on.
-            if (item.ContextMenu is { } menu)
-            {
-                menu.PlacementTarget = item;
-                menu.Placement = PlacementMode.Bottom;
-            }
-        }
-    }
-
-    // Press only ARMS the click now - navigation happens on release (see
-    // FavoritesList_PreviewMouseLeftButtonUp), because a press that turns into
-    // a drag is a reorder, not a click, and navigating on the way into a drag
-    // would jump the tree every time the list is rearranged.
-    private void FavoriteListBoxItem_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (sender is ListBoxItem { DataContext: FavoriteEntry entry })
-        {
-            _favoriteDragEntry = entry;
-            _favoriteDragStart = e.GetPosition(FavoritesList);
-        }
-    }
-
-    // Single click navigates (requirement a). The double-click workaround this
-    // used to require is gone: capping every folder at
-    // FileSystemItem.DisplayCap keeps the tree light enough that the reveal
-    // walk realizes the target's container reliably on the first click, even
-    // below a huge folder (NavigateToPath re-caps overflow first).
-    private async void NavigateToFavorite(FavoriteEntry entry)
-    {
-        {
-            // Re-clicking a favorite that's already revealed, expanded, and
-            // selected used to still re-run the entire walk: re-collapse
-            // every other folder's "more" overflow, re-expand the whole
-            // chain level by level, and re-pin the selection to the top of
-            // the tree - all for an end state identical to what was already
-            // on screen, which read as the whole panel flashing/redrawing.
-            // Nothing left to do only when it's already both selected AND
-            // expanded - IsExpanded matters too, not just the path match: a
-            // favorite added while its own folder was selected but still
-            // collapsed (e.g. right-clicked without ever opening it) would
-            // otherwise match on path alone and skip NavigateToPath - the one
-            // call that actually expands it - leaving it selected but stuck
-            // collapsed until some other selection change knocked it loose.
-            //
-            // "Nothing left to do" is about the WALK, not the scroll: the row
-            // being selected and expanded says nothing about where it is on
-            // screen. Wheel-scrolling away from a favorite leaves exactly this
-            // state, so returning outright swallowed the click completely -
-            // the one thing it was for (put that folder back at the top) did
-            // nothing at all, however far the view had drifted. Re-pin instead,
-            // which is the cheap half of the walk and the half that was
-            // actually missing; if the row scrolled far enough for its
-            // container to be virtualized away, fall through and let the full
-            // walk realize it again.
-            if (ExplorerTree.SelectedItem is FileSystemItem { IsExpanded: true } selected &&
-                string.Equals(selected.FullPath.TrimEnd('\\'), entry.Path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) &&
-                FindRealizedContainer(selected) is { } selectedContainer)
-            {
-                PinRowToTop(selectedContainer);
-                return;
-            }
-
-            // ASKED BEFORE THE WALK, and only once the re-pin above has had its
-            // chance: a favourite already on screen is plainly reachable, and
-            // that path is the common one - no reason to go to disk for it.
-            //
-            // A folder that is gone made this click do nothing at all until
-            // 2026-08-16, which is what someone moving their settings to
-            // another PC meets first (see PlaceIsReachable).
-            if (!await PlaceIsReachable(entry.Path))
-            {
-                if (AskToForgetMissingPlace(entry.Path))
-                {
-                    _settings.Favorites.Remove(entry);
-                    _settingsService.Save(_settings);
-                    UpdateFavoritesPanelVisibility();
-                }
-                return;
-            }
-
-            // The walk is asynchronous (RevealChainStep defers via the
-            // dispatcher), so the "navigating from a favorite" guard is set and
-            // cleared inside NavigateToPath / the walk itself, not around this
-            // synchronous call - clearing it here would drop the guard while the
-            // walk is still running and let an intermediate selection change
-            // clear the favorite we just clicked.
-            NavigateToPath(entry.Path, source: "favorite", collapseOthers: true);
-        }
-    }
-
-    // ----- 즐겨찾기 드래그 재정렬 ------------------------------------------
-    //
-    // No drag handle: the row itself is the target, with click and drag split
-    // by movement (the same rule the tree's drag-out uses). A handle would add
-    // permanent visual noise to a narrow row and make the same action a
-    // smaller target; "move up/down" menu items were considered and dropped as
-    // half a feature. Order is the settings list's own order, so nothing about
-    // the saved format changes.
-    //
-    // Mouse capture rather than DragDrop.DoDragDrop: this never leaves the
-    // list, and the OLE drag loop is the one that has cost this app real bugs
-    // (stuck captures, phantom self-drops). Capture is released on button-up
-    // AND on LostMouseCapture, with the app's own capture watchdog as the
-    // backstop underneath both.
-
-    private System.Windows.Point? _favoriteDragStart;
-    private FavoriteEntry? _favoriteDragEntry;
-    private bool _favoriteDragActive;
-    private int _favoriteDropIndex = -1;
-
-    private void FavoritesList_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
-    {
-        if (e.LeftButton != MouseButtonState.Pressed ||
-            _favoriteDragEntry is null ||
-            _favoriteDragStart is not { } start)
-        {
-            return;
-        }
-
-        var current = e.GetPosition(FavoritesList);
-        if (!_favoriteDragActive)
-        {
-            // Below the system's own drag threshold this is still a click -
-            // a few pixels of travel while pressing is normal, especially on a
-            // high-DPI screen with a fast mouse.
-            if (Math.Abs(current.X - start.X) < SystemParameters.MinimumHorizontalDragDistance &&
-                Math.Abs(current.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance)
-            {
-                return;
-            }
-            if (_settings.Favorites.Count < 2)
-            {
-                return;
-            }
-
-            _favoriteDragActive = true;
-            FavoritesList.CaptureMouse();
-        }
-
-        // Dragged off the list entirely (onto the tree below, most often):
-        // that cancels, it does not drop at the nearest end. The cursor being
-        // past the last row means "the end of the list" only while it is still
-        // over the list - outside it, the gesture has left, and dumping the
-        // row at the bottom on release is a move nobody asked for.
-        bool overList =
-            current.X >= 0 && current.X <= FavoritesList.ActualWidth &&
-            current.Y >= 0 && current.Y <= FavoritesList.ActualHeight;
-
-        UpdateFavoriteDropIndicator(overList ? ComputeFavoriteDropIndex(current) : -1);
-
-        // The ListBox must not see this move. It reads mouse movement while it
-        // holds capture as its own drag-selection - and the capture here is
-        // OURS, taken for the reorder - so dragging a row down past the list
-        // was quietly selecting whichever item was nearest the cursor (the
-        // last one). Handling the preview event suppresses the bubbling
-        // MouseMove entirely, which is what Selector acts on.
-        e.Handled = true;
-    }
-
-    private void FavoritesList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        var entry = _favoriteDragEntry;
-        bool dragged = _favoriteDragActive;
-        int dropIndex = _favoriteDropIndex;
-
-        EndFavoriteDrag();
-
-        if (entry is null)
-        {
-            return;
-        }
-
-        // A press that never became a drag is the click it always was.
-        if (dragged)
-        {
-            CommitFavoriteReorder(entry, dropIndex);
-        }
-        else
-        {
-            NavigateToFavorite(entry);
-        }
-    }
-
-    // Capture can also be taken away (another window activating, a system
-    // dialog): the drag ends where it stands rather than reordering on a
-    // release that never came.
-    private void FavoritesList_LostMouseCapture(object sender, System.Windows.Input.MouseEventArgs e) => EndFavoriteDrag();
-
-    private void EndFavoriteDrag()
-    {
-        bool wasDragging = _favoriteDragActive;
-
-        // The selection belongs to the row that was picked up, whatever the
-        // list may have decided while the cursor was travelling over it.
-        if (wasDragging && _favoriteDragEntry is { } dragged)
-        {
-            FavoritesList.SelectedItem = dragged;
-        }
-
-        _favoriteDragActive = false;
-        _favoriteDragEntry = null;
-        _favoriteDragStart = null;
-        _favoriteDropIndex = -1;
-        FavoriteDropIndicator.Visibility = Visibility.Collapsed;
-
-        // Checked first: releasing capture raises LostMouseCapture, which
-        // lands right back here.
-        if (wasDragging && FavoritesList.IsMouseCaptured)
-        {
-            FavoritesList.ReleaseMouseCapture();
-        }
-    }
-
-    // Where the dragged row would be inserted: the first row whose middle the
-    // cursor is above, or the end of the list. Using the midpoint is what
-    // makes the indicator only move as a row boundary is actually crossed, so
-    // jitter within one row never changes anything.
-    private int ComputeFavoriteDropIndex(System.Windows.Point pointInList)
-    {
-        int count = _settings.Favorites.Count;
-        for (int i = 0; i < count; i++)
-        {
-            if (FavoritesList.ItemContainerGenerator.ContainerFromIndex(i) is not ListBoxItem container)
-            {
-                continue;
-            }
-
-            double top = container.TransformToAncestor(FavoritesList).Transform(new System.Windows.Point(0, 0)).Y;
-            if (pointInList.Y < top + container.ActualHeight / 2)
-            {
-                return i;
-            }
-        }
-        return count;
-    }
-
-    private void UpdateFavoriteDropIndicator(int dropIndex)
-    {
-        if (dropIndex == _favoriteDropIndex)
-        {
-            return;
-        }
-        _favoriteDropIndex = dropIndex;
-
-        // -1 is "nowhere to drop" (the cursor has left the list): no line, and
-        // CommitFavoriteReorder leaves the order alone when it sees it.
-        if (dropIndex < 0 || FavoriteDropIndicatorOffset(dropIndex) is not { } offset)
-        {
-            FavoriteDropIndicator.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        // Centred on the boundary rather than hanging below it.
-        FavoriteDropIndicator.Margin = new Thickness(0, Math.Max(0, offset - 1), 0, 0);
-        FavoriteDropIndicator.Visibility = Visibility.Visible;
-    }
-
-    private double? FavoriteDropIndicatorOffset(int dropIndex)
-    {
-        int count = _settings.Favorites.Count;
-        if (count == 0)
-        {
-            return 0;
-        }
-
-        if (dropIndex < count)
-        {
-            return FavoritesList.ItemContainerGenerator.ContainerFromIndex(dropIndex) is ListBoxItem container
-                ? container.TransformToAncestor(FavoritesList).Transform(new System.Windows.Point(0, 0)).Y
-                : null;
-        }
-
-        return FavoritesList.ItemContainerGenerator.ContainerFromIndex(count - 1) is ListBoxItem last
-            ? last.TransformToAncestor(FavoritesList).Transform(new System.Windows.Point(0, 0)).Y + last.ActualHeight
-            : null;
-    }
-
-    private void CommitFavoriteReorder(FavoriteEntry entry, int dropIndex)
-    {
-        var favorites = _settings.Favorites;
-        int from = favorites.IndexOf(entry);
-        if (from < 0 || dropIndex < 0)
-        {
-            return;
-        }
-
-        // The insertion index was measured with the dragged row still in
-        // place, so removing it first shifts everything after it up one.
-        int to = dropIndex > from ? dropIndex - 1 : dropIndex;
-        if (to == from)
-        {
-            return;
-        }
-
-        favorites.RemoveAt(from);
-        favorites.Insert(to, entry);
-
-        // The list is a plain List<T> with no change notification of its own
-        // (same as everywhere else it's bound), so the view is told outright.
-        FavoritesList.Items.Refresh();
-        FavoritesList.SelectedItem = entry;
-
-        // Saved immediately, same reasoning as bookmarks: a deliberate
-        // arrangement whose whole point is that it persists.
-        _settingsService.Save(_settings);
     }
 
     // Expands every ancestor folder down to targetPath, and the target itself,
@@ -7456,13 +7027,12 @@ public partial class MainWindow : Window
 
     private void AttachEdgeShades()
     {
-        // The tree and both side panels. The panels share their template with
-        // the search results and the two history dropdowns, which are left out
+        // The tree and the side panel. The panel shares its template with the
+        // search results and the two history dropdowns, which are left out
         // deliberately - a dropdown carries its own border and shadow already,
         // and the search list was not what was asked for. Adding either is one
         // line here, not a template change.
         AttachEdgeShades(ExplorerTree, "PART_TreeScrollViewer", "TreeTopShade", "TreeBottomShade");
-        AttachEdgeShades(FavoritesList, "PART_PanelScrollViewer", "PanelTopShade", "PanelBottomShade");
         AttachEdgeShades(BookmarkPanelList, "PART_PanelScrollViewer", "PanelTopShade", "PanelBottomShade");
         UpdateEdgeShades();
     }
@@ -8335,14 +7905,10 @@ public partial class MainWindow : Window
                 LogClickLine("options menu: a 기본 설정 row is missing");
             }
 
-            if (FindMenuItem(sidePanel, "sidePanelFavorites") is { } panelFavorites &&
-                FindMenuItem(sidePanel, "sidePanelBookmarks") is { } panelBookmarks &&
-                FindMenuItem(sidePanel, "sidePanelNone") is { } panelNone &&
+            if (FindMenuItem(sidePanel, "sidePanelShow") is { } panelShow &&
                 FindMenuItem(sidePanel, "favoritesAtBottom") is { } favoritesAtBottom)
             {
-                panelBookmarks.IsChecked = IsBookmarkPanelMode;
-                panelNone.IsChecked = IsPanelHiddenMode;
-                panelFavorites.IsChecked = !IsBookmarkPanelMode && !IsPanelHiddenMode;
+                panelShow.IsChecked = !IsPanelHiddenMode;
 
                 // Nothing to place while the panel is off.
                 favoritesAtBottom.IsChecked = _settings.FavoritesAtBottom;
@@ -8350,7 +7916,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                LogClickLine("options menu: a 패널 표시 row is missing");
+                LogClickLine("options menu: a 북마크 패널 row is missing");
             }
 
             if (FindMenuItem(fontWeight, "fontWeightNormal") is { } weightNormal &&
@@ -9034,26 +8600,17 @@ public partial class MainWindow : Window
         ApplyTreeFontWeight();
     }
 
-    private void SidePanelModeMenuItem_Click(object sender, RoutedEventArgs e)
+    // 세 모드 중 하나를 고르던 자리다(2026-08-17까지). 목록이 하나가 되면서 남은
+    // 물음이 "보이느냐"뿐이라 체크 한 줄이 됐고, 그래서 여기서는 지금 화면 상태를
+    // 읽지 않고 체크 상태를 그대로 따른다.
+    private void SidePanelShowMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem item)
         {
             return;
         }
 
-        string mode = System.Windows.Automation.AutomationProperties.GetAutomationId(item) switch
-        {
-            "sidePanelBookmarks" => "bookmarks",
-            "sidePanelNone" => "none",
-            _ => "favorites",
-        };
-
-        // A checkable row toggles itself on click, so clicking the mode that is
-        // already current would UNCHECK it and leave the group saying nothing
-        // is on for the moment before the menu closes. The re-check on open
-        // fixes it next time; this fixes it now.
-        item.IsChecked = true;
-
+        string mode = item.IsChecked ? "bookmarks" : "none";
         if (string.Equals(_settings.SidePanelMode, mode, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -9980,6 +9537,12 @@ public partial class MainWindow : Window
         // exist here (different drive letters, folders that only existed on
         // the old machine) - drop anything that doesn't resolve on this one
         // rather than importing dead entries.
+        //
+        // STILL WORTH DOING AFTER THE MERGE (2026-08-17), and this is the one
+        // place it is: a settings file written before the merge arrives with
+        // its favorites unmerged, so they become bookmarks on the next launch
+        // (SettingsService.Load). Pruning here is what keeps a folder that only
+        // existed on the other machine from landing in the bookmark list.
         for (int i = imported.Favorites.Count - 1; i >= 0; i--)
         {
             if (!Directory.Exists(imported.Favorites[i].Path))
@@ -14981,24 +14544,10 @@ public partial class MainWindow : Window
         // as lag rather than as smoothing.
         UpdateViewerExpandButton();
 
-        // Picking a folder directly in the tree keeps the favorites list in
-        // sync: highlight it there too if it happens to be one, otherwise
-        // clear whatever was left highlighted from an earlier NavigateToPath.
-        // Skipped when this selection change is itself the result of
-        // navigating to that same favorite (see
-        // FavoriteListBoxItem_PreviewMouseLeftButtonDown) - it's already
-        // selected there and this would just re-select the same entry.
-        if (!_isNavigatingFromFavorite)
-        {
-            FavoritesList.SelectedItem = _selectedItem is null
-                ? null
-                : _settings.Favorites.FirstOrDefault(f =>
-                    string.Equals(f.Path.TrimEnd('\\'), _selectedItem.FullPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
-        }
-
-        // NOT behind the same guard: a bookmark jump runs the whole reveal walk
-        // with that flag set, and clearing it raises no further selection
-        // change - so gating this the way the favorites sync is gated would
+        // NOT behind _isNavigatingFromFavorite, which the favorites list used to
+        // sit behind: a bookmark jump runs the whole reveal walk with that flag
+        // set, and clearing it raises no further selection change - so gating
+        // this the same way would
         // leave the panel blank after every Ctrl+Alt+L, which is the one case
         // it most needs to answer. Re-marking the row it is already on costs
         // nothing.
@@ -16051,7 +15600,7 @@ public partial class MainWindow : Window
     // growing it shifts the whole tree under the cursor mid-click.
     private void RefreshBookmarkPanelIfShowing(string? revealPath = null)
     {
-        if (!IsBookmarkPanelMode)
+        if (IsPanelHiddenMode)
         {
             return;
         }
@@ -16160,7 +15709,7 @@ public partial class MainWindow : Window
     // the panel shows.
     private void SyncBookmarkPanelToSelection()
     {
-        if (!IsBookmarkPanelMode)
+        if (IsPanelHiddenMode)
         {
             return;
         }
@@ -17605,41 +17154,14 @@ public partial class MainWindow : Window
         // Saved immediately, same reasoning as the color settings: a bookmark
         // is a deliberate act whose whole point is persisting.
         _settingsService.Save(_settings);
-        if (added)
-        {
-            ShowSidePanelFor(bookmarks: true);
-        }
         RefreshBookmarkPanelIfShowing(added ? item.FullPath : null);
     }
 
-    // ----- 방금 담은 곳을 보여 주기 ------------------------------------------------
-    //
-    // 즐겨찾기 패널을 열어 둔 채 북마크를 추가하면 아무 일도 안 일어난 것처럼
-    // 보였다 - 담기는 담겼는데 화면에 있는 목록은 다른 쪽이라서. 반대도 같다
-    // (2026-08-16 보고: "왜 없지? 하게 된다").
-    //
-    // 메뉴에서 막는 쪽을 먼저 검토했고 안 했다. 북마크는 패널 말고도 행의 리본,
-    // Ctrl+Alt+K, 북마크 목록에서 동작하므로 메뉴만 막으면 그 셋과 답이 달라지고,
-    // 무엇보다 헷갈림은 "하면 안 되는 걸 했다"가 아니라 "한 것이 안 보인다"이다.
-    // 보여 주면 사라지는 종류의 문제였다.
-    //
-    // 추가할 때만, 그리고 이미 그 목록이 보이고 있으면 아무것도 안 한다. 지울
-    // 때는 따라가지 않는다 - 지운 것을 보여 주려고 화면을 바꾸는 것은 볼 것이
-    // 없는 곳으로 데려가는 일이다.
-    // 패널을 아예 꺼 둔 사람에게는 아무것도 안 한다. 그건 목록을 안 보겠다고
-    // 정해 둔 것이고, 항목 하나 담았다고 패널이 열리는 것은 이 수정이 없애려는
-    // 놀람보다 큰 놀람이다. 그 경우 담긴 것은 여전히 담긴다.
-    private void ShowSidePanelFor(bool bookmarks)
-    {
-        if (IsPanelHiddenMode || IsBookmarkPanelMode == bookmarks)
-        {
-            return;
-        }
-
-        _settings.SidePanelMode = bookmarks ? "bookmarks" : "favorites";
-        _settingsService.Save(_settings);
-        ApplySidePanelMode();
-    }
+    // ShowSidePanelFor는 2026-08-17에 없어졌다. 하는 일이 "담은 것과 다른 목록이
+    // 화면에 있으면 담은 쪽으로 바꾼다"였는데, 목록이 하나가 되면서 바꿔 갈 곳이
+    // 없어졌다. 패널을 꺼 둔 사람에게 아무것도 안 하던 것은 그대로다 - 그건 목록을
+    // 안 보겠다고 정해 둔 것이고, 항목 하나 담았다고 패널이 열리는 것은 그 함수가
+    // 없애려던 놀람보다 큰 놀람이다. 그 경우 담긴 것은 여전히 담긴다.
 
     // +1 = next (Ctrl+Alt+L), -1 = previous (Ctrl+Alt+J), cycling in the
     // order bookmarks were added. An entry whose path doesn't answer right
@@ -18470,7 +17992,6 @@ public partial class MainWindow : Window
             {
                 parentsToRefresh.Add(parent);
             }
-            RemoveFavoritesUnder(item.FullPath);
             RemoveBookmarksUnder(item.FullPath);
         }
 
@@ -18503,33 +18024,11 @@ public partial class MainWindow : Window
         }
     }
 
-    // Deleting a folder that's itself favorited - or that contains a
-    // favorited descendant, since the whole subtree goes with it to the
-    // Recycle Bin - would otherwise leave the favorites list pointing at a
-    // path that no longer exists. Drops every matching entry and re-fits the
-    // panel to the new (possibly smaller, possibly empty) count.
-    private void RemoveFavoritesUnder(string deletedPath)
-    {
-        string trimmed = deletedPath.TrimEnd('\\');
-        string prefix = trimmed + '\\';
+    // RemoveFavoritesUnder was the twin of the method below and went with the
+    // merge (2026-08-17): the archived Favorites array is not read by anything,
+    // so pruning it on a delete would only edit the copy kept for going back.
 
-        var stale = _settings.Favorites.Where(f =>
-            string.Equals(f.Path.TrimEnd('\\'), trimmed, StringComparison.OrdinalIgnoreCase) ||
-            f.Path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
-
-        if (stale.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var entry in stale)
-        {
-            _settings.Favorites.Remove(entry);
-        }
-        UpdateFavoritesPanelVisibility();
-    }
-
-    // The bookmark half of the above, which was simply missing: deleting a
+    // Deleting a folder that's itself bookmarked - or that contains a
     // bookmarked file left its bookmark behind, and the panel then drew it as a
     // row with no icon at all (the kind probe has nothing to answer with), which
     // reads as a rendering fault rather than as a dead entry. Reported
@@ -19195,18 +18694,21 @@ public partial class MainWindow : Window
             any = true;
         }
 
-        if (FavoritesList.Visibility == Visibility.Visible)
+        // The panel's rows count too - they sit in the same column as the tree
+        // and a name cut off up there is cut off just the same. This walked the
+        // favorites list until 2026-08-17 and follows the merged list now.
+        if (BookmarkPanelList.Visibility == Visibility.Visible)
         {
-            for (int i = 0; i < FavoritesList.Items.Count; i++)
+            for (int i = 0; i < BookmarkPanelList.Items.Count; i++)
             {
-                if (FavoritesList.ItemContainerGenerator.ContainerFromIndex(i) is not ListBoxItem favoriteItem)
+                if (BookmarkPanelList.ItemContainerGenerator.ContainerFromIndex(i) is not ListBoxItem panelItem)
                 {
                     continue;
                 }
-                favoriteItem.ApplyTemplate();
-                if (favoriteItem.Template.FindName("FavoriteNameText", favoriteItem) is TextBlock favoriteText)
+                panelItem.ApplyTemplate();
+                if (panelItem.Template.FindName("BookmarkNameText", panelItem) is TextBlock panelText)
                 {
-                    maxWidth = Math.Max(maxWidth, RowFitWidth(favoriteText));
+                    maxWidth = Math.Max(maxWidth, RowFitWidth(panelText));
                     any = true;
                 }
             }

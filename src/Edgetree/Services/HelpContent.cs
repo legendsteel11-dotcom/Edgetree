@@ -9,7 +9,7 @@ namespace SidebarExplorer.App.Services;
 // became a ROW, which is the shape that gets read.
 //
 // AND A ROW HAS TO EARN ITS LINE. If the menu item's own name already says what
-// it does - 우클릭 → 즐겨찾기 doing "keep it in the side panel" - the row is
+// it does - 우클릭 → 북마크 doing "keep it in the side panel" - the row is
 // reading the label back and it goes. What belongs here is what the label
 // cannot say: keys, gestures, and the consequences nobody would guess.
 //
@@ -50,7 +50,7 @@ public static class HelpContent
         // that makes the pair usable at all.
         T("자주 쓰는 파일 종류(확장자) 지정하기 (제외 확장자 입력시 최우선 적용)",
           "Set the file kinds you work with - anything you type as excluded wins over the rest"),
-        T("자주 가는 폴더는 북마크나 즐겨찾기로", "Bookmark the folders you keep going back to"),
+        T("자주 가는 곳은 북마크로", "Bookmark the places you keep going back to"),
         T("썸네일 캐싱 켜고 이미지 많은 폴더 빠르게 관리",
           "Turn thumbnail caching on and move through big image folders fast"),
         T("원하는 색상 선택", "Pick the colours you want"),
@@ -577,8 +577,8 @@ public static class HelpContent
                       "Colours → the link on a row", "Ties rows together - the ones lit together share a colour"),
                     R("색상 설정 → 모노", "팔레트 전체를 회색톤으로 한 번에",
                       "Colours → Mono", "The whole palette to greyscale in one press"),
-                    R("색상 설정 → 그림자", "트리·패널 목록의 위아래 끝을 옅게 덮음",
-                      "Colours → Shading", "Veils the top and bottom ends of the tree and panel lists"),
+                    R("색상 설정 → 그림자", "트리와 북마크 패널의 위아래 끝을 옅게 덮음",
+                      "Colours → Shading", "Veils the top and bottom ends of the tree and the bookmark panel"),
                     R("옵션 → 기본 설정", "자동 시작 · 트레이 · 아이콘 · 자동 숨김", "Options → General", "Autostart · tray · icons · auto-hide"),
                     // "아이콘" in the row above reads as ONE switch, and it is
                     // three. The drive one arrived last (2026-08-16) and the

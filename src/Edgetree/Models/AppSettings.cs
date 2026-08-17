@@ -330,7 +330,17 @@ public class AppSettings
     public double DockedHeightRatio { get; set; } = 1.0;
     public double DockedTopRatio { get; set; } = 0.0;
     public double TreeFontSize { get; set; } = 12;
+    // 즐겨찾기가 있던 자리. 목록은 북마크로 합쳐졌고(MergeFavoritesIntoBookmarks)
+    // 이 배열은 비우지 않는다 - 합치기는 한 번뿐이라 되돌릴 길이 여기 말고 없다.
+    // 새로 담기는 것은 없으므로 여기 있는 것은 합치기 이전에 담아 둔 것 그대로다.
     public ObservableCollection<FavoriteEntry> Favorites { get; set; } = new();
+
+    // 세워지면 다시 합치지 않는다. Normalize와 달리 합치기는 실행마다 돌면 안 된다 -
+    // 사용자가 북마크에서 지운 것이 다음 실행에 위 배열에서 되살아난다.
+    public bool FavoritesMergedIntoBookmarks { get; set; } = false;
+
+    // 패널 높이. 이름은 즐겨찾기 시절 것이고 저장된 키를 그대로 두려고 남겼다 -
+    // 고치면 지금까지 맞춰 둔 높이가 전부 기본값으로 돌아간다.
     public double FavoritesPanelHeight { get; set; } = 100;
 
     // Options ("...") menu toggles.
@@ -769,17 +779,17 @@ public class AppSettings
     // is skipped when cycling, not an error.
     public List<string> BookmarkPaths { get; set; } = new();
 
-    // What the panel above (or below) the tree shows: "favorites", "bookmarks"
-    // or "none". Defaults to favorites so an existing install looks exactly as
-    // it did before the choice existed.
+    // What the panel above (or below) the tree shows: "bookmarks" or "none".
+    // "favorites" was the third value and is migrated away on load - see
+    // MergeFavoritesIntoBookmarks below.
     //
-    // "none" is not the same as an empty favorites list, even though both end
+    // "none" is not the same as an empty bookmark list, even though both end
     // with no panel on screen: the list keeps its entries and comes back when
     // the mode does. Before this, giving that row back to the tree meant
-    // deleting favorites (see MainWindow.UpdateFavoritesPanelVisibility, which
+    // deleting entries (see MainWindow.UpdateFavoritesPanelVisibility, which
     // collapses the row only when the list is empty) - a real cost on a
     // 1080p screen, paid in data.
-    public string SidePanelMode { get; set; } = "favorites";
+    public string SidePanelMode { get; set; } = "bookmarks";
 
     // Tree text weight: "normal", "bold", or "folders" (folders bold, files
     // normal - the structure reads without every file name thickening with it).
@@ -859,6 +869,9 @@ public class AppSettings
     public static AppSettings ForFirstRun() => new()
     {
         AutoHideUseHandle = true,
+        // 옮겨 올 것이 없는 사람이다. 세워 두지 않으면 첫 저장 전까지 합치기가
+        // 매번 도는데, 하는 일이 없어도 도는 것과 안 도는 것은 다르다.
+        FavoritesMergedIntoBookmarks = true,
     };
 
     // ----- 값이 레이아웃에 닿기 전에 -------------------------------------------
@@ -898,6 +911,44 @@ public class AppSettings
         DockedTopRatio = Sane(DockedTopRatio, 0.0, min: 0, max: 1);
         NormalizeColors();
         NormalizePresets();
+    }
+
+    // ----- 즐겨찾기를 북마크로 (한 번만) ------------------------------------------
+    //
+    // 두 목록이 하나가 됐다. 즐겨찾기가 북마크보다 나았던 것은 순서를 끌어서 정하는
+    // 것 하나뿐이었고 그것은 북마크 패널이 이어받았다 - 나머지(파일도 담김, 트리 행의
+    // 책갈피, Ctrl+Alt+K·L·J)는 전부 북마크 쪽에만 있었다.
+    //
+    // 담아 둔 순서 그대로 북마크 끝에 붙는다. 그 순서가 곧 Ctrl+Alt+L 순환 순서라
+    // 원래 쓰던 북마크의 번호는 하나도 안 바뀌고 옮겨 온 것이 그 뒤에 선다. 양쪽에
+    // 다 있던 경로는 한 번만 남는다.
+    //
+    // Normalize와 달리 실행마다 돌면 안 되므로 표식을 세운다. 위의 Favorites는
+    // 비우지 않는다 - 이 함수가 한 일을 되돌릴 길이 그 배열 말고 없다.
+    public void MergeFavoritesIntoBookmarks()
+    {
+        if (FavoritesMergedIntoBookmarks)
+        {
+            return;
+        }
+
+        FavoritesMergedIntoBookmarks = true;
+
+        var known = new HashSet<string>(BookmarkPaths, StringComparer.OrdinalIgnoreCase);
+        foreach (var favorite in Favorites)
+        {
+            if (!string.IsNullOrWhiteSpace(favorite.Path) && known.Add(favorite.Path))
+            {
+                BookmarkPaths.Add(favorite.Path);
+            }
+        }
+
+        // 즐겨찾기를 보고 있던 패널은 같은 자리에서 북마크를 보게 된다. 꺼 둔
+        // 사람("none")은 꺼진 채로 둔다 - 목록을 안 보겠다고 정해 둔 것이다.
+        if (string.Equals(SidePanelMode, "favorites", StringComparison.OrdinalIgnoreCase))
+        {
+            SidePanelMode = "bookmarks";
+        }
     }
 
     // ----- 프리셋 목록이 밖에서 들어올 때 ---------------------------------------

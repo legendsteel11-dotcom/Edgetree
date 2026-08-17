@@ -67,6 +67,9 @@ public class SettingsService
                     // see AppSettings.Normalize for what it does and what it
                     // deliberately leaves to the use sites.
                     settings.Normalize();
+                    // 한 번만 도는 것이라 Normalize 안이 아니라 그 뒤다 - 표식은
+                    // 이 다음 저장에 실려 나간다.
+                    settings.MergeFavoritesIntoBookmarks();
                     return settings;
                 }
             }

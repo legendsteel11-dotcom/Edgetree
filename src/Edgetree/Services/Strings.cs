@@ -9,7 +9,10 @@ namespace SidebarExplorer.App.Services;
 public static class Strings
 {
     // Context menu (file/folder rows)
-    public static string MenuAddFavorite = "즐겨찾기에 추가";
+    //
+    // MenuAddFavorite("즐겨찾기에 추가") was here until 2026-08-17. 즐겨찾기와
+    // 북마크는 같은 일을 하는 두 목록이었고, 즐겨찾기 쪽에만 있던 것은 순서를
+    // 끌어서 정하는 것 하나뿐이라 그것을 북마크 패널로 옮기고 목록을 합쳤다.
     public static string MenuBookmark = "북마크";
     public static string MenuBookmarkAdd = "북마크 추가";
     public static string MenuBookmarkRemove = "북마크 해제";
@@ -118,11 +121,15 @@ public static class Strings
     public static string MenuFontWeightFoldersOnly = "폴더만 굵게";
     public static string MenuFontWeightFilesOnly = "파일만 굵게";
 
-    // The panel beside the tree: which list it shows, or none at all.
-    public static string MenuSidePanel = "패널 표시";
-    public static string MenuSidePanelFavorites = "즐겨찾기";
-    public static string MenuSidePanelBookmarks = "북마크";
-    public static string MenuSidePanelNone = "표시 안 함";
+    // 트리 옆(위 또는 아래)의 목록. 이름에 북마크를 넣은 것은 이 앱에 패널이 셋이라
+    // 맨 "패널"이 어느 것인지 안 갈리기 때문이다 - 나머지 둘은 이미 멀티미디어
+    // 패널·컨트롤 패널로 수식돼 있고 이것만 맨몸이었다(2026-08-17).
+    //
+    // 세 모드(즐겨찾기·북마크·표시 안 함)가 있던 자리다. 목록이 하나가 되면서
+    // 남은 물음은 "보이느냐"뿐이라 체크 한 줄로 줄었다. 안의 두 줄이 주어를 다시
+    // 말하지 않는 것은 멀티미디어 패널 서브메뉴와 같은 이유다.
+    public static string MenuSidePanel = "북마크 패널";
+    public static string MenuSidePanelShow = "표시";
 
     public static string MenuHideFolder = "이 폴더 숨기기";
     // Replaces the line above while several rows are picked. Files among them
@@ -156,8 +163,6 @@ public static class Strings
     public static string HiddenClearAllConfirmBody = "숨긴 폴더 {0}개를 모두 다시 표시하겠습니까?";
     public static string BookmarkClearAllConfirmTitle = "북마크 전체 해제";
     public static string BookmarkClearAllConfirmBody = "북마크 {0}개를 모두 해제하겠습니까?";
-    public static string FavoriteClearAllConfirmTitle = "즐겨찾기 전체 해제";
-    public static string FavoriteClearAllConfirmBody = "즐겨찾기 {0}개를 모두 해제하겠습니까?";
     public static string BookmarkShortcutNext = "다음 북마크";
     public static string BookmarkShortcutPrev = "이전 북마크";
     public static string MenuNewFolder = "새 폴더";
@@ -190,7 +195,6 @@ public static class Strings
     public static string MenuRevealInTree = "트리에서 보기";
     public static string GestureDoubleClick = "더블클릭";
     public static string MenuProperties = "속성";
-    public static string MenuRemoveFavorite = "즐겨찾기에서 제거";
 
     // Options ("...") menu
     public static string MenuAutoCollapse = "폴더 자동 접기";
@@ -226,9 +230,8 @@ public static class Strings
     public static string MenuShowPanelDividers = "영역 구분선";
     // MenuShowPathBar removed 2026-08-11 along with the toggle it labelled -
     // the strip is always on now that it carries the history chevrons.
-    // Named after the PANEL, not favorites: it now holds either list. Lives
-    // inside the 패널 표시 submenu, under the three modes.
-    public static string MenuFavoritesAtBottom = "아래에 표시";
+    // 북마크 패널 서브메뉴 안, 표시 아래. 주어는 메뉴 이름이 이미 말했다.
+    public static string MenuSidePanelAtBottom = "아래에 표시";
     // In the colour window, not the options menu - among behaviour toggles the
     // word reads as a shadow around the whole app. The tip says which shadow.
     public static string ButtonEdgeShades = "그림자";
@@ -624,22 +627,21 @@ public static class Strings
     public static string ColorLabelFileNameFont = "파일 이름";
     public static string ColorLabelFileNameHighlightFont = "파일 이름 강조";
     public static string ColorLabelSelection = "선택된 항목";
-    // Named after the PANEL, not favorites - the same correction 아래에 표시
-    // got in the options menu, and for the same reason: this one brush paints
-    // the favorites list, the bookmark list AND the search view's scope strip
-    // (which borrows the panel's colour on purpose). The stored JSON key stays
-    // HistoryBackgroundColorHex so nobody's customised colour resets.
-    public static string ColorLabelHistory = "패널 배경";
+    // 맨 "패널 배경"이었다. 이 목록 안에 멀티미디어 패널 배경이 같이 있어서 둘이
+    // 문맥으로 안 갈렸다 - 이름이 아니라 자리가 문제였고, 그래서 수식을 붙였다
+    // (2026-08-17). 이 브러시는 북마크 목록과 검색 화면의 범위 줄을 함께 칠한다
+    // (그 줄이 패널 색을 일부러 빌려 쓴다). 저장 키는 HistoryBackgroundColorHex
+    // 그대로라 맞춰 둔 색은 초기화되지 않는다.
+    public static string ColorLabelHistory = "북마크 패널 배경";
     public static string ColorLabelHoverBackground = "마우스 오버";
     public static string ColorLabelFolderNameHoverFont = "폴더 이름 마우스 오버";
     public static string ColorLabelFileNameHoverFont = "파일 이름 마우스 오버";
     public static string ColorLabelShowMore = "더 보기";
-    // 패널 배경과 같은 말로 시작한다 - 즐겨찾기 목록·북마크 목록 둘 다 칠하므로
-    // 한쪽 이름을 달면 다른 쪽이 안 듣는 것처럼 읽힌다(제외 칩 글자 행에서 겪은
-    // 것과 같은 계열, 2026-08-15).
-    public static string ColorLabelPanelNameFont = "패널 이름";
-    public static string ColorLabelPanelNameHighlightFont = "패널 이름 강조";
-    public static string ColorLabelPanelNameHoverFont = "패널 이름 마우스 오버";
+    // 배경은 패널의 것이고 이 셋은 그 안에 적힌 이름의 것이라 "패널"을 빼고 짧게
+    // 간다 - 위 배경 행이 이미 어느 패널인지 말했고, 이 목록은 종류로 훑는다.
+    public static string ColorLabelPanelNameFont = "북마크 이름";
+    public static string ColorLabelPanelNameHighlightFont = "북마크 이름 강조";
+    public static string ColorLabelPanelNameHoverFont = "북마크 이름 마우스 오버";
     public static string ColorLabelGuideLine = "들여쓰기 안내선";
     public static string ColorLabelGuideLineActive = "들여쓰기 안내선 강조";
     // 화살표가 아니라 기호 - 사용자가 부르는 이름 그대로.
@@ -799,7 +801,7 @@ public static class Strings
     public static string SettingsImportedBody = "설정을 가져왔습니다. 적용하려면 앱을 다시 시작해야 합니다. 지금 다시 시작할까요?";
 
     public static string ResetSettingsConfirmTitle = "설정 초기화";
-    public static string ResetSettingsConfirmBody = "모든 설정과 즐겨찾기가 앱 기본 상태로 초기화됩니다. 이 작업은 되돌릴 수 없습니다.\n\n초기화 후 적용을 위해 앱을 다시 시작합니다. 계속할까요?";
+    public static string ResetSettingsConfirmBody = "모든 설정과 북마크가 앱 기본 상태로 초기화됩니다. 이 작업은 되돌릴 수 없습니다.\n\n초기화 후 적용을 위해 앱을 다시 시작합니다. 계속할까요?";
 
     // Which language the fields below ended up in. Almost nothing needs to ask
     // - the point of this class is that callers just read a string - but a
@@ -832,7 +834,6 @@ public static class Strings
         }
 
         IsEnglish = true;
-        MenuAddFavorite = "Add to Favorites";
         MenuBookmark = "Bookmark";
         MenuBookmarkAdd = "Add Bookmark";
         MenuBookmarkRemove = "Remove Bookmark";
@@ -879,10 +880,8 @@ public static class Strings
         MenuFontWeightBold = "Bold";
         MenuFontWeightFoldersOnly = "Bold Folders Only";
         MenuFontWeightFilesOnly = "Bold Files Only";
-        MenuSidePanel = "Side Panel";
-        MenuSidePanelFavorites = "Favorites";
-        MenuSidePanelBookmarks = "Bookmarks";
-        MenuSidePanelNone = "Hidden";
+        MenuSidePanel = "Bookmark Panel";
+        MenuSidePanelShow = "Show";
         MenuHideFolder = "Hide This Folder";
         MenuHideSelectedFolders = "Hide Selected Folders";
         MenuHiddenFolderList = "Hidden Folders";
@@ -905,8 +904,6 @@ public static class Strings
         MenuBookmarkClearAll = "Clear all";
         BookmarkClearAllConfirmTitle = "Clear All Bookmarks";
         BookmarkClearAllConfirmBody = "Clear all {0} bookmarks?";
-        FavoriteClearAllConfirmTitle = "Clear All Favorites";
-        FavoriteClearAllConfirmBody = "Clear all {0} favorites?";
         BookmarkShortcutNext = "Next bookmark";
         BookmarkShortcutPrev = "Previous bookmark";
         MenuNewFolder = "New Folder";
@@ -934,7 +931,6 @@ public static class Strings
         MenuRevealInTree = "Show in Tree";
         GestureDoubleClick = "Double-click";
         MenuProperties = "Properties";
-        MenuRemoveFavorite = "Remove from Favorites";
 
         MenuAlwaysOnTop = "Always on Top";
         MenuGeneralSettings = "General";
@@ -946,7 +942,7 @@ public static class Strings
         MenuTitleBarTitle = "Title Bar Text";
         MenuDragMoves = "Drag Moves (hold Ctrl to copy)";
         MenuShowPanelDividers = "Panel Dividers";
-        MenuFavoritesAtBottom = "Show at Bottom";
+        MenuSidePanelAtBottom = "Show at Bottom";
         ButtonEdgeShades = "Shading";
         ButtonEdgeShadesTip = "Veils the top and bottom ends of a list";
         MenuViewerSideSwapped = "Swap Sides";
@@ -1114,14 +1110,14 @@ public static class Strings
         ColorLabelFileNameFont = "File Name";
         ColorLabelFileNameHighlightFont = "File Name Highlight";
         ColorLabelSelection = "Selected Item";
-        ColorLabelHistory = "Panel Background";
+        ColorLabelHistory = "Bookmark Panel Background";
         ColorLabelHoverBackground = "Mouse Hover";
         ColorLabelFolderNameHoverFont = "Folder Name Mouse Hover";
         ColorLabelFileNameHoverFont = "File Name Mouse Hover";
         ColorLabelShowMore = "Show More";
-        ColorLabelPanelNameFont = "Panel Name";
-        ColorLabelPanelNameHighlightFont = "Panel Name Highlight";
-        ColorLabelPanelNameHoverFont = "Panel Name Mouse Hover";
+        ColorLabelPanelNameFont = "Bookmark Name";
+        ColorLabelPanelNameHighlightFont = "Bookmark Name Highlight";
+        ColorLabelPanelNameHoverFont = "Bookmark Name Mouse Hover";
         ColorLabelGuideLine = "Guide Line";
         ColorLabelGuideLineActive = "Guide Line Highlight";
         ColorLabelExpander = "Expand Arrow";
@@ -1219,7 +1215,7 @@ public static class Strings
         SettingsImportedBody = "Settings were imported. Restarting the app is required to apply them. Restart now?";
 
         ResetSettingsConfirmTitle = "Reset Settings";
-        ResetSettingsConfirmBody = "All settings and favorites will be reset to the app's default state. This cannot be undone.\n\nThe app will restart afterward to apply it. Continue?";
+        ResetSettingsConfirmBody = "All settings and bookmarks will be reset to the app's default state. This cannot be undone.\n\nThe app will restart afterward to apply it. Continue?";
 
 #if INSTRUMENT
         RootPathLabel += " (INSTRUMENTED)";
