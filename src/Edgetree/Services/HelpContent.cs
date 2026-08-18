@@ -430,8 +430,8 @@ public static class HelpContent
                     // other fills the panel.
                     R("채우기", "패널을 꽉 채우고 넘치는 부분은 잘라냄 (다음 그림에도 이어짐)",
                       "Fill", "Fills the panel and crops the overflow - and stays on for the next picture"),
-                    R("휠클릭 · Enter", "전체 화면 (우클릭 메뉴에서 방식 선택)",
-                      "Wheel click · Enter", "Full screen (pick which kind in the right-click menu)"),
+                    R("Wheel Click · Enter", "전체 화면 (우클릭 메뉴에서 방식 선택)",
+                      "Wheel Click · Enter", "Full screen (pick which kind in the right-click menu)"),
                     R("Esc", "전체 화면 종료", "Esc", "Leave full screen"),
                     R("↑ ↓", "이전 · 다음 항목", "↑ ↓", "Previous · next item"),
                     R("← →", "썸네일 바 켜져 있을 때 이전 · 다음",
