@@ -382,7 +382,7 @@ public static class HelpContent
                       "Picture size, navigator and thumbnail bar instead of the file items, plus the title bar's menu - presets, help, restart, quit"),
                     // 2026-08-17: 창 모드에서만 나오는 줄이라 조건을 앞에 적었다 -
                     // 부착 상태에서 찾다가 없다고 읽으면 그게 더 나쁘다.
-                    R("창 모드 · 전체 화면에서 우클릭 → 바탕화면 전체",
+                    R("창 모드 · 전체 화면에서 우클릭 → 바탕화면 채우기",
                       "비활성화하면 창 크기 그대로 그림만 꽉 채움 (기본은 창을 화면 전체로)",
                       "Window mode · right-click in full screen → Fill the desktop",
                       "Off keeps the window's own size and fills that instead; on (the default) grows the window to the screen"),

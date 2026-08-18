@@ -6641,7 +6641,7 @@
                                      told about, so the mode was invisible to
                                      anyone who had not been. The key stays; this
                                      row is for the first time.
-                                     Directly above 바탕화면 전체 because the two
+                                     Directly above 바탕화면 채우기 because the two
                                      are a pair read downward: the mode, then how
                                      far it reaches. -->
                                 <MenuItem x:Name="ViewerFullscreenItem"

@@ -230,7 +230,7 @@ public static class Strings
     // 2026-08-17: `제목 표시줄 타이틀 제거`였음. 이 묶음의 다른 줄은 전부 켜면
     // 보이는 쪽(`폴더 아이콘`·`드라이브 아이콘`·`영역 구분선`)인데 이 줄만 반대라,
     // 체크가 무엇을 뜻하는지 줄마다 다시 읽어야 했음.
-    public static string MenuTitleBarTitle = "제목 표시줄 타이틀";
+    public static string MenuTitleBarTitle = "제목 표시줄 텍스트";
     // Names the way BACK, because that is what someone looks for first when a
     // drag did something they did not expect. The other half of the rule -
     // across drives it copies - is on the row in the help rather than here,
@@ -434,7 +434,7 @@ public static class Strings
     // 앱 전체화면이 창 모드에서 어디까지 가는지. 사용자가 고른 말이고, "화면 전체"
     // 대신 `바탕화면`인 것이 요점 - 앱 전체화면 자체가 이미 "화면"을 쓰고 있어서
     // 그 말로는 둘이 구분되지 않는다.
-    public static string ViewerFullDesktop = "바탕화면 전체";
+    public static string ViewerFullDesktop = "바탕화면 채우기";
     // 들어가고 나오는 문. 지금까지 휠클릭 하나뿐이었고, 그건 배워야 아는 것이라
     // 이 모드가 있다는 사실 자체가 안 보였다 (2026-08-17). 단축키를 아는 사람은
     // 계속 그걸 쓰면 되고, 이 행은 처음 쓰는 사람을 위한 것이다. 바로 아래
