@@ -530,7 +530,9 @@ public static class Strings
     // 높이가 아니라 위치. 이 줄이 바꾸는 것은 자막이 화면에서 어디에 놓이는가이고,
     // 높이라고 하면 글자의 높이로도 읽힌다 - 바로 윗줄이 크기라 더 그렇다.
     public static string ViewerSubtitlePosition = "자막 위치";
-    public static string ViewerSubtitleSync = "자막 싱크";
+    // 단위는 라벨에. 값에 붙이면 같은 뜻을 이 메뉴가 두 가지로 말하게 된다 -
+    // 바로 아래 슬라이드 간격이 (초)로 쓰고 있었고, 이 줄만 s 였다(2026-08-18).
+    public static string ViewerSubtitleSync = "자막 싱크 (초)";
     // Safe to be this blunt because of WHERE it is: inside the 북마크 목록
     // submenu, under the positions it clears. The word 삭제 means files
     // everywhere else in this app, and it would have needed qualifying if it
@@ -1094,7 +1096,7 @@ public static class Strings
         ViewerSubtitles = "Subtitles";
         ViewerSubtitleSize = "Subtitle size";
         ViewerSubtitlePosition = "Subtitle position";
-        ViewerSubtitleSync = "Subtitle sync";
+        ViewerSubtitleSync = "Subtitle sync (sec)";
         ViewerMarkClear = "Clear all";
         ViewerHdrToneMap = "HDR color correction";
         ViewerHdrBrightness = "  Brightness";

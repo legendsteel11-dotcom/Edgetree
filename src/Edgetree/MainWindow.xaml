@@ -6789,10 +6789,12 @@
                                      4K panel puts them right against the edge).
                                      Directly under 자막 크기 because the two are
                                      tuned in the same sitting, and the number
-                                     is the plate's gap from the bottom - so
-                                     BIGGER means HIGHER, and the buttons are
-                                     ordered to say so rather than to follow the
-                                     number: − lowers, + raises. -->
+                                     is a SIGNED OFFSET from where the plate
+                                     sat before this row existed, negative
+                                     upwards - the same shape 자막 싱크 uses, and
+                                     the direction anyone thinking in screen
+                                     coordinates expects. The buttons follow the
+                                     number: − raises, + lowers. -->
                                 <MenuItem x:Name="ViewerSubtitleBottomItem"
                                         StaysOpenOnClick="True"
                                         Focusable="False"

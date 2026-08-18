@@ -23633,9 +23633,13 @@ public partial class MainWindow : Window
     // have raised them. A DIP number rather than a share of the height - the
     // plate is positioned by a margin, and a share would have to be recomputed
     // on every resize for a difference nobody would be able to name.
-    private const double MinSubtitleBottom = 0;
-    private const double MaxSubtitleBottom = 300;
+    // 18 is where the plate was fixed before this row existed, and it is the
+    // zero the readout counts from. The bounds are whole steps either side of
+    // it so the number never lands between two.
+    private const double DefaultSubtitleBottom = 18;
     private const double SubtitleBottomStep = 10;
+    private const double MinSubtitleBottom = DefaultSubtitleBottom - SubtitleBottomStep;
+    private const double MaxSubtitleBottom = DefaultSubtitleBottom + (SubtitleBottomStep * 28);
 
     // Half a second a press: small enough to land on, large enough that a real
     // drift takes a few presses rather than twenty. Bounded well past anything
@@ -23802,13 +23806,20 @@ public partial class MainWindow : Window
         ViewerSubtitlePlate.Margin = new Thickness(margin.Left, margin.Top, margin.Right, bottom);
         if (ViewerSubtitleBottomText is not null)
         {
-            // The readout counts STEPS, not pixels (2026-08-18, on request:
-            // "숫자를 10으로 나눠도 될듯요"). A press moves ten of them, so the
-            // pixel figure ran 130, 140, 150 and only ever changed its tens
-            // digit - three characters where one was doing the work. The stored
-            // value stays in DIPs; only what the row shows is divided.
-            ViewerSubtitleBottomText.Text =
-                ((int)Math.Round(bottom / SubtitleBottomStep)).ToString();
+            // A SIGNED OFFSET FROM WHERE IT SAT BEFORE, negative upwards
+            // (2026-08-18, the author's second pass: "자막위치도 보통 위로
+            // 올라가는 거는 음수로 하지 않나요"). The first version counted the
+            // gap from the bottom, so bigger meant higher - true to the margin
+            // underneath and backwards to anyone thinking in screen
+            // coordinates, where up is where y gets smaller.
+            //
+            // It also makes this row and 자막 싱크 read as siblings: both are 0
+            // at the default and signed away from it, which is what they are.
+            //
+            // Steps, not pixels - a press moves ten, so the pixel figure ran
+            // 130, 140, 150 and only ever changed its tens digit.
+            int steps = (int)Math.Round((DefaultSubtitleBottom - bottom) / SubtitleBottomStep);
+            ViewerSubtitleBottomText.Text = steps == 0 ? "0" : $"{steps:+0;-0}";
         }
     }
 
@@ -23867,11 +23878,13 @@ public partial class MainWindow : Window
     {
         if (ViewerSubtitleOffsetText is not null)
         {
-            // Signed and in seconds, because the sign IS the information - "0.5"
-            // alone would not say which way it moved.
+            // Signed, because the sign IS the information - "0.5" alone would
+            // not say which way it moved. The unit moved to the label on
+            // 2026-08-18: it was the only readout in this menu carrying one,
+            // and it said s where the slideshow row a few lines down said 초.
             ViewerSubtitleOffsetText.Text = _subtitleOffset == 0
-                ? "0s"
-                : $"{_subtitleOffset:+0.0;-0.0}s";
+                ? "0"
+                : $"{_subtitleOffset:+0.0;-0.0}";
         }
     }
 
@@ -23885,11 +23898,12 @@ public partial class MainWindow : Window
 
     private void ViewerSubtitleLarger_Click(object sender, RoutedEventArgs e) => StepSubtitleFontSize(+1);
 
-    // 아래로 = 여백을 줄여 화면 끝에 붙이는 것, 위로 = 여백을 키우는 것.
-    // 버튼이 말하는 것은 자막이 가는 방향이지 숫자의 방향이 아니다.
-    private void ViewerSubtitleLower_Click(object sender, RoutedEventArgs e) => StepSubtitleBottom(-SubtitleBottomStep);
+    // 버튼은 숫자를 따른다 - − 를 누르면 숫자가 작아지고, 작아지는 쪽이 위다.
+    // 여백으로는 반대라서(위로 가려면 아래 여백이 커진다) 부호가 뒤집혀 있는데,
+    // 읽는 사람이 보는 것은 여백이 아니라 숫자다.
+    private void ViewerSubtitleLower_Click(object sender, RoutedEventArgs e) => StepSubtitleBottom(+SubtitleBottomStep);
 
-    private void ViewerSubtitleHigher_Click(object sender, RoutedEventArgs e) => StepSubtitleBottom(+SubtitleBottomStep);
+    private void ViewerSubtitleHigher_Click(object sender, RoutedEventArgs e) => StepSubtitleBottom(-SubtitleBottomStep);
 
     private void ViewerSubtitleToggle_Click(object sender, RoutedEventArgs e)
     {
