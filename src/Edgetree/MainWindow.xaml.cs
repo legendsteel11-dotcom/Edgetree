@@ -22071,8 +22071,23 @@ public partial class MainWindow : Window
         _videoLogClock = System.Diagnostics.Stopwatch.StartNew();
         _videoLogLines.Add(
             $"play #{_videoPlayCount}  {Path.GetFileName(path ?? "-")}");
+        // NEW SOURCE OR THE SAME ELEMENT AGAIN (2026-08-18). Read BEFORE the
+        // Source assignment that follows this call, so it still holds the
+        // outgoing file.
+        //
+        // The frozen-picture sightings both begin at a saved position, and the
+        // author's reading is that a film resumed freezes while one started from
+        // the beginning does not. The log could not test it: a play that seeks
+        // to 1360s and a play whose element was already sitting at 1351s look
+        // the same afterwards, and only the first has a seek line to show for
+        // it. This says which one happened.
+        string? playing = ViewerMedia.Source?.IsFile == true ? ViewerMedia.Source.LocalPath : null;
+        bool reused = playing is not null && path is not null &&
+            string.Equals(playing, path, StringComparison.OrdinalIgnoreCase);
+
         _videoLogLines.Add(
             $"  from {_videoLogStartPosition.TotalSeconds:F2}s  " +
+            $"source={(reused ? "reused" : "new")}  " +
             $"scrubbing={ViewerMedia.ScrubbingEnabled}  volume={ViewerMedia.Volume:F2}");
     }
 
@@ -22199,6 +22214,26 @@ public partial class MainWindow : Window
         _videoLogLines.Add(
             $"picture  hash={hash:X8}  still={_videoLogPictureStill,3}  " +
             $"avg=#{sumR / count:X2}{sumG / count:X2}{sumB / count:X2}  spread={hi - lo,3}");
+
+        // THE FROZEN-PICTURE SIGHTING, on the same line as the evidence for it
+        // (2026-08-18, second sighting). The picture stops while the position
+        // keeps running; the first time it was seen there was nothing to read
+        // afterwards, and this time the three logs had to be lined up by clock
+        // to find out what the window was doing - which is enough to raise a
+        // suspicion and never enough to kill one.
+        //
+        // Two conditions, both cheap. still >= 2 is a real hold rather than a
+        // slow shot, and spread > 50 keeps a fade to black out of it - a flat
+        // frame repeating is the picture being correct, and the first sighting's
+        // neighbours in this log were exactly that (spread=0, still=7).
+        if (_videoLogPictureStill >= 2 && hi - lo > 50)
+        {
+            _videoLogLines.Add(
+                $"  STILL  docked={_isDocked} hidden={_settings.IsAutoHidden} " +
+                $"revealed={_isAutoHideRevealed} full={_viewerFullscreen} " +
+                $"clip={_appliedClip.Kind} margin={RootContent.Margin.Top:F0}/{RootContent.Margin.Bottom:F0} " +
+                $"left={Left:F0} width={Width:F0} state={WindowState}");
+        }
     }
 
     // Set by the failure handler so the flush that follows says how the run
