@@ -1,4 +1,4 @@
-# Edgetree v2.4.0
+# Edgetree v2.4.1
 
 [한국어 안내](README-ko.md)
 
@@ -208,6 +208,15 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v2.4.1 (2026-08-18)
+
+- Saving presets one after another no longer leaves the tray popping.
+- Two help rows no longer show Korean text on the English screen.
+- One spelling throughout: colors, minimize, grayscale.
+- The language dialog now asks to change the language instead of saying it already changed.
+- Counts of one read correctly.
+- Accordion Mode is now Auto-Collapse Folders, the name its Korean row already carried.
 
 ### v2.4.0 (2026-08-17)
 

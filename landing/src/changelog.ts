@@ -33,6 +33,41 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // A PATCH RELEASE MADE ALMOST ENTIRELY OF WORDS, which is the awkward case
+    // for this file: only one line here changes what the app DOES. The rest are
+    // labels and sentences, and a card is read by someone deciding whether to
+    // download - so the test each line still has to pass is whether a person
+    // would notice.
+    //
+    // THE TWO LISTS ARE NOT THE SAME LENGTH, on purpose. Four of these fixes
+    // only exist on the English screen (Korean text showing there, one spelling,
+    // a dialog title, counts of one), and a Korean reader gets nothing from
+    // being told about them line by line - so Korean carries them as one line
+    // at the end. Padding either list to match the other would mean inventing a
+    // line or dropping a true one.
+    //
+    // THE AUTHOR'S OWN WORDING for the tray line, used as given (2026-08-18):
+    // the draft said the tray answers once, and theirs names what was actually
+    // happening - the message kept coming. English follows theirs rather than
+    // the draft, so the two sides describe the same thing.
+    version: 'v2.4.1',
+    ko: [
+      '프리셋을 연속으로 저장했을 때 트레이 메시지가 계속 나오는 것을 방지했습니다.',
+      '`표시할 파일 종류`가 `표시할 파일 형식`으로 변경되었습니다.',
+      '`바탕화면 전체`가 `바탕화면 채우기`로, `제목 표시줄 타이틀`이 `제목 표시줄 텍스트`로 변경되었습니다.',
+      '사용자 지정 확장자 입력칸의 예시가 알아보기 쉬운 형식으로 변경되었습니다.',
+      '영문 UI의 표기와 문장을 정리했습니다.',
+    ],
+    en: [
+      'Saving presets one after another no longer leaves the tray popping.',
+      'Two help rows no longer show Korean text on the English screen.',
+      'One spelling throughout: colors, minimize, grayscale.',
+      'The language dialog now asks to change the language instead of saying it already changed.',
+      'Counts of one read correctly.',
+      'Accordion Mode is now Auto-Collapse Folders, the name its Korean row already carried.',
+    ],
+  },
+  {
     // THE AUTHOR'S OWN WORDING, used verbatim (2026-08-17). The draft handed to
     // them was rewritten line by line into one register - plain declaratives,
     // none of the em-dash asides the draft leaned on - and that register is the
