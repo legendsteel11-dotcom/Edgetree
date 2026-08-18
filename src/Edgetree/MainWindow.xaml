@@ -5154,6 +5154,7 @@
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                       MouseDoubleClick="ExplorerTree_MouseDoubleClick"
                       PreviewMouseLeftButtonDown="ExplorerTree_PreviewMouseLeftButtonDown"
+                      PreviewMouseDown="ExplorerTree_PreviewMouseDown"
                       TreeViewItem.Expanded="ExplorerTree_ItemExpandedOrCollapsed"
                       TreeViewItem.Collapsed="ExplorerTree_ItemExpandedOrCollapsed"
                       SelectedItemChanged="ExplorerTree_SelectedItemChanged"

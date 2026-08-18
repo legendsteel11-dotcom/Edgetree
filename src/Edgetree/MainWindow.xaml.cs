@@ -10203,7 +10203,64 @@ public partial class MainWindow : Window
 
     private void TreeHistoryForwardButton_Click(object sender, RoutedEventArgs e) => GoTreeHistory(+1);
 
-    private void GoTreeHistory(int direction) => GoTreeHistoryTo(_treeHistoryIndex + direction);
+    // The mouse's back/forward buttons over the tree, which is what they mean
+    // in every file manager the app sits beside - the same two places the
+    // chevrons and Ctrl+←/→ already go.
+    //
+    // The viewer panel claims the same buttons for its own thing, and the two
+    // do not overlap: each handler hangs off its own control, so the answer is
+    // decided by where the cursor is rather than by a mode.
+    private void ExplorerTree_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        int direction = e.ChangedButton switch
+        {
+            MouseButton.XButton1 => -1,
+            MouseButton.XButton2 => +1,
+            _ => 0,
+        };
+        if (direction == 0)
+        {
+            return;
+        }
+
+        // Handled either way, including at the ends of the list. Letting it
+        // through would hand the button to whatever the mouse driver has bound
+        // it to, so the gesture would work everywhere except the one press
+        // where nothing happens - which reads as the app dropping it.
+        GoTreeHistory(direction);
+        e.Handled = true;
+    }
+
+    // 2026-08-18: 뒤로는 한 칸씩 가는데 앞으로는 3~4칸씩 건너뛴다는 신고. 재현이
+    // 안 되므로 고치기 전에 무엇이 도는지부터 본다 - 한 번의 누름에 이 줄이 몇
+    // 번 찍히는지가 첫 갈림길이다. 한 번이면 목록 쪽이고, 여러 번이면 이벤트가
+    // 여러 번 오는 것이다. DEBUG 전용이라 배포본에는 없다.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogTreeHistory(string what, int direction)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "history.log"),
+                $"{DateTime.Now:HH:mm:ss.fff}  {what} dir={direction:+0;-0}  " +
+                $"index={_treeHistoryIndex} count={_treeHistory.Count}  " +
+                $"selected={_selectedItem?.FullPath ?? "(none)"}" +
+                Environment.NewLine);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private void GoTreeHistory(int direction)
+    {
+        LogTreeHistory("go", direction);
+        GoTreeHistoryTo(_treeHistoryIndex + direction);
+        LogTreeHistory("after", direction);
+    }
 
     // The chevrons ask for a step; the dropdown asks for a slot. Both arrive
     // here, so the two rules that make this work at all - the dead-entry test
@@ -23849,21 +23906,20 @@ public partial class MainWindow : Window
         }
     }
 
-    // The mouse's back/forward buttons, ±10 seconds. Free to take: nothing in
-    // this app had them, and no browser is involved - checked before binding
-    // rather than after (the note this came from asked for exactly that).
+    // The mouse's back/forward buttons. Free to take: nothing in this app had
+    // them, and no browser is involved - checked before binding rather than
+    // after (the note this came from asked for exactly that).
     //
     // Scoped to the VIEWER PANEL rather than the window. Those buttons carry a
     // meaning the user's mouse driver may have given them everywhere else, and
-    // claiming them app-wide for a film that may not even be loaded is a bigger
-    // claim than the feature is worth. Over the panel they are unambiguous.
+    // claiming them app-wide is a bigger claim than the feature is worth. The
+    // tree has its own handler and its own reason; nothing between the two
+    // claims them.
+    //
+    // WHAT THEY DO DEPENDS ON WHAT IS ON SCREEN, which is the same division the
+    // arrow keys draw a few hundred lines up: a film seeks, a picture pages.
     private void ViewerPanel_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (_viewerVideoPath is null)
-        {
-            return;
-        }
-
         int direction = e.ChangedButton switch
         {
             MouseButton.XButton1 => -1,
@@ -23875,9 +23931,28 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Through the same seek every other route takes, so the bar's latch and
-        // the readout behave identically however the jump was asked for.
-        SeekViewerMedia(ViewerMedia.Position.TotalSeconds + direction * 10);
+        // ViewerMediaIsSelection rather than "a film is loaded", and the change
+        // matters now that there is a branch below it: music left running in
+        // another folder would otherwise take these buttons away from the
+        // pictures the hand is actually looking at. Same call the arrow keys
+        // make, for the same reason (2026-08-11).
+        if (ViewerMediaIsSelection)
+        {
+            // Through the same seek every other route takes, so the bar's latch
+            // and the readout behave identically however the jump was asked
+            // for. 10 seconds, where a keyboard tap takes 5 - the thumb is the
+            // coarse adjustment, which is the division every player draws.
+            SeekViewerMedia(ViewerMedia.Position.TotalSeconds + direction * 10);
+            e.Handled = true;
+            return;
+        }
+
+        // Pictures: the same step the chevrons and the sideways drag take, and
+        // it guards itself - a row the carousel does not walk simply returns.
+        // No filmstrip condition here, unlike the arrow keys: those had to earn
+        // the right to mean something other than collapse/expand, and a thumb
+        // button is not competing with anything.
+        ViewerCarouselStep(direction);
         e.Handled = true;
     }
 
@@ -27925,6 +28000,28 @@ public partial class MainWindow : Window
 
     private void ViewerNextButton_Click(object sender, RoutedEventArgs e) => ViewerCarouselStep(+1);
 
+    // 같은 신고의 다른 절반. 그림 쪽에서 건너뛰는 것이라면 여기 찍힌다 -
+    // 한 번의 누름에 한 줄이면 목록이 잘못된 것이고, 여러 줄이면 이벤트가
+    // 여러 번 오는 것이다. 트리 쪽 history.log 와 같은 시각으로 대조된다.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogCarouselStep(int direction, int index, int next, int count)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "history.log"),
+                $"{DateTime.Now:HH:mm:ss.fff}  carousel dir={direction:+0;-0}  " +
+                $"index={index} -> {next}  of {count}" +
+                Environment.NewLine);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
     private void ViewerCarouselStep(int direction)
     {
         // A chevron is someone taking the pictures back into their own hands.
@@ -27938,6 +28035,7 @@ public partial class MainWindow : Window
         var images = GetViewerCarouselItems(current);
         int index = images.IndexOf(current);
         int next = index + direction;
+        LogCarouselStep(direction, index, next, images.Count);
         if (index < 0 || next < 0 || next >= images.Count)
         {
             return;
