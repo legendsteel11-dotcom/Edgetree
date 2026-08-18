@@ -106,7 +106,7 @@ public static class Strings
     public static string FilterCustomTitle = "사용자 지정 확장자";
     // At the point of use, because nobody reads help - it has to say both the
     // separator and that a dot is optional, in one line.
-    public static string FilterCustomHint = "쉼표로 구분 · psd, ai, .fig";
+    public static string FilterCustomHint = "쉼표로 구분 · txt, png, .mp3";
     // Under the box, only while it holds nothing: an empty box is the way to
     // remove the filter, and that is not guessable.
     public static string FilterCustomEmptyHint = "비워 두고 확인하면 사용자 지정이 없어집니다";
@@ -906,7 +906,7 @@ public static class Strings
         MenuFileFilterOther = "Other";
         MenuFileFilterCustomEdit = "Custom…";
         FilterCustomTitle = "Custom Extensions";
-        FilterCustomHint = "Separate with commas · psd, ai, .fig";
+        FilterCustomHint = "Separate with commas · txt, png, .mp3";
         FilterCustomEmptyHint = "Leaving this empty removes the custom kind";
         MenuFileFilterExcludeEdit = "Exclude…";
         FilterExcludeTitle = "Excluded Extensions";
