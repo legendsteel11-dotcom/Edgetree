@@ -234,7 +234,7 @@ const dict = {
         { title: 'Dock / Auto-Hide / Window Mode', desc: 'One click on the title bar pin tucks it away to a thin sliver at the screen edge; move your mouse there to bring it back. Drag the title bar to switch into a floating window. It works on either side of the screen, and on any monitor you have.' },
         { title: 'File Search & Network Locations', desc: "The title bar's search icon (or Ctrl + F / Ctrl + E) toggles between the search box and the explorer for a quick file lookup. You can also register a network folder and reach it from the tree at any time." },
         { title: 'Context Menu & File Access', desc: 'Right-click a folder or file in the explorer for the essentials at hand — image files show a preview right at the top of the menu, no need to open them. Copy files out to another window, or send them straight to the VS Code explorer.' },
-        { title: 'Collapse All / Restore Expanded & Accordion Mode', desc: 'The ▲ icon on the title bar collapses or restores the whole expanded tree at once; you can also keep only the folder you open expanded while the rest auto-collapse.' },
+        { title: 'Collapse All / Restore Expanded & Auto-Collapse Folders', desc: 'The ▲ icon on the title bar collapses or restores the whole expanded tree at once; you can also keep only the folder you open expanded while the rest auto-collapse.' },
         { title: 'Multimedia Panel', desc: 'Open the multimedia panel on the right of the tree to view or play images, music and video. Images get zoom, pan, a desktop background you set per monitor, and a slideshow; music keeps playing in the background while you work. Video comes with HDR correction and subtitles.' },
         { title: 'Path Bar & History', desc: 'Type a path straight into the box below the tree to go there. You can also step through the folders you have already been in with Ctrl + ← / → or the two buttons.' },
         { title: 'Setting Presets', desc: "Save the app's whole setup as up to five presets and pick the one you need. A mini MP3 player for listening to music; an image-only filter with the multimedia panel already open for picture work; full height and a comfortable text size for using it as a proper explorer." },
@@ -269,7 +269,7 @@ const dict = {
         },
         {
           title: 'Options menu',
-          desc: 'Fine-tune Accordion Mode, Always on Top, tray icon, sort order, language, and more.',
+          desc: 'Fine-tune Auto-Collapse Folders, Always on Top, tray icon, sort order, language, and more.',
         },
         {
           title: 'Color customization',
@@ -284,7 +284,7 @@ const dict = {
     features: {
       title: 'More Features',
       items: [
-        { title: 'Folder Tree', desc: "VS Code-style tree browsing - Collapse All and Restore Expanded, Accordion Mode, and an items-per-folder cap keep even huge folders fast." },
+        { title: 'Folder Tree', desc: "VS Code-style tree browsing - Collapse All and Restore Expanded, Auto-Collapse Folders, and an items-per-folder cap keep even huge folders fast." },
         { title: 'Docking & Window Mode', desc: "Dock to either screen edge or float as a free window - double-click the edge to auto-fit the width." },
         { title: 'Auto-Hide', desc: 'One click of the pin tucks it away to a thin sliver at the screen edge; hover to reveal, click it again to keep it open.' },
         { title: 'Core Options', desc: "Start with Windows, Always on Top, minimize to tray - all toggleable from the options menu." },

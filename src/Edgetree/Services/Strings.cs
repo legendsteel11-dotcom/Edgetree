@@ -203,6 +203,12 @@ public static class Strings
     public static string MenuProperties = "속성";
 
     // Options ("...") menu
+    //
+    // The English was Accordion Mode until 2026-08-18. It named the same row
+    // as the Korean 폴더 자동 접기 but shared no word with it, so someone who
+    // switched language could not tell it was the same switch - and the word
+    // carries a web page's weight rather than a file tree's. Hyphenated to
+    // match the Auto-Hide rows it sits near.
     public static string MenuAutoCollapse = "폴더 자동 접기";
     public static string MenuCollapseAllExpanded = "모든 펼친 폴더 접기";
     public static string CollapseAllConfirmTitle = "모든 펼친 폴더 접기";
@@ -941,7 +947,7 @@ public static class Strings
         BookmarkShortcutPrev = "Previous bookmark";
         MenuNewFolder = "New Folder";
         MenuRefresh = "Refresh";
-        MenuAutoCollapse = "Accordion Mode";
+        MenuAutoCollapse = "Auto-Collapse Folders";
         MenuCollapseAllExpanded = "Collapse All Expanded Folders";
         CollapseAllConfirmTitle = "Collapse All Expanded Folders";
         CollapseAllConfirmBody = "Collapse every folder that is currently expanded?";
