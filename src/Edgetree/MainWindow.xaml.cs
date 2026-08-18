@@ -2006,6 +2006,21 @@ public partial class MainWindow : Window
                     StepViewerZoom(-1, null);
                     e.Handled = true;
                     return;
+                // 창을 영상에 맞춤. 두 키가 같은 일을 하고 메뉴에 적히는 것은
+                // F 하나다 - F는 무엇을 하는 키인지 읽히고, 8은 다른 재생기에서
+                // 그 자리에 있던 키라 손이 먼저 가는 사람에게만 뜻이 있다.
+                //
+                // 영상이 올라와 있고 창 모드일 때만 가져간다. 그 바깥에서는
+                // 글자가 트리의 타이핑 검색으로 그대로 지나가야 한다 - 이 줄이
+                // 무조건 삼키면 f로 시작하는 폴더를 못 찾게 된다.
+                case Key.F or Key.D8 or Key.NumPad8:
+                    if (!CanFitWindowToVideo)
+                    {
+                        break;
+                    }
+                    FitWindowToVideo();
+                    e.Handled = true;
+                    return;
             }
         }
 
@@ -25490,6 +25505,128 @@ public partial class MainWindow : Window
         SetViewerZoom(target, anchor);
     }
 
+    // ----- 창을 영상에 맞추기 (2026-08-19, 요청) --------------------------
+    //
+    // 뷰어의 영상 크기 줄이 창 안에서 영상을 어떻게 놓을지 정한다면 이것은 그
+    // 반대다. 영상에 창을 맞춘다.
+    //
+    // 원본 크기가 아니라 원본 비율이고, 기준은 사용자가 이미 맞춰 둔 지금의
+    // 영상 폭이다. 그래서 움직이는 것은 창의 높이 하나이고 결과는 위아래 검은
+    // 띠가 없어지는 것이다. 원본 크기로 잡는 안도 있었지만, 4K 영상 하나에
+    // 창이 화면을 채워 버리는 것은 부탁받은 일이 아니다 - 폭은 그 사람이 이미
+    // 정했다.
+    //
+    // 크롬은 세지 않고 잰다. `창 높이 - 영상 상자의 높이`가 지금 이 상태에서
+    // 영상 위아래에 있는 모든 것(헤더, 캡션 띠, 여백, 재생 막대)의 두께이고,
+    // 앱 전체화면에서는 그것이 0에 가깝다. 그래서 전체화면이든 보통 패널이든
+    // 같은 식 하나로 서고, 나중에 크롬이 바뀌어도 따라온다.
+    //
+    // 영상 상자는 ViewerMediaHost, 즉 영상이 놓인 자리다. 줌은 RenderTransform
+    // 이라 이 크기를 건드리지 않으므로, 확대해 둔 영상에서도 잰 값은 화면에 난
+    // 자리 그대로다.
+    private bool CanFitWindowToVideo =>
+        !_isDocked &&
+        _viewerOpen &&
+        _viewerPixelWidth > 0 &&
+        _viewerPixelHeight > 0 &&
+        _viewerVideoPath is { } fitPath &&
+        IsViewerVideo(fitPath);
+
+    private void FitWindowToVideo()
+    {
+        if (!CanFitWindowToVideo)
+        {
+            return;
+        }
+
+        // 최대화된 창은 Left/Top/Width/Height 쓰기를 조용히 무시한다 - Undock과
+        // Dock이 같은 이유로 먼저 Normal로 되돌린다. 바탕화면 채우기로 들어온
+        // 앱 전체화면이 여기 해당하고, 그때는 최대화가 풀리면서 크기가 잡힌다.
+        // 다른 재생기에서 크기 키를 누를 때와 같은 결과다.
+        if (WindowState != WindowState.Normal)
+        {
+            WindowState = WindowState.Normal;
+
+            // 방금 최대화를 풀었으면 영상 상자는 아직 최대화 시절의 크기를 들고
+            // 있다. 그것을 재면 화면 폭을 기준으로 비율을 잡게 된다.
+            UpdateLayout();
+        }
+
+        // 재는 것은 영상 요소가 아니라 그것이 놓인 자리다. MediaElement는 Image와
+        // 같은 Stretch 계산을 써서 자기 크기를 이미 원본 비율로 잡아 두고, 검은
+        // 띠는 그 요소가 자리 안에서 가운데 서기 때문에 생긴다. 그래서 요소를
+        // 재면 폭 × 비율이 언제나 지금 높이와 같아서 창이 한 픽셀도 안 움직인다 -
+        // 첫 시도가 정확히 그랬고, 오류 없이 아무 일도 안 일어났다(2026-08-19).
+        double slotWidth = ViewerMediaHost.ActualWidth;
+        double slotHeight = ViewerMediaHost.ActualHeight;
+        if (slotWidth <= 0 || slotHeight <= 0 || !double.IsFinite(Width) || !double.IsFinite(Height))
+        {
+            return;
+        }
+
+        // 영상 요소의 여백은 자리 안에 있으므로 비율에서 빼 둔다. 앱 전체화면에서는
+        // 0이고(SetViewerFullscreen이 걷는다) 패널 안에서는 10이다.
+        double padX = ViewerMedia.Margin.Left + ViewerMedia.Margin.Right;
+        double padY = ViewerMedia.Margin.Top + ViewerMedia.Margin.Bottom;
+        if (slotWidth - padX <= 0)
+        {
+            return;
+        }
+
+        double chromeWidth = Width - slotWidth;
+        double chromeHeight = Height - slotHeight;
+        double ratio = (double)_viewerPixelHeight / _viewerPixelWidth;
+        var workArea = GetCurrentMonitorWorkArea();
+
+        double HeightForWidth(double windowWidth) =>
+            chromeHeight + padY + ((windowWidth - chromeWidth - padX) * ratio);
+        double WidthForHeight(double windowHeight) =>
+            chromeWidth + padX + ((windowHeight - chromeHeight - padY) / ratio);
+
+        double targetWidth = Width;
+        double targetHeight = HeightForWidth(targetWidth);
+
+        // 화면을 넘길 때만 폭까지 함께 줄인다. 높이만 잘라 내면 비율이 다시
+        // 어긋나서, 하려던 일을 안 한 것이 된다.
+        if (targetHeight > workArea.Height)
+        {
+            targetHeight = workArea.Height;
+            targetWidth = WidthForHeight(targetHeight);
+        }
+
+        // 세로로 긴 영상은 반대쪽으로 넘친다. 한 번 더, 같은 식으로.
+        if (targetWidth > workArea.Width)
+        {
+            targetWidth = workArea.Width;
+            targetHeight = HeightForWidth(targetWidth);
+        }
+
+        targetWidth = Math.Max(targetWidth, MinWidth);
+        targetHeight = Math.Max(targetHeight, MinHeight);
+        if (!double.IsFinite(targetWidth) || !double.IsFinite(targetHeight))
+        {
+            return;
+        }
+
+        // 창의 가운데를 붙잡는다. 보통은 높이만 바뀌므로 위아래로 고르게 자라고,
+        // 보고 있던 영상이 있던 자리에서 가장 덜 움직인다. 왼쪽 위를 붙잡으면
+        // 아래로만 자라 화면 밖으로 밀렸다가 되물려 오게 된다.
+        double centerX = Left + (Width / 2);
+        double centerY = Top + (Height / 2);
+
+        Width = targetWidth;
+        Height = targetHeight;
+
+        Left = Math.Clamp(centerX - (targetWidth / 2), workArea.Left, Math.Max(workArea.Left, workArea.Right - targetWidth));
+        Top = Math.Clamp(centerY - (targetHeight / 2), workArea.Top, Math.Max(workArea.Top, workArea.Bottom - targetHeight));
+
+        // 여기까지 와야 이 창의 진짜 기하다. 저장은 안 한다 - 나가는 길의
+        // 저장이 싣고 간다(StoreFloatingState의 주석과 같은 약속).
+        StoreFloatingState();
+    }
+
+    private void ViewerFitWindowMenuItem_Click(object sender, RoutedEventArgs e) => FitWindowToVideo();
+
     // Middle-click on the picture toggles a full cover: the window maximizes
     // (floating only) and the viewer takes the tree's column as well. Docked,
     // the window is a parked band with a clip region and margins, and
@@ -25932,6 +26069,12 @@ public partial class MainWindow : Window
         ViewerMediaZoomLabel.Text = coveredPicture
             ? Strings.ViewerZoomPicture
             : Strings.ViewerZoom;
+
+        // 도킹 중에는 물을 것이 없어서 CanFitWindowToVideo가 이미 거른다 -
+        // 파킹된 띠는 폭이 가장자리이고 높이가 화면 비율이라, 맞출 창이 없다.
+        ViewerFitWindowItem.Visibility = CanFitWindowToVideo
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
         // The navigator and the strip, on the same terms as the size row: the
         // cover is the one state where their own switches are not on screen.

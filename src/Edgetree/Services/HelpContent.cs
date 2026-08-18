@@ -482,6 +482,10 @@ public static class HelpContent
                     R("우클릭 → 영상 크기 → 채우기", "패널을 꽉 채우고 넘치는 부분은 잘라냄 (다음 영상은 맞춤으로 시작)",
                       "Right-click → Video size → Fill",
                       "Fills the panel and crops the overflow - the next film starts fitted again"),
+                    // 바로 위 줄의 반대편. 그 줄은 창 안에서 영상을 어떻게 놓을지
+                    // 정하고, 이 줄은 영상에 창을 맞춘다.
+                    R("F", "창을 영상 비율에 맞춤, 위아래 검은 띠가 없어짐 (창 모드)",
+                      "F", "Fits the window to the film's proportions - the black bands go (window mode)"),
                     R("우클릭 → 자막", "활성화 · 크기 · 싱크 조절", "Right-click → Subtitles", "On, size, and sync"),
                     // 컨트롤 패널, not 재생 막대 (2026-08-16). The strip is what
                     // a reader calls it, and the app had two names for it in

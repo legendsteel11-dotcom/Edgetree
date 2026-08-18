@@ -531,6 +531,10 @@ public static class Strings
     // 두 경우를 덮을 수도 있지만, 이 메뉴에는 자막 크기도 있어서 무엇의 크기인지가
     // 라벨에 남아야 한다.
     public static string ViewerZoomPicture = "그림 크기";
+    // 영상 크기 줄의 반대편이라 바로 아래에 선다. 그 줄은 창 안에서 영상을
+    // 어떻게 놓을지 정하고, 이 줄은 영상에 창을 맞춘다. 주어가 창인 것이
+    // 이름에 그대로 나와야 해서 "비율 맞춤"이 아니다 - 바뀌는 것은 창이다.
+    public static string ViewerFitWindow = "창을 영상에 맞춤";
     public static string ViewerSubtitles = "자막";
     public static string ViewerSubtitleSize = "자막 크기";
     // 높이가 아니라 위치. 이 줄이 바꾸는 것은 자막이 화면에서 어디에 놓이는가이고,
@@ -1099,6 +1103,7 @@ public static class Strings
         ViewerNextVideo = "Next video";
         ViewerZoom = "Video size";
         ViewerZoomPicture = "Picture size";
+        ViewerFitWindow = "Fit window to video";
         ViewerSubtitles = "Subtitles";
         ViewerSubtitleSize = "Subtitle size";
         ViewerSubtitlePosition = "Subtitle position";

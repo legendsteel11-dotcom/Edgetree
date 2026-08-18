@@ -6616,6 +6616,31 @@
                                         </Grid>
                                     </MenuItem.Header>
                                 </MenuItem>
+                                <!-- THE SAME QUESTION FROM THE OTHER SIDE
+                                     (2026-08-19, on request). The row above
+                                     decides how the film sits inside the window;
+                                     this one moves the window to the film, so it
+                                     stands directly under it rather than as a
+                                     fourth button in it - those three are all
+                                     about the picture, and this one is not.
+                                     Only the HEIGHT moves: the width is the one
+                                     the user already set, and the height that
+                                     gives it the film's own proportions is what
+                                     takes the black bands away.
+                                     The key is written beside it because the
+                                     menu cannot be opened over a PLAYING film -
+                                     the media element is this menu owner's
+                                     sibling, so the click never walks past it -
+                                     which leaves the row for a paused film and
+                                     the key for the rest. 8 does the same thing
+                                     and is deliberately not written here (the
+                                     author's own hand, borrowed from another
+                                     player). -->
+                                <MenuItem x:Name="ViewerFitWindowItem"
+                                        Header="{x:Static services:Strings.ViewerFitWindow}"
+                                        InputGestureText="F"
+                                        Visibility="Collapsed"
+                                        Click="ViewerFitWindowMenuItem_Click"/>
                                 <!-- The two things the panel draws AROUND a
                                      picture, brought here for the cover
                                      (2026-08-16, on report). Their switches are
@@ -7233,7 +7258,8 @@
                          tree (reported with a screenshot, 2026-08-10). Its own
                          Border, rather than clipping the row's Grid, so the play
                          overlay and the navigator keep the bounds they had. -->
-                    <Border Grid.Row="0"
+                    <Border x:Name="ViewerMediaHost"
+                            Grid.Row="0"
                             ClipToBounds="True">
                     <MediaElement x:Name="ViewerMedia"
                             Margin="10"
