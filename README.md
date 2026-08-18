@@ -22,7 +22,7 @@ Grab the latest build from the [Releases page](https://github.com/legendsteel11/
   already on the machine.
 
 Settings live in `%AppData%\Edgetree` and all three share them, so moving from
-one to another keeps your bookmarks and colours — and uninstalling
+one to another keeps your bookmarks and colors — and uninstalling
 leaves them where they are.
 
 ## Screenshots
@@ -39,7 +39,7 @@ leaves them where they are.
   a thin sliver at the edge; move your mouse there and it slides back open.
   The pin lies on its side while auto-hiding — click it again to pin the
   window open. The sliver can be a short handle at the middle of the edge
-  instead of running its whole height, and it takes a colour of its own.
+  instead of running its whole height, and it takes a color of its own.
 - **Floating mode.** Drag the header away from the edge to get a normal,
   movable window. The pin snaps it back to the edge, and both modes remember
   their size and position.
@@ -57,7 +57,7 @@ leaves them where they are.
   rows at once. The cap is adjustable (1–50).
 - **Multi-select** with `Ctrl+click` and `Shift+click`, then copy, delete,
   or drag the whole selection out in one go.
-- **Auto Collapse** (optional): expanding a folder closes the others, so
+- **Auto-Collapse Folders** (optional): expanding a folder closes the others, so
   only the path you're on stays open.
 - **Inline rename** with `F2`, right in the row — no popup. Clicking an
   already-selected file again after a pause works too, like Explorer.
@@ -101,8 +101,8 @@ leaves them where they are.
 
 - **Two icon styles**: the same icons Windows Explorer shows (default), or
   the bundled [Material Icon Theme](THIRD-PARTY-NOTICES.md) set.
-- **15 customizable colors**, with separate dark and light palettes and a
-  one-click reset. Each one takes a `#RRGGBB` code, so a colour copied from a
+- **25 customizable colors**, with separate dark and light palettes and a
+  one-click reset. Each one takes a `#RRGGBB` code, so a color copied from a
   browser or a design tool can be pasted straight in.
 - **Font size** (`Ctrl` `+`/`-`, 9–20pt), indent width, row spacing, and
   scrollbar width are all adjustable — icons and menus scale along.
@@ -487,7 +487,7 @@ the window they belong to.
 MIT — see [LICENSE.md](LICENSE.md). File and folder icons come from the Material
 Icon Theme project (MIT) and the interface glyphs from Google's Material Symbols
 (Apache License 2.0) — see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), and
-the Apache licence text the app itself carries at
+the Apache License text the app itself carries at
 [src/Edgetree/Resources/APACHE-2.0.txt](src/Edgetree/Resources/APACHE-2.0.txt).
 
 ## About Development
