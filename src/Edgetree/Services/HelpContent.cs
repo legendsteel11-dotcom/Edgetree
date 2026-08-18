@@ -386,14 +386,18 @@ public static class HelpContent
                       "비활성화하면 창 크기 그대로 그림만 꽉 채움 (기본은 창을 화면 전체로)",
                       "Window mode · right-click in full screen → Fill the desktop",
                       "Off keeps the window's own size and fills that instead; on (the default) grows the window to the screen"),
-                    // 이미 되는 것을 적는 줄. 헤더가 사라져도 그 자리는 제목
+                    // 이미 되는 것을 적던 줄. 헤더가 사라져도 그 자리는 제목
                     // 표시줄이라 창이 끌리는데, 화면에 아무 표시가 없어서 아는
                     // 방법이 없었음 (2026-08-17, 창 크기를 유지하는 전체화면이
                     // 생기면서 실제로 필요해짐). 대가를 같은 줄에 적은 이유는 그것이
                     // "위에서는 휠이 안 먹는다"의 답이기도 하기 때문.
-                    R("창 모드 · 전체 화면에서 위쪽 띠 드래그", "창 이동, 그 띠는 제목 표시줄이라 그림에는 닿지 않음",
-                      "Window mode · drag the top strip in full screen",
-                      "Moves the window - that strip is still the title bar, so it does not reach the picture"),
+                    // 도킹 상태가 2026-08-19에 들어왔다. 그전에는 창 모드 전용이라
+                    // 줄머리에 그렇게 적혀 있었고, 이제 두 상태에서 다 되므로
+                    // 조건이 빠지고 무엇이 달라지는지가 설명으로 갔다.
+                    R("전체 화면에서 위쪽 띠 드래그",
+                      "창 모드는 창 이동, 도킹 상태는 도킹이 풀리며 이동 (그 띠는 그림에 닿지 않음)",
+                      "Drag the top strip in full screen",
+                      "Moves the window; docked, it undocks and then follows - either way that strip does not reach the picture"),
                 }),
 
                 new Group(T("이미지", "Images"), new[]

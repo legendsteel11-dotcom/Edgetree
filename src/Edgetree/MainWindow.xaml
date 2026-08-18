@@ -8964,6 +8964,28 @@
                     VerticalAlignment="Center"/>
         </Border>
 
+        <!-- 같은 자리, 도킹 상태 (2026-08-19, 요청). 창 모드에서 위쪽 띠는 캡션이라
+             Windows가 알아서 창을 옮겨 주지만, 도킹 상태에서는 캡션 높이가 0이라
+             그 자리에 아무것도 없다 - 앱 전체화면에서는 헤더까지 사라져서, 창을
+             잡을 방법이 하나도 남지 않는다.
+             그래서 같은 자리에 잡을 곳을 하나 만든다. 끌면 도킹이 풀리고 창이
+             커서를 따라온다. 헤더를 끌어 도킹을 푸는 것과 같은 동작이고, 그 헤더가
+             없는 상태에서의 같은 문이다.
+             투명하고 히트테스트를 받는다. 바로 위 ViewerMoveHint와 반대인데,
+             그쪽은 Windows가 드래그를 받아야 해서 비켜서야 하고 이쪽은 우리가
+             받아야 하기 때문이다. 그 표시 바로 다음에 서서 입력을 먼저 받고,
+             투명하므로 표시는 그대로 비친다.
+             높이는 보일 때 코드에서 헤더 높이로 맞춘다(글꼴을 따라간다). -->
+        <Border x:Name="ViewerDockedMoveStrip"
+                VerticalAlignment="Top"
+                Height="36"
+                Background="Transparent"
+                Visibility="Collapsed"
+                MouseLeftButtonDown="FullscreenUndockStrip_MouseLeftButtonDown"
+                MouseMove="FullscreenUndockStrip_MouseMove"
+                MouseLeftButtonUp="FullscreenUndockStrip_MouseLeftButtonUp"
+                MouseLeave="FullscreenUndockStrip_MouseLeave"/>
+
         <Border x:Name="TopResizeStrip"
                 VerticalAlignment="Top"
                 Height="6"

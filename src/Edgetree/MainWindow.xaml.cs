@@ -435,10 +435,15 @@ public partial class MainWindow : Window
         return IntPtr.Zero;
     }
 
-    // THE WASH OVER THE CAPTION STRIP, and the one state it belongs to: a
-    // FLOATING window in 앱 전체화면 (2026-08-17). Docked, the caption height is 0
-    // and nothing up there drags, so a hint would be a lie; out of full screen the
-    // header is drawn there and says it itself.
+    // THE WASH OVER THE STRIP AT THE TOP, and the one mode it belongs to:
+    // 앱 전체화면 (2026-08-17). Out of full screen the header is drawn there and
+    // says it itself.
+    //
+    // DOCKED COUNTS NOW TOO (2026-08-19). It did not until then, because the
+    // caption height is 0 while docked and nothing up there dragged - so a hint
+    // would have been a lie. ViewerDockedMoveStrip is what changed that: the
+    // same strip now undocks and carries the window, which is a different answer
+    // to the same sentence the wash is saying, "this is not the picture".
     //
     // Height is taken from the caption at the moment of showing rather than left
     // at the XAML's 36: the header follows the font (see HeaderHeight), and a wash
@@ -452,7 +457,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        bool want = on && _viewerOpen && _viewerFullscreen && !_isDocked;
+        // 도킹 상태도 이제 여기 든다 (2026-08-19). 그 자리를 잡을 수 있게 되었으므로
+        // 표시가 거짓말이 아니게 되었다 - 창 모드에서는 창이 옮겨지고 도킹
+        // 상태에서는 도킹이 풀리며 옮겨진다. 표시가 말하는 것은 그 자리가 그림이
+        // 아니라는 것 하나다.
+        bool want = on && _viewerOpen && _viewerFullscreen;
 
         if (want)
         {
@@ -537,8 +546,9 @@ public partial class MainWindow : Window
         return timer;
     }
 
-    // 커서가 캡션 띠에 있는지 - 이 표시가 사는 상태(창 모드 + 앱 전체화면)에서는
-    // 창의 위쪽 끝이 곧 캡션이므로, 창 좌표로 옮겨서 그 띠 안인지만 보면 된다.
+    // 커서가 위쪽 띠에 있는지. 창 모드 + 앱 전체화면에서는 창의 위쪽 끝이 곧
+    // 캡션이므로, 창 좌표로 옮겨서 그 띠 안인지만 보면 된다. 도킹 상태는 아래에서
+    // 요소에 직접 묻는다.
     //
     // 변환은 WPF에 넘긴다. Left/Top으로 직접 재던 자리였고, 그것이 이 표시가 사는
     // 상태 그 자체에서 틀렸다 (2026-08-17, 사용자 확인): **WPF는 WindowState가
@@ -553,9 +563,23 @@ public partial class MainWindow : Window
     // 빌려 쓰지 않는다 - 손으로 나누던 식은 그 경우에도 어긋났다.
     private bool CursorIsOnCaptionStrip()
     {
-        if (!_viewerOpen || !_viewerFullscreen || _isDocked)
+        if (!_viewerOpen || !_viewerFullscreen)
         {
             return false;
+        }
+
+        // 도킹 상태는 우리가 세운 요소에 직접 물어본다 (2026-08-19). 아래의 창
+        // 좌표 식은 캡션이 창의 맨 위인 창 모드에만 맞고, 도킹된 창은 띠가
+        // RootContent의 마진만큼 내려와 있어서 어긋난다 - 바탕화면 채우기가 꺼져
+        // 있으면 그 마진이 살아 있다.
+        //
+        // 이 함수가 도킹을 아예 거절하던 자리다. 그때는 도킹 상태에 잡을 띠가
+        // 없었으니 맞는 답이었는데, 띠가 생기면서 틀린 답이 되었다 - 손을 얹고
+        // 있어도 커서가 띠에 없다고 답해서, 이 검사가 막으려고 생긴 바로 그 일이
+        // 도킹 상태에서만 다시 일어났다.
+        if (_isDocked)
+        {
+            return ViewerDockedMoveStrip.IsMouseOver;
         }
 
         // 변환은 이 창이 화면에 붙어 있어야 성립한다. 위의 조건이 이미 그것을
@@ -4727,6 +4751,125 @@ public partial class MainWindow : Window
         (sender as UIElement)?.ReleaseMouseCapture();
     }
 
+    // ----- 도킹 + 앱 전체화면에서 위쪽 띠 잡기 (2026-08-19, 요청) -------------
+    //
+    // 헤더를 끌어 도킹을 푸는 것과 같은 동작이고, 그 헤더가 없는 상태에서의 같은
+    // 문이다. 창 모드에서는 그 자리가 캡션이라 Windows가 받아 주는데, 도킹
+    // 상태에서는 캡션 높이가 0이고 앱 전체화면에서는 헤더도 없어서 창을 잡을
+    // 자리가 하나도 남지 않았다.
+    //
+    // 캡션 높이를 도킹 상태에서 세우는 길도 있었지만 그러지 않았다. 그러면 창을
+    // 옮기는 것이 Windows의 이동 루프가 되는데, 도킹된 창은 마진과 클립 영역으로
+    // 만든 띠라 그것이 통째로 끌려간다 - 도킹 기하를 건드리지 않는다는 규칙이
+    // 정확히 그 자리에 있다. 그래서 WPF 쪽에서 받아 먼저 도킹을 풀고, 창이 된
+    // 다음에 DragMove로 넘긴다.
+    private void FullscreenUndockStrip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        // 헤더의 것과 달리 더블클릭 분기가 없다. 그쪽의 더블클릭은 최대화·복원인데,
+        // 도킹 상태에서 최대화만 푸는 것은 도킹 기하가 없는 도킹 상태를 만든다.
+        _headerDragStart = e.GetPosition(this);
+        (sender as UIElement)?.CaptureMouse();
+    }
+
+    private void FullscreenUndockStrip_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        // 창 모드의 캡션이 WM_NCMOUSEMOVE로 하는 일과 같다 - 움직일 때마다 다시
+        // 세워, 셈은 포인터가 멈춰 있던 시간을 잰다.
+        SetMoveHint(true);
+
+        if (_headerDragStart is not { } start || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(this);
+        bool pastThreshold =
+            Math.Abs(current.X - start.X) >= SystemParameters.MinimumHorizontalDragDistance ||
+            Math.Abs(current.Y - start.Y) >= SystemParameters.MinimumVerticalDragDistance;
+
+        if (!pastThreshold)
+        {
+            return;
+        }
+
+        _headerDragStart = null;
+        (sender as UIElement)?.ReleaseMouseCapture();
+
+        if (!_isDocked)
+        {
+            return;
+        }
+
+        // 전체화면인 채로 넘어가야 한다 (2026-08-19, 신고: 기본 화면으로 돌아와
+        // 도킹이 풀려서 조작이 한 번 더 든다). Undock이 지나가는 ApplyViewerSide가
+        // 전체화면을 끄는데, 그것은 도킹·해제·좌우 바꾸기가 열 배치를 처음부터 다시
+        // 세우기 때문이고 그 자체로는 옳다. 그래서 끄지 말라고 하는 대신 다시 켠다 -
+        // 새로 선 배치 위에 얹는 것이 이 모드가 원래 서는 방식이다.
+        bool wasFullscreen = _viewerFullscreen;
+
+        // 최대화(바탕화면 채우기로 들어온 앱 전체화면)도 여기서 함께 풀린다 -
+        // Undock이 맨 먼저 하는 일이 Normal로 되돌리는 것이다.
+        Undock();
+
+        if (wasFullscreen)
+        {
+            // 창은 건드리지 않는다. 지금 손이 창을 어디에 놓을지 정하는 중인데
+            // 바탕화면 채우기가 켜져 있으면 그 자리에서 최대화되어 버린다. 시작할
+            // 때의 복원이 같은 이유로 같은 인자를 쓴다.
+            SetViewerFullscreen(true, takeOverWindow: false);
+        }
+
+        // 커서 아래로 옮겨 놓고 넘긴다. 도킹 상태의 창은 화면 가장자리에 붙은
+        // 전체 높이 띠(또는 최대화된 창)이고 그 자리에서 나온 창은 훨씬 작아서,
+        // 잡은 자리를 그대로 두면 창이 커서에서 멀리 떨어진 채 끌려온다.
+        // 최대화된 창의 제목 표시줄을 끌 때 Windows가 하는 것과 같은 처리이고,
+        // 셈은 HeaderGrid_MouseMove의 같은 자리에서 가져왔다 - 지금 커서 위치
+        // 하나만 쓰므로 오차가 쌓이지 않는다.
+        var cursorScreen = System.Windows.Forms.Cursor.Position;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double cursorX = cursorScreen.X / dpi.DpiScaleX;
+        double cursorY = cursorScreen.Y / dpi.DpiScaleY;
+        double screenLeft = SystemParameters.VirtualScreenLeft;
+        double screenTop = SystemParameters.VirtualScreenTop;
+        double screenRight = screenLeft + SystemParameters.VirtualScreenWidth;
+        double screenBottom = screenTop + SystemParameters.VirtualScreenHeight;
+        Left = Math.Clamp(cursorX - (Width / 2), screenLeft, Math.Max(screenLeft, screenRight - Width));
+        Top = Math.Clamp(cursorY - (HeaderHeight / 2), screenTop, Math.Max(screenTop, screenBottom - Height));
+
+        // 같은 손짓 그대로 Windows의 이동 루프에 넘긴다. 여기까지 오면 창은 이미
+        // 창 모드라, 도킹된 창을 옮기는 일은 일어나지 않는다.
+        DragMove();
+    }
+
+    private void FullscreenUndockStrip_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        _headerDragStart = null;
+        (sender as UIElement)?.ReleaseMouseCapture();
+    }
+
+    // 드래그 중에는 _inCaptionDrag가 서 있어서 SetMoveHint가 이 요청을 물린다 -
+    // 창 모드의 띠와 같은 약속이다(WM_ENTERSIZEMOVE).
+    private void FullscreenUndockStrip_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        => SetMoveHint(false);
+
+    // 이 띠가 사는 자리는 하나뿐이다 - 도킹, 패널 열림, 앱 전체화면. 셋 중 하나가
+    // 바뀌는 곳(SetViewerFullscreen · Dock · Undock)에서 부른다.
+    private void UpdateDockedMoveStrip()
+    {
+        bool want = _isDocked && _viewerOpen && _viewerFullscreen;
+        if (want)
+        {
+            ViewerDockedMoveStrip.Height = HeaderHeight;
+        }
+        else if (ViewerDockedMoveStrip.IsMouseCaptured)
+        {
+            _headerDragStart = null;
+            ViewerDockedMoveStrip.ReleaseMouseCapture();
+        }
+
+        ViewerDockedMoveStrip.Visibility = want ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     // The pin is a full pinned/auto-hide toggle now (2026-07-23,
     // relayed "혼란스럽다" feedback on the old greyed-out-while-pinned pin):
     // docked and pinned, clicking it enters auto-hide; docked and
@@ -4963,6 +5106,9 @@ public partial class MainWindow : Window
             }
         }
 
+        // 도킹 상태에서만 서는 띠이므로 여기서는 물러난다.
+        UpdateDockedMoveStrip();
+
         UpdateResizeThumbVisibility();
         UpdatePinButtonVisibility();
 
@@ -5084,6 +5230,9 @@ public partial class MainWindow : Window
 
         UpdateResizeThumbVisibility();
         UpdatePinButtonVisibility();
+
+        // 도킹 + 앱 전체화면이면 위쪽 띠가 여기서 선다.
+        UpdateDockedMoveStrip();
     }
 
     // Approximate single-row height (icon/text line plus the item's own
@@ -25888,6 +26037,8 @@ public partial class MainWindow : Window
             ExplorerTree.Focus();
         }));
 
+        // 이 모드에 들고 나는 것이 띠의 조건 중 하나다.
+        UpdateDockedMoveStrip();
     }
 
     private void ViewerImageHost_MouseDown(object sender, MouseButtonEventArgs e)
