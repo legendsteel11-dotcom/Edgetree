@@ -173,6 +173,64 @@ version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
 
+### v2.4.0 (2026-08-17)
+
+- Favorites are now merged into Bookmarks, and your saved items carry over.
+- Drag rows in the Bookmarks panel to reorder them.
+- Presets now store the window mode, and the app reopens in the mode it was closed in.
+- Added an option to keep the current window size when entering full screen.
+- Album art now supports Fit, 1:1, and Fill, and the selected size persists across restarts.
+- Clicking an already-open folder now only selects it; a second click collapses it.
+- Fixed folders collapsing on their own and the tree resetting to C:.
+
+### v2.3.1 (2026-08-17)
+
+- Folder auto-collapse now applies to bookmark, favourite and search jumps too
+- Presets on the tree's empty-space right-click menu
+- Fixed: the window could not be widened to the screen edge in full screen
+
+### v2.3.0 (2026-08-16)
+
+- PSD, RAW, JXL and more picture formats in the panel
+- A clock over the panel (F9)
+- Switch presets with Ctrl+1-5, overwrite with Ctrl+Shift+S
+- The multimedia panel opens when you select a file (option)
+- An option to show drive icons
+- Colour settings for the expand arrow and the footer chips
+- The track you picked reads apart from the one that is playing
+- Show more / Show less selects the parent folder, and the indent guides follow at once
+- A reworked expand arrow, with the indent guide through its centre
+- Adding a bookmark or favourite opens the list it went into
+- Fixed: in some large or network folders, editing the search box while it indexed left the app unresponsive
+- Fixed: the thumbnail bar read ahead into large files like PSD and RAW
+- Fixed: in full screen, the playback controls hid themselves while being pointed at
+
+### v2.2.0 (2026-08-15)
+
+- Swap the multimedia panel and the tree (option)
+- Fixed: some jumps to a bookmark or favourite left the tree at the bottom
+- The tree folding itself shut while the window was resized
+- Fill — crop a picture to the panel
+- Fine zoom on a picture with Ctrl or Shift and the wheel
+- Right-click a folder to play the music and video in it
+- The folders you have been in, listed on the path bar
+- The app can be made smaller
+- Colour chains and a greyscale roll, and shading at the ends of a list
+
+### v2.1.0 (2026-08-14)
+
+- Image slideshow (right-click a picture, or F8)
+- Set a different wallpaper on each monitor (whichever one the app is on)
+- A row half-clipped at the bottom of the panel now takes one click
+- Fixed: un-picking one of several selected rows could sometimes clear the whole selection
+- Fixed: a favorite or bookmark did not always land at the top after the jump
+
+### v2.0.5 (2026-08-13)
+
+- The app's file operations brought in line with Windows Explorer's
+- Add a network location (right-click the empty area)
+- Option to show every file in a folder at once
+- Bug fixes and stability improvements
 ### v2.0.4 (2026-08-13)
 
 - Tree positioning refinements
