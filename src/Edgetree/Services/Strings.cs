@@ -874,7 +874,7 @@ public static class Strings
         PresetRenameTitle = "Rename preset";
         MenuPresetDelete = "Delete";
         PresetNameTitle = "Preset name";
-        PresetNameHint = "Saves position, size, docking, colours, file types and the current folder";
+        PresetNameHint = "Saves position, size, docking, colors, file types and the current folder";
         PresetDefaultName = "Preset {0}";
         PresetSavedToast = "Preset saved";
         PlaceMissingTitle = "Folder not found";
@@ -927,10 +927,10 @@ public static class Strings
         NetworkLocationDuplicateTitle = "Already in the list";
         MenuListRowRemove = "Remove";
         HiddenClearAllConfirmTitle = "Unhide All Folders";
-        HiddenClearAllConfirmBody = "Show all {0} hidden folders again?";
+        HiddenClearAllConfirmBody = "Show every hidden folder again? ({0})";
         MenuBookmarkClearAll = "Clear all";
         BookmarkClearAllConfirmTitle = "Clear All Bookmarks";
-        BookmarkClearAllConfirmBody = "Clear all {0} bookmarks?";
+        BookmarkClearAllConfirmBody = "Clear every bookmark? ({0})";
         BookmarkShortcutNext = "Next bookmark";
         BookmarkShortcutPrev = "Previous bookmark";
         MenuNewFolder = "New Folder";
@@ -1030,10 +1030,10 @@ public static class Strings
         RootPathLabel = "This PC";
         MenuThumbnailMaxSize = "Max thumbnail size";
         ShowMoreFormat = "… Show {0} more";
-        ShowLessFormat = "… Show {0} less";
+        ShowLessFormat = "… Show {0} fewer";
 
         ToolTipSearch = "Search (Ctrl+F)";
-        ToolTipViewer = "Multimedia Panel";
+        ToolTipViewer = "Multimedia panel";
         ViewerZoomFit = "Fit";
         ViewerZoomActual = "1:1";
         ViewerZoomFill = "Fill";
@@ -1080,13 +1080,13 @@ public static class Strings
         ViewerSubtitleSize = "Subtitle size";
         ViewerSubtitleSync = "Subtitle sync";
         ViewerMarkClear = "Clear all";
-        ViewerHdrToneMap = "HDR colour correction";
+        ViewerHdrToneMap = "HDR color correction";
         ViewerHdrBrightness = "  Brightness";
         ViewerHdrSaturation = "  Saturation";
         ViewerHdrContrast = "  Contrast";
         ViewerMediaOpening = "Opening…";
         ViewerMediaOpeningSlow = "Opening… this is taking a while";
-        ViewerMediaOpenGaveUp = "No response — playback cancelled";
+        ViewerMediaOpenGaveUp = "No response — playback canceled";
         ViewerMediaStalled = "Waiting for the file…";
         ViewerPlay = "Play";
         ViewerPause = "Pause";
@@ -1098,7 +1098,7 @@ public static class Strings
         ViewerRepeatShuffle = "Repeat shuffled";
         ViewerRepeatHint = "right-click to change";
         ViewerBackgroundPlay = "Background play · keeps going in other folders";
-        ViewerFolderItemCount = "{0} files this panel can show";
+        ViewerFolderItemCount = "{0} can be shown here";
         ViewerFolderPlayAll = "Play this folder";
         ViewerPlaybackUnsupported = "This format can't be played here · Enter opens it in the default app";
         ViewerPlaybackInterrupted = "Playback stopped · press play to resume, Enter opens it in the default app";
@@ -1115,8 +1115,8 @@ public static class Strings
         SearchBoxPlaceholder = "Search";
         PathBarPlaceholder = "Type a path, press Enter";
         SearchStatusScanning = "Indexing… ({0}) · you can search now";
-        SearchStatusResults = "{0} results";
-        SearchStatusResultsCapped = "Showing {0} of {1} results";
+        SearchStatusResults = "{0} found";
+        SearchStatusResultsCapped = "Showing {0} of {1}";
         SearchStatusNoResults = "No results";
         SearchStatusNoResultsCached = "No results · index from {0} · refresh to update";
         SearchStatusIndexAgeSuffix = " · index from {0}";
@@ -1162,10 +1162,10 @@ public static class Strings
         ButtonClose = "Close";
         ButtonExportColors = "Export";
         ButtonImportColors = "Import";
-        ColorFileFilter = "Edgetree colours (*.json)|*.json";
+        ColorFileFilter = "Edgetree colors (*.json)|*.json";
         ColorFileDefaultName = "edgetree-colors.json";
-        ColorImportFailedTitle = "Import Colours";
-        ColorImportFailedBody = "That file holds no colours.";
+        ColorImportFailedTitle = "Import Colors";
+        ColorImportFailedBody = "That file holds no colors.";
         SettingsSaveFailedTitle = "Settings";
         SettingsSaveFailedBody =
             "Your settings could not be saved. What you have changed will be gone when the app closes.\n\n{0}";
@@ -1173,12 +1173,12 @@ public static class Strings
         ColorThemeLightMode = "Light";
         ButtonRandomColors = "Random";
         ButtonMonoColors = "Mono";
-        ButtonMonoColorsTip = "Greyscale in one press";
+        ButtonMonoColorsTip = "Grayscale in one press";
         // Missing outright until 2026-08-16, so the link marks on all seventeen
         // colour rows carried a Korean tooltip in an English app - a whole
         // feature explained in the wrong language, and the one feature here
         // that explains itself nowhere else.
-        ColorChainTip = "Chain · rows lit together share a colour";
+        ColorChainTip = "Chain · rows lit together share a color";
         ButtonRandomColorsTip = "Combinations that go together";
         ButtonDaringColors = "Bold";
         ButtonDaringColorsTip = "Bolder combinations, starting from a primary hue";
@@ -1229,10 +1229,10 @@ public static class Strings
         DeleteFailedTitle = "Delete Failed";
         CompressFailedTitle = "Compress Failed";
         ExtractFailedTitle = "Extract Failed";
-        CompressSkippedBody = "{0} items could not be read and were skipped.";
+        CompressSkippedBody = "Skipped {0} that could not be read.";
         StartWithWindowsFailedTitle = "Start with Windows";
         StartWithWindowsFailedBody = "Failed to register as a startup program. It may be restricted by administrator policy.";
-        LanguageChangeTitle = "Language Changed";
+        LanguageChangeTitle = "Change Language";
         LanguageChangeBody = "Changing the language requires restarting the app. Restart now?";
         ImportFailedTitle = "Import Failed";
         OverwriteConfirmTitle = "Confirm Overwrite";

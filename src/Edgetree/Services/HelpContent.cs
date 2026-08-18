@@ -53,7 +53,7 @@ public static class HelpContent
         T("자주 가는 곳은 북마크로", "Bookmark the places you keep going back to"),
         T("썸네일 캐싱 활성화로 이미지 많은 폴더 빠르게 관리",
           "Turn thumbnail caching on and move through big image folders fast"),
-        T("원하는 색상 선택", "Pick the colours you want"),
+        T("원하는 색상 선택", "Pick the colors you want"),
         T("설정한 상태를 프리셋으로 저장 (제목 표시줄 우클릭 메뉴)",
           "Save a setup as a preset (right-click the title bar)"),
     };
@@ -89,12 +89,12 @@ public static class HelpContent
                     // the tray option AND on which mode the window is in, and a
                     // single sentence covering both read as a paragraph.
                     R("제목 표시줄 최소화 아이콘", "트레이 옵션과 모드에 따라 다름",
-                      "The minimise icon in the title bar", "Depends on the tray option and the mode"),
+                      "The minimize icon in the title bar", "Depends on the tray option and the mode"),
                     // Indented AND bulleted: the indent alone left them reading
                     // as three ordinary rows that happened to start further in,
                     // and the dash is what says they belong to the row above.
                     R("  - 트레이 옵션 켜짐", "트레이로 최소화",
-                      "  - Tray option on", "Minimise to the tray"),
+                      "  - Tray option on", "Minimize to the tray"),
                     // NOT 앱 here, unlike the rows around it: this half of the
                     // row is a CONDITION, and the condition is which mode the
                     // window is in - the English side has said 도킹 all along
@@ -102,9 +102,9 @@ public static class HelpContent
                     R("  - 트레이 꺼짐 · 도킹 상태", "숨김",
                       "  - Tray off, docked", "Hide it"),
                     R("  - 트레이 꺼짐 · 창 모드", "작업 표시줄로 최소화",
-                      "  - Tray off, window mode", "Minimise to the taskbar"),
+                      "  - Tray off, window mode", "Minimize to the taskbar"),
                     R("제목 표시줄 우클릭", "도움말 · 트레이로 최소화 · 다시 시작 · 종료",
-                      "Right-click the title bar", "Help · Minimise to tray · Restart · Quit"),
+                      "Right-click the title bar", "Help · Minimize to tray · Restart · Quit"),
                     R("가장자리 드래그", "너비 조절",
                       "Drag the outer edge", "Resize"),
                     R("가장자리 더블클릭", "내용에 맞춰 너비 맞춤",
@@ -127,7 +127,7 @@ public static class HelpContent
                     R("제목 표시줄 드래그", "창으로 분리 · 이동",
                       "Drag the title bar", "Pull it off, and move it"),
                     R("제목 표시줄 더블클릭", "최대화 · 복원",
-                      "Double-click the title bar", "Maximise · restore"),
+                      "Double-click the title bar", "Maximize · restore"),
                     R("가장자리 · 모서리 드래그", "크기 조절",
                       "Drag an edge or corner", "Resize"),
                     R("가장자리로 드래그", "다시 도킹",
@@ -154,7 +154,7 @@ public static class HelpContent
                 new Group(string.Empty, new[]
                 {
                     R("제목 표시줄 우클릭", "저장된 프리셋 목록 · 프리셋 추가 (최대 5개)",
-                      "Right-click the title bar", "The setups you saved, and 프리셋 추가 - up to five"),
+                      "Right-click the title bar", "The setups you saved, and Add preset - up to five"),
                     // The list this row used to carry (위치 · 크기 · 도킹 · 자동
                     // 숨김 · 색상 · 파일 종류 · 현재 폴더) came out on the author's
                     // call (2026-08-16): seven items read as seven things to
@@ -185,13 +185,13 @@ public static class HelpContent
                     R("↑ ↓", "위 · 아래 행 이동", "↑ ↓", "Previous · next row"),
                     R("← →", "접기 · 펼치기", "← →", "Collapse · expand"),
                     // 2026-08-17: 열린 폴더를 눌러도 안 접히게 바뀌었으므로 이
-                    // 두 줄이 필요해졌다. 접는 방법이 둘(다시 누르기 · 꺽쇠)이고
+                    // 두 줄이 필요해졌다. 접는 방법이 둘(다시 누르기 · 펼침기호)이고
                     // 어느 쪽도 화면에 안 적혀 있다.
                     R("폴더 클릭", "접힌 폴더는 펼치기 · 열린 폴더는 선택만, 다시 누르면 접기",
                       "Clicking a folder",
                       "A closed folder opens; an open one is only selected - press it again to close"),
-                    R("꺽쇠 클릭", "누를 때마다 바로 접기 · 펼치기",
-                      "Clicking the chevron", "Opens and closes on every press"),
+                    R("펼침기호 클릭", "누를 때마다 바로 접기 · 펼치기",
+                      "Clicking the expand arrow", "Opens and closes on every press"),
                     // Named for the places rather than for the rows: it moves
                     // between folders you have been in, not between every row
                     // you clicked, and someone who expects the second one will
@@ -296,7 +296,7 @@ public static class HelpContent
                     // its folder scrolled off, so two identically named folders
                     // are told apart by which guide line lights up.
                     R("더 보기 · 접기", "나머지 항목 펼치기 · 되접기 (그 부모 폴더가 선택됨)",
-                      "Show more · Show less", "Reveal the rest, or fold it back - its parent folder gets selected"),
+                      "Show more · Show fewer", "Reveal the rest, or fold it back - its parent folder gets selected"),
                 }),
             }),
 
@@ -576,7 +576,7 @@ public static class HelpContent
             {
                 new Group(string.Empty, new[]
                 {
-                    R("옵션 → 색상 설정", "직접 선택 · 랜덤 지정", "Options → Colours", "Pick them, or roll the dice"),
+                    R("옵션 → 색상 설정", "직접 선택 · 랜덤 지정", "Options → Color Settings", "Pick them, or roll the dice"),
                     // THE THREE THINGS IN THAT WINDOW A LABEL CANNOT TEACH
                     // (2026-08-16). The chain is the clearest case this file's
                     // own rule has: a small link mark sits on all seventeen
@@ -590,11 +590,11 @@ public static class HelpContent
                     // whole app), and the cost of that choice is that anyone
                     // hunting the options menu for it never finds it.
                     R("색상 설정 → 행의 고리", "색을 묶어 함께 변경, 함께 활성화한 줄끼리 같은 색",
-                      "Colours → the link on a row", "Ties rows together - the ones lit together share a colour"),
+                      "Color Settings → the link on a row", "Ties rows together - the ones lit together share a color"),
                     R("색상 설정 → 모노", "팔레트 전체를 회색톤으로 한 번에",
-                      "Colours → Mono", "The whole palette to greyscale in one press"),
+                      "Color Settings → Mono", "The whole palette to grayscale in one press"),
                     R("색상 설정 → 그림자", "트리와 북마크 패널의 위아래 끝을 옅게 덮음",
-                      "Colours → Shading", "Veils the top and bottom ends of the tree and the bookmark panel"),
+                      "Color Settings → Shading", "Veils the top and bottom ends of the tree and the bookmark panel"),
                     R("옵션 → 기본 설정", "자동 시작 · 트레이 · 아이콘 · 자동 숨김", "Options → General", "Autostart · tray · icons · auto-hide"),
                     // "아이콘" in the row above reads as ONE switch, and it is
                     // three. The drive one arrived last (2026-08-16) and the
@@ -609,7 +609,7 @@ public static class HelpContent
                     // The cost goes on the row, not in a paragraph: it is the
                     // one setting here that can make the tree slower.
                     R("옵션 → 한 번에 표시할 개수 → 전체 표시", "더 보기 없이 전부, 큰 폴더에서는 느려짐",
-                      "Options → Items per Folder → Show All", "No 더 보기 row at all - a big folder will feel it"),
+                      "Options → Items per Folder → Show All", "No Show more row at all - a big folder will feel it"),
                     R("옵션 → 네트워크 위치", "드라이브 문자 없는 공유 추가 (\\\\서버\\공유)",
                       "Options → Network Locations", "Add a share with no drive letter (\\\\server\\share)"),
                 }),
