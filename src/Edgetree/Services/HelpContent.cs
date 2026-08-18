@@ -48,7 +48,7 @@ public static class HelpContent
         T("안 쓰는 폴더 감추기", "Hide the folders you never open"),
         // Which of the two wins is the part nobody guesses, and it is the part
         // that makes the pair usable at all.
-        T("자주 쓰는 파일 종류(확장자) 지정하기 (제외 확장자 입력시 최우선 적용)",
+        T("자주 쓰는 파일 형식(확장자) 지정하기 (제외 확장자 입력시 최우선 적용)",
           "Set the file kinds you work with - anything you type as excluded wins over the rest"),
         T("자주 가는 곳은 북마크로", "Bookmark the places you keep going back to"),
         T("썸네일 캐싱 활성화로 이미지 많은 폴더 빠르게 관리",
@@ -254,7 +254,7 @@ public static class HelpContent
                     // not: the row refreshes that folder, this one the drive
                     // list and every folder open in the tree.
                     R("빈 곳 우클릭",
-                      "전체 새로고침 · 새 폴더 · 북마크 · 숨긴 폴더 · 네트워크 위치 · 표시할 파일 종류",
+                      "전체 새로고침 · 새 폴더 · 북마크 · 숨긴 폴더 · 네트워크 위치 · 표시할 파일 형식",
                       "Right-click empty space",
                       "Refresh everything · New Folder · Bookmark · Hidden Folders · Network Locations · Show File Types"),
                 }),
@@ -285,7 +285,7 @@ public static class HelpContent
                     // they will not scroll up to 트리 to find out that the
                     // gesture exists. The row there answers "what is that menu";
                     // this one answers "where else can I set this".
-                    R("트리 빈 곳 우클릭 → 표시할 파일 종류", "필터 버튼 줄과 같은 목록",
+                    R("트리 빈 곳 우클릭 → 표시할 파일 형식", "필터 버튼 줄과 같은 목록",
                       "Right-click empty tree space → Show File Types",
                       "The same list the filter buttons carry"),
                     R("폴더 행의 정렬 아이콘", "그 폴더만 개별 정렬", "The sort icon on a folder row", "Sort that one folder its own way"),

@@ -24,8 +24,14 @@ public static class Strings
     // selection or the whole view.
     // File-kind filter. "전체" is deliberately worded as a state, not a
     // category - picking it clears the rest.
-    // "파일 종류"로 시작했다가 바꿈 - 그것만으로는 무엇을 하는 줄인지 안 읽힘.
-    // 라벨이 그 자리에서 동작을 말해야 함(설명은 아무도 안 읽으므로).
+    // "파일 형식"만으로 시작했다가 바꿈 - 그것만으로는 무엇을 하는 줄인지 안
+    // 읽힘. 라벨이 그 자리에서 동작을 말해야 함(설명은 아무도 안 읽으므로).
+    //
+    // 종류였다가 형식으로 바꿈(2026-08-18, 사용자 판단 "종류에는 확장자들을 다
+    // 포함하니까요"). 릴리즈 노트를 직접 고치실 때 쓰신 말이기도 하다. 영문은
+    // File Types 그대로 - 갈렸던 것은 국어 쪽 두 낱말이고, 영어에는 그 구분이
+    // 없다. 아이콘 쪽 "아이콘 종류"는 남는데, 이제 종류를 쓰는 자리가 거기뿐
+    // 이라 오히려 안 갈린다.
     // ----- 프리셋 ------------------------------------------------------------
     //
     // The saved shapes of the whole app, at the TOP of the header's right-click
@@ -57,7 +63,7 @@ public static class Strings
     // thing saying which one is happening.
     public static string PresetSaveTitle = "현재 상태로 저장";
     public static string PresetRenameTitle = "이름 바꾸기";
-    public static string PresetNameHint = "창 위치·크기·도킹·색상·파일 종류·현재 폴더가 함께 저장됩니다";
+    public static string PresetNameHint = "창 위치·크기·도킹·색상·파일 형식·현재 폴더가 함께 저장됩니다";
     // The default name for slot N. Deliberately dull - the user renames it to
     // what the shape is for, and a clever default would get in the way of that.
     public static string PresetDefaultName = "프리셋{0}";
@@ -80,7 +86,7 @@ public static class Strings
     public static string PresetSlotEmptyTitle = "프리셋";
     public static string PresetSlotEmptyBody = "{0}번 프리셋이 아직 없습니다.\n지금 상태를 저장할까요?";
 
-    public static string MenuFileFilter = "표시할 파일 종류";
+    public static string MenuFileFilter = "표시할 파일 형식";
     // 푸터 칩은 여덟 개가 한 줄에 서야 해서 가장 긴 라벨만 줄여 씀. 나머지는
     // 메뉴와 같은 말을 그대로 쓴다 - 두 곳이 다른 이름을 부르면 같은 것인지
     // 알 수 없으므로.
