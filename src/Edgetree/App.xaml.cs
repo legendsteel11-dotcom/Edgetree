@@ -380,10 +380,58 @@ public partial class App : Application
     // The timeout is passed and ignored: modern Windows shows these as toasts
     // and picks the duration itself. Kept at a plausible value rather than 0,
     // which older shells read as "forever".
+    //
+    // TWO PRESSES ARE ONE ANSWER (2026-08-18, on report). Ctrl+Shift+S can be
+    // held down or hammered, and every press writes the same preset under the
+    // same name - so the balloon after the first says nothing the first did not
+    // already say, while Windows queues each one and the tray keeps popping long
+    // after the hand stopped.
+    //
+    // The gate is here rather than at the shortcut because it is a property of
+    // this surface: the tray does not repeat itself, whoever asks it to. Only
+    // the balloon is held - the save itself already happened and is untouched.
+    //
+    // Leading edge, not trailing: the first press is the one that needs an
+    // answer, and it should arrive while the finger is still on the key. The
+    // rest of the burst is dropped rather than delayed, since a balloon that
+    // surfaces seconds after the last press is the noise being removed.
+    //
+    // Keyed on the message, so what is silenced is only ever a REPEAT. Saving
+    // preset A and then B inside the window are two different answers and both
+    // are shown.
     internal void ShowTrayMessage(string title, string text)
     {
-        _trayIcon?.ShowBalloonTip(3000, title, text, System.Windows.Forms.ToolTipIcon.None);
+        if (_trayIcon is null)
+        {
+            return;
+        }
+
+        string message = title + '\n' + text;
+        long now = Environment.TickCount64;
+
+        if (string.Equals(message, _lastTrayMessage, StringComparison.Ordinal)
+            && now - _lastTrayMessageTicks < TrayMessageRepeatMs)
+        {
+            return;
+        }
+
+        _lastTrayMessage = message;
+        _lastTrayMessageTicks = now;
+        _trayIcon.ShowBalloonTip(3000, title, text, System.Windows.Forms.ToolTipIcon.None);
     }
+
+    // About as long as the balloon itself stays up: Windows picks that duration
+    // and it runs around five seconds. Deliberately matched to it rather than
+    // set past it - a press landing right on the boundary should still get an
+    // answer, even if the two balloons brush past each other for a moment. What
+    // is being avoided here is a stack of them, not every last overlap, and of
+    // the two ways to be wrong, silence is the worse one.
+    private const long TrayMessageRepeatMs = 5000;
+
+    // Empty is the sentinel: no message this app sends is empty, so the first
+    // call always passes and no starting tick value has to be invented.
+    private string _lastTrayMessage = string.Empty;
+    private long _lastTrayMessageTicks;
 
     // Same open/hide split the title bar's own "_" button and tray click use
     // (see MainWindow.MinimizeButton_Click / RestoreMainWindow) - just picks
