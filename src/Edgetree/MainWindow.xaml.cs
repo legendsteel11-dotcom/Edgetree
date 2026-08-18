@@ -12466,15 +12466,15 @@ public partial class MainWindow : Window
         // a literal would start clipping the moment Ctrl+ was pressed.
         double stepperValueWidth = Math.Round(menuChipFontSize * 2.9);
         appResources["MenuStepperValueWidth"] = stepperValueWidth;
-        // A mark in that middle slot is a BUTTON, so it draws a box, and a box
-        // stretched to the width a "-3.0s" needs is a slab beside two neat
-        // square ones. It takes the same box as its neighbours instead and
-        // makes the slot up in margin, so the − and + still land where the rows
-        // below put them - the alignment lives in the SLOT, not in the button.
-        double stepperButtonSize = Math.Max(20.0, Math.Round(20.0 * scale));
-        appResources["MenuStepperMarkMargin"] =
-            new Thickness(Math.Max(0, (stepperValueWidth - stepperButtonSize) / 2), 0,
-                          Math.Max(0, (stepperValueWidth - stepperButtonSize) / 2), 0);
+        // MenuStepperMarkMargin lived here until 2026-08-18. It centred a MARK
+        // in that middle slot - a box the size of its neighbours, with the
+        // slot's extra width made up in margin, so the − and + still landed
+        // where the rows below put them. Worth keeping the reason if a mark ever
+        // goes back in a stepper's middle: the alignment lives in the SLOT, not
+        // in the button, because a box stretched to the width a "-3.0s" needs is
+        // a slab beside two neat square ones. Its one user was the 그림 크기
+        // row's 맞춤 mark, and that row stopped being a stepper.
+        //
         // The 그림 크기 row's three marks are PEERS now rather than a stepper's
         // − and + (2026-08-18, on report: "얘들이 추운지 너무 딱 붙어 있는데").
         // Hard against each other is right for a stepper, where the two boxes
