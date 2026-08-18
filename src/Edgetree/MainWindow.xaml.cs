@@ -12442,6 +12442,23 @@ public partial class MainWindow : Window
         appResources["MenuStepperMarkMargin"] =
             new Thickness(Math.Max(0, (stepperValueWidth - stepperButtonSize) / 2), 0,
                           Math.Max(0, (stepperValueWidth - stepperButtonSize) / 2), 0);
+        // The 그림 크기 row's three marks are PEERS now rather than a stepper's
+        // − and + (2026-08-18, on report: "얘들이 추운지 너무 딱 붙어 있는데").
+        // Hard against each other is right for a stepper, where the two boxes
+        // are one control; it reads as cramped for three separate answers, so
+        // they stand apart the way the panel's own chips do.
+        //
+        // ViewerChipGap is the gap those chips use, but taken through the MENU's
+        // scale rather than the panel's: this row lives in a popup that follows
+        // the menu font, and a literal would come apart the moment Ctrl+ was
+        // pressed - which is exactly what happened to the hardcoded padding this
+        // row's alignment used to rely on.
+        //
+        // Right side only, and NOT on the last mark: the row is right-aligned,
+        // so a trailing gap would pull its edge in and break the column it
+        // shares with the stepper rows below.
+        appResources["MenuChipGap"] =
+            new Thickness(0, 0, Math.Max(1.0, Math.Round(ViewerChipGap * scale)), 0);
         // Not SecondaryFontSize: this one is a fraction of the menu font rather
         // than a fixed number of steps below it. Same clamp for the same
         // reason though - the 8 floor meets the font exactly at the smallest
