@@ -26238,13 +26238,21 @@ public partial class MainWindow : Window
         // hides itself during playback - UpdateFilmstrip shows that it does not
         // (the switch, whether the folder has items, and a running show are the
         // only three things it asks). A wrong premise, not a judgement call.
-        ViewerNavigatorItem.Visibility = coveredPicture ? Visibility.Visible : Visibility.Collapsed;
+        //
+        // 영상에는 내비게이터가 없다 - 패널의 칩이 이미 그 규칙이고, 이 줄만
+        // 어긋나 있었다 (2026-08-19, 신고). coveredPicture는 "전송부가 화면의
+        // 파일을 들고 있지 않다"로 그림인지를 판단하는데, 정지한 영상은 그 답이
+        // 참이라 켤 수 없는 줄이 메뉴에 나왔다. 재생 여부가 아니라 매체를 묻는
+        // 것이 맞고, 그 질문은 IsViewerShowingVideo가 이미 하고 있다.
+        ViewerNavigatorItem.Visibility = coveredPicture && !IsViewerShowingVideo
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         ViewerNavigatorItem.IsChecked = _settings.ViewerNavigator;
         ViewerFilmstripItem.Visibility = _viewerFullscreen ? Visibility.Visible : Visibility.Collapsed;
         // What is ON SCREEN, not what is stored: while a film holds the room
         // the row reads unticked, so ticking it means "show it now" and does.
         ViewerFilmstripItem.IsChecked = _settings.ViewerFilmstrip &&
-            (_filmstripAskedBack || !movingPicture);
+            (_filmstripAskedBack || !IsViewerShowingVideo);
         // ONE QUESTION, TWO ANSWERS AND A WAY OUT (2026-08-17, on report:
         // "조금 헷갈립니다").
         //
@@ -26972,8 +26980,11 @@ public partial class MainWindow : Window
         // setting is untouched and the strip is back on the way out. Pressing
         // 썸네일 바 while the film is up hands it back for this stretch - see
         // SetViewerFilmstrip - so the row still does something.
-        bool filmHasTheScreen = _viewerFullscreen &&
-            _viewerVideoPath is { } filmPath && IsViewerVideo(filmPath);
+        //
+        // 재생 여부와 무관하게, 영상이 화면에 있으면 자리를 내준다 (2026-08-19,
+        // 신고). 전에는 재생 중일 때만이었다 - IsViewerShowingVideo가 이미 그 질문을
+        // 이렇게 묻고 있었고(내비게이터 칩이 쓰던 것), 여기만 따로 물어서 어긋났다.
+        bool filmHasTheScreen = _viewerFullscreen && IsViewerShowingVideo;
         bool show = _settings.ViewerFilmstrip && items is { Count: > 0 } && !_slideshowDriving
             && !(filmHasTheScreen && !_filmstripAskedBack);
         ViewerFilmstripHost.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
