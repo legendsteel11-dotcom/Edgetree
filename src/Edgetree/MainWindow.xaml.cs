@@ -23585,7 +23585,24 @@ public partial class MainWindow : Window
     private int _subtitleToken;
 
     private const double MinSubtitleFontSize = 10;
-    private const double MaxSubtitleFontSize = 48;
+    // 48 until 2026-08-18, raised on report: a film watched full screen on a 4K
+    // panel had the words too small to read at the old ceiling. The size is in
+    // DIPs, so a bigger screen does not enlarge them - it only gives them more
+    // room to be small in.
+    private const double MaxSubtitleFontSize = 60;
+
+    // How far the plate sits off the bottom edge, in the same DIPs. 18 is where
+    // it was fixed until 2026-08-18 and stays the default, so nobody who never
+    // opens the row sees a change.
+    //
+    // Asked for from the same film as the size: full screen on a large panel
+    // puts the words right against the edge, which is where a television would
+    // have raised them. A DIP number rather than a share of the height - the
+    // plate is positioned by a margin, and a share would have to be recomputed
+    // on every resize for a difference nobody would be able to name.
+    private const double MinSubtitleBottom = 0;
+    private const double MaxSubtitleBottom = 300;
+    private const double SubtitleBottomStep = 10;
 
     // Half a second a press: small enough to land on, large enough that a real
     // drift takes a few presses rather than twenty. Bounded well past anything
@@ -23623,6 +23640,7 @@ public partial class MainWindow : Window
                 _subtitleCues = cues;
                 _subtitleOffset = FindVideoMarks(videoPath)?.SubtitleOffset ?? 0;
                 ApplySubtitleFontSize();
+                ApplySubtitleBottom();
                 ApplySubtitleOffsetReadout();
                 UpdateSubtitleTimer();
             });
@@ -23740,6 +23758,36 @@ public partial class MainWindow : Window
         ApplySubtitleFontSize();
     }
 
+    // The plate's left and right margins are left where the XAML put them: they
+    // are the wrap guard, not a position, and moving the words up has nothing
+    // to say about how wide a line may run.
+    private void ApplySubtitleBottom()
+    {
+        double bottom = Math.Clamp(
+            _settings.ViewerSubtitleBottom, MinSubtitleBottom, MaxSubtitleBottom);
+        var margin = ViewerSubtitlePlate.Margin;
+        ViewerSubtitlePlate.Margin = new Thickness(margin.Left, margin.Top, margin.Right, bottom);
+        if (ViewerSubtitleBottomText is not null)
+        {
+            // The readout counts STEPS, not pixels (2026-08-18, on request:
+            // "숫자를 10으로 나눠도 될듯요"). A press moves ten of them, so the
+            // pixel figure ran 130, 140, 150 and only ever changed its tens
+            // digit - three characters where one was doing the work. The stored
+            // value stays in DIPs; only what the row shows is divided.
+            ViewerSubtitleBottomText.Text =
+                ((int)Math.Round(bottom / SubtitleBottomStep)).ToString();
+        }
+    }
+
+    private void StepSubtitleBottom(double delta)
+    {
+        _settings.ViewerSubtitleBottom = Math.Clamp(
+            Math.Round(_settings.ViewerSubtitleBottom + delta),
+            MinSubtitleBottom, MaxSubtitleBottom);
+        _settingsService.Save(_settings);
+        ApplySubtitleBottom();
+    }
+
     // Written into the same per-film entry the marks and the resume point use,
     // and dropped again the moment it goes back to zero - an entry that holds
     // nothing should not survive to take up one of the 200 slots.
@@ -23803,6 +23851,12 @@ public partial class MainWindow : Window
     private void ViewerSubtitleSmaller_Click(object sender, RoutedEventArgs e) => StepSubtitleFontSize(-1);
 
     private void ViewerSubtitleLarger_Click(object sender, RoutedEventArgs e) => StepSubtitleFontSize(+1);
+
+    // 아래로 = 여백을 줄여 화면 끝에 붙이는 것, 위로 = 여백을 키우는 것.
+    // 버튼이 말하는 것은 자막이 가는 방향이지 숫자의 방향이 아니다.
+    private void ViewerSubtitleLower_Click(object sender, RoutedEventArgs e) => StepSubtitleBottom(-SubtitleBottomStep);
+
+    private void ViewerSubtitleHigher_Click(object sender, RoutedEventArgs e) => StepSubtitleBottom(+SubtitleBottomStep);
 
     private void ViewerSubtitleToggle_Click(object sender, RoutedEventArgs e)
     {
@@ -25794,10 +25848,12 @@ public partial class MainWindow : Window
         ViewerSubtitleToggleItem.Visibility = subtitleRows;
         ViewerSubtitleToggleItem.IsChecked = _settings.ViewerSubtitles;
         ViewerSubtitleSizeItem.Visibility = subtitleRows;
+        ViewerSubtitleBottomItem.Visibility = subtitleRows;
         ViewerSubtitleSyncItem.Visibility = subtitleRows;
         if (subtitleRows == Visibility.Visible)
         {
             ApplySubtitleFontSize();
+            ApplySubtitleBottom();
             ApplySubtitleOffsetReadout();
         }
         // Only when it has marks: a submenu that is always there and usually

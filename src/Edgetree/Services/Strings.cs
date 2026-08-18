@@ -527,6 +527,9 @@ public static class Strings
     public static string ViewerZoomPicture = "그림 크기";
     public static string ViewerSubtitles = "자막";
     public static string ViewerSubtitleSize = "자막 크기";
+    // 높이가 아니라 위치. 이 줄이 바꾸는 것은 자막이 화면에서 어디에 놓이는가이고,
+    // 높이라고 하면 글자의 높이로도 읽힌다 - 바로 윗줄이 크기라 더 그렇다.
+    public static string ViewerSubtitlePosition = "자막 위치";
     public static string ViewerSubtitleSync = "자막 싱크";
     // Safe to be this blunt because of WHERE it is: inside the 북마크 목록
     // submenu, under the positions it clears. The word 삭제 means files
@@ -1090,6 +1093,7 @@ public static class Strings
         ViewerZoomPicture = "Picture size";
         ViewerSubtitles = "Subtitles";
         ViewerSubtitleSize = "Subtitle size";
+        ViewerSubtitlePosition = "Subtitle position";
         ViewerSubtitleSync = "Subtitle sync";
         ViewerMarkClear = "Clear all";
         ViewerHdrToneMap = "HDR color correction";

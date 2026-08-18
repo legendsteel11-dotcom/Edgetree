@@ -6784,6 +6784,48 @@
                                         </Grid>
                                     </MenuItem.Header>
                                 </MenuItem>
+                                <!-- Where the words sit, not how big they are
+                                     (2026-08-18, on report: full screen on a
+                                     4K panel puts them right against the edge).
+                                     Directly under 자막 크기 because the two are
+                                     tuned in the same sitting, and the number
+                                     is the plate's gap from the bottom - so
+                                     BIGGER means HIGHER, and the buttons are
+                                     ordered to say so rather than to follow the
+                                     number: − lowers, + raises. -->
+                                <MenuItem x:Name="ViewerSubtitleBottomItem"
+                                        StaysOpenOnClick="True"
+                                        Focusable="False"
+                                        Padding="{DynamicResource MenuStepperRowPadding}"
+                                        Visibility="Collapsed">
+                                    <MenuItem.Header>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                    Text="{x:Static services:Strings.ViewerSubtitlePosition}"
+                                                    Foreground="{DynamicResource MenuForeground}"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,8,0"/>
+                                            <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal">
+                                                <Button Content="−"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerSubtitleLower_Click"/>
+                                                <TextBlock x:Name="ViewerSubtitleBottomText"
+                                                        Foreground="{DynamicResource MenuForeground}"
+                                                        Width="{DynamicResource MenuStepperValueWidth}"
+                                                        TextAlignment="Center"
+                                                        VerticalAlignment="Center"/>
+                                                <Button Content="+"
+                                                        Style="{StaticResource MenuStepperButtonStyle}"
+                                                        Click="ViewerSubtitleHigher_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </MenuItem.Header>
+                                </MenuItem>
                                 <!-- Sync, kept per film (see
                                      VideoMarkEntry.SubtitleOffset). Half a
                                      second a press, signed, so the readout says

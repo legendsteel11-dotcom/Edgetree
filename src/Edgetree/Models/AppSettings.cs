@@ -196,6 +196,11 @@ public class AppSettings
     public bool ViewerSubtitles { get; set; } = true;
     public double ViewerSubtitleFontSize { get; set; } = 16;
 
+    // 자막 판이 아래 가장자리에서 얼마나 떨어지는가(DIP). 2026-08-18까지는
+    // XAML에 18로 박혀 있었고 그 값이 기본값이다 - 이 줄을 한 번도 안 여는
+    // 사람에게는 달라지는 것이 없어야 한다.
+    public double ViewerSubtitleBottom { get; set; } = 18;
+
     // What happens when a file finishes playing: "off" (stay on it, which is
     // what the panel always did), "all" (the next one in the folder), "one"
     // (the same file again) or "shuffle".
