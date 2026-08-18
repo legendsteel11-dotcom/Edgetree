@@ -25473,6 +25473,10 @@ public partial class MainWindow : Window
 
         _viewerFullscreen = on;
 
+        // Each crossing starts with the strip yielded again - asking for it back
+        // answers THIS stretch, not every one after it.
+        _filmstripAskedBack = false;
+
         // WRITTEN, NOT SAVED (2026-08-17). The field is set here and carried out
         // by the exit save - SaveCurrentWidth, which every graceful exit path
         // reaches (measured against exit.log: Application.Shutdown does raise
@@ -25685,6 +25689,11 @@ public partial class MainWindow : Window
         // follows re-applies this - but not when the column was already the
         // width it wanted, so do it here too rather than depend on a resize.
         ApplyViewerZoom();
+
+        // The strip's answer depends on the mode, and nothing else here asks it
+        // to look again - which is why setting the flag alone changed nothing
+        // the first time (2026-08-18, reported as "안사라지고").
+        UpdateViewerCarousel();
 
         // ↑↓ walk the folder in this mode, and they only reach the tree while
         // the tree holds keyboard focus - which it may not, since anything
@@ -25903,7 +25912,10 @@ public partial class MainWindow : Window
         ViewerNavigatorItem.Visibility = coveredPicture ? Visibility.Visible : Visibility.Collapsed;
         ViewerNavigatorItem.IsChecked = _settings.ViewerNavigator;
         ViewerFilmstripItem.Visibility = _viewerFullscreen ? Visibility.Visible : Visibility.Collapsed;
-        ViewerFilmstripItem.IsChecked = _settings.ViewerFilmstrip;
+        // What is ON SCREEN, not what is stored: while a film holds the room
+        // the row reads unticked, so ticking it means "show it now" and does.
+        ViewerFilmstripItem.IsChecked = _settings.ViewerFilmstrip &&
+            (_filmstripAskedBack || !movingPicture);
         // ONE QUESTION, TWO ANSWERS AND A WAY OUT (2026-08-17, on report:
         // "조금 헷갈립니다").
         //
@@ -26619,7 +26631,22 @@ public partial class MainWindow : Window
         // Away while a show runs - see ApplySlideshowChrome. The CHIP is not
         // touched: the setting is still on, the show is just borrowing the
         // room, and unchecking it here would mean the strip never came back.
-        bool show = _settings.ViewerFilmstrip && items is { Count: > 0 } && !_slideshowDriving;
+        //
+        // AND AWAY OVER A FILM IN FULL SCREEN (2026-08-18, on request). Both
+        // kinds of full screen, since _viewerFullscreen is the mode rather than
+        // how far it reaches. The strip lists the FOLDER, which is a thing to
+        // pick from - and someone who has just filled the screen with a film is
+        // not picking, they are watching. Over a picture it stays, because there
+        // the strip and the screen are the same activity.
+        //
+        // Borrowed, not turned off, exactly like the slideshow above: the
+        // setting is untouched and the strip is back on the way out. Pressing
+        // 썸네일 바 while the film is up hands it back for this stretch - see
+        // SetViewerFilmstrip - so the row still does something.
+        bool filmHasTheScreen = _viewerFullscreen &&
+            _viewerVideoPath is { } filmPath && IsViewerVideo(filmPath);
+        bool show = _settings.ViewerFilmstrip && items is { Count: > 0 } && !_slideshowDriving
+            && !(filmHasTheScreen && !_filmstripAskedBack);
         ViewerFilmstripHost.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         ViewerFilmstripChip.IsChecked = _settings.ViewerFilmstrip;
         if (!show)
@@ -28102,8 +28129,24 @@ public partial class MainWindow : Window
         }
     }
 
+    // 전체화면에 들어간 뒤 사용자가 썸네일 바를 도로 달라고 말했는가.
+    //
+    // 처음에는 반대로 - "지금 영상에 자리를 내주고 있다"를 들고 있었고, 그것이
+    // 결함이었다(2026-08-18, 사용자 신고: 나왔다가 돌아오니 아이콘은 켜져 있는데
+    // 바가 안 나옴). 그 플래그는 전체화면을 나가는 모든 경로가 지워 줘야 하는데,
+    // 나가는 길이 하나가 아니라 하나만 놓쳐도 바가 영영 안 나온다.
+    //
+    // 지금 것은 남을 수가 없다. 자리를 내주는 조건은 UpdateFilmstrip 에서 그때그때
+    // 계산하고(전체화면인가 · 영상인가), 이 값은 사용자가 직접 누른 것만 기록한다.
+    // 어떤 길로 나가든 전체화면이 아니게 되는 순간 조건이 거짓이 되므로 바가 돌아온다.
+    private bool _filmstripAskedBack;
+
     private void SetViewerFilmstrip(bool on)
     {
+        // Asking for the strip is asking for it NOW. Without this the row would
+        // tick and nothing would appear, because the film's hold outranks the
+        // setting in UpdateFilmstrip.
+        _filmstripAskedBack = true;
         _settings.ViewerFilmstrip = on;
         ViewerFilmstripChip.IsChecked = on;
         _settingsService.Save(_settings);
