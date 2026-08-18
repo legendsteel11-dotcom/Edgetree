@@ -3921,12 +3921,53 @@ public partial class MainWindow : Window
     // submenu - cannot say.
     private const double SubmenuGutterPull = 6.0;
 
+    // ONE MENU, ONE LEFT EDGE (2026-08-18, on report - the author sent a shot of
+    // the viewer's menu with sixteen rows starting at two different x).
+    //
+    // A checkable row reserves the check column whether or not it is ticked; a
+    // plain one does not, and reserving it for every row everywhere would put a
+    // dead gutter down menus that have no checks at all (the tray's four rows).
+    // So the question is asked PER MENU: if anything here can be ticked, every
+    // row here makes room for a tick.
+    //
+    // Only VISIBLE rows count. This menu hides most of itself depending on what
+    // is playing, and a hidden checkable row would otherwise indent a menu that
+    // shows no checks at the moment.
+    //
+    // Each level answers for itself - a submenu is its own menu, and its rows
+    // line up with each other rather than with the parent's.
+    private static void ApplyMenuCheckColumn(ItemsControl menu)
+    {
+        var rows = menu.Items.OfType<MenuItem>()
+            .Where(row => row.Visibility == Visibility.Visible)
+            .ToList();
+
+        // IsChecked as well as IsCheckable: a few rows are ticked from code
+        // without being user-checkable, and they draw the mark all the same.
+        bool anyChecks = rows.Any(row => row.IsCheckable || row.IsChecked);
+        foreach (var row in rows)
+        {
+            MenuVisual.SetReserveCheck(row, anyChecks && !row.IsCheckable && !row.IsChecked);
+        }
+    }
+
+    private void MenuItem_SubmenuOpened(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem item)
+        {
+            ApplyMenuCheckColumn(item);
+        }
+    }
+
     private void AnyMenu_Opened(object sender, RoutedEventArgs e)
     {
         ApplySubmenuSide();
 
         if (sender is ContextMenu menu)
         {
+            // After the rows have been shown and hidden for this opening, which
+            // every menu here does from its own Opened handler before this runs.
+            ApplyMenuCheckColumn(menu);
             _openMenus.Add(menu);
             LogClick("menu opened", null);
 
