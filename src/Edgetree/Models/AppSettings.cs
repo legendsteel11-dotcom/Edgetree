@@ -343,6 +343,11 @@ public class AppSettings
     // 세워지면 다시 합치지 않는다. Normalize와 달리 합치기는 실행마다 돌면 안 된다 -
     // 사용자가 북마크에서 지운 것이 다음 실행에 위 배열에서 되살아난다.
     public bool FavoritesMergedIntoBookmarks { get; set; } = false;
+    // 자막 크기가 1080 기준의 상대값으로 바뀌었는가 (2026-08-19). 세워지기 전의
+    // 파일이 들고 있는 숫자는 화면에 그대로 그리던 DIP라, 한 번만 지금 화면 기준으로
+    // 나눠 준다 - MainWindow.BaselineSubtitleFontSize. 즐겨찾기 합치기와 같은 꼴이고
+    // 같은 이유로 Normalize에는 들어가지 않는다: 실행마다 돌면 안 되는 일이다.
+    public bool ViewerSubtitleSizeIsRelative { get; set; } = false;
 
     // 패널 높이. 이름은 즐겨찾기 시절 것이고 저장된 키를 그대로 두려고 남겼다 -
     // 고치면 지금까지 맞춰 둔 높이가 전부 기본값으로 돌아간다.
@@ -916,6 +921,8 @@ public class AppSettings
         // 옮겨 올 것이 없는 사람이다. 세워 두지 않으면 첫 저장 전까지 합치기가
         // 매번 도는데, 하는 일이 없어도 도는 것과 안 도는 것은 다르다.
         FavoritesMergedIntoBookmarks = true,
+        // 옮겨 올 숫자가 없다 - 기본값 16은 이미 1080 기준으로 읽으면 되는 값이다.
+        ViewerSubtitleSizeIsRelative = true,
     };
 
     // ----- 값이 레이아웃에 닿기 전에 -------------------------------------------

@@ -641,6 +641,9 @@ public partial class MainWindow : Window
     private void MainWindow_Loaded(object? sender, RoutedEventArgs e)
     {
         _settings = _settingsService.Load();
+        // 저장에서 들어온 자막 크기를 1080 기준으로 한 번만 옮긴다. 설정을 읽은
+        // 바로 다음이 자리인 것은 이 값이 화면에 닿기 전에 끝나야 하기 때문이다.
+        BaselineSubtitleFontSize();
         FileSystemService.SortField = ReadSortField(_settings.SortField, _settings.SortByDate);
         FileSystemService.SortDescending = _settings.SortDescending;
         FileSystemItem.DisplayCap = _settings.ShowAllItemsPerFolder
@@ -24015,14 +24018,84 @@ public partial class MainWindow : Window
         ViewerSubtitlePlate.Visibility = Visibility.Visible;
     }
 
+    // ----- 1080을 기준으로 읽는 숫자 (2026-08-19, 요청) -----------------------
+    //
+    // 자막 크기는 화면에 그대로 그리는 DIP였다. 그래서 큰 화면일수록 글자가 작게
+    // 보였다 - 자리는 넓어지는데 글자는 그대로여서, 그림에서 차지하는 몫이 줄어든
+    // 것이다. 4K에서 최대치 60도 작다는 신고가 08-18에 온 것이 그 이야기였고,
+    // 그때는 천장을 올려서 막았다.
+    //
+    // 이제 숫자는 "1080 높이에서 이만큼"을 뜻한다. 그리는 크기는 자막이 놓인 자리의
+    // 높이를 타므로, 어느 화면에서든 그림에서 차지하는 몫이 같다. 1080 화면에서는
+    // 지금까지와 완전히 같은 크기다.
+    //
+    // 기준을 모니터가 아니라 **자리**로 잡은 것은 자막이 그림 위에 있기 때문이다.
+    // 모니터를 기준으로 하면 작은 패널에서 글자만 혼자 커진다.
+    private const double SubtitleBaselineHeight = 1080;
+
+    private double SubtitleSizeScale
+        => ViewerImageHost.ActualHeight is var host && host > 0
+            ? host / SubtitleBaselineHeight
+            : 1;
+
+    // ----- 저장된 숫자를 한 번만 옮긴다 ---------------------------------------
+    //
+    // 이미 쓰던 사람의 숫자는 자기 화면에서 눈으로 맞춘 값이다. 그대로 두면 이번
+    // 변경이 그 사람의 자막을 화면 크기만큼 키워 버린다 - 4K에서 60으로 맞춰 둔
+    // 사람이 갑자기 80을 보게 된다. 그래서 지금 화면으로 한 번 나눠, **보이던
+    // 크기가 그대로**이게 한다.
+    //
+    // 나누는 기준은 작업 영역의 높이다. 자막 크기를 맞추는 자리는 전체화면이고,
+    // 바탕화면 채우기가 켜진 전체화면이 곧 이 크기다. 패널에서 맞췄다면 어긋나지만,
+    // 그 경우에도 한 번 다시 맞추면 끝나는 종류의 어긋남이다.
+    //
+    // 저장은 안 한다 - 나가는 길의 저장이 싣고 간다. 그전에 강제 종료되면 다음
+    // 실행에서 원래 숫자로 다시 돈다(같은 답이 나온다).
+    private void BaselineSubtitleFontSize()
+    {
+        if (_settings.ViewerSubtitleSizeIsRelative)
+        {
+            return;
+        }
+
+        _settings.ViewerSubtitleSizeIsRelative = true;
+
+        double scale = GetCurrentMonitorWorkArea().Height / SubtitleBaselineHeight;
+        if (!double.IsFinite(scale) || scale <= 0 || Math.Abs(scale - 1) < 0.01)
+        {
+            return;
+        }
+
+        _settings.ViewerSubtitleFontSize = Math.Clamp(
+            Math.Round(_settings.ViewerSubtitleFontSize / scale),
+            MinSubtitleFontSize, MaxSubtitleFontSize);
+    }
+
     private void ApplySubtitleFontSize()
     {
-        double size = Math.Clamp(
+        double stored = Math.Clamp(
             _settings.ViewerSubtitleFontSize, MinSubtitleFontSize, MaxSubtitleFontSize);
-        ViewerSubtitleText.FontSize = size;
+
+        // 바닥은 저장 범위의 최솟값과 같다. 비례만 지키면 아주 작은 패널에서 글자가
+        // 못 읽을 만큼 작아지는데, 그 자리에서는 그림보다 자막이 먼저 쓸모를 잃는다.
+        // 0.5 단위로 끊는 것은 창을 끄는 동안을 위한 것이다 - 매 프레임 다른 값이
+        // 들어가면 그때마다 자막이 다시 측정된다.
+        double drawn = Math.Round(
+            Math.Max(MinSubtitleFontSize, stored * SubtitleSizeScale) * 2) / 2;
+        if (Math.Abs(ViewerSubtitleText.FontSize - drawn) > 0.01)
+        {
+            ViewerSubtitleText.FontSize = drawn;
+        }
+
+        // 메뉴에 적히는 것은 저장된 숫자다. 사용자가 돌리는 손잡이가 그것이고,
+        // 그리는 크기는 화면마다 다른 값이라 적을 자리가 아니다.
         if (ViewerSubtitleSizeText is not null)
         {
-            ViewerSubtitleSizeText.Text = ((int)Math.Round(size)).ToString();
+            string readout = ((int)Math.Round(stored)).ToString();
+            if (!string.Equals(ViewerSubtitleSizeText.Text, readout, StringComparison.Ordinal))
+            {
+                ViewerSubtitleSizeText.Text = readout;
+            }
         }
     }
 
@@ -24945,12 +25018,17 @@ public partial class MainWindow : Window
     // That part is two doubles. Everything else waits for the size to settle.
     private void ViewerImageHost_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        // Before the picture's own guard: both of these are sized from the
+        // Before the picture's own guard: these are sized from the
         // PANEL, so they follow a width drag and the full-cover toggle whatever
         // the picture behind them is doing. Each returns on its own when it has
         // nothing to do.
         LayoutViewerClock();
         LayoutViewerPlayOverlay();
+        // 자막도 이 자리에서 크기를 받는다 (2026-08-19). 셋 다 그림이 아니라
+        // 자리에서 크기가 나오는 것들이고, 각자 할 일이 없으면 알아서 돌아간다.
+        // 매 프레임 도는 길이라 ApplySubtitleFontSize는 값이 실제로 달라졌을
+        // 때만 쓴다 - 같은 값을 다시 넣으면 그때마다 글자가 다시 측정된다.
+        ApplySubtitleFontSize();
 
         if (!_viewerOpen || _viewerPixelWidth <= 0)
         {
