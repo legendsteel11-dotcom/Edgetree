@@ -2280,6 +2280,20 @@ public partial class MainWindow : Window
         // property would swallow the assignment (see StopSlide).
         StopSlide();
 
+        // Covering the desktop from a docked window (see IsDockedFullscreen).
+        // Everything below rebuilds the band, and the band is exactly what this
+        // state is not. The four geometry writes would be swallowed by the
+        // Maximized state anyway; the margin would not, and the clip hangs off
+        // it - so the one thing to do here is make sure both are cleared, and
+        // leave. Every path that recomputes the window - DPI, monitor, taskbar,
+        // work area - lands here, which is why this is the only guard needed.
+        if (IsDockedFullscreen)
+        {
+            RootContent.Margin = new Thickness(0);
+            ApplyWindowClipRegion();
+            return;
+        }
+
         var workArea = GetCurrentMonitorWorkArea(dpiScale);
 
         // Vertical first, horizontal last, and that order is load-bearing.
@@ -2779,6 +2793,25 @@ public partial class MainWindow : Window
     // above, with the option on. Everything about the handle keys off this one
     // expression so the shape can never disagree with itself.
     private bool IsCollapsedToHandle => IsCollapsedToEdge && _settings.AutoHideUseHandle;
+
+    // Docked AND covering the desktop (2026-08-18, on request: "고정상태에서도
+    // 바탕화면 채우기 옵션을 주면 안되는지, 창모드로 바꾸고 매번 하려니").
+    //
+    // Refused until now for a reason that WAS real: full screen is a maximize,
+    // and a docked window's Left, Width, Top and Height are the docking's, so
+    // the two were writing the same four properties. What makes it cheap after
+    // all is that WPF ignores those four while the state is Maximized - the same
+    // fact Undock has to work around from the other side. So the geometry needs
+    // no third mode; only the BAND ARRANGEMENT does, and that is a margin plus a
+    // clip region hanging off it. Clear the margin and the clip follows on its
+    // own (see ApplyWindowClipRegion, whose band branch tests the margin).
+    //
+    // Deliberately NOT an undock and re-dock. That path rewrites the panel side,
+    // the floating width and - on a session's first float - the whole window
+    // shape, which is a lot of state to churn for a round trip the user thinks
+    // of as one press.
+    private bool IsDockedFullscreen =>
+        _isDocked && _viewerFullscreen && _settings.ViewerFullscreenFillsDesktop;
 
     // What "the window is up" means to everything OUTSIDE this window - the
     // tray icon's menu row and its click handler, both of which used to read
@@ -25412,10 +25445,18 @@ public partial class MainWindow : Window
         // screen in that case simply because the window is that big.
         if (on)
         {
-            if (takeOverWindow && !_isDocked && _settings.ViewerFullscreenFillsDesktop &&
+            if (takeOverWindow && _settings.ViewerFullscreenFillsDesktop &&
                 WindowState != WindowState.Maximized)
             {
                 _viewerFullscreenPreviousState = WindowState;
+                // Docked as well as floating since 2026-08-18. The band's margin
+                // and clip go first: maximizing under them would grow the window
+                // to the screen and still show a strip of it.
+                if (_isDocked)
+                {
+                    RootContent.Margin = new Thickness(0);
+                    ApplyWindowClipRegion();
+                }
                 WindowState = WindowState.Maximized;
             }
         }
@@ -25423,6 +25464,13 @@ public partial class MainWindow : Window
         {
             _viewerFullscreenPreviousState = null;
             WindowState = previous;
+            // _viewerFullscreen is already false above, so the guard in
+            // PositionToWorkArea has stood down and this rebuilds the band the
+            // window had before - margin, clip and all four bounds.
+            if (_isDocked)
+            {
+                PositionToWorkArea();
+            }
         }
 
         // The header goes with it. Without this the mode was just "the window
@@ -25833,7 +25881,10 @@ public partial class MainWindow : Window
         // 도킹 중에는 물을 것이 없다 - 파킹된 띠는 최대화할 대상이 아니다. 모드
         // 밖에서도 보이는 것은 일부러다: 미리 정해 두고 휠클릭만 쓰는 순서가
         // 자연스럽고, 전에는 먼저 모드에 들어가야만 이 줄이 보였다.
-        ViewerFullDesktopItem.Visibility = _isDocked ? Visibility.Collapsed : Visibility.Visible;
+        // Docked too since 2026-08-18. It was withheld there on the reading that
+        // a docked window has no second answer to offer - which was true of the
+        // implementation, not of the question. See IsDockedFullscreen.
+        ViewerFullDesktopItem.Visibility = Visibility.Visible;
         ViewerFullDesktopItem.IsChecked = _settings.ViewerFullscreenFillsDesktop;
         ViewerMarkAddItem.Visibility = playbackRows;
         // The FILE's bookmark, on every kind of file the panel opens. One row
