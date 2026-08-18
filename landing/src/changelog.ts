@@ -20,6 +20,18 @@
 // altogether rather than being softened into vagueness: the fix ships either
 // way, and this list sits directly above a download button.
 //
+// A RENAME IS A LIST ITEM, NOT A STORY (v2.4.1, the author's call: 사소한걸
+// 너무 풀어서 설명해 준 느낌이 강해서 민망스럽다). "X → Y" is the whole line.
+// WHY that name was picked is our side of it, not the reader's: 계열을 맞췄다,
+// 국문과 겹치는 낱말이 없었다 - all of it stays in the commit message and TODO,
+// where the reasoning is actually useful. The same goes for the GitHub release
+// notes, which had grown two paragraphs around a one-line fix; they are a list
+// now too, and a one-line fix does not get a section heading of its own.
+//
+// The exception is narrow: keep the explanation only where WITHOUT it nobody
+// can tell what was fixed - a window that had been contradicting itself, or a
+// dialog title that said something had already happened when it had not.
+//
 // One rule when releasing: add an entry here in the same pass that bumps the
 // csproj. If this list falls behind, the card notices - the section only shows
 // its lines when the newest entry matches the version GitHub reports as latest
