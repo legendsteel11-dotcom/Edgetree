@@ -55,6 +55,15 @@ leaves them where they are.
 - **Large folders stay fast.** Each folder shows its first 25 items with a
   "Show N more" row for the rest, so the tree never renders thousands of
   rows at once. The cap is adjustable (1–50).
+- **File type filter**: a row of chips along the bottom — code, images,
+  documents, media, archives, executables — picks what the tree shows and
+  drops the rest. Type extensions of your own under Custom, or ones to always
+  hide under Exclude. Search still finds what the filter is hiding.
+- **Path bar**: type a path to go straight there. `Ctrl+←` / `Ctrl+→` step
+  back and forward through the folders you have been in, and the bar lists
+  them.
+- **Network locations**: add a share with no drive letter (`\\server\share`)
+  from the right-click menu on empty tree space, and it stays in the tree.
 - **Multi-select** with `Ctrl+click` and `Shift+click`, then copy, delete,
   or drag the whole selection out in one go.
 - **Auto-Collapse Folders** (optional): expanding a folder closes the others, so
@@ -84,6 +93,28 @@ leaves them where they are.
 - **Drag files out** into Explorer or any other app — a standard Windows
   file drag.
 
+### The multimedia panel
+
+- **Pictures, music and video in the app.** The picture icon in the title bar
+  opens a panel beside the tree — on either side, your choice. Turn on
+  **Open on double-click** and files from the tree open here instead of in
+  your usual program; there is also an option to open the panel as soon as
+  you select a file.
+- **Pictures**: wheel to zoom, `Ctrl`/`Shift`+wheel for finer steps, drag to
+  move around with a navigator in the corner. Double-click switches Fit ↔ 1:1,
+  and Fill crops the picture to the panel. PSD, RAW and JXL read alongside the
+  usual formats. The thumbnail bar takes a size of its own, and a picture
+  drags straight out into another app.
+- **Slideshow**: right-click a picture, or `F8`.
+- **Wallpaper**: set a picture as the desktop background, separately on each
+  monitor.
+- **Music keeps playing** while you work — close the panel and the sound
+  stays on. Album art, and a clock over the panel with `F9`.
+- **Video** with HDR correction and subtitles.
+- **Full screen**: wheel-click or `Enter`, `Esc` to leave. It grows the
+  window to the screen, or fills the window you already have — pick which
+  from the right-click menu.
+
 ### Bookmarks and search
 
 - **Bookmark panel**: keep the folders and files you go back to, and reach any
@@ -109,6 +140,11 @@ leaves them where they are.
 - **Sharp at any display scale** (125%, 150%, 200%…): rendered at the
   actual scale instead of being stretched.
 - **Korean and English UI.**
+- **Presets**: keep the whole shape of the app — window mode, position, size,
+  docking, colors, file types and the current folder — as up to five presets.
+  `Ctrl+1`–`Ctrl+5` switches between them and `Ctrl+Shift+S` overwrites the
+  one you are in; they also sit on the title bar's right-click menu and the
+  tree's empty-space menu.
 - **Settings export/import** as a JSON file, bookmarks included.
 - The rest lives in the options ("...") menu: start with Windows, always on
   top, minimize to tray, update notification, and more. An update dot on the
