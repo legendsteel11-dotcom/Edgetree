@@ -353,13 +353,6 @@ public static class HelpContent
                 {
                     R("제목 표시줄 이미지 아이콘", "멀티미디어 패널 열기 · 닫기",
                       "The picture icon in the title bar", "Open · close the multimedia panel"),
-                    // Beside the icon rather than down with the viewer's other
-                    // keys: it is a way OUT of the panel, and this group is
-                    // where the ways in and out are read together. The
-                    // condition is in the row because the key does nothing
-                    // with the panel closed.
-                    R("Backspace", "패널이 펼쳐져 있을 때 패널 접기",
-                      "Backspace", "Folds the panel away, while it is open"),
                     R("옵션 → 멀티미디어 패널 → 더블클릭으로 열기",
                       "트리에서 더블클릭한 파일을 기본 프로그램 대신 패널에서 엶",
                       "Options → Multimedia panel → Open on double-click",
@@ -447,6 +440,16 @@ public static class HelpContent
                     R("Wheel Click · Enter", "전체 화면 (우클릭 메뉴에서 방식 선택)",
                       "Wheel Click · Enter", "Full screen (pick which kind in the right-click menu)"),
                     R("Esc", "전체 화면 종료", "Esc", "Leave full screen"),
+                    // WITH THE KEYS, not up in the group that lists the ways
+                    // into the panel. It was there first, on the argument that
+                    // it is a way out and belongs beside the title bar's icon -
+                    // and the author went looking for it among the keys and did
+                    // not find it (2026-08-19). Where someone looks beats where
+                    // it classifies. Under Esc because the two are read
+                    // together: one leaves the full screen, the other folds the
+                    // panel away.
+                    R("Backspace", "패널 접기 (패널이 펼쳐져 있을 때)",
+                      "Backspace", "Fold the panel away, while it is open"),
                     R("↑ ↓", "이전 · 다음 항목", "↑ ↓", "Previous · next item"),
                     R("← →", "썸네일 바 켜져 있을 때 이전 · 다음",
                       "← →", "Previous · next, while the thumbnail bar is open"),
