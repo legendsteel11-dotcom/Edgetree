@@ -496,10 +496,17 @@ public static class HelpContent
                       "Fills the panel and crops the overflow - the next film starts fitted again"),
                     // 바로 위 줄의 반대편. 그 줄은 창 안에서 영상을 어떻게 놓을지
                     // 정하고, 이 줄은 영상에 창을 맞춘다.
-                    R("F", "창을 영상 비율에 맞춤, 위아래 검은 띠가 없어짐 (창 모드)",
-                      "F", "Fits the window to the film's proportions - the black bands go (window mode)"),
+                    R("F · 우클릭 → 창을 영상에 맞춤", "창 높이를 영상 비율에 맞춤, 위아래 검은 띠가 없어짐 (창 모드)",
+                      "F · right-click → Fit window to video",
+                      "Sets the window's height to the film's proportions - the black bands go (window mode)"),
                     R("우클릭 → 자막", "활성화 · 크기 · 위치 · 싱크 조절",
                       "Right-click → Subtitles", "On, size, position, and sync"),
+                    // 랜딩에서 네 번 내세우는 기능인데 F1에는 한 줄도 없었다
+                    // (2026-08-19에 발견). 세 스테퍼는 따로 적지 않는다 - 이 줄이
+                    // 여는 곳을 가리키고 나머지는 그 안에서 보인다.
+                    R("우클릭 → HDR 색 보정", "밝기 · 채도 · 대비 조절, 흰빛으로 뜨는 HDR 영상 보정",
+                      "Right-click → HDR correction",
+                      "Brightness, saturation and contrast - for the HDR films that arrive washed out"),
                     // 컨트롤 패널, not 재생 막대 (2026-08-16). The strip is what
                     // a reader calls it, and the app had two names for it in
                     // its own text - this row and the music group below. The
