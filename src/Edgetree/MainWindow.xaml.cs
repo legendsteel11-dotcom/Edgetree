@@ -658,6 +658,7 @@ public partial class MainWindow : Window
         {
             _restoringViewerVolume = false;
         }
+        FileSystemService.ShowHiddenItems = _settings.ShowHiddenItems;
         FileSystemService.SortField = ReadSortField(_settings.SortField, _settings.SortByDate);
         FileSystemService.SortDescending = _settings.SortDescending;
         FileSystemItem.DisplayCap = _settings.ShowAllItemsPerFolder
@@ -8297,6 +8298,15 @@ public partial class MainWindow : Window
             }
         }
 
+        // ITS OWN LOOKUP, deliberately outside the chain below. That chain is
+        // all-or-nothing by design, and every id added to it is one more way for
+        // the whole of it to stop matching at once.
+        if (sender is ContextMenu own &&
+            FindMenuItem(own, "showHiddenItems") is { } showHiddenItems)
+        {
+            showHiddenItems.IsChecked = _settings.ShowHiddenItems;
+        }
+
         if (sender is ContextMenu menu &&
             FindMenuItem(menu, "collapseAllExpanded") is { } collapseAllExpanded &&
             FindMenuItem(menu, "generalSettings") is { } generalSettings &&
@@ -10303,6 +10313,28 @@ public partial class MainWindow : Window
             }
 
             _settingsService.Save(_settings);
+        }
+    }
+
+    // A STANDALONE LOOKUP, not another link in the options menu's chain: that
+    // chain is all-or-nothing, and one id that stops matching takes every
+    // setting in it down silently. This row can only ever fail for itself.
+    private void ShowHiddenItemsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.ShowHiddenItems = menuItem.IsChecked;
+            FileSystemService.ShowHiddenItems = menuItem.IsChecked;
+            _settingsService.Save(_settings);
+            // Every loaded folder, because the answer changes at every level
+            // that is already open rather than only where the hand is.
+            //
+            // pinSelectionToTop: false. This is a display switch, not a move -
+            // nobody asked to go anywhere, so the view stays where the hand
+            // left it. The pin walk is also the machinery behind every 'the
+            // jump landed wrong' report this app has had, and there is no
+            // reason to run it for a toggle.
+            RefreshAllLoadedFolders(pinSelectionToTop: false);
         }
     }
 

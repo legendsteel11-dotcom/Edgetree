@@ -57,6 +57,14 @@ public class AppSettings
     // 파일의 음량 차이가 4.2dB 였다).
     public double ViewerVolume { get; set; } = 0.6;
 
+    // 숨김·시스템 속성이 붙은 폴더와 파일을 트리에 표시할지. 기본은 끔이고, 그것이
+    // 탐색기의 기본과 같다.
+    //
+    // 이 설정이 생긴 이유는 클라우드·가상 드라이브다(이슈 #1, 2026-08-19):
+    // 그런 드라이브는 자기 최상위 폴더에 시스템 속성을 붙이는 경우가 있어서,
+    // 드라이브는 보이는데 안이 빈 것처럼 나온다.
+    public bool ShowHiddenItems { get; set; }
+
     // The largest a filmstrip thumbnail may be fetched and kept, in pixels. The
     // strip asks for what the current cell needs; this caps that, so a taller
     // strip is drawn from the same picture rather than a bigger one.

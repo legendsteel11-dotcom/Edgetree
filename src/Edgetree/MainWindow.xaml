@@ -2038,6 +2038,15 @@
             <!-- Same shape as the bookmark list above and built the same way -
                  the row context menu carries one too, but this is where someone
                  looks who no longer has the folder's row to right-click. -->
+            <!-- Beside 숨긴 폴더 because the two answer one question between
+                 them: why a folder is not in the tree. That one is the folders
+                 hidden BY HAND; this is the ones Windows marks. Someone looking
+                 for either will look here (added 2026-08-19 for issue #1, a
+                 cloud drive whose own top-level folders carry System). -->
+            <MenuItem Header="{x:Static services:Strings.MenuShowHiddenItems}"
+                    IsCheckable="True"
+                    AutomationProperties.AutomationId="showHiddenItems"
+                    Click="ShowHiddenItemsMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuHiddenFolderList}"
                     AutomationProperties.AutomationId="hiddenFolderList"
                     SubmenuOpened="HiddenFolderSubmenu_Opened">

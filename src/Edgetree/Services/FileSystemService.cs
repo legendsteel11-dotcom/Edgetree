@@ -340,11 +340,38 @@ public static class FileSystemService
     // Hidden/System items are skipped so the tree matches Windows Explorer's
     // default (and the file search, which already skips them). RecurseSub-
     // directories stays false - LoadChildren only ever loads one level.
-    private static readonly EnumerationOptions VisibleEntryOptions = new()
+    //
+    // THE SKIP IS A SETTING SINCE 2026-08-19 (issue #1). A cloud or virtual
+    // drive can mark its own top-level folders System, and this line then hid
+    // the whole of it: the drive appeared and had nothing in it. Explorer's
+    // default is still the default here; the option is the way out for the
+    // people whose drive needs it.
+    //
+    // Two prebuilt objects rather than one built per call - this runs twice for
+    // every folder the tree opens.
+    private static readonly EnumerationOptions SkipHiddenEntryOptions = new()
     {
         AttributesToSkip = FileAttributes.Hidden | FileAttributes.System,
         IgnoreInaccessible = true
     };
+
+    private static readonly EnumerationOptions AllEntryOptions = new()
+    {
+        AttributesToSkip = 0,
+        IgnoreInaccessible = true
+    };
+
+    // Pushed in from the settings once at startup and on every toggle, the same
+    // way SortField is - this class is static and has no settings of its own.
+    //
+    // THE SEARCH IS DELIBERATELY NOT WIRED TO THIS. Its own enumeration drops
+    // Hidden/System too, and following this setting there would pull Windows'
+    // whole system tree into an index of C: - a large, slow index for a setting
+    // that exists to make one virtual drive readable.
+    public static bool ShowHiddenItems { get; set; }
+
+    private static EnumerationOptions VisibleEntryOptions
+        => ShowHiddenItems ? AllEntryOptions : SkipHiddenEntryOptions;
 
     // readFailed distinguishes "this folder is genuinely empty" from "the
     // read itself blew up" (sleeping/disconnected NAS, permissions, drive

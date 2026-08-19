@@ -221,6 +221,7 @@ public static class Strings
     public static string MenuGeneralSettings = "기본 설정";
     public static string MenuStartWithWindows = "부팅 후 자동 시작";
     public static string MenuAlwaysShowTrayIcon = "트레이 아이콘";
+    public static string MenuShowHiddenItems = "숨김·시스템 항목 표시";
     public static string MenuShowFolderIcons = "폴더 아이콘";
     public static string MenuShowFileIcons = "파일 아이콘";
     // 드라이브만 따로. 폴더 아이콘과 나란히 두되 이름이 무엇을 가리키는지가
@@ -993,6 +994,7 @@ public static class Strings
         MenuGeneralSettings = "General";
         MenuStartWithWindows = "Start with Windows";
         MenuAlwaysShowTrayIcon = "Always Show Tray Icon";
+        MenuShowHiddenItems = "Show Hidden and System Items";
         MenuShowFolderIcons = "Show Folder Icons";
         MenuShowFileIcons = "Show File Icons";
         MenuShowDriveIcons = "Show Drive Icons";
