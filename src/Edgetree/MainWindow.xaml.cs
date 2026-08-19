@@ -24205,12 +24205,26 @@ public partial class MainWindow : Window
     // The plate's left and right margins are left where the XAML put them: they
     // are the wrap guard, not a position, and moving the words up has nothing
     // to say about how wide a line may run.
+    //
+    // ONE OWNER OF THE BOTTOM MARGIN (2026-08-19, pre-release review). The
+    // full-screen transport band wrote it too - 18 going out and 18 + the lift
+    // coming in - which was correct until 자막 위치 arrived on 2026-08-18 and gave
+    // that number a user behind it. After that, showing the band once threw the
+    // tuned position away and nothing put it back: this method runs on a
+    // subtitle load, on the menu opening and on the stepper, none of which a
+    // pointer travelling to the bottom of the screen touches.
+    //
+    // The band now sets _subtitleLift and asks here instead, so the stored
+    // number is added to rather than replaced.
+    private double _subtitleLift;
+
     private void ApplySubtitleBottom()
     {
         double bottom = Math.Clamp(
             _settings.ViewerSubtitleBottom, MinSubtitleBottom, MaxSubtitleBottom);
         var margin = ViewerSubtitlePlate.Margin;
-        ViewerSubtitlePlate.Margin = new Thickness(margin.Left, margin.Top, margin.Right, bottom);
+        ViewerSubtitlePlate.Margin = new Thickness(
+            margin.Left, margin.Top, margin.Right, bottom + _subtitleLift);
         if (ViewerSubtitleBottomText is not null)
         {
             // A SIGNED OFFSET FROM WHERE IT SAT BEFORE, negative upwards
@@ -29634,8 +29648,10 @@ public partial class MainWindow : Window
         UpdateViewerNowPlaying();
 
         // The subtitle line lives at the bottom too, so it steps up out of the
-        // way rather than being covered by what just arrived.
-        ViewerSubtitlePlate.Margin = new Thickness(16, 0, 16, 18 + FullScreenSubtitleLift);
+        // way rather than being covered by what just arrived. 사용자가 맞춰 둔
+        // 자막 위치에 얹는 것이지 대신 쓰는 것이 아니다 - ApplySubtitleBottom 참고.
+        _subtitleLift = FullScreenSubtitleLift;
+        ApplySubtitleBottom();
 
         // 원반의 조건 중 하나가 방금 바뀌었다 - ViewerPointerOverPicture 참고.
         UpdateViewerPlayOverlay();
@@ -29682,7 +29698,10 @@ public partial class MainWindow : Window
         // Put back for the panel, where the caption builder owns them again.
         ViewerFileName.Visibility = Visibility.Visible;
         ViewerFileInfo.Visibility = Visibility.Visible;
-        ViewerSubtitlePlate.Margin = new Thickness(16, 0, 16, 18);
+        // 그 자리를 내려놓는다. 숫자를 직접 쓰지 않고 ApplySubtitleBottom에 맡기는
+        // 것은 사용자가 맞춰 둔 자막 위치가 여기 있기 때문이다.
+        _subtitleLift = 0;
+        ApplySubtitleBottom();
 
         // The caption is back to naming the track, so the line below stops.
         UpdateViewerNowPlaying();
