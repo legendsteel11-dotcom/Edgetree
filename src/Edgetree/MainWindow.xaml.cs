@@ -12790,6 +12790,21 @@ public partial class MainWindow : Window
         appResources["DialogTitleTextSize"] =
             Math.Max(DefaultTreeFontSize, ExplorerTree.FontSize);
         appResources["DialogTitleFontSize"] = ExplorerTree.FontSize + 2.0;
+        // 도움말은 바닥을 따로 갖는다 (2026-08-19, 요청: "최소 폰트를 좀 살짝").
+        // 위의 DialogTitleTextSize가 이미 같은 일을 하고 있었다 - 창 제목은 12
+        // 아래로 안 내려간다 - 그런데 본문에는 그 바닥이 없어서, 트리 글꼴을 11로
+        // 두면 제목이 12인 창 안에서 본문만 11로 나왔다.
+        //
+        // 여기 규칙을 그대로 따른다: **문서와 함께 커지고, 읽히지 않는 지점에서
+        // 멈춘다.** 백 줄이 넘는 참고 문서라 훑는 것이 아니라 읽는 자리이고,
+        // 트리처럼 작게 두는 이유가 없다.
+        //
+        // 도움말만 쓰는 키다. 다른 대화상자(색상 설정, 앱 정보)의 본문은
+        // DialogFontSize를 그대로 쓴다 - 거기에 바닥을 걸면 본문만 올라가고 그
+        // 창들의 소제목은 안 올라가서 크기가 뒤집힌다.
+        appResources["HelpFontSize"] = Math.Max(DefaultTreeFontSize, ExplorerTree.FontSize);
+        appResources["HelpTitleFontSize"] =
+            Math.Max(DefaultTreeFontSize, ExplorerTree.FontSize) + 2.0;
         appResources["DialogTitleIconSize"] = Math.Round(24.0 * scale);
         // The stepper buttons carry a "+"/"−" that follows the menu font, so
         // their box has to follow it too. Left at a fixed 20px they stopped

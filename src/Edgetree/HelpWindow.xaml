@@ -11,7 +11,7 @@
         WindowStyle="None"
         AllowsTransparency="False"
         ShowInTaskbar="False"
-        FontSize="{DynamicResource DialogFontSize}"
+        FontSize="{DynamicResource HelpFontSize}"
         Background="{DynamicResource DialogBackground}">
     <!-- WindowStyle="None" plus CanResize makes Windows draw its own frame
          again, and on Windows 11 that frame is a bright accent line across the

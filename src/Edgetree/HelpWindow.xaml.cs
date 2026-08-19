@@ -204,7 +204,7 @@ public partial class HelpWindow : Window
         // The only size in the document that is not the inherited one, so it is
         // the only one that has to ask for itself. A reference, not a read:
         // Ctrl+/− has to reach a window that is already open.
-        text.SetResourceReference(TextBlock.FontSizeProperty, "DialogTitleFontSize");
+        text.SetResourceReference(TextBlock.FontSizeProperty, "HelpTitleFontSize");
         row.Children.Add(text);
 
         return row;
