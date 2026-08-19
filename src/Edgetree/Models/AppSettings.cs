@@ -961,6 +961,13 @@ public class AppSettings
         ViewerWidth = Sane(ViewerWidth, 360, min: 1);
         ViewerFilmstripCellHeight = Sane(ViewerFilmstripCellHeight, 64, min: 1);
         ViewerVolume = Sane(ViewerVolume, 0.6, min: 0, max: 1);
+        // 볼륨 옆에 이 둘이 없던 것이 2026-08-19 점검에서 걸렸다. 범위는
+        // 쓰는 자리가 정하므로(상수가 MainWindow에 있고 거기서 Math.Clamp를
+        // 건다) 여기서 막는 것은 **그 Clamp가 통과시키는 것 하나, NaN**이다.
+        // NaN이 들어가면 터지지 않고 조용히 멈춘다 - 값이 달라졌는지 보는 비교가
+        // 거짓이 되어 크기도 위치도 영영 안 써진다.
+        ViewerSubtitleFontSize = Sane(ViewerSubtitleFontSize, 16, min: 1);
+        ViewerSubtitleBottom = Sane(ViewerSubtitleBottom, 18, min: 0);
         AutoHideSliverWidth = Sane(AutoHideSliverWidth, 3, min: 1);
         AutoHideHandleWidth = Sane(AutoHideHandleWidth, 8, min: 1);
         SlideshowSeconds = (int)Sane(SlideshowSeconds, 5, min: 3);

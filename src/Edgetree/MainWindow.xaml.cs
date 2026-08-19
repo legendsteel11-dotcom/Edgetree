@@ -649,7 +649,15 @@ public partial class MainWindow : Window
         // 값을 요소가 아니라 슬라이더에 쓴다 - ValueChanged 가 음소거 해제와
         // MediaElement 반영을 이미 하고 있고, 요소에 직접 쓰면 컨트롤이 다른
         // 말을 하게 된다 (↑↓ 키가 슬라이더를 거쳐 가는 것과 같은 이유다).
-        ViewerMediaVolume.Value = _settings.ViewerVolume;
+        _restoringViewerVolume = true;
+        try
+        {
+            ViewerMediaVolume.Value = _settings.ViewerVolume;
+        }
+        finally
+        {
+            _restoringViewerVolume = false;
+        }
         FileSystemService.SortField = ReadSortField(_settings.SortField, _settings.SortByDate);
         FileSystemService.SortDescending = _settings.SortDescending;
         FileSystemItem.DisplayCap = _settings.ShowAllItemsPerFolder
@@ -25045,12 +25053,24 @@ public partial class MainWindow : Window
         // 지나가는 자리라 한 번의 조작에 수십 번 불린다. 값은 그때마다 들고
         // 있어도 되지만 디스크는 그러면 안 된다 - 휠 한 칸마다 설정을 쓰던 것이
         // 2026-08-17 사전 점검에서 걸린 적이 있다.
-        _settings.ViewerVolume = e.NewValue;
-        ScheduleViewerVolumeSave();
+        // 복원이 자기 자신을 저장하지 않게 한다. 이 대입은 시작할 때 한 번
+        // 일어나고 값도 방금 읽어 온 그것이라, 걸어 두면 실행할 때마다 아무것도
+        // 안 바뀐 설정을 한 번씩 쓰게 된다.
+        //
+        // 플래그가 걸릴 자리가 없다: 대입 한 줄을 try/finally로 감싸고 있어서
+        // 그 줄이 끝나면 반드시 내려간다. 같은 이유로 이 앱의 다른 자기-선택
+        // 가드들(_filmstripSelfSelect)도 이 모양이다.
+        if (!_restoringViewerVolume)
+        {
+            _settings.ViewerVolume = e.NewValue;
+            ScheduleViewerVolumeSave();
+        }
     }
 
     // 손이 멈춘 뒤 한 번. 조작 중에는 계속 미뤄지고, 마지막 움직임에서 1초 뒤에
     // 한 번만 쓴다.
+    private bool _restoringViewerVolume;
+
     private System.Windows.Threading.DispatcherTimer? _viewerVolumeSaveTimer;
 
     private void ScheduleViewerVolumeSave()
