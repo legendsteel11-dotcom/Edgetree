@@ -2333,6 +2333,12 @@ public partial class MainWindow : Window
         {
             RootContent.Margin = new Thickness(0);
             ApplyWindowClipRegion();
+
+            // 이 줄만은 함께 나간다 (2026-08-19, 릴리즈 전 검토). 아래의 것들은
+            // 띠를 다시 세우는 일이라 이 상태에서 할 것이 없지만, 메뉴 높이 상한은
+            // 작업 영역의 분수라서 모니터가 바뀌면 이 상태에서도 낡는다. 이 함수가
+            // 그 변화를 전부 받는다는 것이 그 줄이 여기 있는 이유였다.
+            ApplyMenuMaxHeight();
             return;
         }
 
@@ -28626,7 +28632,15 @@ public partial class MainWindow : Window
         _settingsService.Save(_settings);
 
         // 모드 밖에서는 정해 두기만 한다 - 다음에 들어갈 때 이 값이 쓰인다.
-        if (_isDocked || !_viewerFullscreen)
+        //
+        // 도킹은 더 이상 여기서 빠지지 않는다 (2026-08-19, 릴리즈 전 검토). 이 줄은
+        // 2026-08-18에 도킹 상태에도 나오게 됐는데 손잡이는 그대로여서, 도킹 + 앱
+        // 전체화면에서 켜면 설정만 저장되고 화면은 그대로였다. "모드 중에도 즉시
+        // 적용된다"는 이 줄의 약속과 어긋나는 것이 첫 번째이고, 더 나쁜 것은 그
+        // 사이에 IsDockedFullscreen이 참이 되어 다음 PositionToWorkArea가 띠의
+        // 마진과 클립을 지우고 돌아간다는 것이다 - 최대화되지도 않은 채 띠만 펴져서,
+        // 맞춰 둔 높이가 없어진다. 반대로 끄면 최대화된 창에 띠 마진이 얹힌다.
+        if (!_viewerFullscreen)
         {
             return;
         }
@@ -28638,6 +28652,15 @@ public partial class MainWindow : Window
             if (WindowState != WindowState.Maximized)
             {
                 _viewerFullscreenPreviousState = WindowState;
+                // SetViewerFullscreen이 같은 자리에서 하는 것과 같은 순서다. 띠의
+                // 마진과 클립이 먼저 없어져야 한다 - 그것을 둔 채 최대화하면 창은
+                // 화면만큼 커지고 화면에는 여전히 띠 한 줄만 보인다.
+                if (_isDocked)
+                {
+                    RootContent.Margin = new Thickness(0);
+                    ApplyWindowClipRegion();
+                }
+
                 WindowState = WindowState.Maximized;
             }
 
@@ -28652,6 +28675,14 @@ public partial class MainWindow : Window
         {
             _viewerFullscreenPreviousState = null;
             WindowState = previous;
+
+            // 도킹이면 띠를 다시 세운다. IsDockedFullscreen은 방금 거짓이 되었으므로
+            // PositionToWorkArea의 조기 반환은 이미 물러났고, 마진·클립·네 값이
+            // 한 번에 돌아온다. SetViewerFullscreen이 모드를 나갈 때와 같다.
+            if (_isDocked)
+            {
+                PositionToWorkArea();
+            }
         }
     }
 
