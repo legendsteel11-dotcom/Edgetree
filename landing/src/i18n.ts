@@ -24,18 +24,29 @@ const dict = {
     hero: {
       eyebrow: 'Windows 폴더/파일 탐색기 유틸',
       title: 'Edgetree',
-      tagline: '화면 가장자리에 항상 붙어있는, VS Code 스타일의 가벼운 탐색기',
-      // Was "폴더 구조를 빠르게 훑어보고 파일 위치로 바로 이동하기 위한 보조
-      // 도구입니다" - true, and true of a dozen other things. What actually
-      // makes it a different app is that the tree gets cut down to the work in
-      // hand (author, 2026-08-06), so the one line under the tagline says that
-      // instead. Imperative first, payoff second: the instruction alone would
-      // be onboarding copy in a slot where nobody has decided anything yet.
+      // TWO HALVES, and the comma is the join: where the app sits, and what
+      // opens out of it. The multimedia panel had never been named in the hero
+      // at all, which left the half no other explorer has to be found by
+      // scrolling (author, 2026-08-19).
+      //
+      // "가벼운" came out in the same pass. It was meant as footprint and read
+      // as "an explorer with less in it" - the one word on the page arguing
+      // against the panel, HDR, subtitles, search and presets sitting below
+      // it. The download section already carries the sizes, which is where a
+      // number belongs. A superlative was raised here and refused: the
+      // communities this page actually gets its visitors from discount them on
+      // sight, and the measured lift on the author's previous app came from
+      // removing self-criticism, never from adding boasts.
+      tagline: '화면 가장자리의 폴더 탐색기, 바로 펼쳐서 감상하는 이미지·음악·영상',
+      // Line one is the tree, line two is what the app takes the place of.
+      // 엣지트리 is the ONLY place on the page the name is written in Hangul,
+      // and it is deliberate: Korean search has no other handle on it. The
+      // English page drops the name in the same slot - see the note there.
       description:
         // Broken at the sentence, not left to wrap: at the hero's width the
         // second sentence ran onto a third line and split 수월합니 / 다
         // (2026-08-06). .description is white-space: pre-line for this.
-        '안 쓰는 폴더는 감추고, 자주 사용하는 파일 형식만 선택하세요.\n필요한 파일만 보여주어 작업이 한층 수월합니다.',
+        '원하는 폴더와 파일을 선택하여 PC 전체와 네트워크까지 빠르게 탐색하세요.\n엣지트리 하나로 파일 관리와 멀티미디어 재생까지 처리하여 데스크톱 공간을 절약합니다.',
       // Korean page only - the English one leaves this empty and the badge is
       // not rendered at all.
       //
@@ -217,9 +228,17 @@ const dict = {
     hero: {
       eyebrow: 'Windows Folder & File Explorer Utility',
       title: 'Edgetree',
-      tagline: 'A lightweight explorer that lives at your screen edge, VS Code style',
+      tagline: 'A folder tree at your screen edge. Pictures, music and video open right there.',
+      // The Korean line names the app once (엣지트리) so Korean search has
+      // something to hold; this one does not. The H1 two lines above already
+      // says Edgetree in the same alphabet, so repeating it reads as a stutter
+      // rather than as a name being introduced.
+      //
+      // "managing files and playing media" rather than "file management": in
+      // English that noun phrase is the name of a product category, and it
+      // promises dual panes and batch operations this app has never had.
       description:
-        'Hide the folders you never touch, and keep just the file kinds you work with.\nWith only what you need on screen, the work goes easier.',
+        'Pick the folders and files you want, and move quickly across your PC and your network.\nOne app for managing files and playing media, so your desktop has room to work.',
       // Empty on purpose - see the Korean side. An English reader looking at
       // English screenshots has nothing to be corrected about.
       langBadge: '',
