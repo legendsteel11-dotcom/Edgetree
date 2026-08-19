@@ -4855,6 +4855,10 @@ public partial class MainWindow : Window
     private void FullscreenUndockStrip_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
         => SetMoveHint(false);
 
+    // 도킹된 띠의 위쪽 크기 조절 손잡이가 쓰는 두께(TopResizeThumb의 Height와
+    // 같은 6). 위쪽 이동 띠가 그만큼 비켜서지 않으면 그 손잡이를 삼킨다.
+    private const double DockedTopResizeBand = 6;
+
     // 이 띠가 사는 자리는 하나뿐이다 - 도킹, 패널 열림, 앱 전체화면. 셋 중 하나가
     // 바뀌는 곳(SetViewerFullscreen · Dock · Undock)에서 부른다.
     private void UpdateDockedMoveStrip()
@@ -4862,7 +4866,9 @@ public partial class MainWindow : Window
         bool want = _isDocked && _viewerOpen && _viewerFullscreen;
         if (want)
         {
-            ViewerDockedMoveStrip.Height = HeaderHeight;
+            // 표시가 덮는 자리와 같은 끝에서 끝난다: 위로 6px 비켜서 있으므로
+            // 높이도 그만큼 줄어든다(XAML의 Margin 참고).
+            ViewerDockedMoveStrip.Height = Math.Max(0, HeaderHeight - DockedTopResizeBand);
         }
         else if (ViewerDockedMoveStrip.IsMouseCaptured)
         {

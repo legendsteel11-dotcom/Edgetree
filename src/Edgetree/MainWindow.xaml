@@ -8975,10 +8975,17 @@
              그쪽은 Windows가 드래그를 받아야 해서 비켜서야 하고 이쪽은 우리가
              받아야 하기 때문이다. 그 표시 바로 다음에 서서 입력을 먼저 받고,
              투명하므로 표시는 그대로 비친다.
-             높이는 보일 때 코드에서 헤더 높이로 맞춘다(글꼴을 따라간다). -->
+             높이는 보일 때 코드에서 헤더 높이로 맞춘다(글꼴을 따라간다).
+             맨 위 6px은 비켜 준다. 그 자리는 도킹된 띠의 위쪽 크기 조절
+             손잡이(TopResizeThumb)이고, 이 띠가 그 위에 서면서 삼켰다
+             (2026-08-19, 신고). 진짜 창의 제목 표시줄도 맨 위 몇 픽셀은
+             크기 조절 테두리이므로, 비켜 주는 것이 원래 모양이기도 하다.
+             표시(ViewerMoveHint)는 그대로 맨 위에서 시작한다 - 표시가 말하는
+             것은 "여기는 그림이 아니다"이고, 그 6px도 그림은 아니다. -->
         <Border x:Name="ViewerDockedMoveStrip"
                 VerticalAlignment="Top"
                 Height="36"
+                Margin="0,6,0,0"
                 Background="Transparent"
                 Visibility="Collapsed"
                 MouseLeftButtonDown="FullscreenUndockStrip_MouseLeftButtonDown"
