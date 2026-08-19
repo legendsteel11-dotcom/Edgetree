@@ -380,12 +380,15 @@ public static class HelpContent
                     R("전체 화면에서 우클릭", "파일 항목 대신 그림 크기 · 내비게이터 · 썸네일 바와 제목 표시줄 메뉴 (프리셋 · 도움말 · 다시 시작 · 종료)",
                       "Right-click in full screen",
                       "Picture size, navigator and thumbnail bar instead of the file items, plus the title bar's menu - presets, help, restart, quit"),
-                    // 2026-08-17: 창 모드에서만 나오는 줄이라 조건을 앞에 적었다 -
-                    // 부착 상태에서 찾다가 없다고 읽으면 그게 더 나쁘다.
-                    R("창 모드 · 전체 화면에서 우클릭 → 바탕화면 채우기",
-                      "비활성화하면 창 크기 그대로 그림만 꽉 채움 (기본은 창을 화면 전체로)",
-                      "Window mode · right-click in full screen → Fill the desktop",
-                      "Off keeps the window's own size and fills that instead; on (the default) grows the window to the screen"),
+                    // 2026-08-17에는 창 모드에서만 나오는 줄이라 조건을 앞에 적었다 -
+                    // 부착 상태에서 찾다가 없다고 읽으면 그게 더 나쁘다는 이유였다.
+                    // 그 조건이 2026-08-18에 없어졌고(도킹 상태에도 나온다), 이 줄은
+                    // 2026-08-19에야 따라왔다. 기능이 넓어질 때 그것을 설명하던 글을
+                    // 같이 찾는 것이 이번 판에서 세 번 걸린 일이다.
+                    R("전체 화면에서 우클릭 → 바탕화면 채우기",
+                      "비활성화하면 창 크기를 그대로 두고 그림만 꽉 채움 (기본은 화면 전체로)",
+                      "Right-click in full screen → Fill the desktop",
+                      "Off keeps the window's own size and fills that instead; on (the default) grows it to the whole screen"),
                     // 이미 되는 것을 적던 줄. 헤더가 사라져도 그 자리는 제목
                     // 표시줄이라 창이 끌리는데, 화면에 아무 표시가 없어서 아는
                     // 방법이 없었음 (2026-08-17, 창 크기를 유지하는 전체화면이
@@ -495,7 +498,8 @@ public static class HelpContent
                     // 정하고, 이 줄은 영상에 창을 맞춘다.
                     R("F", "창을 영상 비율에 맞춤, 위아래 검은 띠가 없어짐 (창 모드)",
                       "F", "Fits the window to the film's proportions - the black bands go (window mode)"),
-                    R("우클릭 → 자막", "활성화 · 크기 · 싱크 조절", "Right-click → Subtitles", "On, size, and sync"),
+                    R("우클릭 → 자막", "활성화 · 크기 · 위치 · 싱크 조절",
+                      "Right-click → Subtitles", "On, size, position, and sync"),
                     // 컨트롤 패널, not 재생 막대 (2026-08-16). The strip is what
                     // a reader calls it, and the app had two names for it in
                     // its own text - this row and the music group below. The
@@ -576,6 +580,14 @@ public static class HelpContent
                 {
                     R("장수 표시 옆 ▤ 버튼", "아래에 해당 폴더 이미지 목록 표시, 검색 중이면 검색 결과",
                       "The ▤ button beside the counter", "The folder's images as a row - or the results, while searching"),
+                    // 없어지는 것을 적는 줄, 그리고 이 파일에서 그 종류는 이것뿐이다
+                    // (2026-08-19). 바가 사라지는 것을 설명하지 않으면 고장으로
+                    // 읽힌다 - 켜 놓은 설정은 그대로인데 화면에서만 안 보이므로 더
+                    // 그렇다. 바로 다음 줄이 아니라 여는 방법 다음에 두는 것은,
+                    // 안 보인다고 찾아온 사람이 위에서 두 번째 줄까지는 읽기 때문이다.
+                    R("영상을 전체화면으로 볼 때", "썸네일 바는 자리를 내주고, 전체화면을 나가면 돌아옴. 우클릭 → 썸네일 바로 그 자리에서 다시 부를 수 있음",
+                      "While a film is full screen",
+                      "The bar steps aside and comes back on the way out; right-click → Thumbnail bar calls it in for that stretch"),
                     R("칸을 밖으로 드래그", "다른 앱으로 드롭", "Drag a cell out", "Drop it into another app"),
                     R("바 위쪽 가장자리 드래그", "칸 크기 조절", "Drag the bar's top edge", "Cell size"),
                     R("옵션 → 멀티미디어 패널", "이미지 썸네일 캐싱 · 캐싱 파일 정리",
