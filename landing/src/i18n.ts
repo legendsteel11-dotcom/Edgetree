@@ -168,7 +168,7 @@ const dict = {
       // 아무것도 말해 주지 않는 낱말이기도 했다 - 런타임이 필요한 1MB짜리가 '일반'이고
       // 155MB짜리가 '독립 실행형'이라 오히려 뒤집혀 읽혔다.
       setupTitle: '설치 버전',
-      setupDesc: '다운로드 후 클릭 몇 번. 시작 메뉴에 등록되고, 제거도 깔끔합니다.',
+      setupDesc: '다운로드 후 클릭 몇 번, 시작 메뉴에 등록됩니다.',
       setupSize: '49 MB',
       portableTitle: '무설치',
       // TabStick은 '압축을 풀고 바로 실행합니다'인데 이쪽은 zip이 아니라 exe 하나다.
@@ -330,7 +330,7 @@ const dict = {
     download: {
       title: 'Download',
       setupTitle: 'Installer',
-      setupDesc: 'Download, click through, done — it lands in your Start menu and uninstalls cleanly.',
+      setupDesc: 'Download, click through, done — it lands in your Start menu.',
       setupSize: '49 MB',
       portableTitle: 'Portable',
       portableDesc: 'One file. Run it, nothing to install.',
