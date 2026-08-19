@@ -1,10 +1,57 @@
 <!doctype html>
-<html lang="en">
+<!-- lang is ko because that is what the page renders by default (i18n.ts opens
+     on 'ko'); it said en while showing Korean. The toggle does not rewrite it -
+     a language switch is a visitor's choice, and the document's declared
+     language is what a crawler reads before any of that runs. -->
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Edgetree</title>
+
+    <!-- EVERYTHING BELOW IS THE ONLY TEXT THAT EXISTS BEFORE JAVASCRIPT RUNS,
+         and that is the whole reason it is here (2026-08-19). Google does
+         render this SPA - the hero copy is what it shows as the snippet for
+         "edgetree" - but two things it cannot do without these tags:
+           - a link pasted into a community board had no card at all. Title,
+             description and image are what fills it, and those boards are
+             where most of this site's visitors come from.
+           - with no description tag, Google picks the snippet itself out of
+             the body. It picked well; it is not obliged to.
+         Naver's crawler is the other reason: it is not known to run the page's
+         JavaScript, so for Korean search this head may be all there is.
+
+         Keep these in step with the hero in src/i18n.ts. They are deliberately
+         the SAME sentences - two answers to "what is this" is one too many. -->
+    <title>Edgetree 엣지트리 | 화면 가장자리의 Windows 폴더 탐색기</title>
+    <meta
+      name="description"
+      content="엣지트리(Edgetree)는 화면 가장자리의 Windows 폴더 탐색기입니다. 원하는 폴더와 파일을 선택하여 PC 전체와 네트워크까지 빠르게 탐색하고, 이미지·음악·영상을 바로 재생합니다."
+    />
+
+    <!-- og:site_name because search results were labelling the publisher
+         "Vercel" off the vercel.app domain. This does not settle it on its own
+         - a domain of its own is what would - but it is the one lever there is
+         without one. -->
+    <meta property="og:site_name" content="Edgetree" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:url" content="https://edgetree.vercel.app/" />
+    <meta property="og:title" content="Edgetree 엣지트리 | 화면 가장자리의 Windows 폴더 탐색기" />
+    <meta
+      property="og:description"
+      content="원하는 폴더와 파일을 선택하여 PC 전체와 네트워크까지 빠르게 탐색하세요. 엣지트리 하나로 파일 관리와 멀티미디어 재생까지 처리하여 데스크톱 공간을 절약합니다."
+    />
+    <!-- 1200x630, the ratio the boards and the search cards crop to. Cut from
+         screenshots/et-08.png because that shot carries BOTH halves of the
+         tagline: the tree on the left, the multimedia panel playing beside it.
+         A shot of the tree alone would illustrate the half every explorer has.
+         The dimensions are declared so a card can reserve the space before the
+         image lands. -->
+    <meta property="og:image" content="https://edgetree.vercel.app/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="app"></div>
