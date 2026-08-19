@@ -400,6 +400,9 @@ public static class Strings
     // The footer's now-playing row, which only exists while the viewer is shut
     // and 배경 재생 is holding a track.
     public static string FooterNowPlayingOpen = "멀티미디어 패널에서 열기";
+    // 같은 줄의 두 번째 일. 트리가 다른 곳으로 가면서 멈춘 영상을 가리키고,
+    // 누르면 그 자리에서 이어서 본다 - 위의 열기와 방향은 같고 말이 다르다.
+    public static string FooterHeldFilmResume = "이어서 보기";
     // 트랜스포트 위 줄의 머리표. 이름 앞에 붙어 그 이름이 "화면에 있는 파일"이
     // 아니라 "재생 중인 파일"임을 말함 - 둘이 같을 때도 붙는다. 같을 때만 빼면
     // 머리표가 있고 없고가 또 하나의 신호가 되어, 읽는 사람이 그 규칙까지
@@ -1067,6 +1070,7 @@ public static class Strings
         ViewerNavigator = "Navigator";
         ViewerClose = "Close the multimedia panel";
         FooterNowPlayingOpen = "Open in the multimedia panel";
+        FooterHeldFilmResume = "Pick up where you left off";
         ViewerNowPlayingLabel = "Now playing";
         ViewerBackToPlaying = "Back to the playing track";
         MenuSetWallpaper = "Set as desktop background";

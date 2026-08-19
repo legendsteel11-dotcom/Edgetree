@@ -471,6 +471,11 @@ public static class HelpContent
                     R("마우스 앞 · 뒤 버튼", "10초 뒤 · 앞", "Mouse back · forward buttons", "Back · forward 10 seconds"),
                     R("같은 영상 재생 시", "마지막 위치부터 이어보기",
                       "Play the same file again", "It carries on from where you left off"),
+                    // 이어보기 줄 바로 아래. 그 줄이 "다시 틀면 이어진다"이고 이
+                    // 줄이 "그 파일을 어디서 다시 찾는가"라, 둘이 한 이야기의 앞뒤다.
+                    R("보다가 다른 폴더로 이동", "트리 하단에 영상 이름 표시, 누르면 보던 위치에서 이어보기",
+                      "Move to another folder while watching",
+                      "The film's name waits at the foot of the tree - press it to carry on where you left off"),
                     R("Home", "처음부터", "Home", "Back to the start"),
                     R("P · Insert", "영상 북마크 표시 · 해제",
                       "P · Insert", "Bookmark this moment, or take it back"),

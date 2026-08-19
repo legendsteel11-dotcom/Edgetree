@@ -5607,11 +5607,14 @@
                                 </Style>
                             </Border.Style>
                         </Border>
-                        <!-- Material Symbols "music_note". The row only ever
-                             shows for audio (see ViewerBackgroundPlaying), so
-                             the mark can be literal. -->
-                        <Path Grid.Column="0"
-                                Data="M400-120q-66 0-113-47t-47-113q0-66 47-113t113-47q23 0 42.5 5.5T480-418v-422h240v160H560v400q0 66-47 113t-113 47Z"
+                        <!-- Material Symbols "music_note" at optical size 20, the
+                             file the author supplied (2026-08-19). The app had the
+                             opsz24 cut, which is a different drawing.
+                             The row's first job: a track 배경 재생 is holding. The
+                             film mark below is the second. -->
+                        <Path x:Name="FooterNowPlayingMusicMark"
+                                Grid.Column="0"
+                                Data="M306-186q-42-42-42-102t42-102q42-42 102-42 20 0 38 5.5t34 14.5v-404h216v144H552v384q0 60-42 102t-102 42q-60 0-102-42Z"
                                 Stretch="Uniform"
                                 Width="{DynamicResource ViewerChipIconSize}"
                                 Height="{DynamicResource ViewerChipIconSize}"
@@ -5624,6 +5627,43 @@
                                  still sitting on it. Opacity is the right tool
                                  here and only here in this row - see the note
                                  on the name below. -->
+                            <Path.Style>
+                                <Style TargetType="Path">
+                                    <Setter Property="Opacity" Value="0.65"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Value="True"
+                                                Binding="{Binding IsMouseOver,
+                                                    ElementName=FooterNowPlayingRow}">
+                                            <Setter Property="Opacity" Value="0.9"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Path.Style>
+                        </Path>
+                        <!-- Material Symbols "play_arrow", for the OTHER thing
+                             this row can name (2026-08-19): a film that was
+                             stopped when the tree moved away, waiting to be
+                             continued. Both marks live in the XAML and one is
+                             shown, the way the transport's own play/pause pair
+                             does - a Path assigned from code would put the
+                             artwork out of reach of the row's sizing.
+                             A play triangle rather than a film reel because the
+                             row is not reporting a state here, it is offering
+                             one press: continue watching this.
+                             The style is repeated rather than shared. It is
+                             twelve lines either way once a resource key and its
+                             lookup are counted, and a local style is read where
+                             it is used. -->
+                        <Path x:Name="FooterNowPlayingFilmMark"
+                                Grid.Column="0"
+                                Data="M336-216v-528l408 264-408 264Zm73-265Zm-1 133 204-132-204-132v264Z"
+                                Stretch="Uniform"
+                                Visibility="Collapsed"
+                                Width="{DynamicResource ViewerChipIconSize}"
+                                Height="{DynamicResource ViewerChipIconSize}"
+                                Fill="{DynamicResource ForegroundText}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,5,0">
                             <Path.Style>
                                 <Style TargetType="Path">
                                     <Setter Property="Opacity" Value="0.65"/>

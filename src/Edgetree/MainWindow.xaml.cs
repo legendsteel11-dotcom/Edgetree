@@ -20205,9 +20205,13 @@ public partial class MainWindow : Window
         // this path just never asked. The predicate is the one the selection
         // handlers already use, so all three routes agree.
         //
-        // A film always stops: there is nothing to keep without the picture.
+        // A film stops here as it always has, but it no longer vanishes without
+        // trace (2026-08-19): the file it was on goes to the footer's row, and
+        // pressing that comes back to it at the second it was left. See
+        // HoldFilmForResume.
         if (!ViewerBackgroundPlaying)
         {
+            HoldFilmForResume();
             StopViewerVideo();
         }
         ReleaseFilmstripCells();
@@ -20252,24 +20256,69 @@ public partial class MainWindow : Window
     // changes. One predicate, so the row cannot disagree with the transport.
     private void UpdateFooterNowPlaying()
     {
-        bool show = !_viewerOpen && ViewerBackgroundPlaying && _viewerVideoPath is not null;
+        // 소리가 먼저다. 한 줄이므로 둘이 동시에 설 수는 없고, 지금 돌고 있는
+        // 것과 멈춰 세워 둔 것 중에서는 도는 쪽이 급한 이야기다.
+        bool track = !_viewerOpen && ViewerBackgroundPlaying && _viewerVideoPath is not null;
+
+        // 멈춰 세워 둔 영상. 패널이 열려 있어도 보인다 - 소리 쪽과 다른 점이고,
+        // 이유는 그 줄이 대신 말해 주지 못하기 때문이다. 패널이 열려 있으면
+        // 트랜스포트는 지금 화면에 있는 파일의 것이지 이 영상의 것이 아니다.
+        // 그 영상으로 돌아오면 조건이 저절로 거짓이 된다.
+        bool film = !track
+            && _heldFilmPath is { } held
+            && !string.Equals(held, _pendingViewerPath, StringComparison.OrdinalIgnoreCase);
+
+        bool show = track || film;
         FooterNowPlayingRow.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        FooterNowPlayingMusicMark.Visibility = track ? Visibility.Visible : Visibility.Collapsed;
+        FooterNowPlayingFilmMark.Visibility = film ? Visibility.Visible : Visibility.Collapsed;
 
         if (show)
         {
-            string name = System.IO.Path.GetFileName(_viewerVideoPath!);
+            string path = (track ? _viewerVideoPath : _heldFilmPath)!;
+            string name = System.IO.Path.GetFileName(path);
             FooterNowPlayingText.Text = name;
             // The name is trimmed to the width the footer has, so the whole one
             // has to be reachable some other way.
-            FooterNowPlayingText.ToolTip = $"{name}\n{Strings.FooterNowPlayingOpen}";
+            FooterNowPlayingText.ToolTip = track
+                ? $"{name}\n{Strings.FooterNowPlayingOpen}"
+                : $"{name}\n{Strings.FooterHeldFilmResume}";
         }
     }
 
+    // ----- 보다 만 영상 (2026-08-19, 요청) ------------------------------------
+    //
+    // 영상을 보다가 트리를 다른 곳으로 옮기면 재생이 그 자리에서 끝났다. 잠깐 딴
+    // 일을 하고 오면 어디까지 봤는지 화면에 남는 것이 없어서, 폴더를 다시 찾아
+    // 들어가야 했다.
+    //
+    // **재생을 살려 두지 않는다.** 배경 재생이 소리에 해 주는 것과는 다르고, 그것이
+    // 요청이기도 하다("정지된 상태로요"). 파일을 붙잡고 있지 않으므로 이름 바꾸기와
+    // 삭제가 막히지 않고, 그림을 감출 필요도 없다.
+    //
+    // 되짚어 갈 길은 이미 있다. 멈출 때 RememberResumePosition이 위치를 적어 두고,
+    // 그 파일을 다시 열면 MediaOpened가 그 자리로 보낸다. 그러니까 이 줄이 더하는
+    // 것은 **어디로 돌아가야 하는지 하나뿐**이다.
+    private string? _heldFilmPath;
+
+    // 트리가 떠나면서 영상을 놓을 때 그 자리를 적어 둔다. 소리는 적지 않는다 -
+    // 배경 재생이 켜져 있으면 애초에 안 멈추고, 꺼져 있다면 멈추라는 것이 설정이다.
+    private void HoldFilmForResume()
+    {
+        if (_viewerVideoPath is { } leaving && IsViewerVideo(leaving))
+        {
+            _heldFilmPath = leaving;
+        }
+    }
     // The way back: open the panel on the track this row names. Same direction
     // the tree row's own 보기 goes, so there is one rule rather than two.
     private void FooterNowPlaying_Click(object sender, MouseButtonEventArgs e)
     {
-        if (_viewerVideoPath is not { } playing)
+        // 줄이 무엇을 가리키고 있었든 가는 길은 하나다. 소리면 그 곡, 보다 만
+        // 영상이면 그 영상이고, 영상은 열리면서 저장된 위치로 알아서 돌아간다
+        // (RememberResumePosition과 MediaOpened의 재개).
+        string? target = _viewerVideoPath ?? _heldFilmPath;
+        if (target is null)
         {
             return;
         }
@@ -20278,7 +20327,7 @@ public partial class MainWindow : Window
         // After the panel exists, or there is nothing for the reveal to land in.
         // Through NavigateToPath like every other deliberate jump: the tree
         // moving is what hands the panel its selection.
-        NavigateToPath(playing, source: "nowplaying-footer", collapseOthers: true);
+        NavigateToPath(target, source: "nowplaying-footer", collapseOthers: true);
     }
 
     // Stop rather than pause, and deliberately: half of what this row is for is
@@ -20287,6 +20336,9 @@ public partial class MainWindow : Window
     // with no way out of it.
     private void FooterNowPlayingStop_Click(object sender, RoutedEventArgs e)
     {
+        // 보다 만 영상을 가리키고 있었다면 그 표식도 함께 내린다. 이 단추는 "이
+        // 줄을 치워라"이고, 줄이 무엇을 이름하고 있었는지는 묻지 않는다.
+        _heldFilmPath = null;
         StopViewerVideo();
         UpdateViewerNowPlaying();
         UpdateFooterNowPlaying();
@@ -20479,6 +20531,7 @@ public partial class MainWindow : Window
             // there is still somewhere to pause from without leaving the search.
             if (!ViewerBackgroundPlaying)
             {
+                HoldFilmForResume();
                 StopViewerVideo();
             }
             ViewerPlayOverlay.Visibility = Visibility.Collapsed;
@@ -20520,6 +20573,7 @@ public partial class MainWindow : Window
         StopViewerGif();
         if (!ViewerBackgroundPlaying)
         {
+            HoldFilmForResume();
             StopViewerVideo();
         }
 
@@ -22650,6 +22704,10 @@ public partial class MainWindow : Window
 
         StopViewerGif();
         _viewerVideoPath = path;
+        // 보다 만 영상의 표식은 여기서 지운다. 같은 파일이면 지금 이어서 보는
+        // 중이고, 다른 파일이면 마지막으로 보던 것이 이쪽으로 바뀐다 - 어느 쪽이든
+        // 옛 자리를 가리키고 있을 이유가 없다.
+        _heldFilmPath = null;
         // Remembered because the selection is allowed to leave it behind - see
         // background play, where the next track has to be found in THIS file's
         // folder rather than in whatever the tree has moved on to.
