@@ -117,4 +117,15 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: deskto
 ; Environment.ProcessPath on every launch (MainWindow's TrySetStartWithWindows), so the first
 ; run from {app} repairs it by itself - as long as there IS a first run.
 [Run]
-Filename: "{app}\{#MyAppExe}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+; runasoriginaluser: Setup is elevated (PrivilegesRequired=admin above) and
+; without this flag the app it launches inherits that token. Two things break in
+; an elevated window and only on the very first run, which is the hardest kind of
+; fault to trace: the virtual and mapped drives that are mounted per logon
+; session are invisible to it, and Windows refuses drag and drop into it from a
+; non-elevated Explorer.
+;
+; The app itself never asks for elevation - app.manifest carries no
+; requestedExecutionLevel - so this is the only path by which it can end up
+; running as administrator. Note the 다시 시작 row cannot undo it either: it
+; starts the new process from the old one, which hands the same token along.
+Filename: "{app}\{#MyAppExe}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent runasoriginaluser
