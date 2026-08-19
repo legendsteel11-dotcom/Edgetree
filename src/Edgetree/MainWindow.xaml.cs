@@ -1286,18 +1286,29 @@ public partial class MainWindow : Window
         //
         // The stored colours are left alone, so switching it back on restores
         // exactly what was there - including a colour picked in the other theme.
-        SetBrushColor(
+        SetBothBrushColors(
             "PanelDividerBrush",
             WithDividerVisibility(light ? _settings.LightPanelDividerColorHex : _settings.PanelDividerColorHex));
-        // The scroll thumb, three states deep. White on the dark theme was
-        // white on white in the light one - invisible, reported 2026-08-12.
-        // The same three steps on black rather than a tie to the divider or
-        // guide-line colours, which are the user's to set: the ladder then
-        // reads the same on both themes however else the app has been
-        // recoloured, and it stays a shade weaker than the ink around it.
-        SetBrushColor("ScrollThumbBrush", light ? "#33000000" : "#33FFFFFF");
-        SetBrushColor("ScrollThumbHoverBrush", light ? "#55000000" : "#55FFFFFF");
-        SetBrushColor("ScrollThumbDragBrush", light ? "#70000000" : "#70FFFFFF");
+        // ONE COLOUR, TWO DICTIONARIES (2026-08-19, reported: 라이트 모드 도움말의
+        // 썸이 안 보이고 스크롤바 옆에 검은 선이 남음).
+        //
+        // These four keys are declared in MainWindow.xaml AND in App.xaml, and both
+        // copies matter. MainWindow's own copy is what its eight read sites resolve
+        // - the header, the tree, the bookmark panel, the footer, the search rule,
+        // the thumbnail bar, the two panel borders. App.xaml's copy is what a
+        // SECOND WINDOW resolves, and the help window is the one with a long
+        // scrollbar: it was drawing App.xaml's declared white thumb on a light
+        // background, and App.xaml's #FF3A3A3A gutter line beside it, neither of
+        // which anything had ever recoloured.
+        //
+        // So both are written. Moving the write to the application alone was the
+        // first attempt and it takes the TREE's own scrollbar out - MainWindow's
+        // copy shadows the application's for everything inside this window, so it
+        // would have gone unrecoloured and turned invisible in the light theme,
+        // which is the very bug being fixed.
+        SetBothBrushColors("ScrollThumbBrush", light ? "#33000000" : "#33FFFFFF");
+        SetBothBrushColors("ScrollThumbHoverBrush", light ? "#55000000" : "#55FFFFFF");
+        SetBothBrushColors("ScrollThumbDragBrush", light ? "#70000000" : "#70FFFFFF");
         // The unlit chip's hover ink, one rung past the resting one. The chips
         // rest at 0.65 of ForegroundText and hover already took that to full -
         // a step small enough to miss in a strip of eight (2026-08-12), so the
@@ -1543,6 +1554,61 @@ public partial class MainWindow : Window
 
         LogFrozenBrush(resourceKey);
         Resources[resourceKey] = new SolidColorBrush(color);
+    }
+
+
+    // 이 창의 사전과 애플리케이션 사전에 같은 색을 쓴다 (2026-08-19).
+    //
+    // 두 곳 다 필요한 키에만 쓴다. 이 창 안의 요소는 이 창의 사전을 먼저 찾고,
+    // 다른 Window는 애플리케이션 사전만 볼 수 있다. 한쪽만 쓰면 반드시 한쪽이
+    // 옛 색으로 남는데, 어느 쪽이 남는지가 눈에 띄기까지 오래 걸린다 - 도움말의
+    // 썸은 08-12부터 흰색이었고 08-19에 신고됐다.
+    private void SetBothBrushColors(string resourceKey, string hex)
+    {
+        SetBrushColor(resourceKey, hex);
+        SetAppBrushColor(resourceKey, hex);
+    }
+
+    // Color를 받는 쪽. 구분선은 알파를 손대서 넘어오므로 문자열을 거치지 않는다
+    // (WithDividerVisibility).
+    private void SetBothBrushColors(string resourceKey, Color color)
+    {
+        SetBrushColor(resourceKey, color);
+        SetAppBrushColor(resourceKey, color);
+    }
+
+    // 같은 일을 애플리케이션 사전에 하는 것 (2026-08-19). 다른 Window가 읽는
+    // 브러시는 여기 있어야 한다 - 위의 것은 이 창의 사전이라 도움말이나 색상
+    // 설정 창에서는 안 보인다.
+    //
+    // 값을 바꾸는 쪽을 먼저 시도하는 이유는 위와 같다: 사전 항목을 갈아 끼우면
+    // WPF가 그 키를 읽는 모든 요소를 찾아 무효화한다.
+    private static void SetAppBrushColor(string resourceKey, string hex)
+    {
+        if (ColorConverter.ConvertFromString(hex) is Color color)
+        {
+            SetAppBrushColor(resourceKey, color);
+        }
+    }
+
+    private static void SetAppBrushColor(string resourceKey, Color color)
+    {
+        var appResources = Application.Current?.Resources;
+        if (appResources is null)
+        {
+            return;
+        }
+
+        if (appResources[resourceKey] is SolidColorBrush { IsFrozen: false } existing)
+        {
+            if (existing.Color != color)
+            {
+                existing.Color = color;
+            }
+            return;
+        }
+
+        appResources[resourceKey] = new SolidColorBrush(color);
     }
 
     private readonly HashSet<string> _frozenBrushKeysLogged = new();
