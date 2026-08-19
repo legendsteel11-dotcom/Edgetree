@@ -545,6 +545,13 @@ public static class HelpContent
                       "Sets the window's height to the film's proportions - the black bands go (window mode)"),
                     R("우클릭 → 자막", "활성화 · 크기 · 위치 · 싱크 조절",
                       "Right-click → Subtitles", "On, size, position, and sync"),
+                    // 싱크만 키를 가진 이유가 줄에 들어 있다: 다른 셋은 한 번
+                    // 맞추고 마는 것이고 이것만 맞을 때까지 계속 누르는 것이다.
+                    // 눌러 두면 반복되는 것도 적었다 - 크게 밀어야 할 때 몇 번
+                    // 누를지 세지 않아도 된다.
+                    R("< > (자막 있을 때)", "자막 싱크를 0.5초씩 앞 · 뒤로, 누르고 있으면 계속",
+                      "< > (while there are subtitles)",
+                      "Subtitle sync half a second at a time - hold either one to keep going"),
                     // 랜딩에서 네 번 내세우는 기능인데 F1에는 한 줄도 없었다
                     // (2026-08-19에 발견). 세 스테퍼는 따로 적지 않는다 - 이 줄이
                     // 여는 곳을 가리키고 나머지는 그 안에서 보인다.

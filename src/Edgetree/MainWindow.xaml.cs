@@ -1736,6 +1736,32 @@ public partial class MainWindow : Window
             return;
         }
 
+        // < > 로 자막 싱크 (사용자 요청 2026-08-19). 자막 판의 다른 조절들은
+        // 한 번 맞추고 마는 것이라 메뉴로 충분한데, **싱크만 성격이 다르다** -
+        // 안 맞는 자막을 만나면 맞을 때까지 계속 눌러야 하고, 그때마다 우클릭
+        // 메뉴를 여는 것이 조작 자체보다 오래 걸린다(사용자 말: "안맞는거 나오면
+        // 계속 눌러야 하는거라서요").
+        //
+        // 누르고 있으면 WPF 가 알아서 반복해 주므로 길게 눌러 크게 미는 것도
+        // 된다. 스텝은 메뉴의 것과 같은 0.5초이고, 값을 쓰는 곳도 같은
+        // StepSubtitleOffset 하나다 - 파일별로 저장되는 것까지 그대로 따라온다.
+        //
+        // Shift 를 허용하는 이유는 < > 가 곧 Shift+쉼표·마침표이기 때문이다.
+        // 그래서 , . 로도 눌린다. Ctrl·Alt 조합은 걸러낸다.
+        //
+        // 자막이 실제로 있을 때만 답한다. 없으면 이 두 키는 그대로 비어 있다 -
+        // 위의 Backspace 와 같은 좁히기다.
+        if (_viewerOpen &&
+            HasSubtitles &&
+            (Keyboard.Modifiers & ~ModifierKeys.Shift) == ModifierKeys.None &&
+            e.Key is Key.OemComma or Key.OemPeriod &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            StepSubtitleOffset(e.Key == Key.OemComma ? -SubtitleOffsetStep : SubtitleOffsetStep);
+            e.Handled = true;
+            return;
+        }
+
         // Enter toggles the full cover, but ONLY while the viewer is actually
         // showing a decoded picture. Everywhere else Enter keeps meaning what
         // it has always meant in the tree - open the row with its default app,
