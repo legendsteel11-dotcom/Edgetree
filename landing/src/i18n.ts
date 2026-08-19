@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watchEffect } from 'vue'
 
 export type Lang = 'ko' | 'en'
 
@@ -10,6 +10,12 @@ export function toggleLang() {
 
 const dict = {
   ko: {
+    // The tab title, and the one thing on the page that index.html also
+    // states. It is written there because a crawler reads it before any of
+    // this runs; it is written HERE because that makes it static, and a
+    // static Korean title stayed Korean for a visitor who had switched to
+    // English (2026-08-19). Keep the two in step.
+    docTitle: 'Edgetree 엣지트리 | 화면 가장자리의 Windows 폴더 탐색기',
     nav: {
       howto: '사용방법',
       screenshots: '주요기능',
@@ -217,6 +223,10 @@ const dict = {
     },
   },
   en: {
+    // Shorter than the Korean one on purpose: that title is carrying search
+    // terms Korean has no other handle on, and this one has the whole English
+    // alphabet to be found by.
+    docTitle: 'Edgetree | A folder tree at your screen edge',
     nav: {
       howto: 'How to Use',
       screenshots: 'Key Features',
@@ -383,3 +393,10 @@ const dict = {
 } as const
 
 export const t = computed(() => dict[lang.value])
+
+// Set here rather than in a component: the language is this module's state and
+// the document title is one thing, not any component's. index.html's own title
+// stands until this first runs, which is what a crawler sees.
+watchEffect(() => {
+  document.title = t.value.docTitle
+})
