@@ -6373,6 +6373,8 @@
                             ClipToBounds="True"
                             Background="Transparent"
                             SizeChanged="ViewerImageHost_SizeChanged"
+                            MouseEnter="ViewerPictureHover_Changed"
+                            MouseLeave="ViewerPictureHover_Changed"
                             MouseWheel="ViewerImageHost_MouseWheel"
                             MouseDown="ViewerImageHost_MouseDown"
                             MouseLeftButtonDown="ViewerImageHost_MouseLeftButtonDown"
@@ -7300,7 +7302,9 @@
                          overlay and the navigator keep the bounds they had. -->
                     <Border x:Name="ViewerMediaHost"
                             Grid.Row="0"
-                            ClipToBounds="True">
+                            ClipToBounds="True"
+                            MouseEnter="ViewerPictureHover_Changed"
+                            MouseLeave="ViewerPictureHover_Changed">
                     <MediaElement x:Name="ViewerMedia"
                             Margin="10"
                             Visibility="Collapsed"
@@ -7390,6 +7394,8 @@
                             VerticalAlignment="Center"
                             Visibility="Collapsed"
                             Cursor="Hand"
+                            MouseEnter="ViewerPictureHover_Changed"
+                            MouseLeave="ViewerPictureHover_Changed"
                             Click="ViewerPlayOverlay_Click"
                             ToolTip="{x:Static services:Strings.ViewerPlay}">
                         <!-- Light plate, dark mark, no outline (2026-08-10:

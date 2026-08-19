@@ -21942,9 +21942,33 @@ public partial class MainWindow : Window
     // The playable guard is new too: the old rule never showed the button while
     // the panel and the transport had come apart, and now that it does, the
     // picture on screen may be a photograph.
+    // ----- 원반은 손이 있을 때만 (2026-08-19, 요청) --------------------------
+    //
+    // 그림 위에 얹힌 재생·일시정지 원반이 늘 서 있었다. 앨범아트 위에서는 얼굴
+    // 한가운데를 덮는 일이 생겼고, 그림을 보는 동안에는 그 원반이 할 일이 없다.
+    // 이제 포인터가 그림 위에 있을 때만 나온다.
+    //
+    // 세 요소에 한꺼번에 묻는다. 원반은 그림 host의 자식이 아니라 같은 칸에 놓인
+    // 형제라, host 하나만 보면 포인터가 원반으로 올라가는 순간 host의 IsMouseOver가
+    // 거짓이 되어 원반이 사라지고, 사라지면 다시 host 위가 되어 나타나는 깜박임이
+    // 된다. 셋의 OR로 물으면 그 순간에도 참이다.
+    //
+    // 플래그를 두지 않고 그때그때 IsMouseOver를 읽는 것도 같은 이유다. Leave와
+    // Enter가 어느 순서로 오든 읽는 시점의 사실은 하나다.
+    private bool ViewerPointerOverPicture
+        => ViewerImageHost.IsMouseOver
+           || ViewerMediaHost.IsMouseOver
+           || ViewerPlayOverlay.IsMouseOver;
+
+    private void ViewerPictureHover_Changed(object sender, System.Windows.Input.MouseEventArgs e)
+        => UpdateViewerPlayOverlay();
+
     private void UpdateViewerPlayOverlay()
     {
-        if (_pendingViewerPath is not { } shown || !IsViewerPlayable(shown))
+        // 손이 그림 위에 없으면 더 물을 것이 없다. 가장 자주 거짓이 되는 조건이라
+        // 맨 앞에 선다.
+        if (!ViewerPointerOverPicture ||
+            _pendingViewerPath is not { } shown || !IsViewerPlayable(shown))
         {
             ViewerPlayOverlay.Visibility = Visibility.Collapsed;
             return;
