@@ -644,6 +644,12 @@ public partial class MainWindow : Window
         // 저장에서 들어온 자막 크기를 1080 기준으로 한 번만 옮긴다. 설정을 읽은
         // 바로 다음이 자리인 것은 이 값이 화면에 닿기 전에 끝나야 하기 때문이다.
         BaselineSubtitleFontSize();
+
+        // 볼륨은 슬라이더가 진실이고 설정은 그 슬라이더의 마지막 자리다. 그래서
+        // 값을 요소가 아니라 슬라이더에 쓴다 - ValueChanged 가 음소거 해제와
+        // MediaElement 반영을 이미 하고 있고, 요소에 직접 쓰면 컨트롤이 다른
+        // 말을 하게 된다 (↑↓ 키가 슬라이더를 거쳐 가는 것과 같은 이유다).
+        ViewerMediaVolume.Value = _settings.ViewerVolume;
         FileSystemService.SortField = ReadSortField(_settings.SortField, _settings.SortByDate);
         FileSystemService.SortDescending = _settings.SortDescending;
         FileSystemItem.DisplayCap = _settings.ShowAllItemsPerFolder
@@ -24941,6 +24947,36 @@ public partial class MainWindow : Window
             SetViewerMediaMuted(false);
         }
         ViewerMedia.Volume = _viewerMediaMuted ? 0 : e.NewValue;
+
+        // 기억은 여기서, 저장은 잠시 뒤에. 이 핸들러는 드래그 · 휠 · ↑↓ 가 모두
+        // 지나가는 자리라 한 번의 조작에 수십 번 불린다. 값은 그때마다 들고
+        // 있어도 되지만 디스크는 그러면 안 된다 - 휠 한 칸마다 설정을 쓰던 것이
+        // 2026-08-17 사전 점검에서 걸린 적이 있다.
+        _settings.ViewerVolume = e.NewValue;
+        ScheduleViewerVolumeSave();
+    }
+
+    // 손이 멈춘 뒤 한 번. 조작 중에는 계속 미뤄지고, 마지막 움직임에서 1초 뒤에
+    // 한 번만 쓴다.
+    private System.Windows.Threading.DispatcherTimer? _viewerVolumeSaveTimer;
+
+    private void ScheduleViewerVolumeSave()
+    {
+        if (_viewerVolumeSaveTimer is null)
+        {
+            _viewerVolumeSaveTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(1),
+            };
+            _viewerVolumeSaveTimer.Tick += (_, _) =>
+            {
+                _viewerVolumeSaveTimer!.Stop();
+                _settingsService.Save(_settings);
+            };
+        }
+
+        _viewerVolumeSaveTimer.Stop();
+        _viewerVolumeSaveTimer.Start();
     }
 
     private bool _viewerMediaMuted;

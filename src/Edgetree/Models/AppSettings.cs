@@ -47,6 +47,16 @@ public class AppSettings
     public bool ViewerFilmstrip { get; set; } = false;
     public double ViewerFilmstripCellHeight { get; set; } = 64;
 
+    // 재생 볼륨. 0.6은 슬라이더가 XAML에 박고 있던 값 그대로이므로, 이 설정이
+    // 없던 사람에게는 지금까지와 같다.
+    //
+    // 저장하는 이유가 편의만은 아니다. 0.6은 진폭이라 -4.4dB이고, 켤 때마다
+    // 거기로 돌아간다는 것은 앱이 매번 그만큼을 버리고 시작한다는 뜻이었다.
+    // MediaElement.Volume 은 1.0 이 상한이라 위로는 더 갈 데가 없으므로, 그
+    // 4.4dB 는 조용한 음원에서 실제로 아쉬운 만큼이다 (2026-08-19에 측정한 두
+    // 파일의 음량 차이가 4.2dB 였다).
+    public double ViewerVolume { get; set; } = 0.6;
+
     // The largest a filmstrip thumbnail may be fetched and kept, in pixels. The
     // strip asks for what the current cell needs; this caps that, so a taller
     // strip is drawn from the same picture rather than a bigger one.
@@ -950,6 +960,7 @@ public class AppSettings
         ExpandedWidth = Sane(ExpandedWidth, 240, min: 1);
         ViewerWidth = Sane(ViewerWidth, 360, min: 1);
         ViewerFilmstripCellHeight = Sane(ViewerFilmstripCellHeight, 64, min: 1);
+        ViewerVolume = Sane(ViewerVolume, 0.6, min: 0, max: 1);
         AutoHideSliverWidth = Sane(AutoHideSliverWidth, 3, min: 1);
         AutoHideHandleWidth = Sane(AutoHideHandleWidth, 8, min: 1);
         SlideshowSeconds = (int)Sane(SlideshowSeconds, 5, min: 3);
