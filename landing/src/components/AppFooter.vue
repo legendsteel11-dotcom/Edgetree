@@ -18,7 +18,24 @@ const EMAIL = 'pjh85336@gmail.com'
           <span>Edgetree</span>
           <a class="repo" href="https://github.com/legendsteel11/Edgetree" target="_blank" rel="noopener">{{ t.nav.github }}</a>
         </div>
-        <a class="contact" :href="`mailto:${EMAIL}`">{{ t.footer.contact }}: {{ EMAIL }}</a>
+        <!-- TWO ROUTES, and the second one is why this changed (2026-08-19).
+             The only way in used to be mail, and a report that arrives as mail
+             arrives among the rest of the mail: an issue sat unanswered for a
+             day because a small "1" in a repository header is not something
+             anyone watches. An issue carries its own badge and its own
+             notification, and the next person with the same symptom can read
+             it instead of asking again.
+
+             STILL IN THE FOOTER. It belongs where someone who has decided to
+             use the app goes looking, not beside the download button - a line
+             about bug reports there is a reason to hesitate at the moment of
+             deciding. -->
+        <span class="contact">
+          {{ t.footer.contact }}:
+          <a :href="`mailto:${EMAIL}`">{{ EMAIL }}</a>
+          ·
+          <a href="https://github.com/legendsteel11/Edgetree/issues" target="_blank" rel="noopener">GitHub Issues</a>
+        </span>
       </div>
 
       <!-- 상호 링크는 푸터에(TabStick 랜딩과 같은 자리·같은 모양). -->
@@ -71,13 +88,20 @@ const EMAIL = 'pjh85336@gmail.com'
   color: var(--accent-strong);
 }
 
+/* 이 자리가 링크 하나였다가 라벨 + 링크 둘로 바뀌었으므로(2026-08-19), 색과
+   밑줄은 안쪽 a가 받는다. 바깥 span에만 두면 라벨까지 링크처럼 보이고, 정작
+   눌리는 두 곳은 브라우저 기본 파랑으로 돌아간다. */
 .contact {
   color: var(--text);
-  text-decoration: none;
   font-size: 14px;
 }
 
-.contact:hover {
+.contact a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.contact a:hover {
   color: var(--accent-strong);
 }
 
