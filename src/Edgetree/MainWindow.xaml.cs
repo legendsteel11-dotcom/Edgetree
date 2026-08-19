@@ -21958,7 +21958,13 @@ public partial class MainWindow : Window
     private bool ViewerPointerOverPicture
         => ViewerImageHost.IsMouseOver
            || ViewerMediaHost.IsMouseOver
-           || ViewerPlayOverlay.IsMouseOver;
+           || ViewerPlayOverlay.IsMouseOver
+           // 전체화면에서 아래쪽 컨트롤 패널이 나와 있는 동안에도 세워 둔다
+           // (2026-08-19, 요청). 그 띠로 손을 내리는 것도 재생을 만지러 가는
+           // 길인데, 가는 도중에 원반이 꺼지면 손이 목적지에 닿기 전에 화면이
+           // 한 번 바뀐다. 창 모드에서는 이 조건이 서지 않는다 - 거기서는 컨트롤
+           // 패널이 늘 나와 있어서, 이것을 세면 원반이 영영 안 사라진다.
+           || _fullScreenTransportShown;
 
     private void ViewerPictureHover_Changed(object sender, System.Windows.Input.MouseEventArgs e)
         => UpdateViewerPlayOverlay();
@@ -29630,6 +29636,9 @@ public partial class MainWindow : Window
         // The subtitle line lives at the bottom too, so it steps up out of the
         // way rather than being covered by what just arrived.
         ViewerSubtitlePlate.Margin = new Thickness(16, 0, 16, 18 + FullScreenSubtitleLift);
+
+        // 원반의 조건 중 하나가 방금 바뀌었다 - ViewerPointerOverPicture 참고.
+        UpdateViewerPlayOverlay();
     }
 
     private const double FullScreenSubtitleLift = 64;
@@ -29683,6 +29692,9 @@ public partial class MainWindow : Window
         // answered - a folder, or a file outside the walked set, has no counter
         // at all, and leaving the plate would have put one back.
         UpdateViewerCarousel();
+
+        // 원반의 조건 중 하나가 방금 바뀌었다 - ViewerPointerOverPicture 참고.
+        UpdateViewerPlayOverlay();
     }
 
     // Drag across a fitted picture to walk the folder.
