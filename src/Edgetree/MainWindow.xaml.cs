@@ -11207,13 +11207,30 @@ public partial class MainWindow : Window
     // menu and the tree's empty-space menu both carry the preset rows, and the
     // picture's own menu builds them from its own handler in the cover. Anything
     // holding a Separator tagged "presets" can use this.
+    // PRESETS FIRST, THEN THE SHARED OPEN, and the order is the whole of it
+    // (report 2026-08-19, a shot of the tree's empty-space menu with its labels
+    // starting at two different x).
+    //
+    // AnyMenu_Opened is where the check column is decided, and it decides from
+    // the rows present AT THAT MOMENT. Running it first asked "does anything
+    // here tick?" of a menu whose preset rows had not been built yet - and the
+    // active preset is precisely a ticked row. So the answer came back no, no
+    // row reserved the column, and then the ticked row arrived and pushed its
+    // own label over.
+    //
+    // The rule the check column was written to is stated on ApplyMenuCheckColumn:
+    // every menu settles its own rows from its own Opened handler BEFORE the
+    // shared one runs. This handler was the one place that did it the other way
+    // round. The viewer's menu carries preset rows too and never had this,
+    // because it builds them from ContextMenuOpening, which fires earlier still.
     private void PresetCarryingMenu_Opened(object sender, RoutedEventArgs e)
     {
-        AnyMenu_Opened(sender, e);
         if (sender is ContextMenu menu)
         {
             BuildPresetMenu(menu);
         }
+
+        AnyMenu_Opened(sender, e);
     }
 
     // Rebuilt on every open rather than kept in step with the list: the rows ARE
