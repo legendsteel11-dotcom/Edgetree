@@ -45,6 +45,42 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // ELEVEN LINES IN THE RELEASE NOTES, SIX HERE. What came out is what a
+    // person finds while using the app rather than while deciding to download
+    // it: the panel folding on Backspace, the thumbnail bar stepping aside in
+    // full screen, the play button following the pointer. All three are real
+    // and none of them would move anyone's hand toward the button.
+    //
+    // The three subtitle items are one line. Size, sync and position arrived
+    // together and are read together; three lines would have made a card about
+    // subtitles.
+    //
+    // NO FIX LINES THIS TIME, and that is not an omission. Everything repaired
+    // in this round was a repair to something else in this round - the docked
+    // full screen, the thumbnail bar, the subtitle scale - so none of it ever
+    // reached anyone. Listing them would say the new features shipped broken.
+    //
+    // The two lists are the same length here, unlike v2.4.1: every line is
+    // true on both screens this time.
+    version: 'v2.4.2',
+    ko: [
+      '시청 중이던 영상이 트리 하단에 표시되며, 선택하면 이전 재생 위치부터 재생됩니다.',
+      '자막 크기가 영상 크기에 연동됩니다. `<` `>` 로 싱크를, 메뉴에서 위치를 조정할 수 있습니다.',
+      '고정 상태에서도 `바탕화면 채우기`를 사용할 수 있습니다.',
+      '`F` 키로 창 크기를 영상 비율에 맞게 조정할 수 있습니다.',
+      '마우스 앞·뒤 버튼으로 폴더 이력과 이전·다음 이미지를 이동합니다.',
+      '재생 볼륨이 저장됩니다.',
+    ],
+    en: [
+      'The film you were watching stays at the foot of the tree, and picks up where you left it.',
+      'Subtitles scale with the film. < and > shift the sync; the menu sets their position.',
+      'Fill the desktop without undocking first.',
+      'F fits the window to the film, so the black bands go.',
+      'The mouse thumb buttons move through folders, and through pictures.',
+      'The playback volume is remembered.',
+    ],
+  },
+  {
     // A PATCH RELEASE MADE ALMOST ENTIRELY OF WORDS, which is the awkward case
     // for this file: only one line here changes what the app DOES. The rest are
     // labels and sentences, and a card is read by someone deciding whether to

@@ -1,4 +1,4 @@
-# Edgetree v2.4.1
+# Edgetree v2.4.2
 
 [한국어 안내](README-ko.md)
 
@@ -59,9 +59,9 @@ leaves them where they are.
   documents, media, archives, executables — picks what the tree shows and
   drops the rest. Type extensions of your own under Custom, or ones to always
   hide under Exclude. Search still finds what the filter is hiding.
-- **Path bar**: type a path to go straight there. `Ctrl+←` / `Ctrl+→` step
-  back and forward through the folders you have been in, and the bar lists
-  them.
+- **Path bar**: type a path to go straight there. `Ctrl+←` / `Ctrl+→`, or the
+  mouse thumb buttons, step back and forward through the folders you have been
+  in, and the bar lists them.
 - **Network locations**: add a share with no drive letter (`\\server\share`)
   from the right-click menu on empty tree space, and it stays in the tree.
 - **Multi-select** with `Ctrl+click` and `Shift+click`, then copy, delete,
@@ -99,21 +99,29 @@ leaves them where they are.
   opens a panel beside the tree — on either side, your choice. Turn on
   **Open on double-click** and files from the tree open here instead of in
   your usual program; there is also an option to open the panel as soon as
-  you select a file.
+  you select a file. `Backspace` folds the panel away, and the playback
+  volume is remembered across restarts.
 - **Pictures**: wheel to zoom, `Ctrl`/`Shift`+wheel for finer steps, drag to
   move around with a navigator in the corner. Double-click switches Fit ↔ 1:1,
   and Fill crops the picture to the panel. PSD, RAW and JXL read alongside the
   usual formats. The thumbnail bar takes a size of its own, and a picture
-  drags straight out into another app.
+  drags straight out into another app. The mouse thumb buttons page through
+  the folder.
 - **Slideshow**: right-click a picture, or `F8`.
 - **Wallpaper**: set a picture as the desktop background, separately on each
   monitor.
 - **Music keeps playing** while you work — close the panel and the sound
   stays on. Album art, and a clock over the panel with `F9`.
-- **Video** with HDR correction and subtitles.
+- **Video** with HDR correction and subtitles. Subtitles take a size, a
+  position and a sync offset (`<` and `>` shift the sync), and the size
+  scales with the film, so it holds its proportion at any resolution or window
+  size. `F` fits the window to the film and the black bands go (window mode).
+- **The film you were watching** stays at the foot of the tree when you move to
+  another folder, and picking it up resumes from where you stopped.
 - **Full screen**: wheel-click or `Enter`, `Esc` to leave. It grows the
   window to the screen, or fills the window you already have — pick which
-  from the right-click menu.
+  from the right-click menu. It works while docked, and the thumbnail bar
+  steps aside for a film.
 
 ### Bookmarks and search
 
@@ -208,6 +216,15 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v2.4.2 (2026-08-19)
+
+- The film you were watching stays at the foot of the tree, and picks up where you left it.
+- Subtitles scale with the film. `<` and `>` shift the sync; the menu sets their position.
+- Fill the desktop without undocking first.
+- `F` fits the window to the film, so the black bands go.
+- The mouse thumb buttons move through folders, and through pictures.
+- The playback volume is remembered.
 
 ### v2.4.1 (2026-08-18)
 
