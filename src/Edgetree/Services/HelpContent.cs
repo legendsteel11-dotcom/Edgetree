@@ -353,6 +353,13 @@ public static class HelpContent
                 {
                     R("제목 표시줄 이미지 아이콘", "멀티미디어 패널 열기 · 닫기",
                       "The picture icon in the title bar", "Open · close the multimedia panel"),
+                    // Beside the icon rather than down with the viewer's other
+                    // keys: it is a way OUT of the panel, and this group is
+                    // where the ways in and out are read together. The
+                    // condition is in the row because the key does nothing
+                    // with the panel closed.
+                    R("Backspace", "패널이 펼쳐져 있을 때 패널 접기",
+                      "Backspace", "Folds the panel away, while it is open"),
                     R("옵션 → 멀티미디어 패널 → 더블클릭으로 열기",
                       "트리에서 더블클릭한 파일을 기본 프로그램 대신 패널에서 엶",
                       "Options → Multimedia panel → Open on double-click",

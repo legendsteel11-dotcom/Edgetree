@@ -1705,6 +1705,31 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Backspace folds the panel away (author, 2026-08-19). The panel had a
+        // chevron on the divider and the title bar's picture icon, and no key
+        // at all - so the hand that has just finished with a picture goes
+        // looking for a control instead of pressing something.
+        //
+        // ONLY WHILE THE PANEL IS OPEN, and that is what keeps the key from
+        // being spent. Backspace means "up one folder" in Explorer and this app
+        // has never bound it anywhere; with the panel closed it is still free
+        // for that. Narrowing a key to the one state where it can mean
+        // something is what Enter and Space above already do.
+        //
+        // Not while the panel fills the screen: Esc is the way out of that, and
+        // folding the panel out from under a full cover would land the window
+        // somewhere nobody asked for. Esc first, then this.
+        if (_viewerOpen &&
+            !_viewerFullscreen &&
+            Keyboard.Modifiers == ModifierKeys.None &&
+            e.Key == Key.Back &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            CloseViewer();
+            e.Handled = true;
+            return;
+        }
+
         // Enter toggles the full cover, but ONLY while the viewer is actually
         // showing a decoded picture. Everywhere else Enter keeps meaning what
         // it has always meant in the tree - open the row with its default app,
