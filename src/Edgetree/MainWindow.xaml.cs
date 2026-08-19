@@ -24288,10 +24288,42 @@ public partial class MainWindow : Window
     // 모니터를 기준으로 하면 작은 패널에서 글자만 혼자 커진다.
     private const double SubtitleBaselineHeight = 1080;
 
+    // 영상이 실제로 그려지는 높이로 잰다. 칸의 높이가 아니다 (신고 2026-08-19:
+    // "작은 화면에서 엄청 크게 나온 적이 있다").
+    //
+    // 처음에는 칸(ViewerImageHost)의 높이를 썼고, 그것은 **영상이 칸을 세로로
+    // 꽉 채울 때만** 맞는 값이었다. 영상은 Uniform 으로 들어가므로 세로로 긴
+    // 패널에 16:9 를 넣으면 위아래가 남고, 그 남는 자리까지 세어서 나눈다.
+    // 505x1500 짜리 패널에 16:9 를 넣으면 영상은 284px 로 그려지는데 배율은
+    // 1500/1080 = 1.39 가 나온다 - 맞는 값(0.26)의 다섯 배다. 전체화면에서
+    // 멀쩡해 보였던 것은 거기서만 칸과 영상의 높이가 같기 때문이다.
+    //
+    // 그래서 간헐적인 고장이 아니라 **레터박스에 비례하는** 고장이었다.
+    //
+    // 자연 크기를 모를 때(그림, 아직 안 열린 영상)는 칸 높이로 돌아간다. 그때는
+    // 자막이 없으므로 이 값이 쓰이지 않는다.
     private double SubtitleSizeScale
-        => ViewerImageHost.ActualHeight is var host && host > 0
-            ? host / SubtitleBaselineHeight
-            : 1;
+    {
+        get
+        {
+            double host = ViewerImageHost.ActualHeight;
+            if (host <= 0)
+            {
+                return 1;
+            }
+
+            double drawn = host;
+            if (_viewerPixelWidth > 0 && _viewerPixelHeight > 0 &&
+                ViewerImageHost.ActualWidth > 0)
+            {
+                drawn = Math.Min(
+                    host,
+                    ViewerImageHost.ActualWidth * _viewerPixelHeight / (double)_viewerPixelWidth);
+            }
+
+            return drawn / SubtitleBaselineHeight;
+        }
+    }
 
     // ----- 저장된 숫자를 한 번만 옮긴다 ---------------------------------------
     //
@@ -24379,13 +24411,48 @@ public partial class MainWindow : Window
     // number is added to rather than replaced.
     private double _subtitleLift;
 
+    // 영상 위와 칸 아래 사이의 검은 띠. 자막을 칸 바닥이 아니라 **영상 바닥**에서
+    // 재기 위해 더한다 (2026-08-19).
+    //
+    // 크기를 영상 기준으로 옮기고 나니 위치만 칸 기준으로 남아 둘이 따로 놀았다.
+    // 세로로 긴 패널에서는 영상이 가운데 뜨고 자막은 칸 맨 아래에 붙어서, 패널을
+    // 키울수록 자막이 영상에서 멀어졌다(사용자: "위로 사이즈를 키우면 좀 지나치게
+    // 아래에 붙는 경향").
+    //
+    // 저장된 숫자의 뜻은 그대로다 - 0이 제자리, 음수가 위. 재는 곳만 옮겼다.
+    // 전체화면처럼 띠가 없는 자리에서는 0이므로 지금까지와 똑같다.
+    private double SubtitleLetterboxBand
+    {
+        get
+        {
+            double host = ViewerImageHost.ActualHeight;
+            if (host <= 0 || _viewerPixelWidth <= 0 || _viewerPixelHeight <= 0 ||
+                ViewerImageHost.ActualWidth <= 0)
+            {
+                return 0;
+            }
+
+            double drawn = Math.Min(
+                host,
+                ViewerImageHost.ActualWidth * _viewerPixelHeight / (double)_viewerPixelWidth);
+            return Math.Max(0, (host - drawn) / 2);
+        }
+    }
+
     private void ApplySubtitleBottom()
     {
         double bottom = Math.Clamp(
             _settings.ViewerSubtitleBottom, MinSubtitleBottom, MaxSubtitleBottom);
         var margin = ViewerSubtitlePlate.Margin;
-        ViewerSubtitlePlate.Margin = new Thickness(
-            margin.Left, margin.Top, margin.Right, bottom + _subtitleLift);
+        // 크기와 같은 이유로 값이 달라졌을 때만 쓴다: 이 메서드는 이제 창을 끄는
+        // 동안에도 불리고, 같은 Thickness를 다시 넣으면 그때마다 판이 다시
+        // 배치된다.
+        double wanted = Math.Round((SubtitleLetterboxBand + bottom + _subtitleLift) * 2) / 2;
+        if (Math.Abs(margin.Bottom - wanted) > 0.01)
+        {
+            ViewerSubtitlePlate.Margin = new Thickness(
+                margin.Left, margin.Top, margin.Right, wanted);
+        }
         if (ViewerSubtitleBottomText is not null)
         {
             // A SIGNED OFFSET FROM WHERE IT SAT BEFORE, negative upwards
@@ -25328,6 +25395,9 @@ public partial class MainWindow : Window
         // 매 프레임 도는 길이라 ApplySubtitleFontSize는 값이 실제로 달라졌을
         // 때만 쓴다 - 같은 값을 다시 넣으면 그때마다 글자가 다시 측정된다.
         ApplySubtitleFontSize();
+        // 위치도 같은 자리에서. 검은 띠의 높이가 칸 크기와 영상 비율에서 나오므로
+        // 크기와 정확히 같은 순간에 다시 계산되어야 한다.
+        ApplySubtitleBottom();
 
         if (!_viewerOpen || _viewerPixelWidth <= 0)
         {
