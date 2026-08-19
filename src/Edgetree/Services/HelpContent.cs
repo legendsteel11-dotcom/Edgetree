@@ -51,6 +51,17 @@ public static class HelpContent
         T("자주 쓰는 파일 형식(확장자) 지정하기 (제외 확장자 입력시 최우선 적용)",
           "Set the file kinds you work with - anything you type as excluded wins over the rest"),
         T("자주 가는 곳은 북마크로", "Bookmark the places you keep going back to"),
+        // 요청 2026-08-19. 두 동작이 한 줄에 서 있고, 부르는 조건이 서로
+        // 다르다는 것이 이 줄을 짧게 쓰기 어려운 이유다: 소리는 패널을 닫아야
+        // 나오고(배경 재생이 켜져 있을 때), 보다 만 영상은 트리가 그 폴더를
+        // 떠나면 나오며 패널이 열려 있어도 보인다. 쓰는 사람에게는 한 가지
+        // 이야기 - "듣던 것·보던 것이 트리 아래에 남는다" - 이므로 한 줄로 두고,
+        // 조건 중에서는 소리 쪽만 적었다. 그것이 안 하면 안 나오는 쪽이다.
+        // 두 낱말의 시제가 다른 것이 일부러다(사용자, 2026-08-19). 소리는 실제로
+        // 계속 돌고 있고 영상은 멈춰 세워 둔 것이라, 둘 다 과거형으로 뭉치면
+        // 음악도 멈춘 것처럼 읽힌다. 두 글자로 살 수 있는 구분이다.
+        T("재생 중인 음악·보던 영상은 트리 하단 줄에서 바로 복귀 (음악은 패널을 닫아도 계속 재생)",
+          "The row at the foot of the tree takes you back to the music still playing, or the film you were watching - and music carries on with the panel closed"),
         T("썸네일 캐싱 활성화로 이미지 많은 폴더 빠르게 관리",
           "Turn thumbnail caching on and move through big image folders fast"),
         T("원하는 색상 선택", "Pick the colors you want"),
@@ -183,6 +194,15 @@ public static class HelpContent
                 new Group(string.Empty, new[]
                 {
                     R("↑ ↓", "위 · 아래 행 이동", "↑ ↓", "Previous · next row"),
+                    // Straight under ↑ ↓ because it is the same axis with the
+                    // files taken out, and the two are chosen between rather
+                    // than used apart. Both conditions are in the row: it walks
+                    // what is ON SCREEN and expands nothing, so someone who
+                    // expects it to dive into a closed folder reads the first
+                    // press as a miss (missing from here until 2026-08-19).
+                    R("PageUp · PageDown", "화면에 나와 있는 폴더로만 위 · 아래 이동 (파일은 건너뜀, 접힌 폴더는 열지 않음)",
+                      "PageUp · PageDown",
+                      "Up · down through the folders on screen, skipping the files - nothing gets expanded"),
                     R("← →", "접기 · 펼치기", "← →", "Collapse · expand"),
                     // 2026-08-17: 열린 폴더를 눌러도 안 접히게 바뀌었으므로 이
                     // 두 줄이 필요해졌다. 접는 방법이 둘(다시 누르기 · 펼침기호)이고
@@ -199,6 +219,14 @@ public static class HelpContent
                     R("Ctrl+← · Ctrl+→", "사용한 폴더로 뒤로 · 앞으로 (경로 표시줄의 < > 와 같음)",
                       "Ctrl+← · Ctrl+→",
                       "Back · forward through the folders you have used - the same as the path bar's < >"),
+                    // Under the keys that do the same thing, because that is
+                    // what they do - not a separate feature, a second way in.
+                    // Reported missing 2026-08-19: the buttons had a row for
+                    // the film and none for the two things they were given on
+                    // the same day.
+                    R("마우스 앞 · 뒤 버튼", "트리 위에서 누르면 사용한 폴더로 뒤로 · 앞으로",
+                      "Mouse back · forward buttons",
+                      "Over the tree, back · forward through the folders you have used"),
                     R("경로 표시줄의 목록 버튼", "사용한 폴더들을 확인하고 바로 이동",
                       "The list button on the path bar",
                       "See the folders you have used, and go straight to one"),
@@ -431,6 +459,12 @@ public static class HelpContent
                     R("내비게이터", "확대 시 우측 하단에 표시",
                       "The navigator", "Bottom right, once zoomed in"),
                     R("좌우로 길게 드래그", "이전 · 다음 이미지", "Drag sideways, a good push", "Previous · next image"),
+                    // Beside the drag rather than with the film's own row for
+                    // these buttons: the two rows are one input doing two
+                    // different jobs, and which one happens is decided by what
+                    // is on screen. Each belongs with the thing it does.
+                    R("마우스 앞 · 뒤 버튼", "이전 · 다음 이미지",
+                      "Mouse back · forward buttons", "Previous · next image"),
                     R("더블클릭", "맞춤 ↔ 1:1 전환", "Double-click", "Fit ↔ actual size"),
                     // Says what it gives up, because that is the whole choice
                     // between it and 맞춤: one shows all of the picture, the
