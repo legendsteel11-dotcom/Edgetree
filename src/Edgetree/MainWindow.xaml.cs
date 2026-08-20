@@ -14825,7 +14825,9 @@ public partial class MainWindow : Window
         // drag leaves behind, capture is not allowed to outlive this method.
         try
         {
-            DragDrop.DoDragDrop(ExplorerTree, data, DragDropEffects.Copy);
+            long t0 = Environment.TickCount64;
+            var effect = DragDrop.DoDragDrop(ExplorerTree, data, DragDropEffects.Copy);
+            LogDragOut("tree", dragPaths.Length, Environment.TickCount64 - t0, effect);
         }
         finally
         {
@@ -28842,7 +28844,9 @@ public partial class MainWindow : Window
         // that outlives the drag would leave the app deaf to the next click.
         try
         {
-            DragDrop.DoDragDrop(ViewerFilmstrip, data, DragDropEffects.Copy);
+            long t0 = Environment.TickCount64;
+            var effect = DragDrop.DoDragDrop(ViewerFilmstrip, data, DragDropEffects.Copy);
+            LogDragOut("filmstrip", 1, Environment.TickCount64 - t0, effect);
         }
         finally
         {
@@ -32427,6 +32431,25 @@ public partial class MainWindow : Window
         }
     }
 
+    // ----- 드래그 아웃이 얼마나 붙잡고 있었나 (2026-08-19, 신고) -------------
+    //
+    // 신고: NAS로 수백 개를 옮기는 중에 드래그 잔상이 화면에 남은 채 몇 초 멈췄다가
+    // 풀렸고, 복사 자체는 정상이었음.
+    //
+    // 잔상이 남았다는 것은 창이 그릴 기회를 못 받았다는 뜻이고, 그 시간에 UI
+    // 스레드가 어디 있었는지는 한 군데밖에 후보가 없다: DoDragDrop 은 모달
+    // 루프라 드래그가 끝날 때까지 이 스레드가 그 안에 있다. **받는 쪽이 복사를
+    // 자기 스레드로 넘기지 않으면 복사가 끝나야 이 호출이 돌아온다.**
+    //
+    // 그래서 고치기 전에 잰다. 이 줄이 몇 초를 찍으면 진단이 확정되고, 답은
+    // 데이터 오브젝트에 비동기 표시(IDataObjectAsyncCapability)를 붙여 받는 쪽이
+    // 자기 스레드에서 가져가게 하는 것이다 - 그러면 진행 창도 탐색기가 띄운다.
+    // 즉시 돌아오는데도 멈췄다면 원인은 다른 데 있고, COM 배관을 만들 이유가
+    // 없어진다.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogDragOut(string source, int count, long ms, DragDropEffects result)
+        => LogClickLine($"dragout: {source} files={count} held={ms}ms result={result}");
+
     [System.Diagnostics.Conditional("DEBUG")]
     private void LogClick(string stage, SearchRow? row)
     {
@@ -32481,7 +32504,9 @@ public partial class MainWindow : Window
         // on a mouse capture outliving the drag.
         try
         {
-            DragDrop.DoDragDrop(SearchResultsList, data, DragDropEffects.Copy);
+            long t0 = Environment.TickCount64;
+            var effect = DragDrop.DoDragDrop(SearchResultsList, data, DragDropEffects.Copy);
+            LogDragOut("search", 1, Environment.TickCount64 - t0, effect);
         }
         finally
         {
