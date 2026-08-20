@@ -386,6 +386,8 @@ public static class ShellThumbnailService
                 ThumbnailCacheService.Write(path, thumbnail, pixelSize);
             }
 
+            LogThumb(path, source.Trim(), fromCache, thumbnail);
+
             {
                 double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0)
                     * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
@@ -520,6 +522,33 @@ public static class ShellThumbnailService
         }
     }
 
+    // 한 줄에 셋을 담는다: 누가 만들었는가(캐시·헤더·셸), DIB 헤더가 뭐라고
+    // 했는가, 그리고 나온 그림의 크기. **뒤집힌 것들이 biHeight 부호 하나로
+    // 갈리면 검사를 되살리면 되고, 안 갈리면 헤더는 정말 못 믿는 것이라 다른
+    // 길을 봐야 한다.** 셸이 아닌 경로에서는 biHeight 가 의미 없으므로 - 로 찍는다.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogThumb(string path, string source, bool fromCache, ImageSource? image)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            string bih = source == "shell"
+                ? (_lastDibHeight > 0 ? $"+{_lastDibHeight} (bottom-up)"
+                    : _lastDibHeight < 0 ? $"{_lastDibHeight} (top-down)" : "0 (no dib)")
+                : "-";
+            string size = image is BitmapSource bs ? $"{bs.PixelWidth}x{bs.PixelHeight}" : "-";
+            File.AppendAllText(
+                Path.Combine(dir, "thumb.log"),
+                $"{DateTime.Now:HH:mm:ss.fff}  src={source,-8} cache={(fromCache ? "yes" : "no ")} " +
+                $"biHeight={bih,-18} size={size,-9} {Path.GetFileName(path)}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
     private static BitmapSource? ToBitmapSource(IntPtr hBitmap)
     {
         // Reading the DIB's bits directly preserves the (premultiplied) alpha
@@ -541,6 +570,10 @@ public static class ShellThumbnailService
         // cannot be trusted in either direction, so the code does not consult
         // them: thumbnails are read the way they were read before the theory,
         // which is the way that worked.
+        _lastDibHeight = GetObject(hBitmap, Marshal.SizeOf<DIBSECTION>(), out DIBSECTION dib) != 0
+            ? dib.dsBmih.biHeight
+            : 0;
+
         if (GetObject(hBitmap, Marshal.SizeOf<BITMAP>(), out BITMAP bmp) != 0 &&
             bmp.bmBitsPixel == 32 && bmp.bmBits != IntPtr.Zero)
         {
@@ -568,6 +601,54 @@ public static class ShellThumbnailService
         public int cx;
         public int cy;
     }
+
+    // ----- 뒤집힌 썸네일을 재기 위한 것 (2026-08-19, 신고) -------------------
+    //
+    // 신고: 썸네일 바의 그림이 종종 거꾸로 뜬다. **다시 가면 바로 서고, 갓 저장한
+    // 파일에서 잘 난다.** 그 두 가지가 진단을 좁힌다 - 파일에 박힌 문제라면 같은
+    // 파일이 항상 뒤집혀야 하므로, 처음 만든 그림과 나중에 캐시에서 온 그림이
+    // 서로 다르다는 뜻이다.
+    //
+    // **높이 부호 검사는 2026-08-09에 한 번 넣었다가 뺐다**(아래 ToBitmapSource의
+    // 주석). 그때 판정은 아이콘으로 했고 아이콘은 결국 다른 경로로 옮겨서
+    // 해결됐으므로, 그 실험이 이 문제를 판정한 것이라고 보기 어렵다. 그래서
+    // 되살리기 전에 잰다.
+    //
+    // GetObject 에 BITMAP 을 주면 bmHeight 는 **항상 양수**라 방향이 안 담긴다.
+    // 방향은 DIB 섹션 헤더의 biHeight 부호에만 있다(양수면 상향식).
+    [ThreadStatic]
+    private static int _lastDibHeight;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BITMAPINFOHEADER
+    {
+        public uint biSize;
+        public int biWidth;
+        public int biHeight;
+        public ushort biPlanes;
+        public ushort biBitCount;
+        public uint biCompression;
+        public uint biSizeImage;
+        public int biXPelsPerMeter;
+        public int biYPelsPerMeter;
+        public uint biClrUsed;
+        public uint biClrImportant;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DIBSECTION
+    {
+        public BITMAP dsBm;
+        public BITMAPINFOHEADER dsBmih;
+        public uint dsBitfields0;
+        public uint dsBitfields1;
+        public uint dsBitfields2;
+        public IntPtr dshSection;
+        public uint dsOffset;
+    }
+
+    [DllImport("gdi32.dll", EntryPoint = "GetObjectW")]
+    private static extern int GetObject(IntPtr h, int c, out DIBSECTION pv);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct BITMAP
