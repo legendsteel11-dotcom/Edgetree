@@ -5169,6 +5169,7 @@
                       TreeViewItem.Expanded="ExplorerTree_ItemExpandedOrCollapsed"
                       TreeViewItem.Collapsed="ExplorerTree_ItemExpandedOrCollapsed"
                       SelectedItemChanged="ExplorerTree_SelectedItemChanged"
+                      PreviewDragOver="ExplorerTree_PreviewDragOver"
                       DragLeave="ExplorerTree_DragLeave"
                       KeyDown="ExplorerTree_KeyDown"
                       PreviewKeyDown="ExplorerTree_PreviewKeyDown"

@@ -14955,6 +14955,124 @@ public partial class MainWindow : Window
     // row crossed. So the mark only comes off when the cursor is genuinely
     // outside the tree, which is the case this handler exists for: a drag that
     // wanders off to another window, or out of the app entirely.
+    // ----- 드래그 중 트리 스크롤 (2026-08-19, 신고) --------------------------
+    //
+    // 없던 기능이고, 없어서 드롭이 한 화면 안에서만 쓸 수 있었다. 위쪽 폴더를
+    // 잡아 아래 NAS로 내리려 하면 트리가 따라오지 않고, 커서가 트리를 벗어나
+    // 경로 표시줄에 닿는 순간 막힘 표시가 뜨고 거기서 끝난다. 그래서 결국
+    // Ctrl+C/V로 돌아가게 됨(사용자, 2026-08-19).
+    //
+    // **이 앱의 "앱이 스스로 화면을 움직이지 않는다"는 규칙에 걸리지 않는다.**
+    // 그 규칙은 아무도 부탁하지 않았는데 움직이는 것을 막는 것이고, 여기서는
+    // 손이 가장자리를 누르고 있는 것 자체가 "더 가자"는 요청이다. 손을 떼면
+    // 즉시 멈춘다.
+    //
+    // 구역은 트리 안쪽이다. 트리 바깥으로 나가야 켜지면 이미 늦다 - 그 바깥이
+    // 바로 막힘 표시가 뜨는 자리다.
+    private const double DragScrollZone = 28;
+    private const int DragScrollTickMs = 60;
+
+    // 이 시간 동안 DragOver 가 한 번도 안 오면 드래그가 끝난 것으로 본다. 틱보다
+    // 넉넉해야 한다 - 손이 구역 안에서 가만히 있는 동안에도 DragOver 는 계속
+    // 오지만, 간격이 고르지는 않다.
+    private const int DragScrollIdleMs = 400;
+
+    private System.Windows.Threading.DispatcherTimer? _dragScrollTimer;
+    private int _dragScrollStep;
+
+    // 마지막으로 DragOver 를 받은 시각. 타이머가 "아직 드래그 중인가"를 이걸로
+    // 판단한다 - Mouse.LeftButton 이 아니라.
+    private long _dragScrollSeenTicks;
+
+    private void ExplorerTree_PreviewDragOver(object sender, DragEventArgs e)
+    {
+        // 행들이 자기 DragOver를 Handled로 표시하므로 터널링(Preview)이라야 자리를
+        // 가리지 않고 매번 받는다.
+        _dragScrollSeenTicks = Environment.TickCount64;
+
+        double y = e.GetPosition(ExplorerTree).Y;
+        double height = ExplorerTree.ActualHeight;
+        if (height <= DragScrollZone * 2)
+        {
+            StopDragScroll();
+            return;
+        }
+
+        // 가장자리에 가까울수록 한 번에 더 간다. 한 줄 고정이면 긴 트리에서는
+        // 손이 먼저 지친다.
+        int step = 0;
+        if (y >= 0 && y < DragScrollZone)
+        {
+            step = y < DragScrollZone / 3 ? -3 : -1;
+        }
+        else if (y > height - DragScrollZone && y <= height)
+        {
+            step = y > height - (DragScrollZone / 3) ? 3 : 1;
+        }
+
+        if (step == 0)
+        {
+            StopDragScroll();
+            return;
+        }
+
+        _dragScrollStep = step;
+        if (_dragScrollTimer is not null)
+        {
+            return;
+        }
+
+        _dragScrollTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(DragScrollTickMs)
+        };
+        _dragScrollTimer.Tick += (_, _) =>
+        {
+            // 드래그가 어떻게 끝나든 - Drop, Esc, 창 밖에서 손을 뗌 - 이 한 줄이
+            // 타이머를 거둔다. DragLeave 가 안 오는 경로가 있고, 남은 타이머는
+            // 다음 드래그 때 혼자 스크롤하는 트리가 된다.
+            //
+            // **Mouse.LeftButton 으로 보면 안 된다(2026-08-19에 물림).** OLE 드래그
+            // 동안에는 입력이 그쪽 모달 루프로 가서 WPF 가 버튼을 눌린 것으로
+            // 보고하지 않을 수 있다. 그러면 이 가드가 첫 틱에 참이 되어 기능이
+            // 시작도 못 하고 멈춘다 - 막으려던 것과 같은 이유로 안전장치가 함께
+            // 고장나는 모양이다.
+            //
+            // 대신 DragOver 가 최근에 왔는지를 본다. 드래그가 살아 있으면 커서가
+            // 이 구역 안에 있는 한 계속 오고, 끝나면 딱 끊긴다.
+            if (Environment.TickCount64 - _dragScrollSeenTicks > DragScrollIdleMs)
+            {
+                StopDragScroll();
+                return;
+            }
+
+            if (FindDescendant<ScrollViewer>(ExplorerTree) is not { } scroller)
+            {
+                StopDragScroll();
+                return;
+            }
+
+            for (int i = 0; i < Math.Abs(_dragScrollStep); i++)
+            {
+                if (_dragScrollStep < 0)
+                {
+                    scroller.LineUp();
+                }
+                else
+                {
+                    scroller.LineDown();
+                }
+            }
+        };
+        _dragScrollTimer.Start();
+    }
+
+    private void StopDragScroll()
+    {
+        _dragScrollTimer?.Stop();
+        _dragScrollTimer = null;
+    }
+
     private void ExplorerTree_DragLeave(object sender, DragEventArgs e)
     {
         var position = e.GetPosition(ExplorerTree);
@@ -14964,6 +15082,7 @@ public partial class MainWindow : Window
 
         if (!stillInside)
         {
+            StopDragScroll();
             SetDropTarget(null);
         }
     }
@@ -32414,23 +32533,6 @@ public partial class MainWindow : Window
             $"  viewport {constraints.Viewport.Height:F0}");
     }
 
-    [System.Diagnostics.Conditional("DEBUG")]
-    private void LogClickLine(string line)
-    {
-        try
-        {
-            string dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
-            Directory.CreateDirectory(dir);
-            File.AppendAllText(
-                Path.Combine(dir, "click.log"),
-                $"{DateTime.Now:HH:mm:ss.fff}  {line}{Environment.NewLine}");
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-        }
-    }
-
     // ----- 드래그 아웃이 얼마나 붙잡고 있었나 (2026-08-19, 신고) -------------
     //
     // 신고: NAS로 수백 개를 옮기는 중에 드래그 잔상이 화면에 남은 채 몇 초 멈췄다가
@@ -32449,6 +32551,23 @@ public partial class MainWindow : Window
     [System.Diagnostics.Conditional("DEBUG")]
     private void LogDragOut(string source, int count, long ms, DragDropEffects result)
         => LogClickLine($"dragout: {source} files={count} held={ms}ms result={result}");
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogClickLine(string line)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "click.log"),
+                $"{DateTime.Now:HH:mm:ss.fff}  {line}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
 
     [System.Diagnostics.Conditional("DEBUG")]
     private void LogClick(string stage, SearchRow? row)
