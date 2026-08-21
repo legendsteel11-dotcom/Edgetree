@@ -13774,6 +13774,46 @@ public partial class MainWindow : Window
     // Still needs the same realize-container-then-recurse approach as that
     // walk, since a container this far from the current scroll position may
     // not exist yet - just without any of ITS side effects.
+    // THE ROW SOMEONE ELSE IS HOLDING MAY NOT BE THE TREE'S ANY MORE.
+    // RefreshChildren (rename, delete, paste, a reload of a folder) rebuilds a
+    // folder's children as fresh instances, and anything that kept the old ones
+    // - the thumbnail bar's cells above all - is then pointing at objects no
+    // list in the tree contains. ContainerFromItem can never find a row for one,
+    // so a click on such a cell selected nothing, however long it was held, and
+    // leaving the folder and coming back was the only cure (reported
+    // 2026-08-20; click.log: "select gave up ... at=-1 of 9" - nine children and
+    // the clicked object not one of them).
+    //
+    // Re-resolving by NAME against the parent's current children repairs the
+    // one place that breaks, at the cost of one lookup on a path that is about
+    // to walk the tree anyway. The alternative - rebuilding the strip whenever a
+    // folder's children are replaced - is closer to the root but has to know
+    // every path a refresh takes, and pays for the whole bar each time.
+    //
+    // Returns the item untouched when it is still the live one (its own name
+    // finds itself) and when the folder no longer lists it at all, so callers
+    // can use it unconditionally.
+    private static FileSystemItem ResolveCurrentInstance(FileSystemItem item)
+        => item.Parent?.FindLoadedChild(item.Name) ?? item;
+
+    // The same question asked of a list that is already on screen: where in
+    // these rows is the one this item names? Siblings, so the name settles it,
+    // and the synthetic "더 보기"/"더 접기" rows are skipped rather than matched
+    // by a name of their own.
+    private static int IndexOfSameName(ItemsControl container, FileSystemItem item)
+    {
+        for (int i = 0; i < container.Items.Count; i++)
+        {
+            if (container.Items[i] is FileSystemItem row && !row.IsShowMore && !row.IsPlaceholder &&
+                string.Equals(row.Name, item.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
     private void SelectVisibleItem(FileSystemItem target)
     {
         var chain = new List<FileSystemItem>();
@@ -13807,6 +13847,30 @@ public partial class MainWindow : Window
             // do on its own - but the user asked for this row by clicking it,
             // and the successful path below scrolls to it anyway.
             int at = container.Items.IndexOf(item);
+
+            // at < 0 CAN MEAN THE OBJECT IS SIMPLY GONE, and retrying for that
+            // is the one case where more passes are certain not to help: the
+            // walk is asking a list for a row it does not contain. That happens
+            // when the holder of this item kept it across a rebuild of the
+            // folder - see ResolveCurrentInstance - so before giving up, look
+            // for the row of the same name in the list actually on show and
+            // walk on with that one.
+            //
+            // Asked of THIS container rather than of the item's own Parent,
+            // which for a stale row is the folder as it used to be. The whole
+            // chain repairs itself this way if it has to: each level is matched
+            // against the list its own container is showing, and the levels
+            // below a swapped one arrive here in turn.
+            int liveAt = at < 0 ? IndexOfSameName(container, item) : -1;
+            if (liveAt >= 0)
+            {
+                LogClickLine(
+                    $"select re-resolved: {item.Name} " +
+                    $"(stale instance, now at={liveAt} of {container.Items.Count})");
+                chain[index] = (FileSystemItem)container.Items[liveAt]!;
+                SelectVisibleItemStep(chain, index, container, attempt);
+                return;
+            }
 
             // Same tolerance as RevealChainStep - a container can genuinely
             // not exist yet for a level that's mid-realization.
@@ -27698,6 +27762,19 @@ public partial class MainWindow : Window
 
         var match = _filmstripCells.FirstOrDefault(cell =>
             ReferenceEquals(cell.Item, ViewerItem));
+
+        // THE OTHER HALF OF THE STALE-INSTANCE FIX. The cells outlive a rebuild
+        // of the folder they were made from, so after one the tree is holding a
+        // fresh instance of the very file a cell is showing and the reference
+        // check finds nothing - the strip would then light no cell, or leave
+        // the one lit for the file before. The path is the same file either
+        // way, so ask that when the reference misses.
+        if (match is null && ViewerItem is { IsDirectory: false } selected)
+        {
+            match = _filmstripCells.FirstOrDefault(cell =>
+                string.Equals(cell.Path, selected.FullPath, StringComparison.OrdinalIgnoreCase));
+        }
+
         if (match is null)
         {
             // A FOLDER IS NOT IN ITS OWN STRIP, so there is nothing to light -
@@ -28906,6 +28983,17 @@ public partial class MainWindow : Window
             return;
         }
 
+        // The strip's cells outlive a rebuild of the folder they were made
+        // from - see ResolveCurrentInstance for what that costs. Swapped here
+        // rather than only where the selection walk gives up, because the
+        // reveal below asks the same question: ShowChildrenUpTo looks the row
+        // up in the overflow, and a stale instance is no more in that list than
+        // in Children, so a click past the cap would fail before the walk was
+        // ever reached.
+        var live = ResolveCurrentInstance(target);
+        bool stale = !ReferenceEquals(live, target);
+        target = live;
+
         // A row past the folder's "더 보기" cap is one the counter and the strip
         // already promised, so the reveal happens rather than the click doing
         // nothing. Only the tree has a cap to cross; a result list has none.
@@ -28924,6 +29012,7 @@ public partial class MainWindow : Window
         // nothing, whatever happens below.
         LogClickLine(
             $"strip move: target={target.Name} wasHidden={(hidden ? "yes" : "-")} " +
+            $"wasStale={(stale ? "yes" : "-")} " +
             $"nowInTree={(target.Parent?.Children.Contains(target) != false ? "yes" : "NO")}");
 
         // Selects, scrolls to and focuses the tree row; selection-follow then

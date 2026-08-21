@@ -746,6 +746,18 @@ public class FileSystemItem : INotifyPropertyChanged
         Children.ReplaceAll(capped);
     }
 
+    // The instance this folder currently lists under that name, revealed or
+    // waiting behind "더 보기", or null if it lists nothing by that name.
+    //
+    // Deliberately does NOT reveal the way FindChildForNavigation does: this
+    // exists to ask whether a row someone else is holding is still the one in
+    // the tree, and a question that moves rows about could not be asked from
+    // the places that need to ask it.
+    public FileSystemItem? FindLoadedChild(string name)
+        => AllLoadedChildren.FirstOrDefault(c =>
+            !c.IsPlaceholder &&
+            string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+
     // Finds a direct child by name for navigation, looking past the cap into
     // the overflow too - and revealing the overflow when the match is hidden
     // there, so RevealChain can realize its container. A path segment is
