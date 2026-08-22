@@ -1,4 +1,4 @@
-# Edgetree v2.4.2
+# Edgetree v2.5.0
 
 [한국어 안내](README-ko.md)
 
@@ -216,6 +216,15 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v2.5.0 (2026-08-22)
+
+- The thumbnail bar can lay its pictures out as a scrolling list, now the default.
+- Ctrl+wheel sizes the thumbnails; dragging the edge shows more rows.
+- Select several pictures and copy, cut, delete or drag them out together.
+- Files with no picture of their own show their file-type icon.
+- Thumbnails no longer come up upside down now and then.
+- A thumbnail click no longer fails to change the picture.
 
 ### v2.4.2 (2026-08-19)
 

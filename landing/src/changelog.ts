@@ -45,6 +45,31 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // THE LIST IS THE RELEASE, so it takes four of the six lines; the two fix
+    // lines are named because both are intermittent shipped bugs, which the
+    // person who hit them knows only by the symptom. The hidden-items option
+    // was drafted here and cut - it shipped inside v2.4.2's assets (the release
+    // was built past its version-bump commit), so listing it again would
+    // describe one release twice.
+    version: 'v2.5.0',
+    ko: [
+      '썸네일 바에 세로로 스크롤되는 `썸네일 목록` 배치가 추가되었으며, 기본값으로 적용됩니다.',
+      '썸네일 크기는 `Ctrl`+휠, 표시되는 줄 수는 경계 드래그로 조정할 수 있습니다.',
+      '썸네일 목록에서 여러 파일을 선택해 복사, 잘라내기, 삭제, 밖으로 드래그할 수 있습니다.',
+      '썸네일이 없는 파일은 종류 아이콘으로 표시됩니다.',
+      '썸네일이 간혹 거꾸로 표시되던 문제를 수정했습니다.',
+      '썸네일을 클릭해도 이미지가 바뀌지 않던 문제를 수정했습니다.',
+    ],
+    en: [
+      'The thumbnail bar can lay its pictures out as a scrolling list, now the default.',
+      'Ctrl+wheel sizes the thumbnails; dragging the edge shows more rows.',
+      'Select several pictures and copy, cut, delete or drag them out together.',
+      'Files with no picture of their own show their file-type icon.',
+      'Thumbnails no longer come up upside down now and then.',
+      'A thumbnail click no longer fails to change the picture.',
+    ],
+  },
+  {
     // ELEVEN LINES IN THE RELEASE NOTES, SIX HERE. What came out is what a
     // person finds while using the app rather than while deciding to download
     // it: the panel folding on Backspace, the thumbnail bar stepping aside in
