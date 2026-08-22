@@ -29429,8 +29429,6 @@ public partial class MainWindow : Window
                 grid ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled);
         }
 
-        ApplyFilmstripGridHeight();
-
         // The position dot belongs to the horizontal bar it is drawn on. The
         // list has an ordinary vertical scrollbar, which already says where it
         // is, so the mark would be a second answer to a question already
@@ -29440,7 +29438,14 @@ public partial class MainWindow : Window
             ViewerFilmstripMarker.Visibility = Visibility.Collapsed;
         }
 
+        // CELL SIZE FIRST, HEIGHT SECOND - the same order the Ctrl+wheel path
+        // keeps, and for the same reason: the height's one-row minimum and
+        // content ceiling are counted in cell footprints, and until the sizes
+        // are applied the footprint resources still describe the OTHER mode's
+        // cells. Height-first left a small folder's strip sized for bar-height
+        // rows after a switch to the list, until the next resize recomputed it.
         ApplyFilmstripCellSize();
+        ApplyFilmstripGridHeight();
         RefreshFilmstripFetchSize();
 
         // THE PICTURE ON SCREEN KEEPS ITS CELL IN VIEW ACROSS THE SWAP. The new
