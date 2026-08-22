@@ -2150,6 +2150,39 @@ public partial class MainWindow : Window
             }
         }
 
+        // ↑↓ ARE A ROW IN THE LIST, and the rule licensing that is the one ←→
+        // already run on: the strip being on screen is a visible reason for the
+        // keys to mean something else. Only ever in the LIST layout, because
+        // only there is there such a thing as a row - in the bar, ↑↓ stay the
+        // tree's, where one press is one file and that is already the carousel.
+        //
+        // Guarded exactly like the ←→ branch above: a row the carousel walks.
+        // With the selection on a FOLDER the tree keeps its keys, so walking the
+        // tree with the panel open is untouched - it is only inside the folder
+        // being looked at that a press means a row of pictures.
+        //
+        // Below the media branch on purpose: over a playing film ↑↓ are the
+        // volume, which is the older rule and the one the hand is more likely
+        // to be reaching for.
+        if (Keyboard.Modifiers == ModifierKeys.None &&
+            _viewerOpen &&
+            FilmstripGridMode &&
+            _viewerListOverride is null &&
+            ViewerFilmstripHost.Visibility == Visibility.Visible &&
+            (e.Key == Key.Up || e.Key == Key.Down) &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase &&
+            ViewerItem is { } gridRow && IsViewerCarouselItem(gridRow))
+        {
+            // CLAMPED, unlike a chevron. A step of one either exists or it does
+            // not, but a row lands past the end whenever the last row is short -
+            // and a key that does nothing near the end of a folder reads as the
+            // strip having stopped answering.
+            ViewerCarouselStep(
+                e.Key == Key.Down ? FilmstripColumns : -FilmstripColumns, clamp: true);
+            e.Handled = true;
+            return;
+        }
+
         // BARE +/- is the viewer's zoom (Ctrl+/- stays the app's font size -
         // two different scales on one pair of keys, told apart by the
         // modifier). Only while the panel is open and showing something
@@ -30325,7 +30358,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ViewerCarouselStep(int direction)
+    private void ViewerCarouselStep(int direction, bool clamp = false)
     {
         // A chevron is someone taking the pictures back into their own hands.
         StopSlideshowOnUserAction("chevron");
@@ -30338,8 +30371,16 @@ public partial class MainWindow : Window
         var images = GetViewerCarouselItems(current);
         int index = images.IndexOf(current);
         int next = index + direction;
+        if (clamp && index >= 0 && images.Count > 0)
+        {
+            // A row-sized step lands past the end whenever the last row is
+            // short, and a key that does nothing there reads as a fault. A
+            // chevron keeps its own rule: one step either exists or it does not.
+            next = Math.Clamp(next, 0, images.Count - 1);
+        }
+
         LogCarouselStep(direction, index, next, images.Count);
-        if (index < 0 || next < 0 || next >= images.Count)
+        if (index < 0 || next < 0 || next >= images.Count || next == index)
         {
             return;
         }
