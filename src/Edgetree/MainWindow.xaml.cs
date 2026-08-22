@@ -28273,6 +28273,19 @@ public partial class MainWindow : Window
     // and a half of background work.
     private const int FilmstripLookahead = 100;
 
+    // AS MANY SCREENS AHEAD, not as many cells. The number above was chosen for
+    // a bar showing a dozen frames at a time, where 100 is eight screens of
+    // runway; the list shows forty at once, where the same 100 is barely two and
+    // a half - so the two shapes were being given very different amounts of
+    // warning from one constant.
+    //
+    // Scaled by what is actually on screen, with the constant as the FLOOR so
+    // the bar is untouched, and a ceiling that keeps the cost inside the budget
+    // the number above was measured against (200 header reads is about a second
+    // and a half of background work).
+    private static int FilmstripLookaheadFor(int visible) =>
+        Math.Clamp(Math.Max(1, visible) * 3, FilmstripLookahead, 200);
+
     // The same measurement said the other half of this: 128 of those 322 files
     // - two in five - carry no thumbnail in their own header, and nothing but
     // the shell can make one for them. Left at that, the strip fills 60% ahead
@@ -28362,7 +28375,7 @@ public partial class MainWindow : Window
         // service's queue is a LIFO stack, so whatever is pushed LAST is served
         // first - walking outward from the middle would hand the far edge of the
         // lookahead priority over the cell under the user's eyes.
-        for (int reach = FilmstripLookahead; reach >= 1; reach--)
+        for (int reach = FilmstripLookaheadFor(last - first + 1); reach >= 1; reach--)
         {
             RequestFilmstripThumbnail(first - reach, ahead: true, remote);
             RequestFilmstripThumbnail(last + reach, ahead: true, remote);
@@ -28472,7 +28485,7 @@ public partial class MainWindow : Window
         int centre = (first + last) / 2;
         int reachLimit = _settings.ViewerPrecacheThumbnails
             ? FilmstripRetainReach
-            : FilmstripLookahead + (last - first);
+            : FilmstripLookaheadFor(last - first + 1) + (last - first);
         FilmstripCell? target = null;
         for (int reach = 0; reach <= reachLimit; reach++)
         {
@@ -28806,6 +28819,17 @@ public partial class MainWindow : Window
     {
         _filmstripFitWidth = e.NewSize.Width;
         ApplyFilmstripCellSize();
+
+        // A WIDTH CHANGE MOVES CELLS IN THE LIST EVEN WHEN NOTHING RESIZES.
+        // Wider means another column, which pulls a different set of cells onto
+        // the screen at the same scroll position - and a cell that arrives that
+        // way announces nothing, because its container is built by the layout
+        // rather than by a scroll. The bar has never needed this: its cells sit
+        // in one row and a width change only shows more of the same ones.
+        if (FilmstripGridMode)
+        {
+            ScheduleFilmstripThumbnails();
+        }
     }
 
     // ----- 오른쪽에 남던 자투리 -------------------------------------------------
