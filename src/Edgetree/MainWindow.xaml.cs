@@ -25663,6 +25663,10 @@ public partial class MainWindow : Window
         // 위치도 같은 자리에서. 검은 띠의 높이가 칸 크기와 영상 비율에서 나오므로
         // 크기와 정확히 같은 순간에 다시 계산되어야 한다.
         ApplySubtitleBottom();
+        // 그리고 목록의 높이도 여기서 다시 접힌다. 창이 작아지면 그림에 남겨 둔
+        // 바닥을 지켜야 하고, 다시 커지면 사용자가 고른 높이를 돌려줘야 한다.
+        // 값이 실제로 달라졌을 때만 쓰는 것은 위의 셋과 같은 이유다.
+        ApplyFilmstripGridHeight();
 
         if (!_viewerOpen || _viewerPixelWidth <= 0)
         {
@@ -27686,14 +27690,61 @@ public partial class MainWindow : Window
     private double FilmstripGridHeight => Math.Clamp(
         _settings.ViewerFilmstripGridHeight, FilmstripMinGridHeight, FilmstripMaxGridHeight);
 
+    // THE PICTURE KEEPS A FLOOR, not a share. The strip's row is Auto against
+    // the picture's *, so an explicit height takes exactly what it asks for and
+    // a grip dragged to the top would otherwise leave the picture with nothing
+    // at all. A share was tried first and was the wrong shape: it takes the same
+    // proportion from a tall panel, where there is plenty to give, as from a
+    // short one.
+    //
+    // The stored number stays whatever the user chose; only what is APPLIED
+    // bends to the window they are in, so making the window taller gives the
+    // list back the height it was asked for.
+    private double MaxFilmstripGridHeightNow()
+    {
+        double panel = ViewerPanel.ActualHeight;
+        if (panel <= 0)
+        {
+            return FilmstripMaxGridHeight;
+        }
+
+        // THREE ROWS SHARE THIS PANEL, not two: the picture, the strip, and the
+        // caption under it. The caption is measured rather than assumed - it
+        // carries the transport when a film is up and is shorter over a
+        // picture, so a constant here would be wrong in one of the two.
+        double caption = ViewerCaptionPanel.Visibility == Visibility.Visible
+            ? ViewerCaptionPanel.ActualHeight
+            : 0;
+
+        return Math.Max(FilmstripMinGridHeight, Math.Min(
+            FilmstripMaxGridHeight, panel - caption - FilmstripPictureFloor));
+    }
+
     // The list's own height range. Two rows at the smallest cell is the floor -
     // anything less is a bar with a vertical scrollbar, which is worse than the
-    // bar at being one. The ceiling leaves the picture the larger share of the
-    // panel; past that the strip is what the panel is for, and the panel has a
-    // way to be that already (open the picture full screen and turn the strip
-    // off).
+    // bar at being one.
+    //
+    // The ceiling is deliberately far past any panel: what actually stops the
+    // grip is the floor kept for the picture below, and the author asked for
+    // that to be small (2026-08-22, "보던 그림의 크기가 훨씬 더 작아져도 될거
+    // 같습니다"). Someone browsing a folder wants the browsing surface, and the
+    // picture at the top is there to say which one is selected - a job it can
+    // do small.
     private const double FilmstripMinGridHeight = 96;
-    private const double FilmstripMaxGridHeight = 640;
+    private const double FilmstripMaxGridHeight = 2000;
+
+    // What the PICTURE keeps whatever the grip is asked for - not what is left
+    // over above the strip, which is a different number and was the mistake the
+    // first version made: 120 was subtracted from the whole panel, and the
+    // caption row underneath (name, size, transport) took most of it, leaving
+    // the picture about thirty pixels (reported 2026-08-22 with a screenshot).
+    // The caption's own height is measured and taken off separately below.
+    //
+    // 200 rather than the 120 that was tried: the author asked for the picture
+    // to be allowed much smaller than a share of the panel, and then said this
+    // was too small. It is the size at which the picture still answers "which
+    // one am I on" from across the room.
+    private const double FilmstripPictureFloor = 200;
 
     // One notch of Ctrl + wheel. Coarse on purpose: the sizes anyone actually
     // wants are a handful, and a fine step means spinning the wheel to cross the
@@ -28944,6 +28995,29 @@ public partial class MainWindow : Window
     // scrolls, and who owns the strip's height. Everything else about the strip
     // is the same in both shapes on purpose - the cells, their template, the
     // selection, the drag-out, and every line that fetches a picture.
+    // The bar is as tall as one row of cells and says so by measuring itself
+    // (NaN is Auto, which is how the strip's row was written before the list
+    // existed); the list is as tall as the user has dragged it, or as much of
+    // that as this window can spare. Written only on a change - it runs from
+    // the panel's resize, which is a per-frame path while a width drag is on.
+    private void ApplyFilmstripGridHeight()
+    {
+        double height = FilmstripGridMode
+            ? Math.Min(FilmstripGridHeight, MaxFilmstripGridHeightNow())
+            : double.NaN;
+
+        double current = ViewerFilmstripHost.Height;
+        bool same = double.IsNaN(height)
+            ? double.IsNaN(current)
+            : !double.IsNaN(current) && Math.Abs(current - height) < 0.5;
+        if (same)
+        {
+            return;
+        }
+
+        ViewerFilmstripHost.Height = height;
+    }
+
     private bool? _filmstripLayoutIsGrid;
 
     private void ApplyFilmstripLayout()
@@ -28968,10 +29042,7 @@ public partial class MainWindow : Window
                 grid ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled);
         }
 
-        // The bar is as tall as one row of cells and says so by measuring itself;
-        // the list is as tall as the user has dragged it. NaN is Auto, which is
-        // how the row was written before the list existed.
-        ViewerFilmstripHost.Height = grid ? FilmstripGridHeight : double.NaN;
+        ApplyFilmstripGridHeight();
 
         // The position dot belongs to the horizontal bar it is drawn on. The
         // list has an ordinary vertical scrollbar, which already says where it
@@ -28984,6 +29055,38 @@ public partial class MainWindow : Window
 
         ApplyFilmstripCellSize();
         RefreshFilmstripFetchSize();
+
+        // THE PICTURE ON SCREEN KEEPS ITS CELL IN VIEW ACROSS THE SWAP. The new
+        // panel starts at the top of the folder, so without this a switch made
+        // 1,800 files in dropped the user back at the first row.
+        //
+        // SCROLLED HERE RATHER THAN LEFT TO SyncFilmstripToSelection, which
+        // returns the moment the cell it wants is already the selected one -
+        // true after a swap, and its whole point is that nothing then needs
+        // moving. That reasoning holds for every other caller and only fails
+        // here, because a layout change moves the cell without changing which
+        // cell it is (reported 2026-08-22: switching back to the bar left it
+        // parked at the start until something else was clicked).
+        //
+        // After layout, not during it: the panel that has just been handed over
+        // has no viewport yet, and a scroll measured against it would be
+        // arithmetic on zero.
+        Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Loaded,
+            new Action(() =>
+            {
+                if (ViewerFilmstrip.SelectedItem is FilmstripCell selected)
+                {
+                    ScrollFilmstripTo(selected);
+                }
+                else
+                {
+                    SyncFilmstripToSelection();
+                }
+
+                ScheduleFilmstripThumbnails();
+            }));
+
         ScheduleFilmstripThumbnails();
     }
 
@@ -29382,8 +29485,8 @@ public partial class MainWindow : Window
             _settings.ViewerFilmstripGridHeight = Math.Clamp(
                 FilmstripGridHeight - e.VerticalChange,
                 FilmstripMinGridHeight,
-                FilmstripMaxGridHeight);
-            ViewerFilmstripHost.Height = _settings.ViewerFilmstripGridHeight;
+                MaxFilmstripGridHeightNow());
+            ApplyFilmstripGridHeight();
             return;
         }
 
