@@ -492,6 +492,9 @@ public static class HelpContent
                     // panel away.
                     R("Backspace", "패널 접기 (패널이 펼쳐져 있을 때)",
                       "Backspace", "Fold the panel away, while it is open"),
+                    // 목록의 한 줄 이동은 일부러 안 적었다(사용자, 2026-08-22):
+                    // 격자에서 ↑↓가 줄을 걷는 것은 너무 자연스러워서 사소하고,
+                    // 재생 중 볼륨 등 다른 ↑↓ 설명과 부딪혀 오히려 헷갈린다.
                     R("↑ ↓", "이전 · 다음 항목", "↑ ↓", "Previous · next item"),
                     R("← →", "썸네일 바 켜져 있을 때 이전 · 다음",
                       "← →", "Previous · next, while the thumbnail bar is open"),
@@ -654,8 +657,29 @@ public static class HelpContent
                     R("영상을 전체화면으로 볼 때", "썸네일 바는 자리를 내주고, 전체화면을 나가면 돌아옴. 우클릭 → 썸네일 바로 그 자리에서 다시 부를 수 있음",
                       "While a film is full screen",
                       "The bar steps aside and comes back on the way out; right-click → Thumbnail bar calls it in for that stretch"),
-                    R("칸을 밖으로 드래그", "다른 앱으로 드롭", "Drag a cell out", "Drop it into another app"),
-                    R("바 위쪽 가장자리 드래그", "칸 크기 조절", "Drag the bar's top edge", "Cell size"),
+                    // THE WAY BACK COMES RIGHT AFTER THE WAYS IN (2026-08-22).
+                    // The list became the default with v2.5.0, so the reader
+                    // most likely to arrive here is the one whose bar changed
+                    // shape after an update - same reasoning as the full-screen
+                    // row above: an unexplained change reads as a fault.
+                    R("옵션 → 멀티미디어 패널 → 썸네일 목록으로 보기", "여러 줄 목록(기본)과 한 줄 바 중 선택",
+                      "Options → Multimedia panel → Thumbnail list layout",
+                      "The multi-row list (the default) or the single-row bar"),
+                    // ONE ROW FOR THE TWO GRIPS. The same edge does different
+                    // work per shape, and two rows would read as two edges.
+                    R("바 위쪽 가장자리 드래그", "목록은 표시되는 줄 수, 바는 칸 크기 조정",
+                      "Drag the top edge", "Rows on show in the list; cell size in the bar"),
+                    R("목록에서 Ctrl+휠", "썸네일 크기 조정",
+                      "Ctrl+wheel over the list", "Thumbnail size"),
+                    R("Ctrl+클릭 · Shift+클릭", "여러 개 선택 · 범위 선택 (Ctrl+Shift는 범위 추가, Ctrl+A는 전체)",
+                      "Ctrl+click · Shift+click",
+                      "Pick several · pick a range (Ctrl+Shift adds a range, Ctrl+A takes all)"),
+                    R("선택한 칸에서 우클릭", "선택한 파일 전체를 복사 · 잘라내기 · 삭제",
+                      "Right-click a picked cell", "Copy, cut or delete everything picked"),
+                    R("칸을 밖으로 드래그", "다른 앱으로 드롭, 여러 개 선택했으면 함께 감",
+                      "Drag a cell out", "Drop it into another app; a picked set travels together"),
+                    R("목록에 파일 끌어다 놓기", "보고 있는 폴더로 복사",
+                      "Drop files onto the list", "They land in the folder on show"),
                     R("옵션 → 멀티미디어 패널", "이미지 썸네일 캐싱 · 캐싱 파일 정리",
                       "Options → Multimedia panel", "Preload thumbnails · clean the cache up"),
                 }),
