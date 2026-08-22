@@ -21243,6 +21243,24 @@ public partial class MainWindow : Window
     // other thing here holding pixels is the full-size decode in the panel - a
     // 3840x2160 photo is 33MB of BGRA on its own (2026-08-12). Counted so the
     // next round starts from a number instead of a suspicion.
+    // HOW MANY CELLS ACTUALLY EXIST AS CONTAINERS, beside how many are holding a
+    // picture. The two answer different questions and only together say whether
+    // a folder is affordable: thumbs is pixels (and a small cell's are cheap -
+    // 2,398 at 48x96 came to 48MB), while this is WPF elements, which is what a
+    // layout that forgot to virtualize would run away with. The tree's own
+    // realized-row count is on this line for the same reason and settled the
+    // same question once already.
+    //
+    // ASKED FOR THE ITEMS PANEL BY TYPE, not for the first Panel in the tree.
+    // The first one is the strip's own ScrollViewer template Grid, and it has
+    // three children whatever the folder holds - so the line read "real 3" for
+    // a folder of 2,398 and looked like a triumph of virtualization until the
+    // number failed to move (2026-08-22, caught within a minute of adding it).
+    private int RealizedFilmstripCells() =>
+        FindDescendant<VirtualizingWrapPanel>(ViewerFilmstrip)?.Children.Count
+        ?? FindDescendant<VirtualizingStackPanel>(ViewerFilmstrip)?.Children.Count
+        ?? 0;
+
     private double ViewerDecodedMegabytes()
     {
         double bytes = 0;
@@ -21306,7 +21324,7 @@ public partial class MainWindow : Window
                 $"{DateTime.Now:HH:mm:ss}  private {_selfProcess.PrivateMemorySize64 / (1024 * 1024),5} MB" +
                 $"  ws {_selfProcess.WorkingSet64 / (1024 * 1024),5} MB" +
                 $"  managed {GC.GetTotalMemory(false) / (1024 * 1024),5} MB" +
-                $"  cells {_filmstripCells.Count,5}  thumbs {held,5}" +
+                $"  cells {_filmstripCells.Count,5}  real {RealizedFilmstripCells(),4}  thumbs {held,5}" +
                 $" ({pixW}x{pixH}, ask {FilmstripFetchSize}, ={bytes / (1024 * 1024),5:F0} MB)" +
                 $"  view {ViewerDecodedMegabytes(),4:F0} MB" +
                 $"  rows {rows,5}" +
