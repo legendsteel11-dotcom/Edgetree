@@ -477,10 +477,31 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
                 <ScrollContentPresenter Grid.Row="0"
+                        Grid.Column="0"
                         Content="{TemplateBinding Content}"
                         CanContentScroll="{TemplateBinding CanContentScroll}"
                         Margin="{TemplateBinding Padding}"/>
+                <!-- The list layout's bar. Only one of the two is ever computed
+                     visible - the strip disables the axis it does not use - so
+                     the two lanes cost nothing in the mode that does not need
+                     them, and each keeps the same lane-of-its-own reasoning
+                     above. -->
+                <ScrollBar x:Name="PART_VerticalScrollBar"
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Margin="0,0,0,0"
+                        Style="{StaticResource MinimalScrollBarStyle}"
+                        Opacity="1"
+                        Orientation="Vertical"
+                        Value="{TemplateBinding VerticalOffset}"
+                        Maximum="{TemplateBinding ScrollableHeight}"
+                        ViewportSize="{TemplateBinding ViewportHeight}"
+                        Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
                 <!-- HELD OFF THE RIGHT EDGE. The panel can sit flush against the
                      window's edge, where the resize grip lives, and a thumb
                      driven into that last few pixels became a fight between two
@@ -490,6 +511,7 @@
                      where the strip most often ends up. -->
                 <ScrollBar x:Name="PART_HorizontalScrollBar"
                         Grid.Row="1"
+                        Grid.Column="0"
                         Margin="0,0,10,0"
                         Style="{StaticResource MinimalScrollBarStyle}"
                         Opacity="1"

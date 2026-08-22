@@ -1953,6 +1953,15 @@
                     </MenuItem.Header>
                 </MenuItem>
                 <Separator/>
+                <!-- WHAT SHAPE THE STRIP TAKES, at the head of the thumbnail
+                     group because everything under it (preloading, the cache,
+                     the size ceiling) applies to both shapes. The rows below
+                     answer how the pictures are fetched; this one answers how
+                     they are laid out. -->
+                <MenuItem Header="{x:Static services:Strings.MenuFilmstripGrid}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="filmstripGrid"
+                        Click="FilmstripGridMenuItem_Click"/>
                 <MenuItem Header="{x:Static services:Strings.MenuPrecacheThumbnails}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="precacheThumbnails"
@@ -2543,6 +2552,26 @@
              The bar is an OVERLAY there, drawn on top of the content rather
              than in a lane of its own, so the strip keeps every pixel of its
              height. -->
+        <!-- THE TWO LAYOUTS THE SAME CELLS CAN TAKE. One row that scrolls
+             sideways, or several that scroll down; the cells, their template,
+             the selection and every gesture on them are shared, so the mode is
+             one assignment (ApplyFilmstripLayout) rather than a second control.
+
+             The wrap panel takes the cell's FOOTPRINT rather than its size -
+             cell plus the gap that follows it - because the gap is what the
+             bar's cells carry as their own margin, and a grid needs one below
+             each row as well. Both numbers are set beside the cell size itself
+             (ApplyFilmstripCellSize), so one place owns the arithmetic. -->
+        <ItemsPanelTemplate x:Key="FilmstripBarPanel">
+            <VirtualizingStackPanel Orientation="Horizontal"/>
+        </ItemsPanelTemplate>
+
+        <ItemsPanelTemplate x:Key="FilmstripGridPanel">
+            <local:VirtualizingWrapPanel
+                    ItemWidth="{DynamicResource FilmstripCellFootprintWidth}"
+                    ItemHeight="{DynamicResource FilmstripCellFootprintHeight}"/>
+        </ItemsPanelTemplate>
+
         <Style x:Key="FilmstripListBoxStyle"
                 TargetType="ListBox">
             <Setter Property="Template">
@@ -7666,10 +7695,11 @@
                                 PreviewMouseLeftButtonDown="ViewerFilmstrip_PreviewMouseLeftButtonDown"
                                 PreviewMouseMove="ViewerFilmstrip_PreviewMouseMove"
                                 PreviewMouseLeftButtonUp="ViewerFilmstrip_PreviewMouseLeftButtonUp">
+                            <!-- The starting layout only; ApplyFilmstripLayout
+                                 swaps it with the stored mode on startup and
+                                 whenever the mode changes. -->
                             <ListBox.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <VirtualizingStackPanel Orientation="Horizontal"/>
-                                </ItemsPanelTemplate>
+                                <StaticResource ResourceKey="FilmstripBarPanel"/>
                             </ListBox.ItemsPanel>
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">

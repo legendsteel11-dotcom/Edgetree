@@ -47,6 +47,16 @@ public class AppSettings
     public bool ViewerFilmstrip { get; set; } = false;
     public double ViewerFilmstripCellHeight { get; set; } = 64;
 
+    // 목록 모드. 같은 셀을 한 줄로 늘어놓는 대신 여러 줄로 접어 세로로 훑는다.
+    //
+    // **크기와 높이를 바 모드와 따로 기억하는 이유**: 두 모드에서 그 둘이 뜻하는
+    // 것이 다르다. 바에서는 높이가 곧 셀 크기지만, 목록에서는 높이가 몇 줄이
+    // 보이느냐이고 셀 크기는 따로 정한다. 한 값을 나눠 쓰면 모드를 오갈 때마다
+    // 상대편이 맞춰 둔 것이 어긋난다.
+    public bool ViewerFilmstripGrid { get; set; } = false;
+    public double ViewerFilmstripGridCellSize { get; set; } = 96;
+    public double ViewerFilmstripGridHeight { get; set; } = 240;
+
     // 재생 볼륨. 0.6은 슬라이더가 XAML에 박고 있던 값 그대로이므로, 이 설정이
     // 없던 사람에게는 지금까지와 같다.
     //
@@ -968,6 +978,8 @@ public class AppSettings
         ExpandedWidth = Sane(ExpandedWidth, 240, min: 1);
         ViewerWidth = Sane(ViewerWidth, 360, min: 1);
         ViewerFilmstripCellHeight = Sane(ViewerFilmstripCellHeight, 64, min: 1);
+        ViewerFilmstripGridCellSize = Sane(ViewerFilmstripGridCellSize, 96, min: 1);
+        ViewerFilmstripGridHeight = Sane(ViewerFilmstripGridHeight, 240, min: 1);
         ViewerVolume = Sane(ViewerVolume, 0.6, min: 0, max: 1);
         // 볼륨 옆에 이 둘이 없던 것이 2026-08-19 점검에서 걸렸다. 범위는
         // 쓰는 자리가 정하므로(상수가 MainWindow에 있고 거기서 Math.Clamp를

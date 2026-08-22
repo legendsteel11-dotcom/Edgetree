@@ -435,6 +435,9 @@ public static class Strings
     // label admitting it needs a translation. The English keeps its own name
     // rather than being translated back.
     public static string ViewerFilmstrip = "썸네일 바";
+    // 같은 셀을 한 줄이 아니라 여러 줄로 접어 세로로 훑는 배치. 옵션 메뉴에 있어
+    // 주어를 받을 윗줄이 없으므로 `썸네일`을 적는다.
+    public static string MenuFilmstripGrid = "썸네일 목록으로 보기";
     // 앱 전체화면이 창 모드에서 어디까지 가는지. 사용자가 고른 말이고, "화면 전체"
     // 대신 `바탕화면`인 것이 요점 - 앱 전체화면 자체가 이미 "화면"을 쓰고 있어서
     // 그 말로는 둘이 구분되지 않는다.
@@ -1082,6 +1085,7 @@ public static class Strings
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
         ViewerFilmstrip = "Thumbnail bar";
+        MenuFilmstripGrid = "Thumbnail list layout";
         ViewerFullscreen = "Full screen";
         GestureWheelClick = "Wheel Click";
         ViewerFullDesktop = "Fill the desktop";

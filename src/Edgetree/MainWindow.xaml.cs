@@ -667,6 +667,11 @@ public partial class MainWindow : Window
 
         AttachViewerMediaContextMenu();
 
+        // Which shape the thumbnail strip takes, before it is ever shown: the
+        // panel it is given decides how its cells are built, so choosing after
+        // the first folder had arrived would build them twice.
+        ApplyFilmstripLayout();
+
         // Off the UI thread and never awaited: it walks the cache directory to
         // learn its size, which is the only thing standing between a full cache
         // and a trim. Nothing waits on the answer - the cache reads and writes
@@ -8328,6 +8333,11 @@ public partial class MainWindow : Window
             FindMenuItem(menu, "languageMenu") is { } languageMenu &&
             FindMenuItem(menu, "imageViewer") is { } imageViewer)
         {
+            if (FindMenuItem(imageViewer, "filmstripGrid") is { } filmstripGrid)
+            {
+                filmstripGrid.IsChecked = _settings.ViewerFilmstripGrid;
+            }
+
             if (FindMenuItem(imageViewer, "thumbnailSizeRow") is { } thumbnailSizeRow)
             {
                 UpdateStepperRow(thumbnailSizeRow, FilmstripMaxFetchSize,
@@ -11866,7 +11876,7 @@ public partial class MainWindow : Window
             UpdateViewerClock();
             _filmstripBuiltFor = default;
             UpdateViewerCarousel();
-            ApplyFilmstripCellSize();
+            ApplyFilmstripLayout();
 
             // 화면에 있는 그림을 프리셋이 말한 크기로 다시 맞춘다. ByHand가 아닌
             // 것은 이것이 손이 아니라 프리셋이고, 값은 ApplyTo가 이미 적었기
@@ -27641,8 +27651,37 @@ public partial class MainWindow : Window
         }
     }
 
+    // WHICH SHAPE THE SAME CELLS TAKE. One row that scrolls sideways, or several
+    // that scroll down. Everything about a cell is shared between the two - the
+    // template, the selection, the drag-out, the fetching - so this is a layout
+    // question and nothing else asks it.
+    private bool FilmstripGridMode => _settings.ViewerFilmstripGrid;
+
+    // In the bar the grip IS the cell size; in the list the grip is how many
+    // rows are on show and the size has its own control (Ctrl + wheel). Same
+    // range either way: it is the same cell, and the fetch step is derived from
+    // it in both.
     private double FilmstripCellHeight => Math.Clamp(
-        _settings.ViewerFilmstripCellHeight, FilmstripMinCellHeight, FilmstripMaxCellHeight);
+        FilmstripGridMode ? _settings.ViewerFilmstripGridCellSize : _settings.ViewerFilmstripCellHeight,
+        FilmstripMinCellHeight, FilmstripMaxCellHeight);
+
+    private double FilmstripGridHeight => Math.Clamp(
+        _settings.ViewerFilmstripGridHeight, FilmstripMinGridHeight, FilmstripMaxGridHeight);
+
+    // The list's own height range. Two rows at the smallest cell is the floor -
+    // anything less is a bar with a vertical scrollbar, which is worse than the
+    // bar at being one. The ceiling leaves the picture the larger share of the
+    // panel; past that the strip is what the panel is for, and the panel has a
+    // way to be that already (open the picture full screen and turn the strip
+    // off).
+    private const double FilmstripMinGridHeight = 96;
+    private const double FilmstripMaxGridHeight = 640;
+
+    // One notch of Ctrl + wheel. Coarse on purpose: the sizes anyone actually
+    // wants are a handful, and a fine step means spinning the wheel to cross the
+    // range.
+    private const double FilmstripGridCellStep = 16;
+
 
     // Called on every selection change (through UpdateViewerCarousel), so the
     // common case has to be cheap: same folder, same length, nothing to do but
@@ -27857,6 +27896,15 @@ public partial class MainWindow : Window
         // nothing has actually changed.
         ApplyFilmstripCellSize();
 
+        // The mark is drawn on the horizontal bar and says where in the folder
+        // the picture sits. The list has a plain vertical scrollbar doing that
+        // already, so this stays away rather than drawing a second answer.
+        if (FilmstripGridMode)
+        {
+            ViewerFilmstripMarker.Visibility = Visibility.Collapsed;
+            return;
+        }
+
         int index = ViewerFilmstrip.SelectedIndex;
         var scroller = FindDescendant<ScrollViewer>(ViewerFilmstrip);
         var bar = scroller?.Template?.FindName("PART_HorizontalScrollBar", scroller)
@@ -28050,6 +28098,32 @@ public partial class MainWindow : Window
             return;
         }
 
+        // The list scrolls in rows, so the arithmetic is the same with the cell
+        // turned into the row that holds it. Same rule as below: bring it just
+        // onto the edge it went off, never centre it.
+        if (FilmstripGridMode)
+        {
+            int columns = Math.Max(1, FilmstripColumns);
+            int row = index / columns;
+            double firstRow = scroller.VerticalOffset;
+            double visibleRows = scroller.ViewportHeight;
+            if (visibleRows <= 0)
+            {
+                return;
+            }
+
+            if (row < firstRow)
+            {
+                scroller.ScrollToVerticalOffset(row);
+            }
+            else if (row >= firstRow + visibleRows)
+            {
+                scroller.ScrollToVerticalOffset(row - visibleRows + 1);
+            }
+
+            return;
+        }
+
         double first = scroller.HorizontalOffset;
         double visible = scroller.ViewportWidth;
         if (visible <= 0)
@@ -28227,9 +28301,24 @@ public partial class MainWindow : Window
         // that was queued, found off-screen at settle time and dropped, then
         // scrolled back into view, never announced itself again. Asking the
         // strip what it is showing has no such hole in it.
-        int first = Math.Max(0, (int)scroller.HorizontalOffset - 1);
-        int last = Math.Min(_filmstripCells.Count - 1,
-            (int)Math.Ceiling(scroller.HorizontalOffset + scroller.ViewportWidth));
+        // THE SAME TWO NUMBERS IN BOTH SHAPES. Each panel scrolls by its own
+        // unit - a cell across in the bar, a ROW down in the list - so the list
+        // multiplies by how many fit across and everything below this line goes
+        // on counting cells, which is what it has always counted.
+        int first, last;
+        if (FilmstripGridMode)
+        {
+            int columns = Math.Max(1, FilmstripColumns);
+            first = Math.Max(0, ((int)scroller.VerticalOffset - 1) * columns);
+            last = Math.Min(_filmstripCells.Count - 1,
+                (((int)Math.Ceiling(scroller.VerticalOffset + scroller.ViewportHeight) + 1) * columns) - 1);
+        }
+        else
+        {
+            first = Math.Max(0, (int)scroller.HorizontalOffset - 1);
+            last = Math.Min(_filmstripCells.Count - 1,
+                (int)Math.Ceiling(scroller.HorizontalOffset + scroller.ViewportWidth));
+        }
 
         bool remote = _filmstripRemote;
 
@@ -28786,6 +28875,14 @@ public partial class MainWindow : Window
         Resources["FilmstripCellHeight"] = height;
         Resources["FilmstripCellWidth"] = width;
 
+        // What one cell OCCUPIES, which is what a layout has to place. The same
+        // advance the fit above counts with - border plus the container's own
+        // margin - so the two cannot disagree about how wide a frame really is.
+        // Used vertically as well: the list needs a gap under each row, and the
+        // bar has never needed one because it has a single row.
+        Resources["FilmstripCellFootprintWidth"] = width + FilmstripCellAdvance;
+        Resources["FilmstripCellFootprintHeight"] = height + FilmstripCellAdvance;
+
         // The play badge's three keys were computed here as well, and went with
         // it on 2026-08-16 - see the cell template.
         //
@@ -28799,6 +28896,144 @@ public partial class MainWindow : Window
         // that and tops out before it could read as a label on the frame rather
         // than a mark on the file.
         Resources["FilmstripRibbonSize"] = Math.Clamp(Math.Round(height * 0.18), 10, 15);
+    }
+
+    // The layout swap, and the whole of it: one panel template, which axis
+    // scrolls, and who owns the strip's height. Everything else about the strip
+    // is the same in both shapes on purpose - the cells, their template, the
+    // selection, the drag-out, and every line that fetches a picture.
+    private bool? _filmstripLayoutIsGrid;
+
+    private void ApplyFilmstripLayout()
+    {
+        bool grid = FilmstripGridMode;
+
+        // Only on a real change: a new ItemsPanel throws away every realized
+        // container and builds them again, and this runs on preset changes as
+        // well as on the switch itself.
+        if (_filmstripLayoutIsGrid != grid)
+        {
+            _filmstripLayoutIsGrid = grid;
+            ViewerFilmstrip.ItemsPanel = (ItemsPanelTemplate)FindResource(
+                grid ? "FilmstripGridPanel" : "FilmstripBarPanel");
+
+            // ONE AXIS EACH, and the disabled one is what keeps the other bar
+            // out of the way: the strip's ScrollViewer template carries both,
+            // and each is shown only when its own axis has somewhere to go.
+            ScrollViewer.SetHorizontalScrollBarVisibility(ViewerFilmstrip,
+                grid ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto);
+            ScrollViewer.SetVerticalScrollBarVisibility(ViewerFilmstrip,
+                grid ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled);
+        }
+
+        // The bar is as tall as one row of cells and says so by measuring itself;
+        // the list is as tall as the user has dragged it. NaN is Auto, which is
+        // how the row was written before the list existed.
+        ViewerFilmstripHost.Height = grid ? FilmstripGridHeight : double.NaN;
+
+        // The position dot belongs to the horizontal bar it is drawn on. The
+        // list has an ordinary vertical scrollbar, which already says where it
+        // is, so the mark would be a second answer to a question already
+        // answered.
+        if (grid)
+        {
+            ViewerFilmstripMarker.Visibility = Visibility.Collapsed;
+        }
+
+        ApplyFilmstripCellSize();
+        RefreshFilmstripFetchSize();
+        ScheduleFilmstripThumbnails();
+    }
+
+    // The cells hold pictures fetched for the size they had. When that size
+    // changes - a grip drag across a step, a Ctrl + wheel notch, a layout swap
+    // that brings the other mode's cell size with it - they are the wrong size
+    // and have to be asked for again: too small to draw cleanly if the cells
+    // grew, needlessly large if they shrank. The app's own cache makes that a
+    // refill rather than a re-read.
+    //
+    // THE PICTURE STAYS UNTIL THE NEW ONE ARRIVES. Handing it back here as well
+    // emptied every cell for as long as the refill took, and the whole bar
+    // blinked once on a drag that crossed a step (2026-08-21, 신고). What is on
+    // screen is the same picture at the wrong size, which is exactly what it was
+    // a moment ago, so there is nothing to gain by taking it away first.
+    private void RefreshFilmstripFetchSize()
+    {
+        if (FilmstripFetchSize == _filmstripFetchStep)
+        {
+            return;
+        }
+
+        _filmstripFetchStep = FilmstripFetchSize;
+        foreach (var cell in _filmstripCells)
+        {
+            cell.Requested = false;
+            cell.AskedAhead = false;
+        }
+
+        ScheduleFilmstripThumbnails();
+    }
+
+    // How many cells the list fits across. One in the bar, since there is only
+    // ever one row - which lets the callers do the same arithmetic in both
+    // shapes rather than forking.
+    private int FilmstripColumns => FilmstripGridMode &&
+        FindDescendant<VirtualizingWrapPanel>(ViewerFilmstrip) is { Columns: > 0 } panel
+            ? panel.Columns
+            : 1;
+
+    private void FilmstripGridMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem item)
+        {
+            return;
+        }
+
+        _settings.ViewerFilmstripGrid = item.IsChecked;
+        _settingsService.Save(_settings);
+        ApplyFilmstripLayout();
+    }
+
+    // Ctrl + wheel over the list, which is where every other app puts "make the
+    // pictures bigger". The plain wheel is left to scroll, because in a layout
+    // that scrolls vertically that is the gesture the hand reaches for first.
+    private void StepFilmstripGridCellSize(int direction)
+    {
+        double next = Math.Clamp(
+            Math.Round(FilmstripCellHeight) + (direction * FilmstripGridCellStep),
+            FilmstripMinCellHeight, FilmstripMaxCellHeight);
+        if (Math.Abs(next - _settings.ViewerFilmstripGridCellSize) < 0.5)
+        {
+            return;
+        }
+
+        _settings.ViewerFilmstripGridCellSize = next;
+        ApplyFilmstripCellSize();
+        RefreshFilmstripFetchSize();
+        ScheduleFilmstripThumbnails();
+
+        // Written when the hand stops, not per notch: this handler is one wheel
+        // turn away from writing settings.json a dozen times, which is the fault
+        // the full-screen toggle was caught doing on every 휠클릭.
+        _filmstripSizeSaveTimer ??= CreateFilmstripSizeSaveTimer();
+        _filmstripSizeSaveTimer.Stop();
+        _filmstripSizeSaveTimer.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer? _filmstripSizeSaveTimer;
+
+    private System.Windows.Threading.DispatcherTimer CreateFilmstripSizeSaveTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1),
+        };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            _settingsService.Save(_settings);
+        };
+        return timer;
     }
 
     // The shell is asked HERE - when a container is realized - rather than when
@@ -28832,6 +29067,24 @@ public partial class MainWindow : Window
     // (CanContentScroll) - which is also what makes the strip virtualize.
     private void ViewerFilmstrip_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
+        if (FilmstripGridMode)
+        {
+            // Ctrl + wheel is "bigger/smaller" everywhere else on this desktop,
+            // and the plain wheel has to stay with the scrolling in a layout
+            // that scrolls the way the wheel points. Left unhandled so the
+            // ScrollViewer does the moving; this only asks for what the move
+            // brought into view.
+            if (Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                StepFilmstripGridCellSize(e.Delta > 0 ? 1 : -1);
+                e.Handled = true;
+                return;
+            }
+
+            ScheduleFilmstripThumbnails();
+            return;
+        }
+
         if (FindDescendant<ScrollViewer>(ViewerFilmstrip) is not { } scroller)
         {
             return;
@@ -29078,6 +29331,20 @@ public partial class MainWindow : Window
     // Dragging UP grows it, which is the direction the strip grows in.
     private void ViewerFilmstripThumb_DragDelta(object sender, DragDeltaEventArgs e)
     {
+        // IN THE LIST THE GRIP MOVES THE HOST, not the cell. Dragging it up asks
+        // for more rows at the size they already are, which is the whole
+        // difference between the two shapes: the bar has one row and can only
+        // answer a taller strip by drawing bigger frames.
+        if (FilmstripGridMode)
+        {
+            _settings.ViewerFilmstripGridHeight = Math.Clamp(
+                FilmstripGridHeight - e.VerticalChange,
+                FilmstripMinGridHeight,
+                FilmstripMaxGridHeight);
+            ViewerFilmstripHost.Height = _settings.ViewerFilmstripGridHeight;
+            return;
+        }
+
         _settings.ViewerFilmstripCellHeight = Math.Clamp(
             FilmstripCellHeight - e.VerticalChange,
             FilmstripMinCellHeight,
@@ -29107,28 +29374,16 @@ public partial class MainWindow : Window
             $"step={_filmstripFetchStep}→{FilmstripFetchSize} " +
             $"refetch={(FilmstripFetchSize == _filmstripFetchStep ? "no" : "YES")}");
 
-        if (FilmstripFetchSize == _filmstripFetchStep)
+        // The list's grip changed how many rows are on show and nothing about
+        // their size, so there is nothing to re-fetch - only new cells to ask
+        // about, which the sweep does by reading what is on screen now.
+        if (FilmstripGridMode)
         {
+            ScheduleFilmstripThumbnails();
             return;
         }
 
-        // THE PICTURE STAYS UNTIL THE NEW ONE ARRIVES. Handing it back here as
-        // well emptied every cell for as long as the refill took, and the whole
-        // bar blinked once on a drag that crossed a step (2026-08-21, 신고).
-        // What is on screen is the same picture at the wrong size, which is
-        // exactly what it was a moment ago while the drag was still moving, so
-        // there is nothing to gain by taking it away first. The setter replaces
-        // the value and its own memory accounting with it, so the only cost is
-        // that both bitmaps exist for the moment between - and only for the
-        // cells within the retain reach.
-        _filmstripFetchStep = FilmstripFetchSize;
-        foreach (var cell in _filmstripCells)
-        {
-            cell.Requested = false;
-            cell.AskedAhead = false;
-        }
-
-        ScheduleFilmstripThumbnails();
+        RefreshFilmstripFetchSize();
     }
 
     // The step the cells currently hold, so a drag that stays inside one costs
