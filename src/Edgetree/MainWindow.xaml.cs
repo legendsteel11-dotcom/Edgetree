@@ -29062,6 +29062,10 @@ public partial class MainWindow : Window
         // that and tops out before it could read as a label on the frame rather
         // than a mark on the file.
         Resources["FilmstripRibbonSize"] = Math.Clamp(Math.Round(height * 0.18), 10, 15);
+
+        // The mark rides the cell the way the ribbon does and stops at the same
+        // kind of ceiling: it is a badge on the frame, not a label of it.
+        Resources["FilmstripMarkSize"] = Math.Clamp(Math.Round(height * 0.22), 12, 18);
     }
 
     // The layout swap, and the whole of it: one panel template, which axis
@@ -29423,9 +29427,129 @@ public partial class MainWindow : Window
             return;
         }
 
+        // ----- 표시해 두기 (2026-08-22) -----------------------------------------
+        //
+        // Marks exist to serve the drag that already works: dropping a handful
+        // of pictures into another app in one gesture. They are NOT the panel's
+        // selection - see FilmstripCell.IsMarked - and nothing else in the app
+        // reads them, so the viewer, the tree and every menu action carry on
+        // being about one file.
+        if (Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            // THE FILE ON SCREEN IS ALREADY ONE OF THEM. Ctrl-clicking a second
+            // picture means "this one as well", and the one it is being added to
+            // is the one being looked at - so the first mark carries the current
+            // cell with it. Without this the count read 1 after the gesture that
+            // was meant to make it 2, and the picture on screen sat there
+            // unbadged as though it had been dropped (reported 2026-08-22).
+            //
+            // Only when the set is EMPTY: once there are marks, the selection is
+            // whatever was marked and the current cell has no special claim.
+            if (_filmstripMarkCount == 0 &&
+                ViewerFilmstrip.SelectedItem is FilmstripCell current &&
+                !ReferenceEquals(current, cell))
+            {
+                current.IsMarked = true;
+            }
+
+            cell.IsMarked = !cell.IsMarked;
+            _filmstripMarkAnchor = _filmstripCells.IndexOf(cell);
+            UpdateFilmstripMarkCount();
+            // The picture does not move. Ctrl-clicking through a folder to
+            // gather a dozen files would otherwise load a dozen pictures, and
+            // on a network folder that is the expensive half of the app.
+            e.Handled = true;
+            return;
+        }
+
+        if (Keyboard.Modifiers == ModifierKeys.Shift && _filmstripMarkAnchor >= 0)
+        {
+            MarkFilmstripRange(_filmstripMarkAnchor, _filmstripCells.IndexOf(cell));
+            e.Handled = true;
+            return;
+        }
+
         _filmstripDragStart = e.GetPosition(ViewerFilmstrip);
         _filmstripDragCandidate = cell.Path;
+        _filmstripDragCell = cell;
+
+        // A PLAIN PRESS INSIDE THE MARKED SET KEEPS IT, and that is the whole
+        // reason this is handled on the way down rather than left to the list.
+        // Pressing a marked cell is how a multi-file drag STARTS, so collapsing
+        // the marks here would leave the drag carrying one file every time. If
+        // the press turns out to be a click rather than a drag, the release
+        // collapses it (see the up handler) - which is what Explorer does with
+        // its own selection.
+        if (cell.IsMarked && _filmstripMarkCount > 1)
+        {
+            _filmstripCollapseMarksOnUp = true;
+            return;
+        }
+
+        ClearFilmstripMarks();
+        _filmstripMarkAnchor = _filmstripCells.IndexOf(cell);
         MoveViewerTo(cell.Item);
+    }
+
+    // Where a Shift range measures from: the last cell pressed or Ctrl-marked.
+    private int _filmstripMarkAnchor = -1;
+    private int _filmstripMarkCount;
+    private bool _filmstripCollapseMarksOnUp;
+    private FilmstripCell? _filmstripDragCell;
+
+    // BY POSITION ON SCREEN, which in the list means the cell order rather than
+    // anything about rows: a range drawn across two rows is the cells between
+    // its ends, exactly as the same gesture means in Explorer's icon view. The
+    // column count can change underneath it and the same files stay marked.
+    private void MarkFilmstripRange(int from, int to)
+    {
+        if (from < 0 || to < 0)
+        {
+            return;
+        }
+
+        int first = Math.Min(from, to);
+        int last = Math.Max(from, to);
+
+        // Replaced rather than added to, since this is Shift on its own. Ctrl +
+        // Shift (extend the set) is a third gesture and is not built.
+        for (int i = 0; i < _filmstripCells.Count; i++)
+        {
+            _filmstripCells[i].IsMarked = i >= first && i <= last;
+        }
+
+        UpdateFilmstripMarkCount();
+    }
+
+    private void ClearFilmstripMarks()
+    {
+        if (_filmstripMarkCount == 0)
+        {
+            return;
+        }
+
+        foreach (var cell in _filmstripCells)
+        {
+            cell.IsMarked = false;
+        }
+
+        UpdateFilmstripMarkCount();
+    }
+
+    private void UpdateFilmstripMarkCount()
+    {
+        int count = 0;
+        foreach (var cell in _filmstripCells)
+        {
+            if (cell.IsMarked)
+            {
+                count++;
+            }
+        }
+
+        _filmstripMarkCount = count;
+        ViewerSelectionText.Text = string.Format(Strings.ViewerMarkedCount, count);
+        ViewerSelectionText.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // Where the strip and the chevrons both land: whatever list is driving the
@@ -29512,11 +29636,24 @@ public partial class MainWindow : Window
         _filmstripDragStart = null;
         _filmstripDragCandidate = null;
 
+        // The press that starts a drag inside the marked set is not a click, so
+        // nothing collapses.
+        _filmstripCollapseMarksOnUp = false;
+
         // FileDrop + Copy-only, exactly like the tree's and the search list's:
         // any app that takes an Explorer file drop takes this, and Copy (never
         // Move) means dropping into Explorer or another app can never remove the
         // original.
-        var data = new DataObject(DataFormats.FileDrop, new[] { path });
+        //
+        // THE MARKED SET GOES IF THE PRESSED CELL IS IN IT, and only then - a
+        // drag that starts outside the marks carries the one file under the
+        // hand, which is Explorer's rule and the one that cannot surprise
+        // anyone. Ordered by the strip rather than by when each was marked, so
+        // what arrives at the other end is in the order it was seen in.
+        string[] files = _filmstripDragCell is { IsMarked: true } && _filmstripMarkCount > 1
+            ? _filmstripCells.Where(c => c.IsMarked).Select(c => c.Path).ToArray()
+            : new[] { path };
+        var data = new DataObject(DataFormats.FileDrop, files);
 
         // Sourced from the LIST, not the cell container: the strip virtualises,
         // so a container can be recycled out from under the drag's modal loop.
@@ -29526,10 +29663,11 @@ public partial class MainWindow : Window
         {
             long t0 = Environment.TickCount64;
             var effect = DragDrop.DoDragDrop(ViewerFilmstrip, data, DragDropEffects.Copy);
-            LogDragOut("filmstrip", 1, Environment.TickCount64 - t0, effect);
+            LogDragOut("filmstrip", files.Length, Environment.TickCount64 - t0, effect);
         }
         finally
         {
+            _filmstripDragCell = null;
             if (Mouse.Captured is not null)
             {
                 Mouse.Capture(null);
@@ -29537,13 +29675,26 @@ public partial class MainWindow : Window
         }
     }
 
-    // Nothing left to do on release - see the press handler for why the work
-    // moved there. Kept as the place the drag candidate is dropped, so a click
-    // that never became a drag leaves no state behind.
+    // The place the drag candidate is dropped, so a click that never became a
+    // drag leaves no state behind - and, since marks arrived, the second half of
+    // the press inside a marked set.
     private void ViewerFilmstrip_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
+        // A PRESS INSIDE THE SET THAT DID NOT BECOME A DRAG IS A CLICK, and a
+        // click means "just this one". The press could not say so - at that
+        // moment it is still a drag that has not moved yet - which is why the
+        // decision waits for the release.
+        if (_filmstripCollapseMarksOnUp && _filmstripDragCell is { } pressed)
+        {
+            ClearFilmstripMarks();
+            _filmstripMarkAnchor = _filmstripCells.IndexOf(pressed);
+            MoveViewerTo(pressed.Item);
+        }
+
+        _filmstripCollapseMarksOnUp = false;
         _filmstripDragStart = null;
         _filmstripDragCandidate = null;
+        _filmstripDragCell = null;
     }
 
     // Height IS cell size - there is nothing else in the row to give pixels to.
@@ -29763,6 +29914,14 @@ public partial class MainWindow : Window
         }
 
         _filmstripCells.Clear();
+
+        // The marks belonged to the folder that has just gone, and so does the
+        // anchor a Shift range would measure from. Counted rather than assumed
+        // zero, so the line on screen and the number behind it cannot disagree.
+        _filmstripMarkAnchor = -1;
+        _filmstripDragCell = null;
+        _filmstripCollapseMarksOnUp = false;
+        UpdateFilmstripMarkCount();
     }
 
     private void ReleaseFilmstripCells()

@@ -507,6 +507,9 @@ public static class Strings
     // {0} is how many are in hand so far. No total: the bar's own counter is
     // right beside it and already says how many the folder holds.
     public static string ViewerPrecaching = "캐싱 중 {0}";
+    // 썸네일에 표시해 둔 개수. 끌어다 놓기용 표시이므로 "선택"이 아니라 개수만
+    // 말한다.
+    public static string ViewerMarkedCount = "{0}개 선택";
     // 북마크, not 위치 기록 (2026-08-11). "기록" reads as logging something
     // rather than as leaving a marker you come back to, and the app already
     // has a word for exactly that act on a tree row. Qualified with 영상 in the
@@ -1104,6 +1107,7 @@ public static class Strings
         MenuClearThumbnailCache = "Clean up thumbnail files";
         MenuClearThumbnailCacheSized = "Clean up thumbnail files ({0})";
         ViewerPrecaching = "Preloading {0}";
+        ViewerMarkedCount = "{0} selected";
         ViewerMarkAdd = "Video Bookmark";
         ViewerMarkList = "Video Bookmarks";
         ViewerRewind = "Back to start";

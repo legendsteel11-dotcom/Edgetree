@@ -7905,6 +7905,40 @@
                                                 </Style>
                                             </Path.Style>
                                         </Path>
+                                        <!-- THE MARK, and it is deliberately not
+                                             another border or another wash. The
+                                             frame already means "this is the one
+                                             the panel is showing" and the wash
+                                             means "the pointer is here"; a third
+                                             state sharing either channel would
+                                             leave one of them unable to show.
+                                             So it is a badge in the corner the
+                                             bookmark ribbon does not use, in the
+                                             selection colour with a white check,
+                                             and it reads on any picture because
+                                             it brings its own ground. -->
+                                        <Border Width="{DynamicResource FilmstripMarkSize}"
+                                                Height="{DynamicResource FilmstripMarkSize}"
+                                                Margin="3,3,0,0"
+                                                CornerRadius="2"
+                                                HorizontalAlignment="Left"
+                                                VerticalAlignment="Top"
+                                                Background="{DynamicResource TreeRowSelectedActiveBackground}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsMarked}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Path Data="F1 M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z M0-960H960M0 0H960"
+                                                    Fill="White"
+                                                    Stretch="Uniform"
+                                                    Margin="2"/>
+                                        </Border>
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
@@ -8091,6 +8125,18 @@
                                     FontSize="{DynamicResource FooterChipFontSize}"
                                     Foreground="{DynamicResource ForegroundText}"
                                     Opacity="0.65"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed"/>
+                            <!-- How many cells are marked. Beside the caching
+                                 line because both are the strip talking about
+                                 itself rather than about the file on screen, and
+                                 both are gone the moment they have nothing to
+                                 say. Full ink, unlike its neighbour: this one is
+                                 the answer to something the user just did. -->
+                            <TextBlock x:Name="ViewerSelectionText"
+                                    Margin="{DynamicResource ViewerChipGroupMargin}"
+                                    FontSize="{DynamicResource FooterChipFontSize}"
+                                    Foreground="{DynamicResource ForegroundText}"
                                     VerticalAlignment="Center"
                                     Visibility="Collapsed"/>
                         </StackPanel>
