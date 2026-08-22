@@ -189,6 +189,8 @@ public static class Strings
     public static string MenuCut = "잘라내기";
     public static string MenuCopy = "복사";
     public static string MenuPaste = "붙여넣기";
+    // 썸네일 목록의 오른쪽 클릭 메뉴에서 폴더 전체를 표시할 때.
+    public static string MenuSelectAll = "전체 선택";
     public static string MenuCompress = "압축";
     public static string MenuExtract = "압축 풀기";
     public static string MenuRename = "이름 바꾸기";
@@ -983,6 +985,7 @@ public static class Strings
         MenuCut = "Cut";
         MenuCopy = "Copy";
         MenuPaste = "Paste";
+        MenuSelectAll = "Select all";
         MenuCompress = "Compress";
         MenuExtract = "Extract";
         MenuRename = "Rename";

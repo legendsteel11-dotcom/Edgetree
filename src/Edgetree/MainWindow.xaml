@@ -7693,8 +7693,62 @@
                                 SizeChanged="ViewerFilmstrip_SizeChanged"
                                 PreviewMouseWheel="ViewerFilmstrip_PreviewMouseWheel"
                                 PreviewMouseLeftButtonDown="ViewerFilmstrip_PreviewMouseLeftButtonDown"
+                                PreviewMouseRightButtonDown="ViewerFilmstrip_PreviewMouseRightButtonDown"
+                                AllowDrop="True"
+                                DragOver="ViewerFilmstrip_DragOver"
+                                Drop="ViewerFilmstrip_Drop"
                                 PreviewMouseMove="ViewerFilmstrip_PreviewMouseMove"
                                 PreviewMouseLeftButtonUp="ViewerFilmstrip_PreviewMouseLeftButtonUp">
+                            <!-- THE SAME OPERATIONS, THE SAME HANDLERS. Every
+                                 row here goes to the tree's own click handler:
+                                 they all work off the app's multi-selection
+                                 (GetEffectiveSelection), which the strip's marks
+                                 now ARE, so nothing had to be taught about a
+                                 second kind of selection.
+                                 Paste is on the list because that is where a
+                                 folder of pictures is being looked at when
+                                 something arrives from elsewhere; it lands in
+                                 the folder the panel is showing.
+                                 Rename and Open are deliberately absent: they
+                                 are one-file actions, and the surface this menu
+                                 opens over is the one built for several. -->
+                            <ListBox.ContextMenu>
+                                <!-- REGISTERED, LIKE EVERY OTHER MENU HERE.
+                                     Without the two handlers this menu is not
+                                     in _openMenus, so the app believes nothing
+                                     is open: auto-hide starts its countdown and
+                                     the capture watchdog pulls the mouse
+                                     capture out from under it, and the menu
+                                     closes a few seconds after opening with
+                                     nothing having been clicked (reported
+                                     2026-08-22). The style comes with the same
+                                     package - a menu that skips it does not
+                                     match the app's own. -->
+                                <ContextMenu Style="{StaticResource DarkContextMenuStyle}"
+                                        Opened="AnyMenu_Opened"
+                                        Closed="AnyMenu_Closed">
+                                    <MenuItem Header="{x:Static services:Strings.MenuSelectAll}"
+                                            InputGestureText="Ctrl+A"
+                                            Click="FilmstripSelectAll_Click"/>
+                                    <Separator/>
+                                    <MenuItem Header="{x:Static services:Strings.MenuCut}"
+                                            InputGestureText="Ctrl+X"
+                                            Click="CutItem_Click"/>
+                                    <MenuItem Header="{x:Static services:Strings.MenuCopy}"
+                                            InputGestureText="Ctrl+C"
+                                            Click="CopyItem_Click"/>
+                                    <MenuItem Header="{x:Static services:Strings.MenuPaste}"
+                                            InputGestureText="Ctrl+V"
+                                            Click="PasteItem_Click"/>
+                                    <Separator/>
+                                    <MenuItem Header="{x:Static services:Strings.MenuDelete}"
+                                            InputGestureText="Del"
+                                            Click="DeleteItem_Click"/>
+                                    <Separator/>
+                                    <MenuItem Header="{x:Static services:Strings.MenuRevealInExplorer}"
+                                            Click="RevealInExplorer_Click"/>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
                             <!-- The starting layout only; ApplyFilmstripLayout
                                  swaps it with the stored mode on startup and
                                  whenever the mode changes. -->
@@ -7928,7 +7982,7 @@
                                                 <Style TargetType="Border">
                                                     <Setter Property="Visibility" Value="Collapsed"/>
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsMarked}" Value="True">
+                                                        <DataTrigger Binding="{Binding Item.IsMultiSelected}" Value="True">
                                                             <Setter Property="Visibility" Value="Visible"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>

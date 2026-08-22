@@ -14135,6 +14135,7 @@ public partial class MainWindow : Window
             item.IsMultiSelected = false;
         }
         _multiSelection.Clear();
+        UpdateFilmstripMarkCount();
         _deferredMultiClearItem = null;
     }
 
@@ -14145,6 +14146,8 @@ public partial class MainWindow : Window
             item.IsMultiSelected = true;
             _multiSelection.Add(item);
         }
+
+        UpdateFilmstripMarkCount();
     }
 
     private void RemoveFromMultiSelection(FileSystemItem item)
@@ -14154,6 +14157,8 @@ public partial class MainWindow : Window
             item.IsMultiSelected = false;
             _multiSelection.Remove(item);
         }
+
+        UpdateFilmstripMarkCount();
     }
 
     // Every row currently on screen or scrolled out of view but realized in
@@ -15200,6 +15205,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        DropPathsInto(item, droppedPaths, e);
+    }
+
+    // The drop itself, with the target folder already decided. Shared with the
+    // thumbnail list, which resolves its target a different way (the folder on
+    // screen rather than the row under the pointer) and then needs every one of
+    // these rules to hold exactly as they do here.
+    private void DropPathsInto(FileSystemItem item, string[] droppedPaths, DragEventArgs e)
+    {
         // Drops that would import an item into the folder it ALREADY lives in
         // are ignored, not overwrite-prompted: importing a file onto itself is
         // never what was meant, and the main way it happens is a click with a
@@ -15215,8 +15229,34 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Read while the event is still live - DragEventArgs says nothing once
+        // the drag loop has ended, and the work below is about to be moved past
+        // that point.
+        bool move = IsMoveDrop(e, importablePaths, item.FullPath);
+
+        // AFTER THE DRAG, AND WITH THE WINDOW IN FRONT. A drop that has to ask
+        // something (대체하시겠습니까) was asking it from inside the drag loop,
+        // with the SOURCE app still in front: the dialog opened behind
+        // everything, the drag cursor stayed on screen, and it looked frozen
+        // until a click somewhere brought the question forward (reported
+        // 2026-08-22, dropping from Explorer onto the thumbnail list).
+        //
+        // Letting the loop unwind first and activating fixes both halves - the
+        // cursor goes back to being a cursor, and the question arrives in front
+        // of the app it belongs to. The tree's drops go through here too and
+        // had the same fault; nobody had happened to drop a colliding name on
+        // it.
+        Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Background,
+            new Action(() => CompleteDrop(item, importablePaths, move)));
+    }
+
+    private void CompleteDrop(FileSystemItem item, string[] importablePaths, bool move)
+    {
+        Activate();
+
         string? error;
-        if (IsMoveDrop(e, importablePaths, item.FullPath))
+        if (move)
         {
             if (!FileOperationService.TryMoveDroppedPaths(
                     importablePaths, item.FullPath, out var emptied, out error))
@@ -29429,11 +29469,14 @@ public partial class MainWindow : Window
 
         // ----- 표시해 두기 (2026-08-22) -----------------------------------------
         //
-        // Marks exist to serve the drag that already works: dropping a handful
-        // of pictures into another app in one gesture. They are NOT the panel's
-        // selection - see FilmstripCell.IsMarked - and nothing else in the app
-        // reads them, so the viewer, the tree and every menu action carry on
-        // being about one file.
+        // Marks are the app's OWN multi-selection - the set the tree paints and
+        // that copy, cut, delete and drag-out already act on. The strip is a
+        // second way into it rather than a second one of it, so a folder marked
+        // from the pictures behaves exactly like the same folder marked from the
+        // rows.
+        //
+        // What it is NOT is the panel's selection: that belongs to the tree and
+        // says which file is on screen.
         if (Keyboard.Modifiers == ModifierKeys.Control)
         {
             // THE FILE ON SCREEN IS ALREADY ONE OF THEM. Ctrl-clicking a second
@@ -29443,18 +29486,29 @@ public partial class MainWindow : Window
             // was meant to make it 2, and the picture on screen sat there
             // unbadged as though it had been dropped (reported 2026-08-22).
             //
+            // It is also what keeps the tree's invariant: a non-empty set always
+            // contains the natively-selected row, and the cell on screen IS that
+            // row.
+            //
             // Only when the set is EMPTY: once there are marks, the selection is
             // whatever was marked and the current cell has no special claim.
-            if (_filmstripMarkCount == 0 &&
+            if (_multiSelection.Count == 0 &&
                 ViewerFilmstrip.SelectedItem is FilmstripCell current &&
                 !ReferenceEquals(current, cell))
             {
-                current.IsMarked = true;
+                AddToMultiSelection(current.Item);
             }
 
-            cell.IsMarked = !cell.IsMarked;
+            if (cell.Item.IsMultiSelected)
+            {
+                RemoveFromMultiSelection(cell.Item);
+            }
+            else
+            {
+                AddToMultiSelection(cell.Item);
+            }
+
             _filmstripMarkAnchor = _filmstripCells.IndexOf(cell);
-            UpdateFilmstripMarkCount();
             // The picture does not move. Ctrl-clicking through a folder to
             // gather a dozen files would otherwise load a dozen pictures, and
             // on a network folder that is the expensive half of the app.
@@ -29480,20 +29534,98 @@ public partial class MainWindow : Window
         // the press turns out to be a click rather than a drag, the release
         // collapses it (see the up handler) - which is what Explorer does with
         // its own selection.
-        if (cell.IsMarked && _filmstripMarkCount > 1)
+        if (cell.Item.IsMultiSelected && _multiSelection.Count > 1)
         {
             _filmstripCollapseMarksOnUp = true;
             return;
         }
 
-        ClearFilmstripMarks();
+        ClearMultiSelection();
         _filmstripMarkAnchor = _filmstripCells.IndexOf(cell);
         MoveViewerTo(cell.Item);
     }
 
+    // The strip's right-click behaves like a plain press when it lands outside
+    // the set: what is under the pointer becomes the one thing, and the menu is
+    // then about it. Inside the set nothing moves - the menu is about all of
+    // them, which is the whole reason to have marked them.
+    private void ViewerFilmstrip_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if ((e.OriginalSource as DependencyObject)?.FindAncestor<ListBoxItem>()
+            is not { Content: FilmstripCell cell })
+        {
+            return;
+        }
+
+        if (cell.Item.IsMultiSelected)
+        {
+            return;
+        }
+
+        // NARROWED THROUGH THE SET, NOT THROUGH THE TREE. Moving the tree here
+        // was what closed the menu on its own a moment after it opened
+        // (reported 2026-08-22): the selection walk focuses the row it lands on,
+        // and it retries on background passes, so the focus can arrive AFTER the
+        // menu is up and take it away - which is why it looked worse while the
+        // folder was busy caching.
+        //
+        // The set answers the same question without moving anything:
+        // GetEffectiveSelection prefers it, so the menu is about this one file,
+        // and the badge says so on screen. The picture stays where it was, which
+        // is also what a right-click should do.
+        ClearMultiSelection();
+        AddToMultiSelection(cell.Item);
+        _filmstripMarkAnchor = _filmstripCells.IndexOf(cell);
+    }
+
+    // Where a drop on the list lands: the folder the panel is showing, which is
+    // the same folder 붙여넣기 uses (see PasteItem_Click) so the two gestures
+    // cannot disagree about where things arrive.
+    //
+    // Null while the results list is driving the panel - those pictures come
+    // from many folders at once, and "this folder" has no answer.
+    private FileSystemItem? FilmstripDropFolder()
+    {
+        if (_viewerListOverride is not null)
+        {
+            return null;
+        }
+
+        return ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false } item
+            ? (item.IsDirectory ? item : item.Parent)
+            : null;
+    }
+
+    private void ViewerFilmstrip_DragOver(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) && FilmstripDropFolder() is not null
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+    }
+
+    private void ViewerFilmstrip_Drop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped &&
+            FilmstripDropFolder() is { } folder)
+        {
+            DropPathsInto(folder, dropped, e);
+        }
+    }
+
+    // 전체 선택. The tree's invariant needs the natively-selected row inside the
+    // set, and taking the whole folder includes it by definition.
+    private void FilmstripSelectAll_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (var cell in _filmstripCells)
+        {
+            AddToMultiSelection(cell.Item);
+        }
+    }
+
     // Where a Shift range measures from: the last cell pressed or Ctrl-marked.
     private int _filmstripMarkAnchor = -1;
-    private int _filmstripMarkCount;
     private bool _filmstripCollapseMarksOnUp;
     private FilmstripCell? _filmstripDragCell;
 
@@ -29513,41 +29645,19 @@ public partial class MainWindow : Window
 
         // Replaced rather than added to, since this is Shift on its own. Ctrl +
         // Shift (extend the set) is a third gesture and is not built.
-        for (int i = 0; i < _filmstripCells.Count; i++)
+        ClearMultiSelection();
+        for (int i = first; i <= last && i < _filmstripCells.Count; i++)
         {
-            _filmstripCells[i].IsMarked = i >= first && i <= last;
+            AddToMultiSelection(_filmstripCells[i].Item);
         }
-
-        UpdateFilmstripMarkCount();
     }
 
-    private void ClearFilmstripMarks()
-    {
-        if (_filmstripMarkCount == 0)
-        {
-            return;
-        }
-
-        foreach (var cell in _filmstripCells)
-        {
-            cell.IsMarked = false;
-        }
-
-        UpdateFilmstripMarkCount();
-    }
-
+    // Written from inside the set's own add/remove/clear, so it cannot drift
+    // from the thing it is reporting - the tree changes the same set (a
+    // Ctrl+click on a row, an Escape, a refresh) and this line has to follow.
     private void UpdateFilmstripMarkCount()
     {
-        int count = 0;
-        foreach (var cell in _filmstripCells)
-        {
-            if (cell.IsMarked)
-            {
-                count++;
-            }
-        }
-
-        _filmstripMarkCount = count;
+        int count = _multiSelection.Count;
         ViewerSelectionText.Text = string.Format(Strings.ViewerMarkedCount, count);
         ViewerSelectionText.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -29650,8 +29760,8 @@ public partial class MainWindow : Window
         // hand, which is Explorer's rule and the one that cannot surprise
         // anyone. Ordered by the strip rather than by when each was marked, so
         // what arrives at the other end is in the order it was seen in.
-        string[] files = _filmstripDragCell is { IsMarked: true } && _filmstripMarkCount > 1
-            ? _filmstripCells.Where(c => c.IsMarked).Select(c => c.Path).ToArray()
+        string[] files = _filmstripDragCell is { Item.IsMultiSelected: true } && _multiSelection.Count > 1
+            ? _filmstripCells.Where(c => c.Item.IsMultiSelected).Select(c => c.Path).ToArray()
             : new[] { path };
         var data = new DataObject(DataFormats.FileDrop, files);
 
@@ -29686,7 +29796,7 @@ public partial class MainWindow : Window
         // decision waits for the release.
         if (_filmstripCollapseMarksOnUp && _filmstripDragCell is { } pressed)
         {
-            ClearFilmstripMarks();
+            ClearMultiSelection();
             _filmstripMarkAnchor = _filmstripCells.IndexOf(pressed);
             MoveViewerTo(pressed.Item);
         }

@@ -29,23 +29,16 @@ public class FilmstripCell : INotifyPropertyChanged
 
     public FileSystemItem Item { get; }
 
-    // MARKED FOR A DRAG, which is a different thing from selected. The strip's
-    // selection belongs to the tree - it says which file the panel is showing,
-    // and it moves with ↑↓ whether or not the strip was touched. A mark says
-    // "take this one too", exists only until the next plain click, and is drawn
-    // in its own corner so the two never have to share a channel.
+    // A MARK LIVES ON THE ITEM, NOT ON THE CELL, and that is deliberate: the
+    // strip marks the app's OWN multi-selection (FileSystemItem.IsMultiSelected,
+    // MainWindow._multiSelection), which the tree already paints and which copy,
+    // cut, delete and drag-out already act on. A set of its own here would have
+    // meant teaching every one of those about a second one.
     //
-    // Layered over the single selection rather than replacing it with WPF's
-    // Extended mode: the tree drives ViewerFilmstrip.SelectedItem, and every
-    // such write would collapse an Extended selection - the same reason the
-    // tree's own multi-selection was designed this way.
-    private bool _marked;
-
-    public bool IsMarked
-    {
-        get => _marked;
-        set => SetField(ref _marked, value);
-    }
+    // Note this is NOT the strip's selection: that belongs to the tree and says
+    // which file the panel is showing. WPF's Extended mode could not be used for
+    // the marks for the same reason - the tree writes SelectedItem constantly,
+    // and each write would collapse an Extended selection.
 
     public string Path => Item.FullPath;
 
