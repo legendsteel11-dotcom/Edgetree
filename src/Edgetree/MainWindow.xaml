@@ -6388,10 +6388,20 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
+                        <!-- THE CAPTION SITS AGAINST THE PICTURE, and the strip
+                             below both (2026-08-22, on report). It says what the
+                             picture IS - name, size, date, the carousel's place
+                             in the folder - so with the strip in between, the
+                             answer and the thing it answers about were a
+                             hundred pixels and a grid of other pictures apart:
+                             "시선이 많이 분산됨".
+                             The strip goes last, where a thing you pick FROM
+                             belongs: everything above it is the one file, and
+                             everything in it is the choice of another. -->
+                        <RowDefinition Height="Auto"/>
                         <!-- The filmstrip. Auto, and collapsed when the strip is
                              off, so a viewer without one lays out exactly as it
                              did before this row existed. -->
-                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <!-- Zoom and pan (round 2) ride entirely on the Image's
@@ -7654,7 +7664,7 @@
                          grab lines (the hand is already on it; it does not need
                          to be told twice). -->
                     <Border x:Name="ViewerFilmstripHost"
-                            Grid.Row="1"
+                            Grid.Row="2"
                             BorderThickness="0,1,0,0"
                             BorderBrush="{DynamicResource PanelDividerBrush}"
                             Visibility="Collapsed">
@@ -8071,7 +8081,7 @@
                       </Grid>
                     </Border>
                     <StackPanel x:Name="ViewerCaptionPanel"
-                            Grid.Row="2"
+                            Grid.Row="1"
                             Margin="{DynamicResource ViewerCaptionPanelMargin}">
                         <!-- Carousel row, < 35 / 257 > ABOVE the caption - the
                              the placement chosen (2026-08-09), and the one that
