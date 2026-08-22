@@ -88,6 +88,15 @@ public class FilmstripCell : INotifyPropertyChanged
     // scroll past it, since that is exactly the file the call is slowest for.
     public bool Requested { get; set; }
 
+    // THE PICTURE IN HAND IS THE WRONG ONE - ask again, showing it until the
+    // replacement lands. The request gate skips any cell already holding a
+    // picture (that is what stops the header pass's deliveries being fetched a
+    // second time), so a refetch - the file's content changed, or the cell size
+    // crossed a step - needs its own word: Requested=false alone never gets
+    // past that gate (2026-08-22, "새로고침을 아무리 해도"). Cleared by the
+    // delivery that answers it, whatever the answer is.
+    public bool Stale { get; set; }
+
     // The same guard for the cheap speculative ask made ahead of the strip on a
     // network folder, kept SEPARATE from Requested on purpose: that ask reads
     // the file's own header and stops there, so its coming back empty says

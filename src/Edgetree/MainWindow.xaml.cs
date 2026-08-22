@@ -28836,6 +28836,7 @@ public partial class MainWindow : Window
             if (thumbnail is not null)
             {
                 target.Thumbnail = thumbnail;
+                target.Stale = false;
                 ReportFilmstripPrecacheProgress();
             }
         });
@@ -29049,7 +29050,12 @@ public partial class MainWindow : Window
         }
 
         var cell = _filmstripCells[index];
-        if (cell.Thumbnail is not null || cell.Requested)
+        // A picture in hand normally ends the question - that is what keeps the
+        // header pass's deliveries from being fetched a second time - EXCEPT
+        // when the cell was marked stale: then the picture is the wrong one
+        // (the file changed, or the size crossed a step) and stays on screen
+        // only until this re-ask replaces it.
+        if (cell.Requested || (cell.Thumbnail is not null && !cell.Stale))
         {
             return;
         }
@@ -29082,6 +29088,7 @@ public partial class MainWindow : Window
             if (thumbnail is not null)
             {
                 cell.Thumbnail = thumbnail;
+                cell.Stale = false;
                 ReportFilmstripPrecacheProgress();
                 return;
             }
@@ -29092,6 +29099,10 @@ public partial class MainWindow : Window
             // would put an icon on a picture that simply had not been read yet.
             if (!headerOnly)
             {
+                // The real ask answered, and "nothing" is an answer too: a
+                // stale mark left standing here would re-ask a file that has
+                // stopped answering on every sweep.
+                cell.Stale = false;
                 ShowFilmstripTypeIcon(cell);
             }
         }, embeddedOnly: headerOnly);
@@ -29524,6 +29535,12 @@ public partial class MainWindow : Window
         {
             cell.Requested = false;
             cell.AskedAhead = false;
+            // Requested=false alone never got past the request gate for a cell
+            // already holding a picture, so since the pictures stopped being
+            // cleared here (2026-08-21) a size-step crossing was not actually
+            // re-fetching - the old picture just stretched. Stale is the word
+            // the gate listens to.
+            cell.Stale = true;
         }
 
         ScheduleFilmstripThumbnails();
