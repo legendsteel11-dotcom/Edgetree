@@ -386,7 +386,7 @@ public static class ShellThumbnailService
                 ThumbnailCacheService.Write(path, thumbnail, pixelSize);
             }
 
-            LogThumb(path, source.Trim(), fromCache, thumbnail);
+            LogThumb(path, source.Trim(), fromCache, thumbnail, pixelSize);
 
             {
                 double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0)
@@ -527,7 +527,8 @@ public static class ShellThumbnailService
     // 갈리면 검사를 되살리면 되고, 안 갈리면 헤더는 정말 못 믿는 것이라 다른
     // 길을 봐야 한다.** 셸이 아닌 경로에서는 biHeight 가 의미 없으므로 - 로 찍는다.
     [System.Diagnostics.Conditional("DEBUG")]
-    private static void LogThumb(string path, string source, bool fromCache, ImageSource? image)
+    private static void LogThumb(string path, string source, bool fromCache, ImageSource? image,
+        int asked)
     {
         try
         {
@@ -542,10 +543,188 @@ public static class ShellThumbnailService
             File.AppendAllText(
                 Path.Combine(dir, "thumb.log"),
                 $"{DateTime.Now:HH:mm:ss.fff}  src={source,-8} cache={(fromCache ? "yes" : "no ")} " +
-                $"biHeight={bih,-18} size={size,-9} {Path.GetFileName(path)}{Environment.NewLine}");
+                $"asked={asked,-4} biHeight={bih,-18} size={size,-9} " +
+                $"{Orientation(path, image)} {Path.GetFileName(path)}{Environment.NewLine}");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+        }
+    }
+
+    // 썸네일 로그에 한 줄 끼워 넣는 자리. 뒤집힘을 재는 동안에는 그림이 언제
+    // 다시 요청됐는지가 같은 시간축에 있어야 읽히므로, 바깥에서 일어난 일도
+    // 이 파일에 적는다.
+    [System.Diagnostics.Conditional("DEBUG")]
+    public static void LogNote(string line)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "thumb.log"),
+                $"{DateTime.Now:HH:mm:ss.fff}  {line}{Environment.NewLine}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    // ----- 뒤집힘을 눈이 아니라 파일 자신에게 물어보는 계측기 (2026-08-21) -----
+    //
+    // 지금까지 판정은 사람 눈이었고, 그래서 표를 만드는 데 재현 절차 한 벌이
+    // 통째로 들었다. **기준은 파일 자신의 디코드로 잡으면 된다** - 앱이 직접
+    // 디코딩하는 경로는 한 번도 뒤집힌 적이 없으므로, 같은 파일을 작게 디코딩해
+    // 위·아래 밝기 차이의 부호를 셸이 준 그림과 견주면 뒤집힘이 객관적으로
+    // 갈린다. 대칭이라 부호가 안 잡히는 그림은 flat 으로 찍고 판정에서 뺀다.
+    //
+    // **같은 줄에 `conv=` 를 함께 찍는 것이 이번 계측의 핵심이다.**
+    // `CreateBitmapSourceFromHBitmap` 은 DIB 헤더를 믿고 줄 순서를 맞추므로,
+    // 헤더가 거짓말을 하는 비트맵에서는 그것도 같이 틀린다 - 즉 2026-08-09에
+    // 죽은 높이 부호 검사와 **같은 이론**일 수 있다. 그것이 사실이면 `conv=` 가
+    // 지금 바로 서 있는 것들에서 down 으로 찍힌다. 한 번 돌리면 이 길이 살아
+    // 있는지 죽었는지가 확정된다.
+    //
+    // 비용이 큰 계측기라 환경 변수로만 켠다(파일마다 디코드 한 번 더). DEBUG
+    // 빌드에서 `EDGETREE_THUMBPROBE=1` 일 때만 돈다.
+    private static readonly bool ProbeOrientation =
+        Environment.GetEnvironmentVariable("EDGETREE_THUMBPROBE") == "1";
+
+    [ThreadStatic]
+    private static double? _lastConvSignature;
+
+    private static string Orientation(string path, ImageSource? image)
+    {
+        if (!ProbeOrientation)
+        {
+            return string.Empty;
+        }
+
+        double? reference = ReferenceSignature(path);
+        string raw = Verdict(reference, (image as BitmapSource) is { } bs ? Signature(bs) : null);
+        string conv = Verdict(reference, _lastConvSignature);
+        _lastConvSignature = null;
+        return $"raw={raw,-5} conv={conv,-5}";
+    }
+
+    private static string Verdict(double? reference, double? candidate)
+    {
+        if (reference is not { } r || candidate is not { } c)
+        {
+            return "-";
+        }
+
+        // 위아래가 비슷한 그림은 어느 쪽으로 놓아도 같은 부호가 나오므로 판정에
+        // 쓰면 안 된다. 이 문턱을 넘는 그림만 답으로 친다.
+        if (Math.Abs(r) < 0.02 || Math.Abs(c) < 0.02)
+        {
+            return "flat";
+        }
+
+        return Math.Sign(r) == Math.Sign(c) ? "up" : "DOWN";
+    }
+
+    // 파일 자신을 작게 디코딩한 기준. 셸을 거치지 않는 유일한 길이다.
+    private static double? ReferenceSignature(string path)
+    {
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.UriSource = new Uri(path);
+            image.DecodePixelWidth = 32;
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+            image.EndInit();
+            image.Freeze();
+            return Signature(image);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or
+                                      NotSupportedException or FileFormatException or
+                                      ArgumentException or UriFormatException or
+                                      InvalidOperationException or OverflowException)
+        {
+            // 영상·문서처럼 WIC 가 못 여는 것은 기준이 없다.
+            return null;
+        }
+    }
+
+    // 위 4분의 1과 아래 4분의 1의 평균 밝기 차이. 부호만 쓰므로 크기·화질과
+    // 무관하고, 두 그림을 같은 형식(Pbgra32)으로 맞춰 재기 때문에 투명한 부분이
+    // 한쪽에서만 검게 나오는 일도 없다.
+    private static double? Signature(BitmapSource source)
+    {
+        try
+        {
+            if (source.PixelWidth < 4 || source.PixelHeight < 4)
+            {
+                return null;
+            }
+
+            var small = new TransformedBitmap(source,
+                new ScaleTransform(16.0 / source.PixelWidth, 16.0 / source.PixelHeight));
+            var converted = new FormatConvertedBitmap(small, PixelFormats.Pbgra32, null, 0);
+            int w = converted.PixelWidth, h = converted.PixelHeight;
+            if (w < 2 || h < 4)
+            {
+                return null;
+            }
+
+            int stride = w * 4;
+            var pixels = new byte[stride * h];
+            converted.CopyPixels(pixels, stride, 0);
+
+            int band = Math.Max(1, h / 4);
+            double top = 0, bottom = 0;
+            for (int y = 0; y < band; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int i = y * stride + x * 4;
+                    top += pixels[i] + pixels[i + 1] + pixels[i + 2];
+                }
+            }
+
+            for (int y = h - band; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int i = y * stride + x * 4;
+                    bottom += pixels[i] + pixels[i + 1] + pixels[i + 2];
+                }
+            }
+
+            return (top - bottom) / (band * w * 3 * 255.0);
+        }
+        catch (Exception e) when (e is COMException or ArgumentException or
+                                      InvalidOperationException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    // 헤더를 믿는 변환이 같은 비트맵을 어느 쪽으로 세우는지. 이것 하나 때문에
+    // 썸네일마다 변환이 한 번 더 도므로 계측기가 켜졌을 때만 부른다.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void ProbeHeaderConversion(IntPtr hBitmap)
+    {
+        if (!ProbeOrientation)
+        {
+            return;
+        }
+
+        try
+        {
+            var converted = Imaging.CreateBitmapSourceFromHBitmap(
+                hBitmap, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            converted.Freeze();
+            _lastConvSignature = Signature(converted);
+        }
+        catch (Exception e) when (e is COMException or ArgumentException or
+                                      InvalidOperationException)
+        {
+            _lastConvSignature = null;
         }
     }
 
@@ -573,6 +752,7 @@ public static class ShellThumbnailService
         _lastDibHeight = GetObject(hBitmap, Marshal.SizeOf<DIBSECTION>(), out DIBSECTION dib) != 0
             ? dib.dsBmih.biHeight
             : 0;
+        ProbeHeaderConversion(hBitmap);
 
         if (GetObject(hBitmap, Marshal.SizeOf<BITMAP>(), out BITMAP bmp) != 0 &&
             bmp.bmBitsPixel == 32 && bmp.bmBits != IntPtr.Zero)

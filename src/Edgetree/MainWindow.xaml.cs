@@ -29097,6 +29097,16 @@ public partial class MainWindow : Window
         // size - too small to draw cleanly if the strip grew, needlessly large
         // if it shrank. Handed back and asked for again at the new step; the
         // app's own cache makes that a refill rather than a re-read.
+        // 뒤집힌 썸네일이 높이를 살짝 건드리면 바로 선다는 관측(2026-08-21)에서
+        // 갈리는 것이 바로 이 한 줄이다. 단계를 안 넘었으면 그림을 다시 요청한
+        // 적이 없다는 뜻이고, 그러면 픽셀은 그대로이므로 뒤집힘은 받아온 그림이
+        // 아니라 그리는 쪽에 있는 것이 된다. 단계를 넘었으면 다른 크기로 셸에
+        // 다시 물어서 바로 선 답을 받은 것이므로 요청 크기가 원인 쪽이다.
+        Services.ShellThumbnailService.LogNote(
+            $"strip height: cell={FilmstripCellHeight:F0} " +
+            $"step={_filmstripFetchStep}→{FilmstripFetchSize} " +
+            $"refetch={(FilmstripFetchSize == _filmstripFetchStep ? "no" : "YES")}");
+
         if (FilmstripFetchSize == _filmstripFetchStep)
         {
             return;
