@@ -7904,9 +7904,29 @@
                                             Height="{DynamicResource FilmstripCellHeight}"
                                             Background="Transparent"
                                             Loaded="FilmstripCell_Loaded">
+                                        <!-- FADED WHILE A CUT IS PENDING, the
+                                             same 0.4 the tree's row icon takes
+                                             for the same reason: the file is
+                                             about to be somewhere else, and the
+                                             two surfaces are showing the same
+                                             file. Requested 2026-08-22 -
+                                             cutting from the list left the
+                                             picture looking untouched while its
+                                             row in the tree had already
+                                             answered. -->
                                         <Image Source="{Binding Thumbnail}"
                                                 Stretch="Uniform"
-                                                RenderOptions.BitmapScalingMode="HighQuality"/>
+                                                RenderOptions.BitmapScalingMode="HighQuality">
+                                            <Image.Style>
+                                                <Style TargetType="Image">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Item.IsCut}" Value="True">
+                                                            <Setter Property="Opacity" Value="0.4"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Image.Style>
+                                        </Image>
                                         <!-- THE PLAY BADGE IS GONE (2026-08-16).
                                              It was the panel's own play button
                                              in miniature, put here as a LABEL
