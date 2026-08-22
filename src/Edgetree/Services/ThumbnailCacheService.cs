@@ -32,7 +32,13 @@ public static class ThumbnailCacheService
     // "ETTC" - checked on read so a truncated or foreign file is a miss rather
     // than an exception.
     private const uint Magic = 0x43545445;
-    private const int Version = 1;
+    // 2 (2026-08-21): 셸에서 받은 그림의 줄 순서를 비트맵마다 확인하도록 고치기
+    // 전에 쓰인 항목들은 뒤집힌 채로 저장돼 있다. 원본이 안 바뀌었으므로 그대로
+    // 두면 계속 뒤집혀 나오고, 사용자가 캐싱 파일 정리를 직접 해야만 사라진다.
+    // 판 번호를 올리면 안 맞는 항목이 전부 없는 것으로 처리되어 다음에 볼 때
+    // 다시 받아온다. **대가는 업데이트 직후 폴더마다 한 번씩 다시 받아오는
+    // 것이고, NAS 폴더의 첫 방문이 그만큼 느려진다.**
+    private const int Version = 2;
 
     // Above this the oldest entries go. 300MB is roughly 20,000 thumbnails at
     // the size they encode to, which is more folders than anyone browses in a

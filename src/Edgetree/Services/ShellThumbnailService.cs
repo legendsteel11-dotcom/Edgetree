@@ -733,8 +733,8 @@ public static class ShellThumbnailService
         // Reading the DIB's bits directly preserves the (premultiplied) alpha
         // channel that CreateBitmapSourceFromHBitmap throws away - without
         // this, a transparent PNG's thumbnail lands on a solid black square.
-        // The buffer is read as top-down, which is what GetImage's thumbnails
-        // are in practice.
+        // The buffer is read as top-down, and WHETHER THAT IS RIGHT IS ASKED
+        // PER BITMAP rather than assumed - see RowsAreReversed.
         //
         // A HEIGHT-SIGN CHECK WAS TRIED HERE AND REMOVED (2026-08-09). The
         // theory was that bottom-up DIBs (biHeight > 0) needed their rows
@@ -757,9 +757,11 @@ public static class ShellThumbnailService
         if (GetObject(hBitmap, Marshal.SizeOf<BITMAP>(), out BITMAP bmp) != 0 &&
             bmp.bmBitsPixel == 32 && bmp.bmBits != IntPtr.Zero)
         {
-            var source = BitmapSource.Create(
-                bmp.bmWidth, bmp.bmHeight, 96, 96, PixelFormats.Pbgra32, null,
-                bmp.bmBits, bmp.bmWidthBytes * bmp.bmHeight, bmp.bmWidthBytes);
+            var source = RowsAreReversed(hBitmap, bmp)
+                ? FromReversedRows(bmp)
+                : BitmapSource.Create(
+                    bmp.bmWidth, bmp.bmHeight, 96, 96, PixelFormats.Pbgra32, null,
+                    bmp.bmBits, bmp.bmWidthBytes * bmp.bmHeight, bmp.bmWidthBytes);
             source.Freeze();
             return source;
         }
@@ -770,6 +772,137 @@ public static class ShellThumbnailService
             hBitmap, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
         fallback.Freeze();
         return fallback;
+    }
+
+    // ----- 줄 순서를 짐작하지 않고 물어본다 (2026-08-21, 신고 · 측정) ---------
+    //
+    // 셸이 주는 32bpp 비트맵의 실제 줄 순서는 **요청 크기에 따라 달라진다.**
+    // 2026-08-21 측정(`thumb.log`, 이미지 20여 건 전부 일치):
+    //
+    //   asked=96   biHeight=+96 (bottom-up)   → 메모리 첫 줄이 그림의 **아래쪽**
+    //   asked=128  biHeight=+256 (bottom-up)  → 메모리 첫 줄이 그림의 **위쪽**
+    //
+    // 96은 셸이 그 크기로 새로 만들어 주는 답이고, 128은 자기 256 캐시로 주는
+    // 답이다. **헤더는 둘 다 bottom-up 이라 여전히 못 믿는다** - 2026-08-09에
+    // 높이 부호 검사를 뺀 판단은 그대로 유효하다. 썸네일 바 높이를 조금 키우면
+    // 바로 서던 것이 이것이었다: 단계를 넘으면서 크기가 바뀌어 다른 쪽 답을
+    // 받았을 뿐이다.
+    //
+    // 그래서 헤더 대신 **같은 비트맵을 두 방식으로 읽어 맞대 본다.**
+    // CreateBitmapSourceFromHBitmap 은 방향을 제대로 세워 주지만 투명도를
+    // 버리므로(투명 PNG가 검은 사각형이 되는 것이 그것이라 지금 raw 읽기를
+    // 쓴다) 그림 자체로는 못 쓴다. 대신 **줄 순서를 물어보는 데는 쓸 수 있다.**
+    // 그쪽의 첫 줄이 이쪽의 첫 줄과 맞으면 그대로, 마지막 줄과 맞으면 뒤집힌
+    // 것이다.
+    //
+    // 비교는 **완전히 불투명한 화소(알파 255)에서만** 한다. 거기서는 미리 곱한
+    // 값과 그냥 값이 같으므로 두 읽기가 바이트까지 일치해야 하고, 투명한 자리의
+    // 값 차이가 판정을 흐리지 않는다. 맞아떨어지는 화소가 너무 적으면(거의 다
+    // 투명한 아이콘) 판정을 포기하고 지금까지의 동작 그대로 둔다.
+    //
+    // 비용은 셸 경로마다 변환 한 번이다. 캐시·헤더 경로는 여기를 지나지 않는다.
+    private static bool RowsAreReversed(IntPtr hBitmap, BITMAP bmp)
+    {
+        if (bmp.bmHeight < 2 || bmp.bmWidth < 1)
+        {
+            return false;
+        }
+
+        try
+        {
+            var upright = Imaging.CreateBitmapSourceFromHBitmap(
+                hBitmap, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            if (upright.PixelWidth != bmp.bmWidth || upright.PixelHeight != bmp.bmHeight)
+            {
+                return false;
+            }
+
+            int stride = bmp.bmWidthBytes;
+            int enough = Math.Max(4, bmp.bmWidth / 8);
+            var top = new byte[stride];
+            var bottom = new byte[stride];
+            var reference = new byte[stride];
+
+            // 맨 윗줄부터 보되 **위아래가 서로 다른 첫 줄**을 골라 판정한다. 첫
+            // 줄과 끝 줄이 같은 그림이 실제로 많고(가장자리가 단색인 스크린샷,
+            // 위아래로 여백이 있는 그림), 그런 줄로는 어느 쪽에 맞는지가 갈리지
+            // 않아 판정을 포기하게 된다 - 2026-08-21 측정에서 남아 있던 뒤집힘
+            // 열 건 중 여덟 건이 이것이었다. 줄 몇 개만 보고 끝내므로 비용은
+            // 그대로다.
+            int scan = Math.Min(bmp.bmHeight / 2, 24);
+            for (int k = 0; k <= scan; k++)
+            {
+                Marshal.Copy(IntPtr.Add(bmp.bmBits, k * stride), top, 0, stride);
+                Marshal.Copy(IntPtr.Add(bmp.bmBits, (bmp.bmHeight - 1 - k) * stride),
+                    bottom, 0, stride);
+                if (OpaqueMatches(top, bottom, bmp.bmWidth) >= bmp.bmWidth - enough)
+                {
+                    // 위아래가 사실상 같은 줄. 이걸로는 못 가른다.
+                    continue;
+                }
+
+                upright.CopyPixels(new Int32Rect(0, k, bmp.bmWidth, 1), reference, stride, 0);
+                int matchesTop = OpaqueMatches(reference, top, bmp.bmWidth);
+                int matchesBottom = OpaqueMatches(reference, bottom, bmp.bmWidth);
+                if (matchesTop >= enough && matchesTop > matchesBottom)
+                {
+                    return false;
+                }
+
+                if (matchesBottom >= enough && matchesBottom > matchesTop)
+                {
+                    return true;
+                }
+            }
+
+            // 어느 쪽으로도 충분히 안 맞으면(거의 투명한 그림) 건드리지 않는다.
+            // 이 안전장치가 하는 일은 "모르겠으면 예전 그대로"다.
+            return false;
+        }
+        catch (Exception e) when (e is COMException or ArgumentException or
+                                      InvalidOperationException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static int OpaqueMatches(byte[] reference, byte[] candidate, int width)
+    {
+        int matches = 0;
+        for (int x = 0; x < width; x++)
+        {
+            int i = x * 4;
+            if (candidate[i + 3] != 255)
+            {
+                continue;
+            }
+
+            if (candidate[i] == reference[i] &&
+                candidate[i + 1] == reference[i + 1] &&
+                candidate[i + 2] == reference[i + 2])
+            {
+                matches++;
+            }
+        }
+
+        return matches;
+    }
+
+    // 줄 순서를 뒤집어 담은 사본. 알파를 그대로 들고 오므로 투명 PNG가 검은
+    // 사각형이 되지 않는다.
+    private static BitmapSource FromReversedRows(BITMAP bmp)
+    {
+        int stride = bmp.bmWidthBytes;
+        var buffer = new byte[stride * bmp.bmHeight];
+        for (int y = 0; y < bmp.bmHeight; y++)
+        {
+            Marshal.Copy(
+                IntPtr.Add(bmp.bmBits, (bmp.bmHeight - 1 - y) * stride),
+                buffer, y * stride, stride);
+        }
+
+        return BitmapSource.Create(
+            bmp.bmWidth, bmp.bmHeight, 96, 96, PixelFormats.Pbgra32, null, buffer, stride);
     }
 
     private const int SIIGBF_BIGGERSIZEOK = 0x00000001;
