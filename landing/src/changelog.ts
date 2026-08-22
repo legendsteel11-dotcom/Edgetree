@@ -45,35 +45,23 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    // A SAME-DAY PATCH ON THE LIST RELEASE, caught by the author within hours:
-    // the crash line names the situation (files landing in the folder on show)
-    // rather than the machinery, and the refresh line is as much a behaviour as
-    // a fix - the strip never re-asked about a file whose content changed, in
-    // the bar era too. The size-step refetch repair rides along unlisted
-    // (당연함: the reader assumes growing the cells always did that).
+    // v2.5.1 CARRIES THE ROUND'S WHOLE CARD, because v2.5.0 lived two hours
+    // and reached two downloads before this superseded it - a two-line patch
+    // card on top would have buried the feature release the author actually
+    // shipped today (their report, 2026-08-22: "새 기능들 랜딩카드가 다
+    // 숨겨져서"). The crash fix is deliberately NOT a line: it repaired
+    // something introduced the same day that effectively nobody had, and the
+    // v2.4.2 rule applies - listing it says the new list shipped broken. The
+    // refresh line stays: the strip (and the bar before it) never re-asked
+    // about a changed file, so it is new behaviour, not a same-day repair.
+    // The v2.5.0 entry below stays as history for the arrows.
     version: 'v2.5.1',
-    ko: [
-      '보고 있는 폴더에 파일이 추가·변경될 때 앱이 종료될 수 있던 문제를 수정했습니다.',
-      '새로고침 시 내용이 변경된 파일의 썸네일이 갱신됩니다.',
-    ],
-    en: [
-      'Fixed a crash when files arrived in the folder on show.',
-      'Refreshing renews the thumbnails of files whose content changed.',
-    ],
-  },
-  {
-    // THE LIST IS THE RELEASE, so it takes four of the six lines; the two fix
-    // lines are named because both are intermittent shipped bugs, which the
-    // person who hit them knows only by the symptom. The hidden-items option
-    // was drafted here and cut - it shipped inside v2.4.2's assets (the release
-    // was built past its version-bump commit), so listing it again would
-    // describe one release twice.
-    version: 'v2.5.0',
     ko: [
       '썸네일 바에 세로로 스크롤되는 `썸네일 목록` 배치가 추가되었으며, 기본값으로 적용됩니다.',
       '썸네일 크기는 `Ctrl`+휠, 표시되는 줄 수는 경계 드래그로 조정할 수 있습니다.',
       '썸네일 목록에서 여러 파일을 선택해 복사, 잘라내기, 삭제, 밖으로 드래그할 수 있습니다.',
       '썸네일이 없는 파일은 종류 아이콘으로 표시됩니다.',
+      '새로고침 시 내용이 변경된 파일의 썸네일이 갱신됩니다.',
       '썸네일이 간혹 거꾸로 표시되던 문제를 수정했습니다.',
       '썸네일을 클릭해도 이미지가 바뀌지 않던 문제를 수정했습니다.',
     ],
@@ -82,10 +70,19 @@ export const changelog: ChangelogEntry[] = [
       'Ctrl+wheel sizes the thumbnails; dragging the edge shows more rows.',
       'Select several pictures and copy, cut, delete or drag them out together.',
       'Files with no picture of their own show their file-type icon.',
+      'Refreshing renews the thumbnails of files whose content changed.',
       'Thumbnails no longer come up upside down now and then.',
       'A thumbnail click no longer fails to change the picture.',
     ],
   },
+  // v2.5.0 HAS NO ENTRY OF ITS OWN - the one above is the merged card for the
+  // 2026-08-22 pair (the author's call: "랜딩카드를 합칠까요 이번엔? 랜딩에서만").
+  // It lived two hours before v2.5.1 superseded it, so a separate entry would
+  // show the arrows two near-identical cards. The label stays exactly 'v2.5.1'
+  // because UpdateNotes.vue hides the whole card unless the newest entry's
+  // version EQUALS the tag GitHub reports as latest - a "~v2.5.1" range label
+  // would read nicely and blank the card. The per-release record lives in the
+  // READMEs' changelog and the GitHub release notes, which keep both.
   {
     // ELEVEN LINES IN THE RELEASE NOTES, SIX HERE. What came out is what a
     // person finds while using the app rather than while deciding to download
