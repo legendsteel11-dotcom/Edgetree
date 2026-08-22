@@ -27700,6 +27700,44 @@ public partial class MainWindow : Window
     // The stored number stays whatever the user chose; only what is APPLIED
     // bends to the window they are in, so making the window taller gives the
     // list back the height it was asked for.
+    // WHAT THE ROWS ACTUALLY COME TO. A folder of ten files is one row, and the
+    // stored height would leave the rest of the strip standing empty and black
+    // under it - the bar never showed that because its row is Auto and measures
+    // itself (2026-08-22, seen in a screenshot of a ten-file folder).
+    //
+    // Only ever a CEILING, and the stored height is untouched: walk into a
+    // folder with hundreds and the strip is back to the height that was chosen
+    // for it.
+    private double FilmstripGridContentHeight()
+    {
+        int count = _filmstripCells.Count;
+        if (count == 0 ||
+            Resources["FilmstripCellFootprintHeight"] is not double rowHeight ||
+            rowHeight <= 0)
+        {
+            return double.PositiveInfinity;
+        }
+
+        int columns = FilmstripColumns;
+        if (columns <= 1 && Resources["FilmstripCellFootprintWidth"] is double cellWidth &&
+            cellWidth > 0)
+        {
+            // Before the panel exists there is nothing to ask, so the same
+            // division it will do is done here. It only has to be right on the
+            // FIRST layout - after that the panel itself answers.
+            double available = ViewerFilmstrip.ActualWidth
+                - ViewerFilmstrip.Padding.Left - ViewerFilmstrip.Padding.Right;
+            if (available > 0)
+            {
+                columns = Math.Max(1, (int)(available / cellWidth));
+            }
+        }
+
+        int rows = (count + Math.Max(1, columns) - 1) / Math.Max(1, columns);
+        return (rows * rowHeight)
+            + ViewerFilmstrip.Padding.Top + ViewerFilmstrip.Padding.Bottom;
+    }
+
     private double MaxFilmstripGridHeightNow()
     {
         double panel = ViewerPanel.ActualHeight;
@@ -27839,6 +27877,9 @@ public partial class MainWindow : Window
             }
         }
 
+        // A new folder is a new number of rows, and the list's height follows
+        // that when the folder is small enough to fit in less than it was given.
+        ApplyFilmstripGridHeight();
         SyncFilmstripToSelection();
         LogFilmstripCost(filmstripStart, rebuilt, items.Count);
     }
@@ -29003,7 +29044,8 @@ public partial class MainWindow : Window
     private void ApplyFilmstripGridHeight()
     {
         double height = FilmstripGridMode
-            ? Math.Min(FilmstripGridHeight, MaxFilmstripGridHeightNow())
+            ? Math.Min(Math.Min(FilmstripGridHeight, MaxFilmstripGridHeightNow()),
+                FilmstripGridContentHeight())
             : double.NaN;
 
         double current = ViewerFilmstripHost.Height;
