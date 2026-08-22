@@ -45,6 +45,23 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // A SAME-DAY PATCH ON THE LIST RELEASE, caught by the author within hours:
+    // the crash line names the situation (files landing in the folder on show)
+    // rather than the machinery, and the refresh line is as much a behaviour as
+    // a fix - the strip never re-asked about a file whose content changed, in
+    // the bar era too. The size-step refetch repair rides along unlisted
+    // (당연함: the reader assumes growing the cells always did that).
+    version: 'v2.5.1',
+    ko: [
+      '보고 있는 폴더에 파일이 추가·변경될 때 앱이 종료될 수 있던 문제를 수정했습니다.',
+      '새로고침 시 내용이 변경된 파일의 썸네일이 갱신됩니다.',
+    ],
+    en: [
+      'Fixed a crash when files arrived in the folder on show.',
+      'Refreshing renews the thumbnails of files whose content changed.',
+    ],
+  },
+  {
     // THE LIST IS THE RELEASE, so it takes four of the six lines; the two fix
     // lines are named because both are intermittent shipped bugs, which the
     // person who hit them knows only by the symptom. The hidden-items option

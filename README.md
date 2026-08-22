@@ -1,4 +1,4 @@
-# Edgetree v2.5.0
+# Edgetree v2.5.1
 
 [한국어 안내](README-ko.md)
 
@@ -216,6 +216,11 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v2.5.1 (2026-08-22)
+
+- Fixed a crash when files arrived in the folder on show.
+- Refreshing renews the thumbnails of files whose content changed.
 
 ### v2.5.0 (2026-08-22)
 

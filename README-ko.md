@@ -1,4 +1,4 @@
-# Edgetree v2.5.0
+# Edgetree v2.5.1
 
 [English](README.md)
 
@@ -244,6 +244,11 @@ dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -o publi
 csproj만 올리면 됩니다.
 
 ## 변경 이력
+
+### v2.5.1 (2026-08-22)
+
+- 보고 있는 폴더에 파일이 추가·변경될 때 앱이 종료될 수 있던 문제를 수정했습니다.
+- 새로고침 시 내용이 변경된 파일의 썸네일이 갱신됩니다.
 
 ### v2.5.0 (2026-08-22)
 
