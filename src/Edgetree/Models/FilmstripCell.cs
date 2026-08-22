@@ -27,7 +27,25 @@ public class FilmstripCell : INotifyPropertyChanged
         IsPlayable = isPlayable;
     }
 
-    public FileSystemItem Item { get; }
+    public FileSystemItem Item { get; private set; }
+
+    // THE SAME FILE, THE TREE'S NEW INSTANCE. A refresh rebuilds a folder's
+    // children as fresh objects, and a cell that survives that (see
+    // MainWindow.MergeFilmstripCells) would otherwise keep pointing at the old
+    // one - which no list in the tree contains any more, so its mark would stop
+    // following the selection and a click on it would have to be re-resolved by
+    // name. Only ever called with an item of the same path, so everything
+    // derived from it - the path, the name, whether it plays - is unchanged.
+    public void Adopt(FileSystemItem item)
+    {
+        if (ReferenceEquals(Item, item))
+        {
+            return;
+        }
+
+        Item = item;
+        OnPropertyChanged(nameof(Item));
+    }
 
     // A MARK LIVES ON THE ITEM, NOT ON THE CELL, and that is deliberate: the
     // strip marks the app's OWN multi-selection (FileSystemItem.IsMultiSelected,
@@ -134,6 +152,9 @@ public class FilmstripCell : INotifyPropertyChanged
         }
 
         field = value;
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        OnPropertyChanged(name);
     }
+
+    private void OnPropertyChanged(string? name)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }

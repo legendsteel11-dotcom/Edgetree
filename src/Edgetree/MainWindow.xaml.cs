@@ -27888,7 +27888,24 @@ public partial class MainWindow : Window
                 ? folder.FullPath
                 : ViewerItem?.Parent?.FullPath ?? string.Empty)
             : SearchFilmstripKey;
-        if (_filmstripBuiltFor != (builtFor, items!.Count))
+        // THE SAME FOLDER WITH A FILE FEWER IS A MERGE, NOT A REBUILD. A delete
+        // (or a paste, or a watcher event) changes the count, and the count is
+        // half this key - so one file leaving a folder of 4,264 threw away every
+        // cell and every thumbnail in it, and the strip refilled from the start
+        // while the counter counted back up from zero (reported 2026-08-22).
+        // Nothing about the other 4,263 pictures changed.
+        //
+        // Same reasoning, and the same shape, as the tree's own
+        // MergeChildrenFromDisk: rows that survive keep their instance and
+        // everything hanging off it.
+        if (_filmstripBuiltFor.Item1 == builtFor && _filmstripBuiltFor.Item2 != items!.Count &&
+            _filmstripCells.Count > 0)
+        {
+            rebuilt = true;
+            _filmstripBuiltFor = (builtFor, items.Count);
+            MergeFilmstripCells(items);
+        }
+        else if (_filmstripBuiltFor != (builtFor, items!.Count))
         {
             // Set with the folder, not per request: it is a property of where
             // these files live. Results spread across folders are paced by the
@@ -27922,6 +27939,72 @@ public partial class MainWindow : Window
         ApplyFilmstripGridHeight();
         SyncFilmstripToSelection();
         LogFilmstripCost(filmstripStart, rebuilt, items.Count);
+    }
+
+    // The strip's own diff against a folder that has changed under it. Cells for
+    // files that are still there keep their instance - and with it the picture
+    // they are holding, the fact that they have already asked for it, and their
+    // place in the retain window - so a delete costs one cell rather than the
+    // folder.
+    //
+    // Matched by PATH rather than by instance: a refresh replaces every
+    // FileSystemItem, so instance identity says only that nothing happened.
+    // The survivors adopt the new instance (FilmstripCell.Adopt) so the mark
+    // and the selection go on following the tree.
+    private void MergeFilmstripCells(List<FileSystemItem> items)
+    {
+        var existing = new Dictionary<string, FilmstripCell>(StringComparer.OrdinalIgnoreCase);
+        foreach (var cell in _filmstripCells)
+        {
+            existing[cell.Path] = cell;
+        }
+
+        var target = new List<FilmstripCell>(items.Count);
+        foreach (var item in items)
+        {
+            if (existing.TryGetValue(item.FullPath, out var cell))
+            {
+                cell.Adopt(item);
+                target.Add(cell);
+            }
+            else
+            {
+                target.Add(new FilmstripCell(item, IsViewerPlayable(item.FullPath)));
+            }
+        }
+
+        // Removed first, so the walk below only ever finds a wanted cell further
+        // right or not at all. Each one that goes hands its picture back on the
+        // way out - the collector is told about those bytes, and a cell dropped
+        // without this would take the count with it.
+        var keep = new HashSet<FilmstripCell>(target);
+        for (int i = _filmstripCells.Count - 1; i >= 0; i--)
+        {
+            if (!keep.Contains(_filmstripCells[i]))
+            {
+                _filmstripCells[i].Drop();
+                _filmstripCells.RemoveAt(i);
+            }
+        }
+
+        for (int i = 0; i < target.Count; i++)
+        {
+            var wanted = target[i];
+            if (i < _filmstripCells.Count && ReferenceEquals(_filmstripCells[i], wanted))
+            {
+                continue;
+            }
+
+            int current = _filmstripCells.IndexOf(wanted);
+            if (current >= 0)
+            {
+                _filmstripCells.Move(current, i);
+            }
+            else
+            {
+                _filmstripCells.Insert(i, wanted);
+            }
+        }
     }
 
     [System.Diagnostics.Conditional("DEBUG")]
