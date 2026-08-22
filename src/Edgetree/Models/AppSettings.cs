@@ -53,7 +53,10 @@ public class AppSettings
     // 것이 다르다. 바에서는 높이가 곧 셀 크기지만, 목록에서는 높이가 몇 줄이
     // 보이느냐이고 셀 크기는 따로 정한다. 한 값을 나눠 쓰면 모드를 오갈 때마다
     // 상대편이 맞춰 둔 것이 어긋난다.
-    public bool ViewerFilmstripGrid { get; set; } = false;
+    // 기본값이 목록이다(2026-08-22, 사용자 결정). **이 설정이 없는 기존 설정
+    // 파일에도 적용되므로, 이미 썸네일 바를 켜 두고 쓰던 사람은 업데이트 후
+    // 목록으로 바뀐 것을 보게 된다.** 되돌리는 길은 옵션의 체크 한 줄이다.
+    public bool ViewerFilmstripGrid { get; set; } = true;
     public double ViewerFilmstripGridCellSize { get; set; } = 96;
     public double ViewerFilmstripGridHeight { get; set; } = 240;
 
