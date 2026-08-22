@@ -2183,6 +2183,24 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Ctrl+A MARKS THE WHOLE STRIP - the key the strip's own menu was
+        // already advertising beside 전체 선택, wired here where every other key
+        // the strip licenses lives. Same visible reason as ←→ and ↑↓ above: the
+        // strip being on screen is what says the key is about the pictures.
+        // Both layouts, because the menu row it belongs to is in both. Never
+        // from a text box - a rename or a search field owns its own Ctrl+A.
+        if (Keyboard.Modifiers == ModifierKeys.Control &&
+            e.Key == Key.A &&
+            _viewerOpen &&
+            ViewerFilmstripHost.Visibility == Visibility.Visible &&
+            _filmstripCells.Count > 0 &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            FilmstripSelectAll_Click(sender, e);
+            e.Handled = true;
+            return;
+        }
+
         // BARE +/- is the viewer's zoom (Ctrl+/- stays the app's font size -
         // two different scales on one pair of keys, told apart by the
         // modifier). Only while the panel is open and showing something
