@@ -199,8 +199,19 @@ public class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
         {
             case NotifyCollectionChangedAction.Remove:
             case NotifyCollectionChangedAction.Replace:
+                RemoveRealizedRange(args.Position, args.ItemUICount);
+                break;
+
+            // FOR A MOVE THE CONTAINER TO DROP IS AT THE OLD PLACE. Position is
+            // where the item went TO, and when that place is off screen the
+            // generator says so as (-1, offset) - which, handed to
+            // RemoveInternalChildRange with a realized container's count, walks
+            // the children from index -1 and throws. That was a CRASH
+            // (2026-08-22): a capture program saving into the folder on show
+            // made the merge reorder its cells, and the watcher re-fired the
+            // same merge until the app died.
             case NotifyCollectionChangedAction.Move:
-                RemoveInternalChildRange(args.Position.Index, args.ItemUICount);
+                RemoveRealizedRange(args.OldPosition, args.ItemUICount);
                 break;
 
             case NotifyCollectionChangedAction.Reset:
@@ -213,6 +224,27 @@ public class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
         }
 
         InvalidateMeasure();
+    }
+
+    // Only what is actually REALIZED gets removed, which is the guard the
+    // framework's own VirtualizingStackPanel wears on this same event: a count
+    // of zero means every affected item was virtual and there is nothing to do,
+    // and a position of (index, offset>0) means the range starts just past the
+    // realized container at index. Without the guards this was the crash above -
+    // a generator position naming no container is not an index into the
+    // children.
+    private void RemoveRealizedRange(GeneratorPosition position, int count)
+    {
+        int index = position.Index;
+        if (position.Offset > 0)
+        {
+            index++;
+        }
+
+        if (count > 0 && index >= 0 && index < InternalChildren.Count)
+        {
+            RemoveInternalChildRange(index, count);
+        }
     }
 
     // ScrollIntoView on a virtualizing panel arrives here rather than at
