@@ -29112,10 +29112,18 @@ public partial class MainWindow : Window
             return;
         }
 
+        // THE PICTURE STAYS UNTIL THE NEW ONE ARRIVES. Handing it back here as
+        // well emptied every cell for as long as the refill took, and the whole
+        // bar blinked once on a drag that crossed a step (2026-08-21, 신고).
+        // What is on screen is the same picture at the wrong size, which is
+        // exactly what it was a moment ago while the drag was still moving, so
+        // there is nothing to gain by taking it away first. The setter replaces
+        // the value and its own memory accounting with it, so the only cost is
+        // that both bitmaps exist for the moment between - and only for the
+        // cells within the retain reach.
         _filmstripFetchStep = FilmstripFetchSize;
         foreach (var cell in _filmstripCells)
         {
-            cell.Thumbnail = null;
             cell.Requested = false;
             cell.AskedAhead = false;
         }
