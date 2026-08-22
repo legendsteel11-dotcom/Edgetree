@@ -29202,10 +29202,7 @@ public partial class MainWindow : Window
     // the panel's resize, which is a per-frame path while a width drag is on.
     private void ApplyFilmstripGridHeight()
     {
-        double height = FilmstripGridMode
-            ? Math.Min(Math.Min(FilmstripGridHeight, MaxFilmstripGridHeightNow()),
-                FilmstripGridContentHeight())
-            : double.NaN;
+        double height = FilmstripGridMode ? WantedFilmstripGridHeight() : double.NaN;
 
         double current = ViewerFilmstripHost.Height;
         bool same = double.IsNaN(height)
@@ -29217,6 +29214,36 @@ public partial class MainWindow : Window
         }
 
         ViewerFilmstripHost.Height = height;
+    }
+
+    // ONE ROW ALWAYS FITS. The stored height is what the grip was dragged to,
+    // but the cell size has its own control now, and growing the cells past that
+    // height left the single row of a small folder cut off inside a strip that
+    // would not grow with it (reported 2026-08-22). A row is the smallest unit
+    // this layout has; below one, there is nothing to show.
+    //
+    // The content ceiling still applies on top, so a folder that fits in less
+    // than the stored height still shrinks to what it has.
+    private double WantedFilmstripGridHeight()
+    {
+        double content = FilmstripGridContentHeight();
+        double stored = FilmstripGridHeight;
+
+        // THE CONTENT CLAMP APPLIES DURING THE DRAG TOO, and leaving it out was
+        // the bounce: the strip followed the grip up past the rows it had, then
+        // dropped back to fit them the moment the button came up ("위로 올라갔다가
+        // 내려오는 느낌", 2026-08-22). Applied throughout, the grip simply stops
+        // where the content ends and there is nothing left to snap back from.
+        //
+        // The STORED number keeps climbing while the hand does, so a folder with
+        // more in it later gets the height that was actually asked for.
+        double oneRow = Resources["FilmstripCellFootprintHeight"] is double row && row > 0
+            ? row + ViewerFilmstrip.Padding.Top + ViewerFilmstrip.Padding.Bottom
+            : stored;
+
+        return Math.Min(
+            Math.Min(Math.Max(stored, Math.Min(content, oneRow)), MaxFilmstripGridHeightNow()),
+            content);
     }
 
     private bool? _filmstripLayoutIsGrid;
@@ -29355,6 +29382,14 @@ public partial class MainWindow : Window
 
         _settings.ViewerFilmstripGridCellSize = next;
         ApplyFilmstripCellSize();
+
+        // AND THE STRIP GROWS WITH THEM. Bigger cells are taller rows, and the
+        // host's height is set rather than measured - so without this the row
+        // grew inside a strip that did not, and the pictures were cut off
+        // (reported 2026-08-22). Nothing else was recomputing it: the height is
+        // worked out when the panel resizes, the mode changes or the folder
+        // does, and this is none of the three.
+        ApplyFilmstripGridHeight();
         RefreshFilmstripFetchSize();
         ScheduleFilmstripThumbnails();
 
