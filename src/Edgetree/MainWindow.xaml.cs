@@ -9790,6 +9790,15 @@ public partial class MainWindow : Window
         // list stale. Drop it up front.
         ClearMultiSelection();
 
+        // 새로고침은 그림에도 새로고침이다 (2026-08-22, 신고). The strip's cells
+        // believe a picture once fetched is answered for good, and no refresh
+        // gesture reached them - so a file whose CONTENT changed kept its old
+        // thumbnail through any number of F5s. Re-asking is cheap where nothing
+        // changed: the disk cache checks each file's write time and size, so
+        // unchanged files come back from the local cache and only the files
+        // that really changed go to the shell.
+        RefreshFilmstripPictures();
+
         // Snapshot every currently-expanded, already-loaded folder's full
         // path, and the current selection, before refreshing discards the
         // actual instances that know about either - a folder's
@@ -16159,6 +16168,7 @@ public partial class MainWindow : Window
         if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true } item)
         {
             item.RefreshChildren();
+            RefreshFilmstripPictures();
         }
     }
 
@@ -29542,6 +29552,43 @@ public partial class MainWindow : Window
             // the gate listens to.
             cell.Stale = true;
         }
+
+        ScheduleFilmstripThumbnails();
+    }
+
+    // 새로고침의 그림 반쪽 (2026-08-22, 신고: "새로고침을 아무리 해도"). A file
+    // whose CONTENT changes in place fires no watcher event at all - LastWrite
+    // is deliberately off the drive watcher (the tree shows names, and watching
+    // writes would churn on every autosave anywhere on the drive) - so the only
+    // way a changed picture can reach its cell is a refresh someone asks for.
+    // This is that path: every cell is set to ask again, the picture staying on
+    // screen until its replacement arrives (the fetch-size rule). The cache
+    // checks each file's write time and size on the way, so what did not change
+    // is a local read of the same pixels and only what did goes to the shell.
+    //
+    // Wired to the EXPLICIT refresh gestures (F5, 새로고침) and nothing else:
+    // the rename/delete/paste refreshes already reach the strip through the
+    // count-keyed merge, and re-asking a NAS folder's window of cells is a cost
+    // that should only follow a hand actually asking for it.
+    private void RefreshFilmstripPictures()
+    {
+        if (ViewerFilmstripHost.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        foreach (var cell in _filmstripCells)
+        {
+            cell.Requested = false;
+            cell.AskedAhead = false;
+            cell.Stale = true;
+        }
+
+        // One line so thumb.log can say whether a refresh gesture reached the
+        // strip at all - its absence is what separates "the hook never fired"
+        // from "the re-ask returned the same picture".
+        Services.ShellThumbnailService.LogNote(
+            $"refresh pictures: cells={_filmstripCells.Count}");
 
         ScheduleFilmstripThumbnails();
     }
