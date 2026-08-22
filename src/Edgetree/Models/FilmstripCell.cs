@@ -58,6 +58,22 @@ public class FilmstripCell : INotifyPropertyChanged
     // the marks for the same reason - the tree writes SelectedItem constantly,
     // and each write would collapse an Extended selection.
 
+    // WHAT A CELL SHOWS WHEN THERE IS NO PICTURE TO SHOW. A track with no album
+    // art, a document, anything the shell cannot make a thumbnail of - the cell
+    // was simply empty, and a folder of music read as a grid of holes (reported
+    // 2026-08-22). Its file-type icon at least says what the thing is.
+    //
+    // Kept apart from Thumbnail rather than written into it: this is not a
+    // picture OF the file, so nothing that counts thumbnail memory, decides what
+    // to preload or drops distant pictures should ever see it.
+    private ImageSource? _typeIcon;
+
+    public ImageSource? TypeIcon
+    {
+        get => _typeIcon;
+        set => SetField(ref _typeIcon, value);
+    }
+
     public string Path => Item.FullPath;
 
     public string Name => Item.Name;

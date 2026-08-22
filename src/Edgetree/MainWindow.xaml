@@ -7924,6 +7924,23 @@
                                              picture looking untouched while its
                                              row in the tree had already
                                              answered. -->
+                                        <!-- THE TYPE'S ICON, at its own size and
+                                             only while there is no picture. Not
+                                             stretched to the cell: an icon blown
+                                             up to fill a frame reads as a bad
+                                             thumbnail, where one sitting small
+                                             in the middle reads as "there is no
+                                             picture, and here is what this is".
+                                             It goes UNDER the picture in the
+                                             stack so the arrival of a real
+                                             thumbnail simply covers it. -->
+                                        <Image Source="{Binding TypeIcon}"
+                                                Stretch="Uniform"
+                                                MaxWidth="48"
+                                                MaxHeight="48"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                RenderOptions.BitmapScalingMode="HighQuality"/>
                                         <Image Source="{Binding Thumbnail}"
                                                 Stretch="Uniform"
                                                 RenderOptions.BitmapScalingMode="HighQuality">

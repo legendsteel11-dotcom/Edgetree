@@ -29032,8 +29032,79 @@ public partial class MainWindow : Window
             {
                 cell.Thumbnail = thumbnail;
                 ReportFilmstripPrecacheProgress();
+                return;
+            }
+
+            // Nothing to show for this file. Only for the real ask - the cheap
+            // speculative one ahead of the strip says nothing about whether a
+            // thumbnail exists, and treating its silence as "there is none"
+            // would put an icon on a picture that simply had not been read yet.
+            if (!headerOnly)
+            {
+                ShowFilmstripTypeIcon(cell);
             }
         }, embeddedOnly: headerOnly);
+    }
+
+    // ----- 그림이 없는 칸 (2026-08-22, 신고) -----------------------------------
+    //
+    // Asked once per EXTENSION, not once per file. A folder of music is one
+    // shell call for .mp3 and one for .flac, however many tracks it holds - the
+    // icon belongs to the type, and the alternative is a thread and a disk read
+    // per cell for an answer that is the same every time.
+    //
+    // The exceptions are the types whose icon is their own (.exe, .lnk, .ico);
+    // none of them reaches here, because the strip lists what the panel can
+    // show and those are not it.
+    private readonly Dictionary<string, ImageSource?> _filmstripTypeIcons =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly HashSet<string> _filmstripTypeIconsPending =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private void ShowFilmstripTypeIcon(FilmstripCell cell)
+    {
+        string extension = System.IO.Path.GetExtension(cell.Path);
+        if (extension.Length == 0)
+        {
+            return;
+        }
+
+        if (_filmstripTypeIcons.TryGetValue(extension, out var known))
+        {
+            cell.TypeIcon = known;
+            return;
+        }
+
+        if (!_filmstripTypeIconsPending.Add(extension))
+        {
+            // Already on its way for this type; the arrival below hands it to
+            // every cell waiting on it, this one included.
+            return;
+        }
+
+        ShellIconService.GetViewerIcon(cell.Path, icon =>
+        {
+            _filmstripTypeIconsPending.Remove(extension);
+            _filmstripTypeIcons[extension] = icon;
+            if (icon is null)
+            {
+                return;
+            }
+
+            // Handed to everything of that type that is still without a
+            // picture. Walked once per extension, so a folder of thousands
+            // costs one pass rather than one per cell.
+            foreach (var waiting in _filmstripCells)
+            {
+                if (waiting.Thumbnail is null && waiting.TypeIcon is null &&
+                    string.Equals(System.IO.Path.GetExtension(waiting.Path), extension,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    waiting.TypeIcon = icon;
+                }
+            }
+        });
     }
 
     // ----- 진행 표시는 진행에서 나와야 한다 (2026-08-22, 신고) -------------------
@@ -31843,7 +31914,7 @@ public partial class MainWindow : Window
         // the honest rendering for a folder.
         if (Directory.Exists(path))
         {
-            ShowViewerFileTypeIcon(path);
+            ShowViewerFileTypeIcon(path, besideButton: false);
             return;
         }
 
@@ -31937,15 +32008,23 @@ public partial class MainWindow : Window
                 ViewerImage.Visibility = Visibility.Collapsed;
                 ViewerImage.Source = null;
                 _viewerShowingDecodedImage = false;
-                ViewerIconImage.Visibility = Visibility.Collapsed;
-                ViewerIconImage.Source = null;
                 ClearViewerZoom();
                 UpdateViewerPlayOverlay();
                 SetViewerFileInfo(path, 0, 0, withMediaInfo: true);
+
+                // AND THE ICON AS WELL NOW, LIFTED CLEAR OF THE BUTTON
+                // (2026-08-22, on request). The 08-11 note above is right that
+                // they cannot be stacked - same size, same centre, one hides the
+                // other - but that was an argument about the PLACE, not about
+                // the icon: a track with no art showed nothing at all saying
+                // what kind of file it was, while its own cell in the strip
+                // below did. Moved up by its own height, both are readable and
+                // the button keeps the middle.
+                ShowViewerFileTypeIcon(path, besideButton: true);
                 return;
             }
 
-            ShowViewerFileTypeIcon(path);
+            ShowViewerFileTypeIcon(path, besideButton: false);
         });
     }
 
@@ -31955,7 +32034,7 @@ public partial class MainWindow : Window
     // system image list (see GetViewerIcon), not GetImage - GetImage's
     // freshly-rendered icon answers sometimes arrive upside down, which is
     // what the intermittent "물구나무서기" folders were (2026-08-09).
-    private void ShowViewerFileTypeIcon(string path)
+    private void ShowViewerFileTypeIcon(string path, bool besideButton)
     {
         ShellIconService.GetViewerIcon(path, icon =>
         {
@@ -31964,14 +32043,28 @@ public partial class MainWindow : Window
                 return;
             }
 
-            ViewerImage.Visibility = Visibility.Collapsed;
-            ViewerImage.Source = null;
-            _viewerShowingDecodedImage = false;
+            // LIFTED BY ITS OWN HEIGHT when the play button has the middle. Both
+            // are 64px squares centred in the same cell, so anything less and
+            // they overlap - which is exactly why the icon used to be dropped
+            // here rather than moved.
+            ViewerIconImage.Margin = besideButton
+                ? new Thickness(0, 0, 0, 88)
+                : new Thickness(0);
+
+            // The picture and the zoom go only where this call OWNS the panel.
+            // Beside the button they have already been dealt with, and clearing
+            // them again would undo the caption the audio branch just wrote.
+            if (!besideButton)
+            {
+                ViewerImage.Visibility = Visibility.Collapsed;
+                ViewerImage.Source = null;
+                _viewerShowingDecodedImage = false;
+                ClearViewerZoom();
+                SetViewerFileInfo(path, 0, 0);
+            }
+
             ViewerIconImage.Visibility = Visibility.Visible;
             ViewerIconImage.Source = icon;
-            // A file-type icon has nothing to zoom, so the strip goes too.
-            ClearViewerZoom();
-            SetViewerFileInfo(path, 0, 0);
         });
     }
 
