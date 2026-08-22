@@ -28607,6 +28607,7 @@ public partial class MainWindow : Window
             if (thumbnail is not null)
             {
                 target.Thumbnail = thumbnail;
+                ReportFilmstripPrecacheProgress();
             }
         });
     }
@@ -28852,8 +28853,39 @@ public partial class MainWindow : Window
             if (thumbnail is not null)
             {
                 cell.Thumbnail = thumbnail;
+                ReportFilmstripPrecacheProgress();
             }
         }, embeddedOnly: headerOnly);
+    }
+
+    // ----- 진행 표시는 진행에서 나와야 한다 (2026-08-22, 신고) -------------------
+    //
+    // `캐싱 중 N` was written only from the trickle's own tick, so it said
+    // nothing at all whenever the trickle was not running - and the trickle
+    // stops itself the moment a speculative read takes too long, which on a cold
+    // network folder is most of the time. The reported symptom was the number
+    // sitting at 158 while thumb.log showed pictures still arriving and
+    // memory.log counted 1,545 of them held.
+    //
+    // A COUNTER THAT ONLY MOVES WHILE ONE PARTICULAR MACHINE IS RUNNING IS
+    // MEASURING THAT MACHINE, NOT THE WORK. Progress is a picture arriving, so
+    // that is where it is now counted - from every path that fills a cell.
+    //
+    // Throttled, because the count walks the retain window (up to 5,000 cells)
+    // and thumbnails arrive in bursts. Four times a second is far faster than
+    // anyone reads a number, and it costs a walk rather than a fetch.
+    private long _precacheTextStamp;
+
+    private void ReportFilmstripPrecacheProgress()
+    {
+        long now = Environment.TickCount64;
+        if (now - _precacheTextStamp < 250)
+        {
+            return;
+        }
+
+        _precacheTextStamp = now;
+        UpdateFilmstripPrecacheText();
     }
 
     // Only cells that actually HOLD a picture are let go. One that is still in
