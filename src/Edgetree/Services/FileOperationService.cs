@@ -71,9 +71,14 @@ public static class FileOperationService
     // What a paste turned out to be, so the caller knows whether the source
     // folders need refreshing too (a move empties them) and can drop its cut
     // markers once they've been acted on.
-    public sealed record PasteOutcome(bool WasMove, IReadOnlyList<string> SourcePaths)
+    // CreatedPaths is where things actually LANDED, which the caller cannot work
+    // out from the sources: a collision numbers up to " (2)", and a cut pasted
+    // back into its own folder lands nowhere at all.
+    public sealed record PasteOutcome(
+        bool WasMove, IReadOnlyList<string> SourcePaths, IReadOnlyList<string> CreatedPaths)
     {
-        public static readonly PasteOutcome None = new(false, Array.Empty<string>());
+        public static readonly PasteOutcome None =
+            new(false, Array.Empty<string>(), Array.Empty<string>());
     }
 
     // Returns false only when the clipboard has nothing pasteable, so the
@@ -101,19 +106,19 @@ public static class FileOperationService
             return false;
         }
 
-        outcome = new PasteOutcome(move, sourcePaths);
+        var created = new List<string>();
+        outcome = new PasteOutcome(move, sourcePaths, created);
 
         foreach (string sourcePath in sourcePaths)
         {
             try
             {
-                if (move)
+                string? landed = move
+                    ? MoveEntry(sourcePath, destinationFolder)
+                    : CopyEntry(sourcePath, destinationFolder);
+                if (landed is not null)
                 {
-                    MoveEntry(sourcePath, destinationFolder);
-                }
-                else
-                {
-                    CopyEntry(sourcePath, destinationFolder);
+                    created.Add(landed);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -176,7 +181,11 @@ public static class FileOperationService
         return false;
     }
 
-    private static void CopyEntry(string sourcePath, string destinationFolder)
+    // Returns the path it actually wrote, which is not always the one the name
+    // suggests: a collision numbers up to " (2)". The caller uses it to show what
+    // arrived, and deriving the name a second time at the call site would get the
+    // numbered cases wrong - it would point at the file that was already there.
+    private static string? CopyEntry(string sourcePath, string destinationFolder)
     {
         string trimmedSource = sourcePath.TrimEnd(Path.DirectorySeparatorChar);
         string name = Path.GetFileName(trimmedSource);
@@ -201,9 +210,9 @@ public static class FileOperationService
                 throw new IOException(Strings.CopyIntoSelfError);
             }
 
-            CopyDirectoryRecursive(sourcePath, GetUniqueDestination(Path.Combine(parent, name)),
-                overwrite: false);
-            return;
+            string selfCopy = GetUniqueDestination(Path.Combine(parent, name));
+            CopyDirectoryRecursive(sourcePath, selfCopy, overwrite: false);
+            return selfCopy;
         }
 
         if (Directory.Exists(sourcePath))
@@ -222,19 +231,27 @@ public static class FileOperationService
                 throw new IOException(Strings.CopyIntoSelfError);
             }
 
-            CopyDirectoryRecursive(sourcePath, GetUniqueDestination(Path.Combine(destinationFolder, name)),
-                overwrite: false);
+            string folderCopy = GetUniqueDestination(Path.Combine(destinationFolder, name));
+            CopyDirectoryRecursive(sourcePath, folderCopy, overwrite: false);
+            return folderCopy;
         }
-        else if (File.Exists(sourcePath))
+
+        if (File.Exists(sourcePath))
         {
-            File.Copy(sourcePath, GetUniqueDestination(Path.Combine(destinationFolder, name)));
+            string fileCopy = GetUniqueDestination(Path.Combine(destinationFolder, name));
+            File.Copy(sourcePath, fileCopy);
+            return fileCopy;
         }
+
+        return null;
     }
 
     // The cut half of paste. Name conflicts number up to " (2)" exactly like a
     // copied paste does - the app has never asked before writing, and a move
     // is not the place to start.
-    private static void MoveEntry(string sourcePath, string destinationFolder)
+    // Returns where it put the item, or null when it did nothing (cut and pasted
+    // back into its own folder). Same reason as CopyEntry above.
+    private static string? MoveEntry(string sourcePath, string destinationFolder)
     {
         string trimmedSource = sourcePath.TrimEnd(Path.DirectorySeparatorChar);
         string name = Path.GetFileName(trimmedSource);
@@ -244,7 +261,7 @@ public static class FileOperationService
         // silently turn a move into a copy.
         if (Path.GetDirectoryName(trimmedSource) is { } sourceParent && IsSamePath(sourceParent, destinationFolder))
         {
-            return;
+            return null;
         }
 
         if (Directory.Exists(sourcePath))
@@ -270,13 +287,20 @@ public static class FileOperationService
                 CopyDirectoryRecursive(sourcePath, destPath, overwrite: false);
                 Directory.Delete(sourcePath, recursive: true);
             }
+
+            return destPath;
         }
-        else if (File.Exists(sourcePath))
+
+        if (File.Exists(sourcePath))
         {
             // File.Move handles crossing volumes on its own (copy + delete,
             // with the delete only after the copy landed).
-            File.Move(sourcePath, GetUniqueDestination(Path.Combine(destinationFolder, name)));
+            string moved = GetUniqueDestination(Path.Combine(destinationFolder, name));
+            File.Move(sourcePath, moved);
+            return moved;
         }
+
+        return null;
     }
 
     private static bool IsSamePath(string a, string b)
@@ -343,9 +367,11 @@ public static class FileOperationService
     // overwriting anything that already exists at the destination; declining
     // just skips that item and moves on to the next.
     public static bool TryImportDroppedPaths(IReadOnlyList<string> sourcePaths, string destinationFolder,
-        Func<string, bool> confirmOverwrite, out string? error)
+        Func<string, bool> confirmOverwrite, out IReadOnlyList<string> createdPaths, out string? error)
     {
         error = null;
+        var created = new List<string>();
+        createdPaths = created;
         foreach (string sourcePath in sourcePaths)
         {
             try
@@ -370,10 +396,12 @@ public static class FileOperationService
                     }
 
                     CopyDirectoryRecursive(sourcePath, destPath, overwrite: exists);
+                    created.Add(destPath);
                 }
                 else if (File.Exists(sourcePath))
                 {
                     File.Copy(sourcePath, destPath, overwrite: exists);
+                    created.Add(destPath);
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -403,16 +431,21 @@ public static class FileOperationService
     // may well have them open: refreshing only the destination would leave the
     // rows that just left still sitting there.
     public static bool TryMoveDroppedPaths(IReadOnlyList<string> sourcePaths, string destinationFolder,
-        out IReadOnlyList<string> emptiedFolders, out string? error)
+        out IReadOnlyList<string> emptiedFolders, out IReadOnlyList<string> createdPaths, out string? error)
     {
         error = null;
         var folders = new List<string>();
+        var created = new List<string>();
+        createdPaths = created;
         foreach (string sourcePath in sourcePaths)
         {
             try
             {
                 string? parent = Path.GetDirectoryName(sourcePath.TrimEnd(Path.DirectorySeparatorChar));
-                MoveEntry(sourcePath, destinationFolder);
+                if (MoveEntry(sourcePath, destinationFolder) is { } landed)
+                {
+                    created.Add(landed);
+                }
                 if (parent is not null && !folders.Contains(parent, StringComparer.OrdinalIgnoreCase))
                 {
                     folders.Add(parent);

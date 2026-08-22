@@ -15256,10 +15256,11 @@ public partial class MainWindow : Window
         Activate();
 
         string? error;
+        IReadOnlyList<string> arrived;
         if (move)
         {
             if (!FileOperationService.TryMoveDroppedPaths(
-                    importablePaths, item.FullPath, out var emptied, out error))
+                    importablePaths, item.FullPath, out var emptied, out arrived, out error))
             {
                 return;
             }
@@ -15280,7 +15281,7 @@ public partial class MainWindow : Window
             }
         }
         else if (!FileOperationService.TryImportDroppedPaths(
-                     importablePaths, item.FullPath, ConfirmOverwrite, out error))
+                     importablePaths, item.FullPath, ConfirmOverwrite, out arrived, out error))
         {
             return;
         }
@@ -15293,6 +15294,59 @@ public partial class MainWindow : Window
         // Merge: a drop adds rows to the target folder, which may well have
         // expanded folders of its own on screen.
         RefreshFolderPreservingState(item);
+        SelectArrivedFiles(item, arrived);
+    }
+
+    // WHAT ARRIVED IS WHAT IS SELECTED. Explorer leaves a paste or a drop with
+    // the new files picked out, and the reason is not decoration: the folder may
+    // hold thousands, the arrivals sort in wherever their names put them, and
+    // without this the only way to find them is to know their names already
+    // (asked for 2026-08-22).
+    //
+    // Taken from what the operation says it WROTE rather than from the sources -
+    // a collision numbers up to " (2)", and deriving the name here would pick
+    // out the file that was already there instead of the one that just landed.
+    //
+    // Run after the folder has been refreshed, so the rows exist to be found.
+    // Anything not found is skipped rather than guessed at: a file can land past
+    // the "더 보기" cap, and one that failed to copy never landed at all.
+    private void SelectArrivedFiles(FileSystemItem folder, IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        ClearMultiSelection();
+
+        FileSystemItem? first = null;
+        foreach (string path in paths)
+        {
+            if (folder.FindLoadedChild(System.IO.Path.GetFileName(
+                    path.TrimEnd(System.IO.Path.DirectorySeparatorChar))) is not { } arrival)
+            {
+                continue;
+            }
+
+            first ??= arrival;
+
+            // ONE ARRIVAL IS NOT A SET. Marking a single file would leave a
+            // badge and a "1개 선택" line to be dismissed after every ordinary
+            // paste; the selection below already says which one it is.
+            if (paths.Count > 1)
+            {
+                AddToMultiSelection(arrival);
+            }
+        }
+
+        // The tree's own selection goes to the first of them, which the panel
+        // follows - so the picture that comes up is one of the files that just
+        // arrived. It also keeps the set's invariant: a non-empty multi-selection
+        // always contains the natively-selected row.
+        if (first is not null)
+        {
+            SelectVisibleItem(first);
+        }
     }
 
     // "Own place" = the item's current folder (it already lives in the drop
@@ -18732,6 +18786,7 @@ public partial class MainWindow : Window
         if (pasteTarget is not null)
         {
             RefreshFolderPreservingState(pasteTarget);
+            SelectArrivedFiles(pasteTarget, outcome.CreatedPaths);
         }
 
         if (outcome.WasMove)
