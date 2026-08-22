@@ -29793,9 +29793,23 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Ctrl+Shift ADDS a range to what is already marked, where Shift alone
+        // replaces it. Without it the two gestures could not be combined at all:
+        // gathering a run, then another run somewhere else, meant Ctrl-clicking
+        // the second run one cell at a time - and the combination that everyone
+        // reaches for instead landed on the plain-click branch and threw the
+        // first run away.
+        if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) &&
+            _filmstripMarkAnchor >= 0)
+        {
+            MarkFilmstripRange(_filmstripMarkAnchor, _filmstripCells.IndexOf(cell), additive: true);
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.Modifiers == ModifierKeys.Shift && _filmstripMarkAnchor >= 0)
         {
-            MarkFilmstripRange(_filmstripMarkAnchor, _filmstripCells.IndexOf(cell));
+            MarkFilmstripRange(_filmstripMarkAnchor, _filmstripCells.IndexOf(cell), additive: false);
             e.Handled = true;
             return;
         }
@@ -29910,7 +29924,7 @@ public partial class MainWindow : Window
     // anything about rows: a range drawn across two rows is the cells between
     // its ends, exactly as the same gesture means in Explorer's icon view. The
     // column count can change underneath it and the same files stay marked.
-    private void MarkFilmstripRange(int from, int to)
+    private void MarkFilmstripRange(int from, int to, bool additive)
     {
         if (from < 0 || to < 0)
         {
@@ -29920,9 +29934,15 @@ public partial class MainWindow : Window
         int first = Math.Min(from, to);
         int last = Math.Max(from, to);
 
-        // Replaced rather than added to, since this is Shift on its own. Ctrl +
-        // Shift (extend the set) is a third gesture and is not built.
-        ClearMultiSelection();
+        // Shift on its own REPLACES what is marked; with Ctrl held it adds to
+        // it. The anchor is left where it was either way, so successive Shift
+        // clicks re-range from the same start rather than walking it along -
+        // the same rule the tree's own Shift+click follows.
+        if (!additive)
+        {
+            ClearMultiSelection();
+        }
+
         for (int i = first; i <= last && i < _filmstripCells.Count; i++)
         {
             AddToMultiSelection(_filmstripCells[i].Item);
