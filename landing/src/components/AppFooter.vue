@@ -38,17 +38,14 @@ const EMAIL = 'pjh85336@gmail.com'
         </span>
       </div>
 
-      <!-- 상호 링크는 푸터에(TabStick 랜딩과 같은 자리·같은 모양).
-           SweepCap rides as a SECOND capsule (2026-08-23, 사용자 요청) rather
-           than a second name inside the first: the first pill's label reads
-           across the row, so the neighbour carries just the name - repeating
-           "같은 개발자의" per pill would say the same thing twice side by side. -->
-      <p class="other">
-        {{ t.footer.otherTool }} ·
-        <a href="https://tabstick.com/" target="_blank" rel="noopener">{{ t.footer.otherToolName }}</a>
-      </p>
-      <p class="other">
-        <a href="https://github.com/legendsteel11/SweepCap" target="_blank" rel="noopener">{{ t.footer.otherTool2Name }}</a>
+      <!-- 상호 링크는 푸터에(TabStick 랜딩과 같은 자리). Since 2026-08-23 the
+           LABEL sits outside as plain text and each tool is a capsule of its
+           own (사용자 요청) - with two tools, a label locked inside the first
+           pill made that pill longer and the pair read as unequal. -->
+      <p class="others">
+        <span class="others-label">{{ t.footer.otherTool }}</span>
+        <a class="other" href="https://tabstick.com/" target="_blank" rel="noopener">{{ t.footer.otherToolName }}</a>
+        <a class="other" href="https://github.com/legendsteel11/SweepCap" target="_blank" rel="noopener">{{ t.footer.otherTool2Name }}</a>
       </p>
 
       <p class="copyright">{{ t.footer.copyright }}</p>
@@ -112,31 +109,35 @@ const EMAIL = 'pjh85336@gmail.com'
   color: var(--accent-strong);
 }
 
-/* 다른 도구(TabStick) 안내 - 옅은 파랑 틴트 알약으로 감싸 다른 푸터 줄과 구분.
-   내용 폭만큼만 감싸게 inline-block. 치수는 이 랜딩의 작은 폰트 스케일에 맞춤. */
+/* 다른 도구 안내 줄: 라벨은 맨글자, 도구마다 옅은 파랑 틴트 알약 하나씩. */
+.others {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.others-label {
+  font-size: 13.5px;
+  color: var(--text);
+  margin-right: 2px;
+}
+
 .other {
   display: inline-block;
   font-size: 13.5px;
-  margin-bottom: 12px;
   padding: 7px 18px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--accent-bg);
-}
-
-.other a {
   color: var(--accent-strong);
   font-weight: 700;
   text-decoration: none;
 }
 
-.other a:hover {
+.other:hover {
   text-decoration: underline;
-}
-
-/* 두 알약 사이 간격. inline-block이라 붙여 두면 한 덩어리로 읽힌다. */
-.other + .other {
-  margin-left: 8px;
 }
 
 .copyright {
