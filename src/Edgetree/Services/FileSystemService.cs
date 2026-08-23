@@ -60,6 +60,37 @@ public static class FileSystemService
 
     public static string NormalizeSortOverridePath(string path) => path.TrimEnd('\\');
 
+    // 부모 폴더 따르기 (2026-08-23, 사용자 설계). A folder with no override of
+    // its own asks UP THE CHAIN before falling back to the app-wide default -
+    // set 이름↑ on a music folder once and every album inside follows, instead
+    // of being set one by one (the report that started this). A folder's own
+    // override still wins over anything above it, which is the whole priority
+    // rule in one sentence.
+    //
+    // The walk is dictionary lookups against path segments - no disk is
+    // touched, and a tree five deep asks five times only when nobody between
+    // has an answer.
+    public static (FileSortField Field, bool Descending) ResolveSortFor(string path)
+    {
+        string current = NormalizeSortOverridePath(path);
+        while (current.Length > 0)
+        {
+            if (SortOverrides.TryGetValue(current, out var over))
+            {
+                return (over.Field, over.Descending);
+            }
+
+            if (Path.GetDirectoryName(current) is not { Length: > 0 } parent)
+            {
+                break;
+            }
+
+            current = NormalizeSortOverridePath(parent);
+        }
+
+        return (SortField, SortDescending);
+    }
+
     // The row's sort icon, as vector geometry rather than the four hand-drawn
     // PNGs it replaces (aliginIcon{Name,Date}{Asc,Desc}.png plus their "_L"
     // light-mode twins). Those encoded the FIELD as well as the direction,
@@ -706,9 +737,7 @@ public static class FileSystemService
         var startedTicks = Environment.TickCount64;
         readFailed = false;
         var result = new List<FileSystemItem>();
-        var (field, descending) = SortOverrides.TryGetValue(NormalizeSortOverridePath(path), out var over)
-            ? (over.Field, over.Descending)
-            : (SortField, SortDescending);
+        var (field, descending) = ResolveSortFor(path);
 
         try
         {

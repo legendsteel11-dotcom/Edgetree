@@ -324,7 +324,9 @@ public static class HelpContent
                     R("트리 빈 곳 우클릭 → 표시할 파일 형식", "필터 버튼 줄과 같은 목록",
                       "Right-click empty tree space → Show File Types",
                       "The same list the filter buttons carry"),
-                    R("폴더 행의 정렬 아이콘", "그 폴더만 개별 정렬", "The sort icon on a folder row", "Sort that one folder its own way"),
+                    R("폴더 행의 정렬 아이콘", "그 폴더의 개별 정렬, 하위 폴더는 따라옴 (개별 설정한 하위는 유지)",
+                      "The sort icon on a folder row",
+                      "Sort that folder its own way - subfolders follow, unless they have their own"),
                     R("옵션 → 정렬 기준", "전체 기본 정렬", "Options → Sort by", "The default for everything"),
                     // 접기 belongs on the same row as 더 보기, and the selection
                     // is the point of the row rather than a side effect: a long

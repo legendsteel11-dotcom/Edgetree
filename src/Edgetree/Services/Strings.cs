@@ -306,7 +306,11 @@ public static class Strings
     // Models.FolderSortOverrideEntry) so it goes back to following
     // MenuDefaultSort - shown in the per-folder "정렬" submenu only when that
     // folder actually has one (see MainWindow.ExplorerItemContextMenu_Opened).
-    public static string MenuFollowDefaultSort = "전역 정렬 따르기";
+    // 전역 정렬 따르기의 후신 (2026-08-23). 개별 정렬이 없는 폴더는 이제 전역이
+    // 아니라 **가장 가까운 상위 폴더의 정렬**을 따르고, 상위에도 없으면 전역으로
+    // 떨어진다. 음악 폴더 하나에 이름↑을 지정하면 안의 앨범 폴더 전부가 따라오는
+    // 것이 이 줄이 생긴 이유다. 체크된 상태가 기본이다.
+    public static string MenuFollowParentSort = "부모 폴더 따르기";
 
     // Tree folder right-click -> jumps to the search view with this folder
     // already set as the scope (see MainWindow.SearchInFolder_Click).
@@ -320,7 +324,9 @@ public static class Strings
     // misread at that size. {0} is one of the SortMode* labels below; built by
     // FileSystemService.FormatSortTooltip/NoSortOverrideTooltip.
     public static string SortTooltipFormat = "정렬 기준: {0}";
-    public static string SortModeFollowGlobal = "전역 설정 따름";
+    // 중립 아이콘의 툴팁. 상속이 생기며 "전역 설정 따름"에서 넓어졌다 - 따르는
+    // 곳이 부모일 수도 전역일 수도 있어서 "상위"가 둘을 다 덮는다.
+    public static string SortModeFollowGlobal = "상위 정렬 따름";
     public static string SortModeFolderGroup = "폴더별 묶기";
     public static string SortModeNameAsc = "이름 오름차순";
     public static string SortModeNameDesc = "이름 내림차순";
@@ -1039,7 +1045,7 @@ public static class Strings
         MenuSortBySize = "Size";
         MenuSortAscending = "Ascending";
         MenuSortDescending = "Descending";
-        MenuFollowDefaultSort = "Follow Default Sort";
+        MenuFollowParentSort = "Follow Parent Folder";
         MenuSearchInFolder = "Search in This Folder";
         SortTooltipFormat = "Sorted by {0}";
         SortModeFollowGlobal = "Follow default";

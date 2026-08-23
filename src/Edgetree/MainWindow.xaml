@@ -1349,9 +1349,13 @@
                         Click="FolderSortDirectionMenuItem_Click"/>
                 <Separator/>
                 <!-- Only enabled when the selected folder actually has its own
-                     override (see ExplorerItemContextMenu_Opened) - clears it,
-                     same action as clicking the folder's own override icon. -->
-                <MenuItem Header="{x:Static services:Strings.MenuFollowDefaultSort}"
+                     override - CHECKED while the folder follows (the default
+                     state since 2026-08-23: following means the nearest
+                     ancestor's override, or the app default past that).
+                     Clicking it clears the folder's own override, same action
+                     as the icon menu's row. -->
+                <MenuItem Header="{x:Static services:Strings.MenuFollowParentSort}"
+                        IsCheckable="True"
                         Click="FolderSortFollowGlobalMenuItem_Click"/>
             </MenuItem>
             <Separator/>
@@ -1574,7 +1578,8 @@
                     Tag="desc"
                     Click="FolderSortDirectionMenuItem_Click"/>
             <Separator/>
-            <MenuItem Header="{x:Static services:Strings.MenuFollowDefaultSort}"
+            <MenuItem Header="{x:Static services:Strings.MenuFollowParentSort}"
+                    IsCheckable="True"
                     Click="FolderSortFollowGlobalMenuItem_Click"/>
         </ContextMenu>
 

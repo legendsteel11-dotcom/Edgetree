@@ -9647,14 +9647,17 @@ public partial class MainWindow : Window
     }
 
     // What a specific folder's own "정렬" checkboxes should currently show -
-    // its own override if it has one, otherwise the app-wide default.
+    // its own override if it has one, otherwise whatever it actually follows:
+    // the nearest ancestor's override, and the app-wide default past that
+    // (ResolveSortFor). Showing the global default here while an ancestor was
+    // deciding the order would check a field the folder is not sorted by.
     private (FileSortField Field, bool SortDescending) GetEffectiveFolderSort(FileSystemItem item)
     {
         var entry = _settings.FolderSortOverrides.FirstOrDefault(o =>
             string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
         return entry is not null
             ? (ReadSortField(entry.SortField, entry.SortByDate), entry.SortDescending)
-            : (ReadSortField(_settings.SortField, _settings.SortByDate), _settings.SortDescending);
+            : FileSystemService.ResolveSortFor(item.FullPath);
     }
 
     // Settings written before 유형/크기 existed carry only the SortByDate
@@ -9694,9 +9697,30 @@ public partial class MainWindow : Window
         item.SortOverrideIconGeometry = FileSystemService.SortOverrideGeometry(sortDescending);
         item.SortOverrideTooltip = FileSystemService.FormatSortTooltip(field, sortDescending);
 
+        ResortFollowingSubtree(item);
+    }
+
+    // A sort that cascades has to REACH what already follows it: every loaded
+    // descendant without an override of its own reads this folder's order now
+    // (ResolveSortFor), so their listings are stale the moment it changes.
+    // ResyncLoadedSubtree is the watcher's own recovery walk and does exactly
+    // the right amount - expanded folders re-read and merge in place,
+    // collapsed-but-loaded ones are flagged to re-read on their next expand,
+    // and the viewer is told where it needs to be. Descendants WITH their own
+    // override re-read too and come back in their own order - their resolver
+    // answer has not changed, so the merge moves nothing.
+    private void ResortFollowingSubtree(FileSystemItem item)
+    {
         if (item.ChildrenLoaded)
         {
             RefreshFolderPreservingState(item);
+            foreach (var child in item.Children)
+            {
+                if (child is { IsPlaceholder: false, IsShowMore: false, IsDirectory: true })
+                {
+                    ResyncLoadedSubtree(child);
+                }
+            }
         }
     }
 
@@ -9729,7 +9753,14 @@ public partial class MainWindow : Window
         CheckSortFieldItems(field, byName, byDate, byType, bySize);
         ascending.IsChecked = !sortDescending;
         descending.IsChecked = sortDescending;
-        followGlobal.IsEnabled = hasOverride;
+        // 부모 폴더 따르기 is CHECKED while the folder has no override of its
+        // own - following is the default state, not an action that became
+        // available (2026-08-23, 사용자 설계: "체크해 놓은 상태로"). Enabled
+        // either way: picking it while already following simply changes
+        // nothing, where a greyed-out checked row reads as unavailable.
+        followGlobal.IsCheckable = true;
+        followGlobal.IsChecked = isFolder && !hasOverride;
+        followGlobal.IsEnabled = isFolder;
     }
 
     private static void CheckSortFieldItems(FileSortField field, MenuItem byName, MenuItem byDate,
@@ -9779,14 +9810,14 @@ public partial class MainWindow : Window
             string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
         FileSystemService.SortOverrides.Remove(FileSystemService.NormalizeSortOverridePath(item.FullPath));
         item.HasSortOverride = false;
-        // Back to the neutral "follows the app-wide default" glyph.
+        // Back to the neutral "follows what is above it" glyph.
         item.SortOverrideIconGeometry = FileSystemService.FollowsGlobalSortGeometry;
         item.SortOverrideTooltip = FileSystemService.NoSortOverrideTooltip;
 
-        if (item.ChildrenLoaded)
-        {
-            RefreshFolderPreservingState(item);
-        }
+        // Clearing changes what the whole following subtree resolves to (an
+        // ancestor's order, or the default), so it propagates the same way
+        // setting does.
+        ResortFollowingSubtree(item);
     }
 
     // Re-reads every already-loaded folder from disk under whatever sort
