@@ -45,6 +45,27 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: 'v2.5.2',
+    ko: [
+      '폴더에 지정한 정렬이 하위 폴더에도 적용됩니다. 하위 폴더에 개별 정렬을 지정한 경우에는 그대로 유지됩니다.',
+      '제목 표시줄의 `전체 접기` 아이콘을 `Shift`+클릭하면 펼침 상태를 저장하지 않고 접습니다.',
+      'USB, 클라우드 드라이브를 연결하거나 해제하면 트리에 자동으로 반영됩니다.',
+      '썸네일 목록에서 선택된 항목의 가시성을 높였습니다.',
+      '음악을 분리 재생 중일 때 제목 우측의 X로 재생을 종료할 수 있습니다.',
+      '`숨김·시스템 항목 표시`가 `옵션 → 기본 설정`으로 이동했습니다.',
+      '트리에서 `더 보기`에 가려진 항목을 썸네일에서 클릭해도 선택되지 않던 문제를 수정했습니다.',
+    ],
+    en: [
+      'A folder’s sort order now applies to its subfolders. A subfolder with its own sort keeps it.',
+      'Shift-clicking the Collapse All icon in the title bar folds without storing the expanded state.',
+      'Connecting or removing a USB or cloud drive updates the tree automatically.',
+      'The selected cell in the thumbnail list is easier to pick out.',
+      'An X beside the title ends detached audio playback.',
+      'Show Hidden and System Items moved to Options → General.',
+      'Clicking a thumbnail for an item hidden behind Show More in the tree now selects it.',
+    ],
+  },
+  {
     // v2.5.1 CARRIES THE ROUND'S WHOLE CARD, because v2.5.0 lived two hours
     // and reached two downloads before this superseded it - a two-line patch
     // card on top would have buried the feature release the author actually
