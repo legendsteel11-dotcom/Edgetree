@@ -8542,30 +8542,66 @@
                                      one level up (see UpdateViewerNowPlaying):
                                      this band holds ONE height in every state a
                                      track can be in. -->
-                                <Button x:Name="ViewerNowPlayingJump"
+                                <!-- Both appear in the DETACHED state and only
+                                     there, on one visibility (the jump's,
+                                     which UpdateViewerNowPlaying writes): the
+                                     pair answers "the sound is not this file" -
+                                     go to its row, or end it. The X exists
+                                     because 정지 in the transport row did the
+                                     job without looking like the way out
+                                     (2026-08-23, 사용자 요청): a hand that
+                                     wants a thing gone looks for an X at the
+                                     top right, so this is the same stop behind
+                                     the mark that gets looked for. -->
+                                <StackPanel x:Name="ViewerNowPlayingActions"
                                         DockPanel.Dock="Right"
-                                        Visibility="Hidden"
-                                        VerticalAlignment="Center"
-                                        Style="{StaticResource FooterActionGlyphChipStyle}"
-                                        Click="ViewerMediaRevealInTree_Click"
-                                        ToolTip="{x:Static services:Strings.ViewerBackToPlaying}">
-                                    <Path Data="M354-270 144-480l210-210 51 51-123 123h462v-108h72v180H282l123 123-51 51Z"
-                                            Stretch="Uniform"
-                                            Width="{DynamicResource ViewerChipIconSize}"
-                                            Height="{DynamicResource ViewerChipIconSize}"
-                                            Fill="{Binding Foreground,
-                                                RelativeSource={RelativeSource AncestorType=Button}}"/>
-                                </Button>
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                    <Button x:Name="ViewerNowPlayingJump"
+                                            Visibility="Hidden"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource FooterActionGlyphChipStyle}"
+                                            Click="ViewerMediaRevealInTree_Click"
+                                            ToolTip="{x:Static services:Strings.ViewerBackToPlaying}">
+                                        <Path Data="M354-270 144-480l210-210 51 51-123 123h462v-108h72v180H282l123 123-51 51Z"
+                                                Stretch="Uniform"
+                                                Width="{DynamicResource ViewerChipIconSize}"
+                                                Height="{DynamicResource ViewerChipIconSize}"
+                                                Fill="{Binding Foreground,
+                                                    RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                    </Button>
+                                    <!-- Material Symbols "close", with the
+                                         bounding strokes every glyph here needs
+                                         so Uniform does not blow the tight X up
+                                         past its neighbours. Same handler as
+                                         the transport's 정지 - one door, no
+                                         second idea of "end playback". -->
+                                    <Button x:Name="ViewerNowPlayingClose"
+                                            Visibility="{Binding Visibility,
+                                                ElementName=ViewerNowPlayingJump}"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource FooterActionGlyphChipStyle}"
+                                            Click="ViewerMediaStop_Click"
+                                            ToolTip="{x:Static services:Strings.ViewerStop}">
+                                        <Path Data="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z M0-960H960M0 0H960"
+                                                Stretch="Uniform"
+                                                Width="{DynamicResource ViewerChipIconSize}"
+                                                Height="{DynamicResource ViewerChipIconSize}"
+                                                Fill="{Binding Foreground,
+                                                    RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                    </Button>
+                                </StackPanel>
                                 <!-- The hidden twin, so the name stays CENTRED
-                                     with a button on one side of it - the same
-                                     trick the carousel counter and the time
-                                     readout use. It mirrors the button's width
-                                     and its visibility, so it is nothing at all
-                                     while the button is away. -->
+                                     with the buttons on one side of it - the
+                                     same trick the carousel counter and the
+                                     time readout use. It mirrors the action
+                                     panel's width and the jump's visibility, so
+                                     it is nothing at all while the pair is
+                                     away. -->
                                 <Border x:Name="ViewerNowPlayingJumpSpacer"
                                         DockPanel.Dock="Left"
                                         Width="{Binding ActualWidth,
-                                            ElementName=ViewerNowPlayingJump}"
+                                            ElementName=ViewerNowPlayingActions}"
                                         Visibility="{Binding Visibility,
                                             ElementName=ViewerNowPlayingJump}"/>
                                 <TextBlock x:Name="ViewerNowPlaying"
