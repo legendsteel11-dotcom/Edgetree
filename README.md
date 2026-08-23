@@ -1,4 +1,4 @@
-# Edgetree v2.5.1
+# Edgetree v2.5.2
 
 [한국어 안내](README-ko.md)
 
@@ -216,6 +216,17 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v2.5.2 (2026-08-24)
+
+- A folder's sort order now applies to its subfolders. A subfolder with its own sort keeps it.
+- Shift-clicking the Collapse All icon in the title bar folds without storing the expanded state.
+- Hovering the arrows at the top or bottom of a long menu scrolls it.
+- Connecting or removing a USB or cloud drive updates the tree automatically.
+- The selected cell in the thumbnail list is easier to pick out.
+- An X beside the title ends detached audio playback.
+- Show Hidden and System Items moved to Options → General.
+- Clicking a thumbnail for an item hidden behind Show More in the tree now selects it.
 
 ### v2.5.1 (2026-08-22)
 
