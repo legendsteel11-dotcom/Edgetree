@@ -264,58 +264,10 @@ public static class FileSystemService
 
         foreach (var drive in DriveInfo.GetDrives())
         {
-            // A hidden drive is dropped exactly like a hidden folder is - one
-            // rule rather than a second presentation of its own. A greyed,
-            // inert row that stayed in place was designed first and dropped by
-            // the user (2026-08-02): "어차피 목록에 들어가는데" - the list is
-            // the way back either way, so the special case bought nothing and
-            // would have collided with the offline-drive look besides.
-            if (IsHiddenByUser(drive.Name))
+            if (TryBuildDriveRoot(drive) is { } row)
             {
-                continue;
+                roots.Add(row);
             }
-
-            bool isNetwork = drive.DriveType == DriveType.Network;
-
-            // A mapped network drive KEEPS its place while the server is away.
-            // Dropping it (which "not ready" used to do) is how both NAS drives
-            // vanished from the tree the moment the NAS rebooted, and a refresh
-            // couldn't bring them back either - it re-asked the same question
-            // and got the same "not ready" (reported 2026-07-26). Explorer
-            // shows exactly these as a crossed-out drive that reconnects when
-            // clicked, and the row has to exist for that click to be possible.
-            // Local drives still drop out when not ready: an empty card reader
-            // slot is not a place to go.
-            if (!drive.IsReady && !isNetwork)
-            {
-                continue;
-            }
-
-            string driveName = drive.Name.TrimEnd('\\');
-            // Not readable while the drive is away - the letter alone stands in
-            // until it answers again and a later refresh picks the label up.
-            string? label = drive.IsReady ? TryGetVolumeLabel(drive) : null;
-            string displayName = string.IsNullOrWhiteSpace(label) ? driveName : $"{label} ({driveName})";
-
-            if (isNetwork)
-            {
-                // Recorded here so a later read can tell, without asking the
-                // drive anything, whether a timeout means "the network went
-                // away" (back off) or "this folder is slow" (don't).
-                lock (UnreachableRootsUntil)
-                {
-                    NetworkRoots.Add(drive.RootDirectory.FullName);
-                }
-            }
-
-            roots.Add(new FileSystemItem(displayName, drive.RootDirectory.FullName, isDirectory: true)
-            {
-                IsOnNetworkDrive = isNetwork,
-                // Recorded, not asked for again later: this is the one moment the
-                // drive's type is already in hand, and the row's icon reads it
-                // (see FileSystemItem.Icon).
-                DriveKind = drive.DriveType
-            });
         }
 
         // AFTER the letters, never among them: the drives are what Windows
@@ -366,6 +318,84 @@ public static class FileSystemService
         }
 
         return roots;
+    }
+
+    // ONE drive's row, built exactly the way the loop above builds them.
+    // Extracted so an arriving letter can be asked about ON ITS OWN: a device
+    // message can land at any moment, and re-reading every drive to answer it
+    // would put IsReady and a volume label for the whole machine - a sleeping
+    // NAS among them - in front of whatever asked. Returns null for the two
+    // cases the loop used to walk past.
+    public static FileSystemItem? TryBuildDriveRoot(DriveInfo drive)
+    {
+        // A hidden drive is dropped exactly like a hidden folder is - one
+        // rule rather than a second presentation of its own. A greyed,
+        // inert row that stayed in place was designed first and dropped by
+        // the user (2026-08-02): "어차피 목록에 들어가는데" - the list is
+        // the way back either way, so the special case bought nothing and
+        // would have collided with the offline-drive look besides.
+        if (IsHiddenByUser(drive.Name))
+        {
+            return null;
+        }
+
+        bool isNetwork = drive.DriveType == DriveType.Network;
+        // A mapped network drive KEEPS its place while the server is away.
+        // Dropping it (which "not ready" used to do) is how both NAS drives
+        // vanished from the tree the moment the NAS rebooted, and a refresh
+        // couldn't bring them back either - it re-asked the same question
+        // and got the same "not ready" (reported 2026-07-26). Explorer
+        // shows exactly these as a crossed-out drive that reconnects when
+        // clicked, and the row has to exist for that click to be possible.
+        // Local drives still drop out when not ready: an empty card reader
+        // slot is not a place to go.
+        if (!drive.IsReady && !isNetwork)
+        {
+            return null;
+        }
+
+        string driveName = drive.Name.TrimEnd('\\');
+        // Not readable while the drive is away - the letter alone stands in
+        // until it answers again and a later refresh picks the label up.
+        string? label = drive.IsReady ? TryGetVolumeLabel(drive) : null;
+        string displayName = string.IsNullOrWhiteSpace(label) ? driveName : $"{label} ({driveName})";
+
+        if (isNetwork)
+        {
+            // Recorded here so a later read can tell, without asking the
+            // drive anything, whether a timeout means "the network went
+            // away" (back off) or "this folder is slow" (don't).
+            lock (UnreachableRootsUntil)
+            {
+                NetworkRoots.Add(drive.RootDirectory.FullName);
+            }
+        }
+
+        return new FileSystemItem(displayName, drive.RootDirectory.FullName, isDirectory: true)
+        {
+            IsOnNetworkDrive = isNetwork,
+            // Recorded, not asked for again later: this is the one moment the
+            // drive's type is already in hand, and the row's icon reads it
+            // (see FileSystemItem.Icon).
+            DriveKind = drive.DriveType
+        };
+    }
+
+    // The same for a letter that has only just appeared. Constructing DriveInfo
+    // reads nothing on its own, so every cost of this call is inside the
+    // overload above - which is why the arrival path runs it off the UI thread.
+    public static FileSystemItem? TryBuildDriveRoot(string letterRoot)
+    {
+        try
+        {
+            return TryBuildDriveRoot(new DriveInfo(letterRoot));
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            // The letter went away again between the message and the look, or
+            // the volume refuses to be asked. Either way there is no row to add.
+            return null;
+        }
     }
 
     // Hidden/System items are skipped so the tree matches Windows Explorer's

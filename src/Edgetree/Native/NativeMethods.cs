@@ -104,6 +104,21 @@ internal static class NativeMethods
     [DllImport("kernel32.dll")]
     private static extern uint SetErrorMode(uint mode);
 
+    [DllImport("kernel32.dll")]
+    private static extern uint GetLogicalDrives();
+
+    // WHICH LETTERS EXIST, and deliberately nothing else - one bit per drive
+    // letter, answered from what the object manager already holds. No volume is
+    // asked anything, and that is the whole reason this stands in front of
+    // DriveInfo rather than beside it: DriveInfo reads IsReady and a volume
+    // label per drive, and a sleeping NAS answers those in tens of seconds on
+    // whichever thread does the asking. A device message can arrive at any
+    // moment, so the question asked first has to be one that cannot block.
+    //
+    // Zero means the call failed. Callers must read that as "no answer" and not
+    // as "every drive left", or a failure would empty the tree.
+    internal static uint LogicalDriveMask() => GetLogicalDrives();
+
     private const uint SEM_FAILCRITICALERRORS = 0x0001;
     private const uint SEM_NOOPENFILEERRORBOX = 0x8000;
 

@@ -357,6 +357,11 @@ public partial class MainWindow : Window
     // needs to be told to hold rather than left to the messages.
     private const int WM_ENTERSIZEMOVE = 0x0231;
     private const int WM_EXITSIZEMOVE = 0x0232;
+
+    // Windows tells every top-level window when the device tree changes, so
+    // there is nothing to register for and nothing to unregister - the hook
+    // this window already has is the whole subscription.
+    private const int WM_DEVICECHANGE = 0x0219;
     private const int HTCAPTION = 2;
 
     private IntPtr SingleInstanceWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -431,6 +436,14 @@ public partial class MainWindow : Window
             // just fail.
             Dispatcher.BeginInvoke(new Action(DropCutMarksIfClipboardMovedOn),
                 System.Windows.Threading.DispatcherPriority.Background);
+        }
+        else if (msg == WM_DEVICECHANGE)
+        {
+            // NOT ACTED ON HERE, and not even looked into. This runs inside the
+            // window procedure, and the answer to "what changed" costs a volume
+            // label per drive - see QueueDriveMaskCheck for the two questions
+            // that stand between this message and any of that.
+            QueueDriveMaskCheck();
         }
         return IntPtr.Zero;
     }
@@ -16446,6 +16459,218 @@ public partial class MainWindow : Window
         }
     }
 
+    // ----- 드라이브가 도중에 나타나고 사라지는 것 ----------------------------
+    //
+    // The drive rows were read once at startup and never again unless something
+    // else happened to rebuild them (a 숨김·시스템 항목 표시 toggle, a network
+    // root added or removed). A USB stick, or a virtual drive an app mounts
+    // while the tree is open, therefore stayed invisible until one of those
+    // happened to run. The empty-space menu's own comment had already written
+    // the gap down - "USB 스틱이야말로 전체 새로고침을 찾게 되는 변화" - with
+    // nothing acting on it.
+    //
+    // THE MESSAGE IS NOT THE ANSWER, only the prompt, and two gates stand
+    // between it and any work. First a debounce, because one insert sends
+    // several messages and a drive an app mounts can come and go repeatedly.
+    // Then a letter-mask compare, which reads nothing off any disk: most device
+    // messages are not about drive letters at all, and that is what makes
+    // answering them free. Only a mask that really differs reaches the merge.
+    private uint _driveMask;
+
+    private System.Windows.Threading.DispatcherTimer? _driveChangeTimer;
+
+    private void QueueDriveMaskCheck()
+    {
+        _driveChangeTimer ??= CreateDriveChangeTimer();
+        _driveChangeTimer.Stop();
+        _driveChangeTimer.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer CreateDriveChangeTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(700)
+        };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            SyncDriveRoots();
+        };
+        return timer;
+    }
+
+    // MERGED, NEVER REBUILT. ReloadRoots would do this in one line and it is
+    // the wrong line, for two reasons that each cost more than the line saves.
+    // It asks every drive on the machine for IsReady and a volume label on the
+    // UI thread, which is the shape of the 21~59s freezes v1.3.2 had - and a
+    // device message is exactly the moment a half-connected drive is least
+    // likely to answer quickly. And it replaces every root instance, which is
+    // what leaves the thumbnail strip holding a chain that is stale at every
+    // level (see ResolveCurrentChain, 2026-08-24). Putting one row in and
+    // taking one row out does neither, and leaves every expanded folder alone.
+    private void SyncDriveRoots()
+    {
+        uint mask = NativeMethods.LogicalDriveMask();
+
+        // Zero is a call that failed, not a machine with no drives. Reading it
+        // as an answer would empty the tree.
+        if (mask == 0 || mask == _driveMask)
+        {
+            LogDriveChange($"device change: no letters moved (mask 0x{mask:X})");
+            return;
+        }
+
+        uint arrived = mask & ~_driveMask;
+        uint left = _driveMask & ~mask;
+        _driveMask = mask;
+        LogDriveChange($"device change: arrived [{LettersText(arrived)}] left [{LettersText(left)}]");
+
+        foreach (string rootPath in DriveLetters(left))
+        {
+            RemoveDriveRoot(rootPath);
+        }
+
+        foreach (string rootPath in DriveLetters(arrived))
+        {
+            AddDriveRootWhenReady(rootPath);
+        }
+    }
+
+    private static IEnumerable<string> DriveLetters(uint mask)
+    {
+        for (int i = 0; i < 26; i++)
+        {
+            if ((mask & (1u << i)) != 0)
+            {
+                yield return $"{(char)('A' + i)}:\\";
+            }
+        }
+    }
+
+    private static string LettersText(uint mask)
+        => string.Join(",", DriveLetters(mask).Select(d => d[..2]));
+
+    // A DRIVE row and only that. A root the user added themselves that happens
+    // to sit on the letter stays where it is, and behaves the way a network
+    // root already does when its server is away: the row remains, and clicking
+    // it tries again.
+    private static bool IsDriveRoot(FileSystemItem root)
+        => root.FullPath.Length == 3 && root.FullPath[1] == ':';
+
+    private void RemoveDriveRoot(string rootPath)
+    {
+        if (_roots.FirstOrDefault(r => IsDriveRoot(r) &&
+                string.Equals(r.FullPath, rootPath, StringComparison.OrdinalIgnoreCase)) is not { } row)
+        {
+            return;
+        }
+
+        // The same care HideFolder takes when a drive leaves the tree, for the
+        // same reason: a selection left pointing at a row that is gone is what
+        // the next operation runs on.
+        if (ExplorerTree.SelectedItem is FileSystemItem selected && IsSelfOrDescendant(selected, row) &&
+            _roots.FirstOrDefault(r => !ReferenceEquals(r, row)) is { } other)
+        {
+            other.IsSelected = true;
+        }
+
+        _roots.Remove(row);
+        StopDriveWatcher(rootPath);
+        LogDriveChange($"left {rootPath[..2]}: row removed");
+    }
+
+    private void StopDriveWatcher(string rootPath)
+    {
+        for (int i = _driveWatchers.Count - 1; i >= 0; i--)
+        {
+            if (!string.Equals(_driveWatchers[i].Path, rootPath, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            // Disposed rather than left to discover the drive is gone on its
+            // own: a watcher on a vanished path raises an error per event, and
+            // the error path resyncs every expanded folder.
+            _driveWatchers[i].EnableRaisingEvents = false;
+            _driveWatchers[i].Dispose();
+            _driveWatchers.RemoveAt(i);
+        }
+    }
+
+    // OFF THE UI THREAD, because this is the half that actually reads. A stick
+    // answers at once; a mapping to a machine that is not there can take as
+    // long as it likes without the tree waiting on it.
+    private void AddDriveRootWhenReady(string rootPath)
+    {
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            var row = FileSystemService.TryBuildDriveRoot(rootPath);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (row is null)
+                {
+                    // Hidden by the user, or not ready and not a network drive -
+                    // the same two answers GetDriveRoots gives, and neither of
+                    // them is a failure.
+                    LogDriveChange($"arrived {rootPath[..2]}: no row (hidden, or not ready)");
+                    return;
+                }
+
+                InsertDriveRoot(row);
+            }));
+        });
+    }
+
+    // Where Windows itself would have put it: letters in their own order, and
+    // the user's added roots after all of them. That is the arrangement
+    // GetDriveRoots builds, and the one an arrival must not disturb.
+    private void InsertDriveRoot(FileSystemItem row)
+    {
+        if (_roots.Any(r => string.Equals(r.FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        int index = 0;
+        while (index < _roots.Count && IsDriveRoot(_roots[index]) &&
+            string.Compare(_roots[index].FullPath, row.FullPath, StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            index++;
+        }
+
+        _roots.Insert(index, row);
+        LogDriveChange($"arrived {row.FullPath[..2]}: added at {index} as \"{row.Name}\"");
+
+        // A root with no watcher would show whatever it held the moment it
+        // appeared and never change again. Skips the ones already watched.
+        StartDriveWatchers();
+    }
+
+    // Debug builds only. WHAT THIS HAS TO SETTLE FIRST is whether a virtual
+    // drive broadcasts at all - the Google Drive letter that started this item
+    // exists only while that app runs, and an app that mounts its own volume
+    // may never send what a USB stick certainly sends. If these lines stay
+    // absent while such a drive comes and goes, the message is the wrong
+    // instrument and a low-frequency mask poll is the right one; the compare it
+    // would drive is already written above and would not change.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void LogDriveChange(string line)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+                Path.Combine(dir, "watcher.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {line}{Environment.NewLine}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
     // Fires on the FileSystemWatcher's own thread pool thread, for every
     // change anywhere on the whole drive - only e.FullPath's parent folder is
     // what might need refreshing (that's the folder whose own listing
@@ -17849,6 +18074,12 @@ public partial class MainWindow : Window
         // A drive that was hidden had no watcher (they are made per ROOT), so
         // its live updates would otherwise stay dead until the next launch.
         StartDriveWatchers();
+
+        // The letters as they stand after a full read, so the device-message
+        // path has something true to compare against. Written HERE rather than
+        // at startup because every caller of this has just re-read the drives:
+        // whatever the mask says now is what the tree is showing.
+        _driveMask = NativeMethods.LogicalDriveMask();
     }
 
     // save: false lets a batch (HideFolder_Click) write settings once at the end
