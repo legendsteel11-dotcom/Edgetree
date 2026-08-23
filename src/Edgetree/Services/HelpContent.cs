@@ -212,6 +212,16 @@ public static class HelpContent
                       "A closed folder opens; an open one is only selected - press it again to close"),
                     R("펼침기호 클릭", "누를 때마다 바로 접기 · 펼치기",
                       "Clicking the expand arrow", "Opens and closes on every press"),
+                    // 두 줄인 이유는 버튼이 두 가지 일을 하기 때문이 아니라,
+                    // 조합 쪽이 되돌릴 수 없기 때문이다. 툴팁이 말하고는 있지만
+                    // 툴팁은 올려 놓아야 보이고, 복원이 안 되는 쪽은 누르기 전에
+                    // 알아야 하는 종류의 것이다.
+                    R("모두 접기 버튼", "펼친 폴더를 모두 접음, 다시 누르면 펼침 상태 복원",
+                      "The collapse-all button",
+                      "Folds every open folder; press it again to put them back"),
+                    R("모두 접기 버튼 Shift+클릭", "펼침 상태를 기억하지 않고 접음 (복원 안 됨)",
+                      "Shift-clicking collapse-all",
+                      "Folds without remembering, so there is nothing to put back"),
                     // Named for the places rather than for the rows: it moves
                     // between folders you have been in, not between every row
                     // you clicked, and someone who expects the second one will
@@ -324,9 +334,16 @@ public static class HelpContent
                     R("트리 빈 곳 우클릭 → 표시할 파일 형식", "필터 버튼 줄과 같은 목록",
                       "Right-click empty tree space → Show File Types",
                       "The same list the filter buttons carry"),
-                    R("폴더 행의 정렬 아이콘", "그 폴더의 개별 정렬, 하위 폴더는 따라옴 (개별 설정한 하위는 유지)",
+                    R("폴더 행의 정렬 아이콘", "그 폴더의 개별 정렬, 하위 폴더는 상위 폴더의 정렬을 따름(단, 하위 폴더를 개별 정렬할 경우 별개로 유지)",
                       "The sort icon on a folder row",
                       "Sort that folder its own way - subfolders follow, unless they have their own"),
+                    // 위 줄은 결과를 적고 이 줄은 그 결과를 만드는 항목을 적는다.
+                    // 이름이 화면에 있는데 도움말에 없으면, 메뉴를 열어 본 사람이
+                    // 무엇을 활성화하고 비활성화하는 것인지 알 길이 없다.
+                    R("정렬 메뉴 → 부모 폴더 따르기",
+                      "기본 활성화, 개별 정렬을 선택하면 해제됨 (다시 선택하면 그 폴더의 개별 지정이 삭제됨)",
+                      "Sort menu → Follow the parent folder",
+                      "On by default; picking a field of its own clears it, and choosing it again drops that folder's own setting"),
                     R("옵션 → 정렬 기준", "전체 기본 정렬", "Options → Sort by", "The default for everything"),
                     // 접기 belongs on the same row as 더 보기, and the selection
                     // is the point of the row rather than a side effect: a long
