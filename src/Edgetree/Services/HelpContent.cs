@@ -284,9 +284,9 @@ public static class HelpContent
                     // 폴더가 왜 트리에 없는가. 위는 손으로 숨긴 것, 이 줄은
                     // Windows가 표시해 둔 것이다. 클라우드 드라이브를 쓰는
                     // 사람에게 필요한 줄이라 그 경우를 그대로 적었다.
-                    R("옵션 → 숨김·시스템 항목 표시",
+                    R("옵션 → 기본 설정 → 숨김·시스템 항목 표시",
                       "Windows가 숨김·시스템으로 표시한 폴더와 파일도 트리에 표시 (일부 클라우드 드라이브가 그렇게 표시함)",
-                      "Options → Show Hidden and System Items",
+                      "Options → General → Show Hidden and System Items",
                       "Lists what Windows marks hidden or system - which is how some cloud drives mark their own folders"),
                     // THE MENU WITH NO ROW UNDER IT. Everything else in this
                     // section acts on the row that was clicked, so a menu that

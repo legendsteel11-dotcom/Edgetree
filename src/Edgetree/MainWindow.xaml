@@ -1833,6 +1833,24 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="showPanelDividers"
                         Click="ShowPanelDividersMenuItem_Click"/>
+                <!-- MOVED IN HERE 2026-08-24 (사용자: "위치가 애매합니다"). It
+                     sat beside 숨긴 폴더 at the top level, paired with it
+                     because the two answered one question between them - why a
+                     folder is not in the tree, by hand there and by Windows
+                     here (added 2026-08-19 for issue #1, a cloud drive whose own
+                     top-level folders carry System).
+
+                     What the pairing did not survive is that 숨긴 폴더 is a
+                     LIST and this is a switch, so a row that only ever toggles
+                     stood among the rows that open things. It is the last of
+                     this group instead, where every row is an answer to what the
+                     window shows - and the biggest of those, since it decides
+                     which rows exist at all. 숨긴 폴더 keeps its place; the two
+                     are now one level apart rather than side by side. -->
+                <MenuItem Header="{x:Static services:Strings.MenuShowHiddenItems}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="showHiddenItems"
+                        Click="ShowHiddenItemsMenuItem_Click"/>
                 <!-- 경로 표시줄's toggle was here and is GONE (2026-08-11). The
                      strip stopped being a display of where you are the moment it
                      grew the history chevrons: turning it off took a way of
@@ -2052,15 +2070,6 @@
             <!-- Same shape as the bookmark list above and built the same way -
                  the row context menu carries one too, but this is where someone
                  looks who no longer has the folder's row to right-click. -->
-            <!-- Beside 숨긴 폴더 because the two answer one question between
-                 them: why a folder is not in the tree. That one is the folders
-                 hidden BY HAND; this is the ones Windows marks. Someone looking
-                 for either will look here (added 2026-08-19 for issue #1, a
-                 cloud drive whose own top-level folders carry System). -->
-            <MenuItem Header="{x:Static services:Strings.MenuShowHiddenItems}"
-                    IsCheckable="True"
-                    AutomationProperties.AutomationId="showHiddenItems"
-                    Click="ShowHiddenItemsMenuItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuHiddenFolderList}"
                     AutomationProperties.AutomationId="hiddenFolderList"
                     SubmenuOpened="HiddenFolderSubmenu_Opened">

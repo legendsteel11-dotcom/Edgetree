@@ -8386,8 +8386,15 @@ public partial class MainWindow : Window
         // ITS OWN LOOKUP, deliberately outside the chain below. That chain is
         // all-or-nothing by design, and every id added to it is one more way for
         // the whole of it to stop matching at once.
+        //
+        // TWO HOPS SINCE 2026-08-24, because the row moved into 기본 설정 and
+        // FindMenuItem only ever looks at direct children. Resolving 기본 설정
+        // again here rather than borrowing the one the chain below finds is the
+        // same decision restated: this row is not to be taken down by an id it
+        // has nothing to do with.
         if (sender is ContextMenu own &&
-            FindMenuItem(own, "showHiddenItems") is { } showHiddenItems)
+            FindMenuItem(own, "generalSettings") is { } ownGeneralSettings &&
+            FindMenuItem(ownGeneralSettings, "showHiddenItems") is { } showHiddenItems)
         {
             showHiddenItems.IsChecked = _settings.ShowHiddenItems;
         }
