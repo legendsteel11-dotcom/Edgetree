@@ -38,10 +38,17 @@ const EMAIL = 'pjh85336@gmail.com'
         </span>
       </div>
 
-      <!-- 상호 링크는 푸터에(TabStick 랜딩과 같은 자리·같은 모양). -->
+      <!-- 상호 링크는 푸터에(TabStick 랜딩과 같은 자리·같은 모양).
+           SweepCap rides as a SECOND capsule (2026-08-23, 사용자 요청) rather
+           than a second name inside the first: the first pill's label reads
+           across the row, so the neighbour carries just the name - repeating
+           "같은 개발자의" per pill would say the same thing twice side by side. -->
       <p class="other">
         {{ t.footer.otherTool }} ·
         <a href="https://tabstick.com/" target="_blank" rel="noopener">{{ t.footer.otherToolName }}</a>
+      </p>
+      <p class="other">
+        <a href="https://github.com/legendsteel11/SweepCap" target="_blank" rel="noopener">{{ t.footer.otherTool2Name }}</a>
       </p>
 
       <p class="copyright">{{ t.footer.copyright }}</p>
@@ -125,6 +132,11 @@ const EMAIL = 'pjh85336@gmail.com'
 
 .other a:hover {
   text-decoration: underline;
+}
+
+/* 두 알약 사이 간격. inline-block이라 붙여 두면 한 덩어리로 읽힌다. */
+.other + .other {
+  margin-left: 8px;
 }
 
 .copyright {
