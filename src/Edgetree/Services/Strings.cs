@@ -212,9 +212,9 @@ public static class Strings
     // carries a web page's weight rather than a file tree's. Hyphenated to
     // match the Auto-Hide rows it sits near.
     public static string MenuAutoCollapse = "폴더 자동 접기";
-    public static string MenuCollapseAllExpanded = "모든 펼친 폴더 접기";
-    public static string CollapseAllConfirmTitle = "모든 펼친 폴더 접기";
-    public static string CollapseAllConfirmBody = "모든 펼쳐졌던 폴더를 접겠습니까?";
+    public static string MenuCollapseAllExpanded = "폴더 전체 접기";
+    public static string CollapseAllConfirmTitle = "폴더 전체 접기";
+    public static string CollapseAllConfirmBody = "펼쳐진 폴더를 전체 접겠습니까?";
     public static string MenuAlwaysOnTop = "항상 위에 표시";
     // The submenu holding the set-once housekeeping toggles (autostart, tray
     // icon, folder/file icons, title bar text) - they sat as top-level rows
@@ -358,7 +358,7 @@ public static class Strings
     public static string ToolTipPinAutoHide = "자동 숨김";
     public static string ToolTipPinStayOpen = "고정";
     // Shift 조합은 화면에 안 보이므로 툴팁이 유일한 안내 자리다.
-    public static string ToolTipCollapseAll = "모두 접기 (Shift+클릭: 복원 안됨)";
+    public static string ToolTipCollapseAll = "전체 접기 (Shift+클릭: 복원 안됨)";
     public static string ToolTipRestoreExpanded = "펼침 상태 복원 (Shift+클릭: 복원 안되게 접기)";
     public static string ToolTipOptions = "옵션";
     public static string ToolTipUpdateAvailable = "새 버전 {0} 다운로드 가능";

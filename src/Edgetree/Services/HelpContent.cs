@@ -172,15 +172,15 @@ public static class HelpContent
                     // check, when the answer a reader wants is that they do not
                     // have to check any of them. It also went stale twice as
                     // AppPreset.Fields grew, which a sentence cannot.
-                    R("저장 항목", "현재 앱 설정 모두를 그대로 저장",
+                    R("저장 항목", "현재 앱 설정 전체를 그대로 저장",
                       "What it holds", "Everything you have set up, exactly as it stands"),
                     R("이름 옆 ›", "적용 · 덮어쓰기 · 이름 바꾸기 · 삭제",
                       "The › beside a name", "Apply · overwrite · rename · delete"),
                     // The two keys, which is what this section is for - the rows
                     // above name a menu, and these are the reason not to open it.
-                    R("Ctrl+1 ~ 5", "그 번호의 프리셋으로 전환 (없으면 그 자리에 저장할지 물음)",
+                    R("Ctrl+1 ~ 5", "해당 번호의 프리셋으로 전환",
                       "Ctrl+1 ~ 5",
-                      "Go to that preset - and if there is none yet, offers to save this setup there"),
+                      "Go to that preset"),
                     R("Ctrl+Shift+S", "현재 선택된 프리셋에 확인 없이 바로 덮어씌움",
                       "Ctrl+Shift+S",
                       "Overwrites the preset you are in, straight away, without asking"),
@@ -200,14 +200,14 @@ public static class HelpContent
                     // what is ON SCREEN and expands nothing, so someone who
                     // expects it to dive into a closed folder reads the first
                     // press as a miss (missing from here until 2026-08-19).
-                    R("PageUp · PageDown", "화면에 나와 있는 폴더로만 위 · 아래 이동 (파일은 건너뜀, 접힌 폴더는 열지 않음)",
+                    R("PageUp · PageDown", "화면에 나와 있는 폴더로만 위 · 아래 이동",
                       "PageUp · PageDown",
                       "Up · down through the folders on screen, skipping the files - nothing gets expanded"),
                     R("← →", "접기 · 펼치기", "← →", "Collapse · expand"),
                     // 2026-08-17: 열린 폴더를 눌러도 안 접히게 바뀌었으므로 이
                     // 두 줄이 필요해졌다. 접는 방법이 둘(다시 누르기 · 펼침기호)이고
                     // 어느 쪽도 화면에 안 적혀 있다.
-                    R("폴더 클릭", "접힌 폴더는 펼치기 · 열린 폴더는 선택만, 다시 누르면 접기",
+                    R("폴더 클릭", "접힌 폴더는 펼치기 · 열린 폴더는 선택만, 다시 클릭하면 접기",
                       "Clicking a folder",
                       "A closed folder opens; an open one is only selected - press it again to close"),
                     R("펼침기호 클릭", "누를 때마다 바로 접기 · 펼치기",
@@ -216,12 +216,12 @@ public static class HelpContent
                     // 조합 쪽이 되돌릴 수 없기 때문이다. 툴팁이 말하고는 있지만
                     // 툴팁은 올려 놓아야 보이고, 복원이 안 되는 쪽은 누르기 전에
                     // 알아야 하는 종류의 것이다.
-                    R("모두 접기 버튼", "펼친 폴더를 모두 접음, 다시 누르면 펼침 상태 복원",
-                      "The collapse-all button",
+                    R("제목 표시줄의 전체 접기 아이콘", "펼친 폴더를 전체 접음, 다시 클릭하면 펼침 상태 복원",
+                      "The Collapse All icon in the title bar",
                       "Folds every open folder; press it again to put them back"),
-                    R("모두 접기 버튼 Shift+클릭", "펼침 상태를 기억하지 않고 접음 (복원 안 됨)",
-                      "Shift-clicking collapse-all",
-                      "Folds without remembering, so there is nothing to put back"),
+                    R("전체 접기 아이콘 Shift+클릭", "펼침 상태를 완전히 접음 (복원 안 됨)",
+                      "Shift-clicking the Collapse All icon",
+                      "Folds for good (no restore)"),
                     // Named for the places rather than for the rows: it moves
                     // between folders you have been in, not between every row
                     // you clicked, and someone who expects the second one will
@@ -234,7 +234,7 @@ public static class HelpContent
                     // Reported missing 2026-08-19: the buttons had a row for
                     // the film and none for the two things they were given on
                     // the same day.
-                    R("마우스 앞 · 뒤 버튼", "트리 위에서 누르면 사용한 폴더로 뒤로 · 앞으로",
+                    R("마우스 앞 · 뒤 버튼", "트리 위에서 클릭하면 사용한 폴더로 뒤로 · 앞으로",
                       "Mouse back · forward buttons",
                       "Over the tree, back · forward through the folders you have used"),
                     R("경로 표시줄의 목록 버튼", "사용한 폴더들을 확인하고 바로 이동",
@@ -248,10 +248,6 @@ public static class HelpContent
                     R("F7", "새 폴더", "F7", "New folder"),
                     R("Del", "휴지통으로 삭제", "Del", "Delete to the Recycle Bin"),
                     R("Shift+Del", "완전 삭제", "Shift+Del", "Delete permanently"),
-                    // The one place a delete still asks, so it is the one place
-                    // the help has to say why.
-                    R("네트워크 위치에서 삭제", "휴지통이 없어 확인 후 완전 삭제",
-                      "Deleting from a network location", "There is no Recycle Bin there, so it asks first"),
                     R("Ctrl+C · Ctrl+X · Ctrl+V", "복사 · 잘라내기 · 붙여넣기",
                       "Ctrl+C · Ctrl+X · Ctrl+V", "Copy · cut · paste"),
                     R("Ctrl+Shift+C", "경로 복사", "Ctrl+Shift+C", "Copy path"),
@@ -280,14 +276,6 @@ public static class HelpContent
                     R("우클릭 → 폴더 숨기기", "트리에서 폴더를 감춤, 검색에서는 보이나 작업 시 폴더 숨김 해제 필요",
                       "Right-click → Hide this folder",
                       "Hidden from the tree; search still finds it, but working on it means unhiding it first"),
-                    // 바로 아래에 두는 이유는 둘이 한 질문에 답하기 때문이다:
-                    // 폴더가 왜 트리에 없는가. 위는 손으로 숨긴 것, 이 줄은
-                    // Windows가 표시해 둔 것이다. 클라우드 드라이브를 쓰는
-                    // 사람에게 필요한 줄이라 그 경우를 그대로 적었다.
-                    R("옵션 → 기본 설정 → 숨김·시스템 항목 표시",
-                      "Windows가 숨김·시스템으로 표시한 폴더와 파일도 트리에 표시 (일부 클라우드 드라이브가 그렇게 표시함)",
-                      "Options → General → Show Hidden and System Items",
-                      "Lists what Windows marks hidden or system - which is how some cloud drives mark their own folders"),
                     // THE MENU WITH NO ROW UNDER IT. Everything else in this
                     // section acts on the row that was clicked, so a menu that
                     // needs the absence of one is the gesture nobody arrives at
@@ -453,9 +441,9 @@ public static class HelpContent
                     // 줄머리에 그렇게 적혀 있었고, 이제 두 상태에서 다 되므로
                     // 조건이 빠지고 무엇이 달라지는지가 설명으로 갔다.
                     R("전체 화면에서 위쪽 띠 드래그",
-                      "창 모드는 창 이동, 도킹 상태는 도킹이 풀리며 이동 (그 띠는 그림에 닿지 않음)",
+                      "창 모드는 창 이동, 도킹 상태는 도킹이 풀리며 이동",
                       "Drag the top strip in full screen",
-                      "Moves the window; docked, it undocks and then follows - either way that strip does not reach the picture"),
+                      "Moves the window; docked, it undocks and then follows"),
                 }),
 
                 new Group(T("이미지", "Images"), new[]
@@ -496,8 +484,8 @@ public static class HelpContent
                     // Says what it gives up, because that is the whole choice
                     // between it and 맞춤: one shows all of the picture, the
                     // other fills the panel.
-                    R("채우기", "패널을 꽉 채우고 넘치는 부분은 잘라냄 (다음 그림에도 이어짐)",
-                      "Fill", "Fills the panel and crops the overflow - and stays on for the next picture"),
+                    R("채우기", "패널을 꽉 채우고 넘치는 부분은 잘라냄",
+                      "Fill", "Fills the panel and crops the overflow"),
                     R("Wheel Click · Enter", "전체 화면 (우클릭 메뉴에서 방식 선택)",
                       "Wheel Click · Enter", "Full screen (pick which kind in the right-click menu)"),
                     R("Esc", "전체 화면 종료", "Esc", "Leave full screen"),
@@ -550,7 +538,7 @@ public static class HelpContent
                       "Play the same file again", "It carries on from where you left off"),
                     // 이어보기 줄 바로 아래. 그 줄이 "다시 틀면 이어진다"이고 이
                     // 줄이 "그 파일을 어디서 다시 찾는가"라, 둘이 한 이야기의 앞뒤다.
-                    R("보다가 다른 폴더로 이동", "트리 하단에 영상 이름 표시, 누르면 보던 위치에서 이어보기",
+                    R("보다가 다른 폴더로 이동", "트리 하단에 영상 이름 표시, 클릭하면 보던 위치에서 이어보기",
                       "Move to another folder while watching",
                       "The film's name waits at the foot of the tree - press it to carry on where you left off"),
                     R("Home", "처음부터", "Home", "Back to the start"),
@@ -565,9 +553,9 @@ public static class HelpContent
                     // had all along. Says it does NOT carry over, because the
                     // picture's does and someone who met it there will expect
                     // the same.
-                    R("우클릭 → 영상 크기 → 채우기", "패널을 꽉 채우고 넘치는 부분은 잘라냄 (다음 영상은 맞춤으로 시작)",
+                    R("우클릭 → 영상 크기 → 채우기", "패널을 꽉 채우고 넘치는 부분은 잘라냄",
                       "Right-click → Video size → Fill",
-                      "Fills the panel and crops the overflow - the next film starts fitted again"),
+                      "Fills the panel and crops the overflow"),
                     // 바로 위 줄의 반대편. 그 줄은 창 안에서 영상을 어떻게 놓을지
                     // 정하고, 이 줄은 영상에 창을 맞춘다.
                     R("F · 우클릭 → 창을 영상에 맞춤", "창 높이를 영상 비율에 맞춤, 위아래 검은 띠가 없어짐 (창 모드)",
@@ -669,13 +657,6 @@ public static class HelpContent
                     R("장수 표시 옆 ▤ 버튼", "아래에 해당 폴더 이미지 목록 표시, 검색 중이면 검색 결과",
                       "The ▤ button beside the counter", "The folder's images as a row - or the results, while searching"),
                     // 없어지는 것을 적는 줄, 그리고 이 파일에서 그 종류는 이것뿐이다
-                    // (2026-08-19). 바가 사라지는 것을 설명하지 않으면 고장으로
-                    // 읽힌다 - 켜 놓은 설정은 그대로인데 화면에서만 안 보이므로 더
-                    // 그렇다. 바로 다음 줄이 아니라 여는 방법 다음에 두는 것은,
-                    // 안 보인다고 찾아온 사람이 위에서 두 번째 줄까지는 읽기 때문이다.
-                    R("영상을 전체화면으로 볼 때", "썸네일 바는 자리를 내주고, 전체화면을 나가면 돌아옴. 우클릭 → 썸네일 바로 그 자리에서 다시 부를 수 있음",
-                      "While a film is full screen",
-                      "The bar steps aside and comes back on the way out; right-click → Thumbnail bar calls it in for that stretch"),
                     // THE WAY BACK COMES RIGHT AFTER THE WAYS IN (2026-08-22).
                     // The list became the default with v2.5.0, so the reader
                     // most likely to arrive here is the one whose bar changed

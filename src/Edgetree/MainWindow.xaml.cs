@@ -7957,7 +7957,7 @@ public partial class MainWindow : Window
 
     // The title bar's collapse/restore toggle has nothing to do when nothing is
     // expanded AND there's no remembered set to restore - which is exactly the
-    // state the options menu's one-shot "모든 펼친 폴더 접기" leaves behind. Grey it
+    // state the options menu's one-shot "폴더 전체 접기" leaves behind. Grey it
     // out then (see ToggleButtonStyle's IsEnabled trigger); expanding any folder
     // lights it back up.
     private void UpdateCollapseAllButtonState()
@@ -8030,7 +8030,7 @@ public partial class MainWindow : Window
         UpdateCollapseAllButtonState();
     }
 
-    // The options-menu "모든 펼친 폴더 접기" - a one-shot cleanup, unlike the title
+    // The options-menu "폴더 전체 접기" - a one-shot cleanup, unlike the title
     // bar's collapse button next to it (a toggle that remembers what was open
     // so a second click restores it). Deliberately also clears that toggle's
     // remembered set and puts its arrow back to "collapse": without that, one
