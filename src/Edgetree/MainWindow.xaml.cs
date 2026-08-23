@@ -8667,18 +8667,99 @@ public partial class MainWindow : Window
 
         bool scrolls = viewer.ScrollableHeight > 0.5;
 
-        if (viewer.Template.FindName("MoreAboveGlyph", viewer) is UIElement above)
+        if (viewer.Template.FindName("MoreAboveGlyph", viewer) is FrameworkElement above)
         {
             above.Visibility = scrolls && viewer.VerticalOffset > 0.5
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+            WireMenuMoreGlyphHover(above);
         }
 
-        if (viewer.Template.FindName("MoreBelowGlyph", viewer) is UIElement below)
+        if (viewer.Template.FindName("MoreBelowGlyph", viewer) is FrameworkElement below)
         {
             below.Visibility = scrolls && viewer.VerticalOffset < viewer.ScrollableHeight - 0.5
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+            WireMenuMoreGlyphHover(below);
+        }
+    }
+
+    // ----- 화살표에 손을 올리면 움직인다 (2026-08-23, 사용자 지적) --------------
+    //
+    // The two chevrons were pure signage (IsHitTestVisible off), and an arrow
+    // that answers nothing reads as broken - Windows' own menus scroll while
+    // the pointer rests on theirs, so the shape carries that promise whether or
+    // not we keep it. Hover, not click: the wheel already covers deliberate
+    // scrolling, and hovering is what the native arrows answer to.
+    //
+    // This does NOT reopen the 08-12 "menu moves under the hand" fault: that
+    // was item hover taking focus and dragging the list; here the pointer is
+    // parked OUTSIDE the items, on the band, and scrolling never puts a new
+    // item under it. The same judgement as the tree's drag-edge scroll - a
+    // hand resting on the edge is the request, and leaving stops it.
+    //
+    // Wired from ScrollChanged because the bands live in the App-level shared
+    // template: only menus attach that handler, so only menus become live.
+    // -= before += keeps the repeated ScrollChanged calls from stacking.
+    private void WireMenuMoreGlyphHover(FrameworkElement glyph)
+    {
+        glyph.MouseEnter -= MenuMoreGlyph_MouseEnter;
+        glyph.MouseEnter += MenuMoreGlyph_MouseEnter;
+        glyph.MouseLeave -= MenuMoreGlyph_MouseLeave;
+        glyph.MouseLeave += MenuMoreGlyph_MouseLeave;
+    }
+
+    private System.Windows.Threading.DispatcherTimer? _menuHoverScrollTimer;
+    private ScrollViewer? _menuHoverScrollViewer;
+    private bool _menuHoverScrollUp;
+
+    private void MenuMoreGlyph_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (sender is not FrameworkElement { TemplatedParent: ScrollViewer viewer } glyph)
+        {
+            return;
+        }
+
+        _menuHoverScrollViewer = viewer;
+        _menuHoverScrollUp = ReferenceEquals(
+            glyph, viewer.Template.FindName("MoreAboveGlyph", viewer));
+
+        // 한 틱에 한 줄. The native arrows creep rather than page - the point
+        // is drifting to the row you can half-see, not covering distance,
+        // which the wheel does better anyway.
+        _menuHoverScrollTimer ??= new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(120),
+        };
+        _menuHoverScrollTimer.Tick -= MenuHoverScrollTimer_Tick;
+        _menuHoverScrollTimer.Tick += MenuHoverScrollTimer_Tick;
+        _menuHoverScrollTimer.Start();
+    }
+
+    private void MenuMoreGlyph_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        _menuHoverScrollTimer?.Stop();
+        _menuHoverScrollViewer = null;
+    }
+
+    // Reaching the end needs no case of its own: ScrollChanged collapses the
+    // band, the collapse takes the pointer off it, and MouseLeave stops the
+    // timer. The null check is for the menu closing mid-hover.
+    private void MenuHoverScrollTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_menuHoverScrollViewer is not { IsLoaded: true } viewer)
+        {
+            _menuHoverScrollTimer?.Stop();
+            return;
+        }
+
+        if (_menuHoverScrollUp)
+        {
+            viewer.LineUp();
+        }
+        else
+        {
+            viewer.LineDown();
         }
     }
 

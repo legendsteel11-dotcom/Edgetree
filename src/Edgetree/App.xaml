@@ -374,32 +374,51 @@
                      width off from the text it belongs to. The gutter column
                      is 0 wide until there is something to scroll, so this is
                      the true centre either way. -->
-                <Path x:Name="MoreAboveGlyph"
+                <!-- Since 2026-08-23 each chevron sits in a full-width
+                     TRANSPARENT band that scrolls while the pointer rests on
+                     it, the way the same arrows behave on Windows' own menus -
+                     an arrow that answers nothing reads as a broken control
+                     (사용자: "저런 모양 자체가 뭔가 할 거 같아서"). The NAME
+                     moved to the band: MenuScrollViewer_ScrollChanged toggles
+                     it and wires the hover (menus are the only attachers, so
+                     the tree and the lists keep two inert Paths as before).
+                     The band swallows clicks over the half-row beneath it -
+                     12px at the very edge, judged cheaper than an arrow that
+                     lies. -->
+                <Border x:Name="MoreAboveGlyph"
                         Grid.Column="0"
-                        Data="M0,4 L4,0 L8,4"
-                        Stroke="{DynamicResource MenuForeground}"
-                        StrokeThickness="1.4"
-                        StrokeLineJoin="Round"
-                        StrokeStartLineCap="Round"
-                        StrokeEndLineCap="Round"
-                        HorizontalAlignment="Center"
+                        Height="12"
+                        Background="Transparent"
                         VerticalAlignment="Top"
-                        Margin="0,1,0,0"
-                        IsHitTestVisible="False"
-                        Visibility="Collapsed"/>
-                <Path x:Name="MoreBelowGlyph"
+                        Visibility="Collapsed">
+                    <Path Data="M0,4 L4,0 L8,4"
+                            Stroke="{DynamicResource MenuForeground}"
+                            StrokeThickness="1.4"
+                            StrokeLineJoin="Round"
+                            StrokeStartLineCap="Round"
+                            StrokeEndLineCap="Round"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top"
+                            Margin="0,1,0,0"
+                            IsHitTestVisible="False"/>
+                </Border>
+                <Border x:Name="MoreBelowGlyph"
                         Grid.Column="0"
-                        Data="M0,0 L4,4 L8,0"
-                        Stroke="{DynamicResource MenuForeground}"
-                        StrokeThickness="1.4"
-                        StrokeLineJoin="Round"
-                        StrokeStartLineCap="Round"
-                        StrokeEndLineCap="Round"
-                        HorizontalAlignment="Center"
+                        Height="12"
+                        Background="Transparent"
                         VerticalAlignment="Bottom"
-                        Margin="0,0,0,1"
-                        IsHitTestVisible="False"
-                        Visibility="Collapsed"/>
+                        Visibility="Collapsed">
+                    <Path Data="M0,0 L4,4 L8,0"
+                            Stroke="{DynamicResource MenuForeground}"
+                            StrokeThickness="1.4"
+                            StrokeLineJoin="Round"
+                            StrokeStartLineCap="Round"
+                            StrokeEndLineCap="Round"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Bottom"
+                            Margin="0,0,0,1"
+                            IsHitTestVisible="False"/>
+                </Border>
             </Grid>
             <ControlTemplate.Triggers>
                 <!-- The user-set bar thickness plus the 1px divider - both
