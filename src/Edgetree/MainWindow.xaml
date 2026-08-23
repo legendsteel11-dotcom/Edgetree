@@ -1833,7 +1833,7 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="showPanelDividers"
                         Click="ShowPanelDividersMenuItem_Click"/>
-                <!-- MOVED IN HERE 2026-08-24 (사용자: "위치가 애매합니다"). It
+                <!-- MOVED IN HERE 2026-08-24. It
                      sat beside 숨긴 폴더 at the top level, paired with it
                      because the two answered one question between them - why a
                      folder is not in the tree, by hand there and by Windows
@@ -8668,7 +8668,7 @@
                                      go to its row, or end it. The X exists
                                      because 정지 in the transport row did the
                                      job without looking like the way out
-                                     (2026-08-23, 사용자 요청): a hand that
+                                     (2026-08-23): a hand that
                                      wants a thing gone looks for an X at the
                                      top right, so this is the same stop behind
                                      the mark that gets looked for. -->

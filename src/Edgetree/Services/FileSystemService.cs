@@ -27,14 +27,42 @@ public static class FileSystemService
     public static FileSortField SortField = FileSortField.Name;
     public static bool SortDescending = false;
 
-    // Per-folder sort overrides, keyed by the folder's own FullPath (not its
-    // children's) - set from AppSettings.FolderSortOverrides at startup and
-    // whenever a folder's own right-click "정렬" is used, same "static mirror
-    // of settings, read at load time" pattern as SortField/SortDescending
-    // above and FileSystemItem.DisplayCap. OrdinalIgnoreCase since Windows
-    // paths are case-insensitive.
-    public static readonly Dictionary<string, FolderSortOverride> SortOverrides =
+    // Per-folder sort overrides, keyed by the folder's own NORMALIZED FullPath
+    // (not its children's) - set from AppSettings.FolderSortOverrides at
+    // startup and whenever a folder's own right-click "정렬" is used, same
+    // "static mirror of settings, read at load time" pattern as SortField/
+    // SortDescending above and FileSystemItem.DisplayCap. OrdinalIgnoreCase
+    // since Windows paths are case-insensitive.
+    //
+    // A PUBLISHED DICTIONARY IS NEVER MUTATED. Folder listings read this from
+    // Task.Run workers (ReadChildrenFromDisk), and since the ancestor cascade
+    // a menu click writes it at the very moment those reads are likeliest to
+    // be in flight - a Dictionary written under a concurrent reader can throw
+    // or spin. Writers below build a copy and swap the reference (atomic);
+    // a reader that wants a consistent view over several lookups takes one
+    // local copy of the reference first, the way ResolveSortFor does. Writes
+    // are menu clicks, so the copy is paid almost never.
+    public static Dictionary<string, FolderSortOverride> SortOverrides { get; private set; } =
         new(StringComparer.OrdinalIgnoreCase);
+
+    public static void SetSortOverride(string path, FolderSortOverride over)
+    {
+        var next = new Dictionary<string, FolderSortOverride>(SortOverrides, StringComparer.OrdinalIgnoreCase)
+        {
+            [NormalizeSortOverridePath(path)] = over
+        };
+        SortOverrides = next;
+    }
+
+    public static void RemoveSortOverride(string path)
+    {
+        var next = new Dictionary<string, FolderSortOverride>(SortOverrides, StringComparer.OrdinalIgnoreCase);
+        next.Remove(NormalizeSortOverridePath(path));
+        SortOverrides = next;
+    }
+
+    public static void ClearSortOverrides()
+        => SortOverrides = new Dictionary<string, FolderSortOverride>(StringComparer.OrdinalIgnoreCase);
 
 
     // Windows Explorer's own "smart" name sort (digit runs compared as
@@ -60,7 +88,7 @@ public static class FileSystemService
 
     public static string NormalizeSortOverridePath(string path) => path.TrimEnd('\\');
 
-    // 부모 폴더 따르기 (2026-08-23, 사용자 설계). A folder with no override of
+    // 부모 폴더 따르기 (2026-08-23). A folder with no override of
     // its own asks UP THE CHAIN before falling back to the app-wide default -
     // set 이름↑ on a music folder once and every album inside follows, instead
     // of being set one by one (the report that started this). A folder's own
@@ -72,10 +100,12 @@ public static class FileSystemService
     // has an answer.
     public static (FileSortField Field, bool Descending) ResolveSortFor(string path)
     {
+        // One read of the reference for the whole walk - see SortOverrides.
+        var overrides = SortOverrides;
         string current = NormalizeSortOverridePath(path);
         while (current.Length > 0)
         {
-            if (SortOverrides.TryGetValue(current, out var over))
+            if (overrides.TryGetValue(current, out var over))
             {
                 return (over.Field, over.Descending);
             }
@@ -562,7 +592,7 @@ public static class FileSystemService
     // "Y:" or "Y:\" - the whole of a lettered drive, which is the only thing
     // DriveInfo will answer for. "Y:\강의" is not one, and neither is any UNC
     // path however short.
-    private static bool IsDriveLetterRoot(string path)
+    public static bool IsDriveLetterRoot(string path)
     {
         if (path.StartsWith(@"\\", StringComparison.Ordinal))
         {

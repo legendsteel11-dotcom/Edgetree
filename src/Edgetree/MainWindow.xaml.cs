@@ -747,11 +747,11 @@ public partial class MainWindow : Window
             FileSystemService.UserRoots.Add(path);
         }
 
-        FileSystemService.SortOverrides.Clear();
+        FileSystemService.ClearSortOverrides();
         foreach (var entry in _settings.FolderSortOverrides)
         {
-            FileSystemService.SortOverrides[FileSystemService.NormalizeSortOverridePath(entry.Path)] =
-                new FolderSortOverride(ReadSortField(entry.SortField, entry.SortByDate), entry.SortDescending);
+            FileSystemService.SetSortOverride(entry.Path,
+                new FolderSortOverride(ReadSortField(entry.SortField, entry.SortByDate), entry.SortDescending));
         }
 
         // Re-applies the Run key every launch rather than only the moment the
@@ -7915,7 +7915,7 @@ public partial class MainWindow : Window
 
     private void CollapseAllButton_Click(object sender, RoutedEventArgs e)
     {
-        // Shift+클릭은 진짜 접기 (2026-08-23, 사용자 결정). The plain click is a
+        // Shift+클릭은 진짜 접기 (2026-08-23). The plain click is a
         // fold-and-remember TOGGLE, and the only way to collapse for real was a
         // confirmation-guarded row in the options menu. A modifier beats an
         // option that would change what the plain click means: Shift is the
@@ -8704,7 +8704,7 @@ public partial class MainWindow : Window
         }
     }
 
-    // ----- 화살표에 손을 올리면 움직인다 (2026-08-23, 사용자 지적) --------------
+    // ----- 화살표에 손을 올리면 움직인다 (2026-08-23) ---------------------------
     //
     // The two chevrons were pure signage (IsHitTestVisible off), and an arrow
     // that answers nothing reads as broken - Windows' own menus scroll while
@@ -8721,10 +8721,19 @@ public partial class MainWindow : Window
     // Wired from ScrollChanged because the bands live in the App-level shared
     // template: only menus attach that handler, so only menus become live.
     // -= before += keeps the repeated ScrollChanged calls from stacking.
+    // MOUSEMOVE, NOT MOUSEENTER, and the difference is who moved. WPF re-runs
+    // hit testing when visibility changes, so a band appearing under a pointer
+    // that has not moved still gets a synthesized MouseEnter - which is
+    // exactly what happens when the wheel scrolls the menu down and the top
+    // band uncollapses under the resting hand. Started from Enter, the timer
+    // then walked the menu straight back up, undoing the wheel it had just
+    // been given (the one shape of app-driven scroll this feature was argued
+    // to not be: a resting hand asked for nothing). A hand that WANTS the
+    // band moves onto it, and that motion is the licence.
     private void WireMenuMoreGlyphHover(FrameworkElement glyph)
     {
-        glyph.MouseEnter -= MenuMoreGlyph_MouseEnter;
-        glyph.MouseEnter += MenuMoreGlyph_MouseEnter;
+        glyph.MouseMove -= MenuMoreGlyph_MouseMove;
+        glyph.MouseMove += MenuMoreGlyph_MouseMove;
         glyph.MouseLeave -= MenuMoreGlyph_MouseLeave;
         glyph.MouseLeave += MenuMoreGlyph_MouseLeave;
     }
@@ -8733,16 +8742,27 @@ public partial class MainWindow : Window
     private ScrollViewer? _menuHoverScrollViewer;
     private bool _menuHoverScrollUp;
 
-    private void MenuMoreGlyph_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+    private void MenuMoreGlyph_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         if (sender is not FrameworkElement { TemplatedParent: ScrollViewer viewer } glyph)
         {
             return;
         }
 
+        bool up = ReferenceEquals(glyph, viewer.Template.FindName("MoreAboveGlyph", viewer));
+
+        // Move fires for every pixel the pointer covers inside the band, and
+        // restarting the timer each time would hold its first tick 120ms away
+        // for as long as the hand keeps drifting. Already running for this
+        // band means there is nothing to change.
+        if (_menuHoverScrollTimer is { IsEnabled: true } &&
+            ReferenceEquals(_menuHoverScrollViewer, viewer) && _menuHoverScrollUp == up)
+        {
+            return;
+        }
+
         _menuHoverScrollViewer = viewer;
-        _menuHoverScrollUp = ReferenceEquals(
-            glyph, viewer.Template.FindName("MoreAboveGlyph", viewer));
+        _menuHoverScrollUp = up;
 
         // 한 틱에 한 줄. The native arrows creep rather than page - the point
         // is drifting to the row you can half-see, not covering distance,
@@ -9736,9 +9756,10 @@ public partial class MainWindow : Window
         SetFolderSortOverride(item, currentField, sortDescending: direction == "desc");
     }
 
-    // "전역 정렬 따르기" - only enabled from the menu when the selected folder
-    // actually has an override (see ExplorerItemContextMenu_Opened); same
-    // action as clicking the folder's own override icon.
+    // "부모 폴더 따르기" - always enabled and checked while the folder already
+    // follows (see ApplyFolderSortMenuState); pressing it then is a no-op by
+    // ClearFolderSortOverride's own early return. Same action as clicking the
+    // folder's own override icon.
     private void FolderSortFollowGlobalMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true } item)
@@ -9749,17 +9770,13 @@ public partial class MainWindow : Window
 
     // What a specific folder's own "정렬" checkboxes should currently show -
     // its own override if it has one, otherwise whatever it actually follows:
-    // the nearest ancestor's override, and the app-wide default past that
-    // (ResolveSortFor). Showing the global default here while an ancestor was
-    // deciding the order would check a field the folder is not sorted by.
-    private (FileSortField Field, bool SortDescending) GetEffectiveFolderSort(FileSystemItem item)
-    {
-        var entry = _settings.FolderSortOverrides.FirstOrDefault(o =>
-            string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
-        return entry is not null
-            ? (ReadSortField(entry.SortField, entry.SortByDate), entry.SortDescending)
-            : FileSystemService.ResolveSortFor(item.FullPath);
-    }
+    // the nearest ancestor's override, and the app-wide default past that.
+    // ResolveSortFor's first probe IS the folder's own override, asked of the
+    // mirror the settings list is loaded into and kept in step with - reading
+    // the settings list separately here was a second store answering the same
+    // question, one more thing the mirror had to be kept honest against.
+    private static (FileSortField Field, bool SortDescending) GetEffectiveFolderSort(FileSystemItem item)
+        => FileSystemService.ResolveSortFor(item.FullPath);
 
     // Settings written before 유형/크기 existed carry only the SortByDate
     // boolean, so an empty field name falls back to it rather than silently
@@ -9792,8 +9809,7 @@ public partial class MainWindow : Window
         entry.SortByDate = field == FileSortField.Date;
         entry.SortDescending = sortDescending;
 
-        FileSystemService.SortOverrides[FileSystemService.NormalizeSortOverridePath(item.FullPath)] =
-            new FolderSortOverride(field, sortDescending);
+        FileSystemService.SetSortOverride(item.FullPath, new FolderSortOverride(field, sortDescending));
         item.HasSortOverride = true;
         item.SortOverrideIconGeometry = FileSystemService.SortOverrideGeometry(sortDescending);
         item.SortOverrideTooltip = FileSystemService.FormatSortTooltip(field, sortDescending);
@@ -9807,9 +9823,14 @@ public partial class MainWindow : Window
     // ResyncLoadedSubtree is the watcher's own recovery walk and does exactly
     // the right amount - expanded folders re-read and merge in place,
     // collapsed-but-loaded ones are flagged to re-read on their next expand,
-    // and the viewer is told where it needs to be. Descendants WITH their own
-    // override re-read too and come back in their own order - their resolver
-    // answer has not changed, so the merge moves nothing.
+    // and the viewer is told where it needs to be.
+    //
+    // A child with its own override is a FENCE, and the walk stops at it:
+    // ResolveSortFor answers from the nearest override, so nothing under that
+    // child resolves through the folder that changed - every read below it
+    // would come back in the order it already shows. Skipping it skips its
+    // whole branch, which on a music root full of individually-sorted albums
+    // is most of the disk work this walk could have done.
     private void ResortFollowingSubtree(FileSystemItem item)
     {
         if (item.ChildrenLoaded)
@@ -9817,7 +9838,8 @@ public partial class MainWindow : Window
             RefreshFolderPreservingState(item);
             foreach (var child in item.Children)
             {
-                if (child is { IsPlaceholder: false, IsShowMore: false, IsDirectory: true })
+                if (child is { IsPlaceholder: false, IsShowMore: false, IsDirectory: true,
+                    HasSortOverride: false })
                 {
                     ResyncLoadedSubtree(child);
                 }
@@ -9856,10 +9878,9 @@ public partial class MainWindow : Window
         descending.IsChecked = sortDescending;
         // 부모 폴더 따르기 is CHECKED while the folder has no override of its
         // own - following is the default state, not an action that became
-        // available (2026-08-23, 사용자 설계: "체크해 놓은 상태로"). Enabled
-        // either way: picking it while already following simply changes
-        // nothing, where a greyed-out checked row reads as unavailable.
-        followGlobal.IsCheckable = true;
+        // available (2026-08-23). Enabled either way: picking it while
+        // already following changes nothing (ClearFolderSortOverride returns
+        // at once), where a greyed-out checked row reads as unavailable.
         followGlobal.IsChecked = isFolder && !hasOverride;
         followGlobal.IsEnabled = isFolder;
     }
@@ -9907,9 +9928,21 @@ public partial class MainWindow : Window
     // the app-wide default like any other folder - see SetFolderSortOverride.
     private void ClearFolderSortOverride(FileSystemItem item)
     {
+        // Nothing to drop is nothing to do, and the row that gets here is now
+        // ALWAYS enabled - checked while the folder already follows, so the
+        // likeliest press of all is the confirming one. Without this line that
+        // press fell through to ResortFollowingSubtree and re-read every
+        // loaded descendant from disk for an order that could not change -
+        // seconds of it on a NAS folder, for a click the menu comment promised
+        // "simply changes nothing".
+        if (!item.HasSortOverride)
+        {
+            return;
+        }
+
         _settings.FolderSortOverrides.RemoveAll(o =>
             string.Equals(o.Path, item.FullPath, StringComparison.OrdinalIgnoreCase));
-        FileSystemService.SortOverrides.Remove(FileSystemService.NormalizeSortOverridePath(item.FullPath));
+        FileSystemService.RemoveSortOverride(item.FullPath);
         item.HasSortOverride = false;
         // Back to the neutral "follows what is above it" glyph.
         item.SortOverrideIconGeometry = FileSystemService.FollowsGlobalSortGeometry;
@@ -16530,7 +16563,15 @@ public partial class MainWindow : Window
 
         uint arrived = mask & ~_driveMask;
         uint left = _driveMask & ~mask;
-        _driveMask = mask;
+
+        // A BIT IS A ROW HANDLED, NOT A LETTER SEEN. Departures are settled
+        // here and their bits go now; an arrival's bit is set only where its
+        // row is actually put in (or deliberately not - a hidden drive), in
+        // AddDriveRootWhenReady's callback. Writing the whole mask up front
+        // was the first version, and it burned a letter whose volume was not
+        // ready yet: no row was made, the bit said otherwise, and every later
+        // message read "no letters moved" - the drive could never appear.
+        _driveMask &= ~left;
         LogDriveChange($"device change: arrived [{LettersText(arrived)}] left [{LettersText(left)}]");
 
         foreach (string rootPath in DriveLetters(left))
@@ -16543,6 +16584,9 @@ public partial class MainWindow : Window
             AddDriveRootWhenReady(rootPath);
         }
     }
+
+    private static uint DriveBit(string rootPath)
+        => 1u << (char.ToUpperInvariant(rootPath[0]) - 'A');
 
     private static IEnumerable<string> DriveLetters(uint mask)
     {
@@ -16561,15 +16605,28 @@ public partial class MainWindow : Window
     // A DRIVE row and only that. A root the user added themselves that happens
     // to sit on the letter stays where it is, and behaves the way a network
     // root already does when its server is away: the row remains, and clicking
-    // it tries again.
+    // it tries again. The judgement itself is the service's - one definition
+    // of "a lettered drive root", not a second weaker one here.
     private static bool IsDriveRoot(FileSystemItem root)
-        => root.FullPath.Length == 3 && root.FullPath[1] == ':';
+        => FileSystemService.IsDriveLetterRoot(root.FullPath);
 
     private void RemoveDriveRoot(string rootPath)
     {
         if (_roots.FirstOrDefault(r => IsDriveRoot(r) &&
                 string.Equals(r.FullPath, rootPath, StringComparison.OrdinalIgnoreCase)) is not { } row)
         {
+            return;
+        }
+
+        // A MAPPED DRIVE KEEPS ITS PLACE WHILE THE SERVER IS AWAY (2026-07-26,
+        // the rule TryBuildDriveRoot itself enforces on the way in). An SMB
+        // session dropping can take the letter out of the mask, and the letter
+        // may send nothing when the server returns - so removing the row here
+        // would strand it gone for good. The row stays; clicking it tries
+        // again, exactly as it always has.
+        if (row.IsOnNetworkDrive)
+        {
+            LogDriveChange($"left {rootPath[..2]}: kept (network drive waits for its server)");
             return;
         }
 
@@ -16605,25 +16662,66 @@ public partial class MainWindow : Window
         }
     }
 
+    // Letters whose build is still out on a worker, so a drive that mounts and
+    // unmounts every few seconds cannot stack blocked readers: one build per
+    // letter at a time, and the message that finds one in flight simply leaves
+    // the bit clear so the next message asks again. Touched on the UI thread
+    // only.
+    private uint _driveBuildsInFlight;
+
     // OFF THE UI THREAD, because this is the half that actually reads. A stick
     // answers at once; a mapping to a machine that is not there can take as
     // long as it likes without the tree waiting on it.
     private void AddDriveRootWhenReady(string rootPath)
     {
+        uint bit = DriveBit(rootPath);
+        if ((_driveBuildsInFlight & bit) != 0)
+        {
+            return;
+        }
+
+        _driveBuildsInFlight |= bit;
         System.Threading.Tasks.Task.Run(() =>
         {
             var row = FileSystemService.TryBuildDriveRoot(rootPath);
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                if (row is null)
+                _driveBuildsInFlight &= ~bit;
+
+                // The letter may have gone again while the worker was reading -
+                // the build can outlive a whole mount. A row put in now would
+                // be a ghost no removal path ever finds, because the letter's
+                // departure was already processed against no row. The bit
+                // stays clear either way, so a letter that returns is an
+                // arrival again.
+                if ((NativeMethods.LogicalDriveMask() & bit) == 0)
                 {
-                    // Hidden by the user, or not ready and not a network drive -
-                    // the same two answers GetDriveRoots gives, and neither of
-                    // them is a failure.
-                    LogDriveChange($"arrived {rootPath[..2]}: no row (hidden, or not ready)");
+                    LogDriveChange($"arrived {rootPath[..2]}: gone again before the row was built");
                     return;
                 }
 
+                if (row is null)
+                {
+                    // The same two answers GetDriveRoots gives, and they part
+                    // ways here: a hidden drive is a row deliberately absent,
+                    // so its bit is set and the matter is closed - while a
+                    // volume that is not ready YET (BitLocker still locked, a
+                    // mount finishing late) leaves its bit clear, so the
+                    // message its becoming ready sends walks in as a fresh
+                    // arrival and tries again.
+                    if (FileSystemService.IsHiddenByUser(rootPath))
+                    {
+                        _driveMask |= bit;
+                        LogDriveChange($"arrived {rootPath[..2]}: hidden, no row");
+                    }
+                    else
+                    {
+                        LogDriveChange($"arrived {rootPath[..2]}: not ready, retry on the next message");
+                    }
+                    return;
+                }
+
+                _driveMask |= bit;
                 InsertDriveRoot(row);
             }));
         });
@@ -16775,20 +16873,10 @@ public partial class MainWindow : Window
     // "a new file didn't show up" reports or the resync above has it covered.
     [System.Diagnostics.Conditional("DEBUG")]
     private static void LogWatcherError(string rootPath, Exception exception)
-    {
-        try
-        {
-            string dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
-            Directory.CreateDirectory(dir);
-            File.AppendAllText(
-                Path.Combine(dir, "watcher.log"),
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  watcher error on {rootPath}: {exception.GetType().Name} {exception.Message} - resyncing expanded folders{Environment.NewLine}");
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-        }
-    }
+        // The same file the drive-change lines go to, through the same writer -
+        // one place owns where watcher.log lives and what a line looks like.
+        => LogDriveChange(
+            $"watcher error on {rootPath}: {exception.GetType().Name} {exception.Message} - resyncing expanded folders");
 
     // Debounced per-folder-path - see _pendingExternalRefreshes' own comment.
     private void QueueExternalRefresh(string folderPath)

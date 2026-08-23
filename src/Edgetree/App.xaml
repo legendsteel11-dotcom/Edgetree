@@ -377,8 +377,8 @@
                 <!-- Since 2026-08-23 each chevron sits in a full-width
                      TRANSPARENT band that scrolls while the pointer rests on
                      it, the way the same arrows behave on Windows' own menus -
-                     an arrow that answers nothing reads as a broken control
-                     (사용자: "저런 모양 자체가 뭔가 할 거 같아서"). The NAME
+                     an arrow that answers nothing reads as a control with a
+                     promise it does not keep (reported 2026-08-23). The NAME
                      moved to the band: MenuScrollViewer_ScrollChanged toggles
                      it and wires the hover (menus are the only attachers, so
                      the tree and the lists keep two inert Paths as before).
