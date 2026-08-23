@@ -351,8 +351,9 @@ public static class Strings
     public static string ToolTipPinRight = "우측에 고정";
     public static string ToolTipPinAutoHide = "자동 숨김";
     public static string ToolTipPinStayOpen = "고정";
-    public static string ToolTipCollapseAll = "모두 접기";
-    public static string ToolTipRestoreExpanded = "펼침 상태 복원";
+    // Shift 조합은 화면에 안 보이므로 툴팁이 유일한 안내 자리다.
+    public static string ToolTipCollapseAll = "모두 접기 (Shift+클릭: 복원 안됨)";
+    public static string ToolTipRestoreExpanded = "펼침 상태 복원 (Shift+클릭: 복원 안되게 접기)";
     public static string ToolTipOptions = "옵션";
     public static string ToolTipUpdateAvailable = "새 버전 {0} 다운로드 가능";
     public static string ToolTipMinimize = "트레이로 최소화";
@@ -1061,8 +1062,8 @@ public static class Strings
         ToolTipPinRight = "Pin to Right";
         ToolTipPinAutoHide = "Auto Hide";
         ToolTipPinStayOpen = "Pin Open";
-        ToolTipCollapseAll = "Collapse All";
-        ToolTipRestoreExpanded = "Restore Expanded";
+        ToolTipCollapseAll = "Collapse All (Shift+click: no restore)";
+        ToolTipRestoreExpanded = "Restore Expanded (Shift+click: collapse, no restore)";
         ToolTipOptions = "Options";
         ToolTipUpdateAvailable = "Version {0} available for download";
         ToolTipMinimize = "Minimize to Tray";

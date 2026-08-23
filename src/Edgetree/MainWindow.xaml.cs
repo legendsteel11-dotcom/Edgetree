@@ -7902,6 +7902,22 @@ public partial class MainWindow : Window
 
     private void CollapseAllButton_Click(object sender, RoutedEventArgs e)
     {
+        // Shift+클릭은 진짜 접기 (2026-08-23, 사용자 결정). The plain click is a
+        // fold-and-remember TOGGLE, and the only way to collapse for real was a
+        // confirmation-guarded row in the options menu. A modifier beats an
+        // option that would change what the plain click means: Shift is the
+        // intent at the moment of the press, so the button never means two
+        // things invisibly. No confirmation here - the menu keeps its dialog
+        // for the person browsing options, but a chord is already deliberate.
+        // Works from the restore-pending state too, dropping the remembered
+        // set (CollapseEverything clears it), so the arrow cannot stay flipped
+        // over a tree that is really collapsed.
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+        {
+            CollapseEverything();
+            return;
+        }
+
         if (_collapseAllRestorePaths is { } pathsToRestore)
         {
             _collapseAllRestorePaths = null;
