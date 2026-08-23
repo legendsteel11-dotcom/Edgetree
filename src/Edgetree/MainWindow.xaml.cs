@@ -13994,6 +13994,60 @@ public partial class MainWindow : Window
     private static FileSystemItem ResolveCurrentInstance(FileSystemItem item)
         => item.Parent?.FindLoadedChild(item.Name) ?? item;
 
+    // THE SAME QUESTION ASKED OF THE WHOLE LINE OF ANCESTORS, and it has to be,
+    // because the one above asks item.Parent - which is only an answer while
+    // the PARENT is still the tree's own. ReloadRoots builds every drive again
+    // (a 숨김 항목 표시 toggle, a network root added or removed), and after it a
+    // strip cell holds a chain that is stale at every level. The stale parent
+    // then happily returns its own stale child, so the row looks live when
+    // nothing about it is.
+    //
+    // WHAT THAT COSTS IS THE CAP, and only the cap - which is why the failure
+    // looked so selective. MoveViewerTo has to know whether the row is behind
+    // "더 보기" before it selects, and it asks the parent. A stale parent lists
+    // every row it was built with, so the answer is always "not hidden", the
+    // reveal never runs, and the walk below is then sent looking for a row the
+    // tree is not showing. Rows inside the cap were found by name and worked;
+    // rows past it could not be, so the click did nothing at all.
+    // click.log 2026-08-24 02:45 has the shape whole: five "select re-resolved"
+    // lines, one per ancestor, and then the file itself "at=-1 of 51".
+    //
+    // Walked down from the LIVE roots by the names the chain carries - matched
+    // the way the selection walk matches, so a folder that is a root of its own
+    // and also sits under a drive root cannot be confused for the other one.
+    // FindLoadedChild at each step, so a level behind its own cap still
+    // answers, and nothing is revealed on the way: this is a question, not a
+    // move. Falls back to the single-level repair the moment a level cannot be
+    // answered (a folder never opened, a rename in flight), so callers can use
+    // it unconditionally.
+    private FileSystemItem ResolveCurrentChain(FileSystemItem item)
+    {
+        var chain = new List<FileSystemItem>();
+        for (FileSystemItem? step = item; step is not null; step = step.Parent)
+        {
+            chain.Insert(0, step);
+        }
+
+        var current = _roots.FirstOrDefault(r =>
+            string.Equals(r.FullPath, chain[0].FullPath, StringComparison.OrdinalIgnoreCase));
+        if (current is null)
+        {
+            return ResolveCurrentInstance(item);
+        }
+
+        for (int i = 1; i < chain.Count; i++)
+        {
+            if (!current.ChildrenLoaded || current.FindLoadedChild(chain[i].Name) is not { } next)
+            {
+                return ResolveCurrentInstance(item);
+            }
+
+            current = next;
+        }
+
+        return current;
+    }
+
     // The same question asked of a list that is already on screen: where in
     // these rows is the one this item names? Siblings, so the name settles it,
     // and the synthetic "더 보기"/"더 접기" rows are skipped rather than matched
@@ -30208,7 +30262,12 @@ public partial class MainWindow : Window
         // up in the overflow, and a stale instance is no more in that list than
         // in Children, so a click past the cap would fail before the walk was
         // ever reached.
-        var live = ResolveCurrentInstance(target);
+        //
+        // THE WHOLE CHAIN, not the row alone (2026-08-24): a rebuild of the
+        // ROOTS leaves the parent stale too, and a stale parent answers the
+        // hidden question below with its own dead listing. See
+        // ResolveCurrentChain for what the log showed.
+        var live = ResolveCurrentChain(target);
         bool stale = !ReferenceEquals(live, target);
         target = live;
 
