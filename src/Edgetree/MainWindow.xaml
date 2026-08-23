@@ -7830,6 +7830,70 @@
                                                         <Border x:Name="Wash"
                                                                 Background="Transparent"
                                                                 IsHitTestVisible="False"/>
+                                                        <!-- WHAT THE FRAME COULD
+                                                             NOT DO ON ITS OWN.
+                                                             The frame's inner
+                                                             face touches the
+                                                             picture (the 2px is
+                                                             all that separates
+                                                             them), so a chosen
+                                                             colour lands on a
+                                                             photo of that colour
+                                                             and there is nothing
+                                                             left to see - and
+                                                             the palette is the
+                                                             user's, so "pick a
+                                                             brighter one" is not
+                                                             an answer. Two
+                                                             hairlines, light and
+                                                             dark, laid over the
+                                                             picture's outermost
+                                                             pixels: whatever the
+                                                             photo is, it cannot
+                                                             be both, so one of
+                                                             them always shows.
+                                                             The same principle
+                                                             the mark badge uses
+                                                             - bring your own
+                                                             ground - spent on a
+                                                             line instead of a
+                                                             block.
+
+                                                             OVERLAID, not nested,
+                                                             and that is the whole
+                                                             reason it costs
+                                                             nothing: a border
+                                                             that took its own
+                                                             2px would resize
+                                                             every picture the
+                                                             moment it was
+                                                             selected, and
+                                                             FilmstripCellAdvance
+                                                             would have to be
+                                                             taught about it.
+                                                             These cover two
+                                                             pixels of picture
+                                                             while selected and
+                                                             move nothing.
+
+                                                             Fixed colours, not
+                                                             theme brushes: what
+                                                             they have to read
+                                                             against is a
+                                                             photograph, which no
+                                                             theme knows
+                                                             anything about. -->
+                                                        <Border x:Name="RingInner"
+                                                                BorderThickness="1"
+                                                                BorderBrush="Transparent"
+                                                                Margin="1"
+                                                                SnapsToDevicePixels="True"
+                                                                IsHitTestVisible="False"/>
+                                                        <Border x:Name="RingOuter"
+                                                                BorderThickness="1"
+                                                                BorderBrush="Transparent"
+                                                                SnapsToDevicePixels="True"
+                                                                IsHitTestVisible="False"/>
                                                     </Grid>
                                                 </Border>
                                                 <ControlTemplate.Triggers>
@@ -7872,13 +7936,31 @@
                                                          picture, not a way of
                                                          calling something
                                                          secondary.) -->
+                                                    <!-- RAISED A STEP ON BOTH
+                                                         CHANNELS (2026-08-24),
+                                                         because the ring below
+                                                         got its two hairlines
+                                                         and the hover was then
+                                                         the faint one next to
+                                                         it. Both, not one: the
+                                                         single 15% wash this
+                                                         pair replaced was the
+                                                         thing called too strong,
+                                                         and putting it all back
+                                                         into the wash would walk
+                                                         straight into that
+                                                         again. 10% and 0.89
+                                                         leaves each channel
+                                                         below where it was
+                                                         judged, and the pair
+                                                         above where it was. -->
                                                     <Trigger Property="IsMouseOver" Value="True">
                                                         <Setter TargetName="Wash"
                                                                 Property="Background"
-                                                                Value="#0DFFFFFF"/>
+                                                                Value="#1AFFFFFF"/>
                                                         <Setter TargetName="Cell"
                                                                 Property="Opacity"
-                                                                Value="0.93"/>
+                                                                Value="0.89"/>
                                                     </Trigger>
                                                     <!-- The tree's OWN selection
                                                          colour, not a separate
@@ -7902,6 +7984,29 @@
                                                         <Setter TargetName="Frame"
                                                                 Property="BorderBrush"
                                                                 Value="{DynamicResource TreeRowSelectedActiveBackground}"/>
+                                                        <!-- Dark against the
+                                                             picture, light
+                                                             against the chosen
+                                                             colour, in that
+                                                             order: the pair has
+                                                             to survive a photo
+                                                             on one side and a
+                                                             palette on the
+                                                             other, and each line
+                                                             is the answer to the
+                                                             side it faces.
+                                                             Neither is opaque -
+                                                             a full black edge
+                                                             reads as a crop, and
+                                                             the point is to mark
+                                                             the picture, not to
+                                                             frame it. -->
+                                                        <Setter TargetName="RingInner"
+                                                                Property="BorderBrush"
+                                                                Value="#B3000000"/>
+                                                        <Setter TargetName="RingOuter"
+                                                                Property="BorderBrush"
+                                                                Value="#D9FFFFFF"/>
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>
                                             </ControlTemplate>
