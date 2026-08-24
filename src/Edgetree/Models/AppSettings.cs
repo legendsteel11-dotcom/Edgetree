@@ -678,8 +678,14 @@ public class AppSettings
     // How many items a folder shows before collapsing the rest behind "더
     // 보기" (see Models/FileSystemItem.DisplayCap) - user-adjustable 1~50 from
     // the "..." options menu, for low-resolution screens that want fewer rows.
-    // Default lowered from 25 to 20 (2026-07-17).
-    public int MaxItemsPerFolder { get; set; } = 20;
+    // Default lowered from 25 to 20 (2026-07-17), then raised to the ceiling
+    // (2026-08-24): 20 put a 더 보기 row under any folder holding 21 things, so
+    // a fresh install met the cap constantly - issue #2 is someone asking to be
+    // rid of it. The cap exists for folders of thousands, and 50 still guards
+    // those; what it stops doing is firing on ordinary ones. Anyone who already
+    // has a number keeps it - this is the default for a settings file that has
+    // none.
+    public int MaxItemsPerFolder { get; set; } = 50;
 
     // "들여쓰기 간격" in the options menu - the per-nesting-level indent width in
     // pixels (also drives the expand arrow's column width and the guide

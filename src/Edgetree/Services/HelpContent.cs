@@ -723,7 +723,7 @@ public static class HelpContent
                       "Options → General → Drag Moves", "Off, a drag always copies and Shift is the way to move"),
                     // The cost goes on the row, not in a paragraph: it is the
                     // one setting here that can make the tree slower.
-                    R("옵션 → 한 번에 표시할 개수 → 전체 표시", "더 보기 없이 전부, 큰 폴더에서는 느려짐",
+                    R("옵션 → 폴더에 표시할 항목 개수 → 전체 표시", "더 보기 없이 전부, 큰 폴더에서는 느려짐",
                       "Options → Items per Folder → Show All", "No Show more row at all - a big folder will feel it"),
                     R("옵션 → 네트워크 위치", "드라이브 문자 없는 공유 추가 (\\\\서버\\공유)",
                       "Options → Network Locations", "Add a share with no drive letter (\\\\server\\share)"),

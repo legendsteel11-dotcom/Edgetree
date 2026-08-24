@@ -52,7 +52,7 @@ leaves them where they are.
   expand them, and the app reopens exactly where you left off.
 - **Single click expands a folder** (the whole row, VS Code style);
   double-click opens a file.
-- **Large folders stay fast.** Each folder shows its first 25 items with a
+- **Large folders stay fast.** Each folder shows its first 50 items with a
   "Show N more" row for the rest, so the tree never renders thousands of
   rows at once. The cap is adjustable (1–50).
 - **File type filter**: a row of chips along the bottom — code, images,

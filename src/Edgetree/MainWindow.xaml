@@ -2100,6 +2100,62 @@
                 <MenuItem Header=""/>
             </MenuItem>
             <Separator/>
+            <!-- ITS OWN PLACE, fenced both sides, above 색상 설정 (2026-08-24).
+                 It sat under 글꼴 크기 among the steppers, where it was found by
+                 nobody: issue #2 is someone asking to be rid of a 더 보기 row
+                 with the setting for it two rows away. Size and count are not
+                 the same question - one is how the tree LOOKS, the other how
+                 much of a folder it holds - and only the second one gets asked
+                 by someone who has just hit a wall. -->
+            <!-- ITS OWN SUBMENU, holding the switch and the count together.
+                 The two are one question - how much of a folder to show - and
+                 side by side in the main list the 전체 row read as a value for
+                 the number beside it. Its first shape put 전체 INSIDE the
+                 stepper as a step past 50, which made a readout sized for two
+                 digits draw a word. -->
+            <MenuItem Header="{x:Static services:Strings.MenuMaxItemsPerFolder}"
+                    AutomationProperties.AutomationId="maxItems">
+                <MenuItem Header="{x:Static services:Strings.MenuMaxItemsAll}"
+                        IsCheckable="True"
+                        StaysOpenOnClick="True"
+                        AutomationProperties.AutomationId="showAllItems"
+                        Click="ShowAllItemsMenuItem_Click"/>
+                <!-- StaysOpenOnClick so stepping the value doesn't close the
+                     whole options menu out from under the user. -->
+                <MenuItem StaysOpenOnClick="True"
+                        Focusable="False"
+                        Padding="{DynamicResource MenuStepperRowPadding}"
+                        AutomationProperties.AutomationId="maxItemsRow">
+                <MenuItem.Header>
+                    <!-- NO LABEL on this one: the submenu it lives in is called
+                         폴더에 표시할 항목 개수, and a row under it saying 개수 is
+                         the same word twice on two lines. Every other stepper
+                         in this menu needs its own because it sits among
+                         unrelated rows. -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="1"
+                                Orientation="Horizontal">
+                            <Button Content="−"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="MaxItemsPerFolderDecrement_Click"/>
+                            <TextBlock Text="50"
+                                    Foreground="{DynamicResource MenuForeground}"
+                                    Width="26"
+                                    TextAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                            <Button Content="+"
+                                    Style="{StaticResource MenuStepperButtonStyle}"
+                                    Click="MaxItemsPerFolderIncrement_Click"/>
+                        </StackPanel>
+                    </Grid>
+                </MenuItem.Header>
+                </MenuItem>
+            </MenuItem>
+            <Separator/>
             <!-- Fenced off by separators on both sides: it opens a window,
                  unlike everything around it, so it belongs to neither the
                  toggles above nor the steppers below. -->
@@ -2174,54 +2230,6 @@
                         </StackPanel>
                     </Grid>
                 </MenuItem.Header>
-            </MenuItem>
-            <!-- ITS OWN SUBMENU, holding the switch and the count together.
-                 The two are one question - how much of a folder to show - and
-                 side by side in the main list the 전체 row read as a value for
-                 the number beside it. Its first shape put 전체 INSIDE the
-                 stepper as a step past 50, which made a readout sized for two
-                 digits draw a word. -->
-            <MenuItem Header="{x:Static services:Strings.MenuMaxItemsPerFolder}"
-                    AutomationProperties.AutomationId="maxItems">
-                <MenuItem Header="{x:Static services:Strings.MenuMaxItemsAll}"
-                        IsCheckable="True"
-                        StaysOpenOnClick="True"
-                        AutomationProperties.AutomationId="showAllItems"
-                        Click="ShowAllItemsMenuItem_Click"/>
-                <!-- StaysOpenOnClick so stepping the value doesn't close the
-                     whole options menu out from under the user. -->
-                <MenuItem StaysOpenOnClick="True"
-                        Focusable="False"
-                        Padding="{DynamicResource MenuStepperRowPadding}"
-                        AutomationProperties.AutomationId="maxItemsRow">
-                <MenuItem.Header>
-                    <!-- NO LABEL on this one: the submenu it lives in is called
-                         한 번에 표시할 개수, and a row under it saying 개수 is
-                         the same word twice on two lines. Every other stepper
-                         in this menu needs its own because it sits among
-                         unrelated rows. -->
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="1"
-                                Orientation="Horizontal">
-                            <Button Content="−"
-                                    Style="{StaticResource MenuStepperButtonStyle}"
-                                    Click="MaxItemsPerFolderDecrement_Click"/>
-                            <TextBlock Text="25"
-                                    Foreground="{DynamicResource MenuForeground}"
-                                    Width="26"
-                                    TextAlignment="Center"
-                                    VerticalAlignment="Center"/>
-                            <Button Content="+"
-                                    Style="{StaticResource MenuStepperButtonStyle}"
-                                    Click="MaxItemsPerFolderIncrement_Click"/>
-                        </StackPanel>
-                    </Grid>
-                </MenuItem.Header>
-                </MenuItem>
             </MenuItem>
             <!-- StaysOpenOnClick so stepping the value doesn't close the whole
                  options menu out from under the user. -->

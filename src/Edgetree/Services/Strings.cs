@@ -336,7 +336,7 @@ public static class Strings
     // only, and a user who needed it didn't find it (see the XAML comment on
     // the row itself).
     public static string MenuFontSize = "글꼴 크기 (Ctrl +/-)";
-    public static string MenuMaxItemsPerFolder = "한 번에 표시할 개수";
+    public static string MenuMaxItemsPerFolder = "폴더에 표시할 항목 개수";
     // Its own row above the count, which it greys out. Says 표시 rather than
     // standing alone as "전체", since the row above it is a number and a bare
     // 전체 next to one reads as a value for it.

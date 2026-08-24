@@ -55,7 +55,7 @@ public class FileSystemItem : INotifyPropertyChanged
     // Mutable (not const) and user-configurable (옵션 메뉴, 1~50) - set from
     // AppSettings.MaxItemsPerFolder at startup and whenever changed, same
     // pattern as FileSystemService.SortField/SortDescending.
-    public static int DisplayCap = 25;
+    public static int DisplayCap = 50;
     private readonly List<FileSystemItem> _overflow = new();
     private bool _showingAll;
 
