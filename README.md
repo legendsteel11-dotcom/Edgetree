@@ -1,4 +1,4 @@
-# Edgetree v2.5.2
+# Edgetree v2.5.3
 
 [한국어 안내](README-ko.md)
 
@@ -216,6 +216,10 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v2.5.3 (2026-08-24)
+
+- Fixed the multimedia panel’s file details overlapping the thumbnail bar, and the panel height changing on its own, after using full screen.
 
 ### v2.5.2 (2026-08-24)
 

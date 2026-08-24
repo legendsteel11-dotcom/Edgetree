@@ -1,4 +1,4 @@
-# Edgetree v2.5.2
+# Edgetree v2.5.3
 
 [English](README.md)
 
@@ -244,6 +244,10 @@ dotnet publish src/Edgetree -c Release -r win-x64 --self-contained true -o publi
 csproj만 올리면 됩니다.
 
 ## 변경 이력
+
+### v2.5.3 (2026-08-24)
+
+- 앱 전체화면을 사용한 뒤 멀티미디어 패널의 파일 정보가 썸네일 바 위에 겹쳐 보이고 패널 높이가 계속 변하던 문제를 수정했습니다.
 
 ### v2.5.2 (2026-08-24)
 

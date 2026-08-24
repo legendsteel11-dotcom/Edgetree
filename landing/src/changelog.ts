@@ -45,6 +45,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // ONE LINE, AND THE MARGIN FIX IS NOT THE SECOND ONE. The caption's bottom
+    // gap not following the text size after a full screen is 사소함 by the
+    // v2.3.0 test - nobody reading this would recognise it, and it ships
+    // either way. The line that stays is the one someone could have SEEN.
+    version: 'v2.5.3',
+    ko: [
+      '앱 전체화면을 사용한 뒤 멀티미디어 패널의 파일 정보가 썸네일 바 위에 겹쳐 보이고 패널 높이가 계속 변하던 문제를 수정했습니다.',
+    ],
+    en: [
+      'Fixed the multimedia panel’s file details overlapping the thumbnail bar, and the panel height changing on its own, after using full screen.',
+    ],
+  },
+  {
     version: 'v2.5.2',
     ko: [
       '폴더에 지정한 정렬이 하위 폴더에도 적용됩니다. 하위 폴더에 개별 정렬을 지정한 경우에는 그대로 유지됩니다.',
