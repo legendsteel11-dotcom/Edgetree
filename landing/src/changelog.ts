@@ -51,10 +51,10 @@ export const changelog: ChangelogEntry[] = [
     // either way. The line that stays is the one someone could have SEEN.
     version: 'v2.5.3',
     ko: [
-      '앱 전체화면을 사용한 뒤 멀티미디어 패널의 파일 정보가 썸네일 바 위에 겹쳐 보이고 패널 높이가 계속 변하던 문제를 수정했습니다.',
+      '앱 전체화면을 사용한 뒤 멀티미디어 패널의 파일 정보가 썸네일 바 위에 겹쳐 보이고 패널 높이가 흔들리던 문제를 수정했습니다.',
     ],
     en: [
-      'Fixed the multimedia panel’s file details overlapping the thumbnail bar, and the panel height changing on its own, after using full screen.',
+      'Fixed the multimedia panel’s file details overlapping the thumbnail bar, and the panel height shifting, after using full screen.',
     ],
   },
   {

@@ -219,7 +219,7 @@ version out of the exe it packages, so bumping the csproj is enough.
 
 ### v2.5.3 (2026-08-24)
 
-- Fixed the multimedia panel’s file details overlapping the thumbnail bar, and the panel height changing on its own, after using full screen.
+- Fixed the multimedia panel’s file details overlapping the thumbnail bar, and the panel height shifting, after using full screen.
 
 ### v2.5.2 (2026-08-24)
 
