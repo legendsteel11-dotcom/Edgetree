@@ -45,20 +45,23 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    // ONE LINE, AND THE MARGIN FIX IS NOT THE SECOND ONE. The caption's bottom
-    // gap not following the text size after a full screen is 사소함 by the
-    // v2.3.0 test - nobody reading this would recognise it, and it ships
-    // either way. The line that stays is the one someone could have SEEN.
+    // v2.5.3 CARRIES v2.5.2's CARD TOO, the same call made for the v2.5.0/v2.5.1
+    // pair and for the same reason: v2.5.2 shipped this morning with seven lines
+    // of features and a one-line patch card on top of it hours later would have
+    // buried the release the author actually shipped today. The label stays
+    // exactly 'v2.5.3' - UpdateNotes.vue hides the whole card unless the newest
+    // entry's version EQUALS the tag GitHub reports as latest, so a merged
+    // "v2.5.2~2.5.3" label would read well and blank the card.
+    //
+    // The v2.5.2 entry is GONE rather than left below: it would be this card
+    // minus one line, and the arrows would step between two near-identical
+    // pages. The per-release record lives in the READMEs' changelog and the
+    // GitHub release notes, which keep both.
+    //
+    // The new fix goes LAST, with the other fix - features first is the order
+    // every entry here uses. The caption's bottom margin is still not a line
+    // (사소함).
     version: 'v2.5.3',
-    ko: [
-      '앱 전체화면을 사용한 뒤 멀티미디어 패널의 파일 정보가 썸네일 바 위에 겹쳐 보이고 패널 높이가 흔들리던 문제를 수정했습니다.',
-    ],
-    en: [
-      'Fixed the multimedia panel’s file details overlapping the thumbnail bar, and the panel height shifting, after using full screen.',
-    ],
-  },
-  {
-    version: 'v2.5.2',
     ko: [
       '폴더에 지정한 정렬이 하위 폴더에도 적용됩니다. 하위 폴더에 개별 정렬을 지정한 경우에는 그대로 유지됩니다.',
       '제목 표시줄의 `전체 접기` 아이콘을 `Shift`+클릭하면 펼침 상태를 저장하지 않고 접습니다.',
@@ -67,6 +70,7 @@ export const changelog: ChangelogEntry[] = [
       '음악을 분리 재생 중일 때 제목 우측의 X로 재생을 종료할 수 있습니다.',
       '`숨김·시스템 항목 표시`가 `옵션 → 기본 설정`으로 이동했습니다.',
       '트리에서 `더 보기`에 가려진 항목을 썸네일에서 클릭해도 선택되지 않던 문제를 수정했습니다.',
+      '앱 전체화면을 사용한 뒤 멀티미디어 패널의 파일 정보가 썸네일 바 위에 겹쳐 보이고 패널 높이가 흔들리던 문제를 수정했습니다.',
     ],
     en: [
       'A folder’s sort order now applies to its subfolders. A subfolder with its own sort keeps it.',
@@ -76,6 +80,7 @@ export const changelog: ChangelogEntry[] = [
       'An X beside the title ends detached audio playback.',
       'Show Hidden and System Items moved to Options → General.',
       'Clicking a thumbnail for an item hidden behind Show More in the tree now selects it.',
+      'Fixed the multimedia panel’s file details overlapping the thumbnail bar, and the panel height shifting, after using full screen.',
     ],
   },
   {
