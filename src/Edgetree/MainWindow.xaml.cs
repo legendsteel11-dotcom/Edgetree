@@ -29906,6 +29906,28 @@ public partial class MainWindow : Window
     // existed); the list is as tall as the user has dragged it, or as much of
     // that as this window can spare. Written only on a change - it runs from
     // the panel's resize, which is a per-frame path while a width drag is on.
+    // A LAYOUT LOOP LIVES HERE AND THIS IS THE BRAKE ON IT (2026-08-24).
+    // The height is derived from the panel's own MEASURED layout - see
+    // MaxFilmstripGridHeightNow, which subtracts ViewerCaptionPanel's
+    // ActualHeight - and applying it lays the panel out again. When the two
+    // answers disagree the strip alternates between them for as long as the
+    // panel is open: the reported shape is a panel growing and shrinking on
+    // its own, a tree that cannot take a click, and 3~5% CPU with nobody
+    // touching anything.
+    //
+    // The equality check below cannot stop it, because an oscillation never
+    // asks for the same number twice - it asks for two numbers in turn.
+    //
+    // WHAT THIS HIDES, and it has to be said: after the brake trips, the strip
+    // keeps whichever of the two heights it happened to be holding, which may
+    // be a row short or a row tall. That is a visible imperfection standing in
+    // for an unusable window, and it is meant to be temporary - the log line
+    // carries every input the height was computed from, so the next run says
+    // which of them flipped rather than leaving it to be guessed at.
+    private long _gridHeightWindowStart;
+    private int _gridHeightApplies;
+    private bool _gridHeightLoopReported;
+
     private void ApplyFilmstripGridHeight()
     {
         double height = FilmstripGridMode ? WantedFilmstripGridHeight() : double.NaN;
@@ -29916,10 +29938,69 @@ public partial class MainWindow : Window
             : !double.IsNaN(current) && Math.Abs(current - height) < 0.5;
         if (same)
         {
+            // Asking for what is already there is the settled state, so the
+            // window starts again from here.
+            _gridHeightApplies = 0;
+            _gridHeightLoopReported = false;
+            return;
+        }
+
+        long now = Environment.TickCount64;
+        if (now - _gridHeightWindowStart > 500)
+        {
+            _gridHeightWindowStart = now;
+            _gridHeightApplies = 0;
+            _gridHeightLoopReported = false;
+        }
+
+        _gridHeightApplies++;
+
+        // ONE LINE CANNOT SHOW A FLIP. The loop alternates between two answers,
+        // so what names the input driving it is the DIFFERENCE between
+        // CONSECUTIVE applications - the run below prints the last few before
+        // the brake takes hold, and whichever number changes from line to line
+        // is the one to fix. It stops at the brake, so a stuck panel cannot
+        // fill the log.
+        if (_gridHeightApplies >= 5 && !_gridHeightLoopReported)
+        {
+            bool stopping = _gridHeightApplies > 8;
+            LogGridHeightLoop(stopping ? "stopped" : "run", height, current);
+            _gridHeightLoopReported = stopping;
+        }
+
+        // EIGHT IN HALF A SECOND is not a resize, it is a loop. A hand on the
+        // grip produces a run of DIFFERENT heights that settles the moment it
+        // stops; this counts applications, so a real drag simply keeps
+        // restarting the window above.
+        if (_gridHeightApplies > 8)
+        {
             return;
         }
 
         ViewerFilmstripHost.Height = height;
+    }
+
+    // Every input the wanted height is built from, so the flip can be READ off
+    // one line instead of reasoned about. panel/caption are the measured pair
+    // that make the ceiling; content and oneRow are the pair that make the
+    // floor; stored is what the grip was dragged to.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogGridHeightLoop(string stage, double wanted, double current)
+    {
+        double row = Resources["FilmstripCellFootprintHeight"] is double r ? r : -1;
+        LogPanelLine(
+            $"grid height LOOP {stage} #{_gridHeightApplies}: " +
+            $"wanted={wanted:F1} current={current:F1} max={MaxFilmstripGridHeightNow():F1} " +
+            $"panel={ViewerPanel.ActualHeight:F1} caption={ViewerCaptionPanel.ActualHeight:F1} " +
+            $"captionVis={ViewerCaptionPanel.Visibility} content={FilmstripGridContentHeight():F1} " +
+            $"stored={FilmstripGridHeight:F1} rowH={row:F1} cells={_filmstripCells.Count} " +
+            $"cols={FilmstripColumns} stripW={ViewerFilmstrip.ActualWidth:F1} " +
+            // The caption's own parts as well, because the ceiling is built out
+            // of its measured height, and a row appearing or going away inside
+            // it is the cheapest way for that number to have two answers.
+            $"nameVis={ViewerFileName.Visibility} nowVis={ViewerNowPlayingRow.Visibility} " +
+            $"nowH={ViewerNowPlayingRow.ActualHeight:F1} hostH={ViewerFilmstripHost.ActualHeight:F1} " +
+            $"imageH={ViewerImageHost.ActualHeight:F1}");
     }
 
     // ONE ROW ALWAYS FITS. The stored height is what the grip was dragged to,
