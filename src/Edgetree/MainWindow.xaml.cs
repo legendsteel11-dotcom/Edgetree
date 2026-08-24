@@ -31691,6 +31691,11 @@ public partial class MainWindow : Window
     // once and could be measured. See ViewerPanel_PreviewMouseMove.
     private const double FullScreenTransportBandHeight = 140;
     private bool _fullScreenTransportShown;
+    // The caption's ordinary row, read off the panel on the way IN so the way
+    // out cannot disagree with the XAML. The value here only covers a restore
+    // that never had a matching show, which HideFullScreenTransport's own early
+    // return already rules out.
+    private int _viewerCaptionHomeRow = 1;
     // How far up from the panel's floor the plate reaches, learned from the
     // plate itself. Zero until it has been shown once.
     private double _fullScreenTransportReach;
@@ -31787,6 +31792,12 @@ public partial class MainWindow : Window
         }
 
         _fullScreenTransportShown = true;
+        // WHERE IT CAME FROM, ASKED RATHER THAN WRITTEN DOWN. The row it goes
+        // back to used to be a 2 in the restore below, and on 2026-08-22 the
+        // caption and the strip swapped places in the XAML - the restore kept
+        // handing the caption the strip's row, so after one full screen the two
+        // shared a cell for the rest of the session. See HideFullScreenTransport.
+        _viewerCaptionHomeRow = Grid.GetRow(ViewerCaptionPanel);
         Grid.SetRow(ViewerCaptionPanel, 0);
         ViewerCaptionPanel.VerticalAlignment = VerticalAlignment.Bottom;
         // Its own plate, because it is now sitting on the film rather than on
@@ -31889,7 +31900,17 @@ public partial class MainWindow : Window
         }
 
         _fullScreenTransportShown = false;
-        Grid.SetRow(ViewerCaptionPanel, 2);
+        // THE ROW IT WAS IN, not a number typed here. This was a literal 2 from
+        // the days when the caption was the last row; the strip took that row on
+        // 2026-08-22 and this line went on sending the caption into it, so after
+        // one full screen the caption was arranged in the STRIP's cell -
+        // stretched to it, drawn over the thumbnails, and, because the ceiling
+        // in MaxFilmstripGridHeightNow is the panel MINUS the caption, feeding
+        // the strip's own height straight back into the number that sets it. Two
+        // answers, alternating, for as long as the panel stayed open (measured
+        // 2026-08-24: caption tracked hostH - 10 exactly, and the wanted height
+        // flipped with it).
+        Grid.SetRow(ViewerCaptionPanel, _viewerCaptionHomeRow);
         ViewerCaptionPanel.VerticalAlignment = VerticalAlignment.Stretch;
         ViewerCaptionPanel.Background = null;
         // The plate's ink goes with the plate.
@@ -31897,7 +31918,11 @@ public partial class MainWindow : Window
         {
             ViewerCaptionPanel.Resources.Remove(key);
         }
-        ViewerCaptionPanel.Margin = new Thickness(10, 0, 10, 10);
+        // Back to the RESOURCE, for the reason spelled out for ViewerZoomBar a
+        // few lines down: the caption's bottom follows 행 간격 and Ctrl +/-
+        // (ViewerCaptionPanelMargin is rebuilt from the compact curve), and the
+        // literal that stood here pinned it to 10 for the rest of the session.
+        ViewerCaptionPanel.SetResourceReference(MarginProperty, "ViewerCaptionPanelMargin");
         // Back to the panel's own gap, not to zero: the transport sits a little
         // below the file's own facts so the sound section reads apart from the
         // picture's description (2026-08-11). Zero here put it back against the
