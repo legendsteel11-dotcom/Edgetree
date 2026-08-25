@@ -4220,6 +4220,10 @@ public partial class MainWindow : Window
             _openMenus.Add(menu);
             LogClick("menu opened", null);
 
+            // The rows for this opening are all in place by now, so what the
+            // menu comes to is finally answerable - see the note there.
+            UpdateMenuMoreGlyphsAfterLayout(menu);
+
             // Kill the popup fade WPF applies to context menus when the OS
             // menu-animation setting is on: menus opened/closed in quick
             // succession restart the fade over each other, which reads as a
@@ -8679,8 +8683,34 @@ public partial class MainWindow : Window
     }
 
     private void MenuScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        => UpdateMenuMoreGlyphs(sender as ScrollViewer);
+
+    // AND AGAIN ONCE THE POPUP HAS ACTUALLY LAID ITSELF OUT. The scroll event
+    // was the only thing driving the chevrons, and on the pass it fires for a
+    // freshly opened menu the popup has not been measured yet: ScrollableHeight
+    // is still 0, so "there is more below" is answered NO, and nothing asks
+    // again until the wheel is touched. Reported 2026-08-26 with three shots of
+    // the same menu - two cut off at 압축 with no mark on them at all, one
+    // showing the chevron - and the difference between them was whether the
+    // wheel had been nudged. A menu that hides rows without saying so is the
+    // 2026-08-02 clipping bug wearing a scrollbar.
+    //
+    // Loaded priority, not Background: this has to land in the frame the menu
+    // appears in, or the mark arrives visibly late instead of not at all.
+    private void UpdateMenuMoreGlyphsAfterLayout(ContextMenu menu)
+        => Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Loaded,
+            new Action(() =>
+            {
+                if (menu.IsOpen && FindDescendant<ScrollViewer>(menu) is { } viewer)
+                {
+                    UpdateMenuMoreGlyphs(viewer);
+                }
+            }));
+
+    private void UpdateMenuMoreGlyphs(ScrollViewer? viewer)
     {
-        if (sender is not ScrollViewer viewer)
+        if (viewer is null)
         {
             return;
         }
