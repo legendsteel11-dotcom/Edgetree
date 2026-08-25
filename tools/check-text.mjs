@@ -244,9 +244,9 @@ const BRIT = /\b(colours?|coloured|behaviour\w*|favourite\w*|minimis\w+|maximis\
   const cs = read('src/Edgetree/MainWindow.xaml.cs')
   const xaml = read('src/Edgetree/MainWindow.xaml')
   const asked = new Set([
-    ...[...cs.matchAll(/FindTaggedMenuElement<[^>]+>([^,]+,s*'([^']+)')/g)].map((m) => m[1]),
-    ...[...cs.matchAll(/FindTaggedMenuElement<[^>]+>([^,]+,s*"([^"]+)")/g)].map((m) => m[1]),
-    ...[...cs.matchAll(/FindMenuItem([^,]+,s*"([^"]+)")/g)].map((m) => m[1]),
+    ...[...cs.matchAll(/FindTaggedMenuElement<[^>]+>\([^,]+,\s*"([^"]+)"/g)].map((m) => m[1]),
+    ...[...cs.matchAll(/FindMenuItem\([^,]+,\s*"([^"]+)"/g)].map((m) => m[1]),
+    ...[...cs.matchAll(/SetMenuItem(?:Checked|Enabled)\([^,]+,\s*"([^"]+)"/g)].map((m) => m[1]),
   ])
   const have = new Set([
     ...[...xaml.matchAll(/Tag="([^"]+)"/g)].map((m) => m[1]),
@@ -255,6 +255,14 @@ const BRIT = /\b(colours?|coloured|behaviour\w*|favourite\w*|minimis\w+|maximis\
   ])
   const hits = [...asked].filter((tag) => !have.has(tag))
     .map((tag) => tag + ' - 코드가 찾는데 XAML에 없음')
+
+  // 이 검사가 스스로 고장난 채로 통과하지 않게 하는 줄이다. 위의 정규식은
+  // 처음 커밋될 때 역슬래시가 빠진 채로 들어갔고(bd4f901), 그래서 아무것도
+  // 안 찾으면서 계속 OK 를 찍고 있었다 - 막으려던 그 고장과 같은 모양이다.
+  // 조회가 하나도 안 잡히면 그건 코드에 조회가 없어진 것이 아니라 여기가
+  // 깨진 것이다.
+  if (asked.size < 20) hits.push('코드에서 태그 조회를 ' + asked.size + '개밖에 못 찾음 - 위 정규식을 볼 것')
+
   report('메뉴 태그가 XAML에 있는가', hits, asked.size + '개 확인')
 }
 
