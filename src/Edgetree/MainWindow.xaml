@@ -2901,6 +2901,23 @@
                     <Setter Property="ToolTipService.IsEnabled"
                             Value="False"/>
                 </DataTrigger>
+                <!-- "필터로 감춰진 파일 N개" is a note, not a button. It shares
+                     its slot and its template with 더 보기, which IS one, so
+                     without this it inherits the hand cursor and offers itself
+                     as something to press (reported 2026-08-26 with a shot of
+                     the pointer over it).
+                     Only the cursor and the keyboard stop are taken away, not
+                     hit testing: the tooltip names the folder the note belongs
+                     to, which is worth keeping on a row that has no name of its
+                     own. The click is already refused in code, where the reason
+                     to refuse it lives. -->
+                <DataTrigger Binding="{Binding IsFilterNotice}"
+                        Value="True">
+                    <Setter Property="Cursor"
+                            Value="Arrow"/>
+                    <Setter Property="Focusable"
+                            Value="False"/>
+                </DataTrigger>
             </Style.Triggers>
         </Style>
 

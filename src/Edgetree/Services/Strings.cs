@@ -387,6 +387,14 @@ public static class Strings
     // back out. {0} is the count that would be hidden again.
     public static string ShowLessFormat = "… 접기 ({0}개)";
 
+    // WHY A FOLDER THAT LOOKS EMPTY IS NOT. The file-type filter takes files
+    // out of the listing, so a folder holding nothing the filter admits shows
+    // no rows at all - and a folder with no rows reads as an empty folder,
+    // which is a folder people delete. This row stands in that folder's place
+    // and says what is really in there. It only appears when the filter has
+    // left nothing else to show. {0} is how many it took out.
+    public static string FilterHiddenFormat = "… 필터로 감춰진 파일 {0}개";
+
     // File search (Ctrl+F view - see MainWindow's search-view methods and
     // Services/FileSearchService)
     public static string ToolTipSearch = "검색 (Ctrl+F)";
@@ -1081,6 +1089,7 @@ public static class Strings
         MenuThumbnailMaxSize = "Max thumbnail size";
         ShowMoreFormat = "… Show {0} more";
         ShowLessFormat = "… Show {0} fewer";
+        FilterHiddenFormat = "… {0} file(s) hidden by the filter";
 
         ToolTipSearch = "Search (Ctrl+F)";
         ToolTipViewer = "Multimedia panel";

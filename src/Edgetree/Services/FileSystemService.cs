@@ -797,6 +797,7 @@ public static class FileSystemService
         var startedTicks = Environment.TickCount64;
         readFailed = false;
         var result = new List<FileSystemItem>();
+        int filteredOut = 0;
         var (field, descending) = ResolveSortFor(path);
 
         try
@@ -826,14 +827,30 @@ public static class FileSystemService
                 // listed above untouched (they are the way through the tree),
                 // and the search scan has its own enumeration, so it keeps
                 // finding everything - the same rule hidden folders follow.
-                if (!string.IsNullOrEmpty(name) && FileTypeFilter.ShouldShowFile(name))
+                if (string.IsNullOrEmpty(name))
+                {
+                    continue;
+                }
+
+                if (FileTypeFilter.ShouldShowFile(name))
                 {
                     result.Add(new FileSystemItem(name, file, isDirectory: false, parent));
+                }
+                else
+                {
+                    // COUNTED WHERE IT IS DROPPED, because this is the only pass
+                    // that knows. A folder left with nothing to show reads as an
+                    // empty folder, and an empty folder is one people delete -
+                    // so the folder gets to say how much the filter took out of
+                    // it (see FileSystemItem.PopulateCapped).
+                    filteredOut++;
                 }
             }
         }
         catch (UnauthorizedAccessException) { readFailed = true; }
         catch (IOException) { readFailed = true; }
+
+        parent.FilteredOutCount = filteredOut;
 
         // A failure on a network path, or a read that took long enough to be
         // felt as a freeze, closes the door on that root for a few seconds.

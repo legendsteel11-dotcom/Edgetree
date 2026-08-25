@@ -314,6 +314,11 @@ public static class HelpContent
                     R("필터 버튼 → 사용자 지정", "확장자 직접 입력 ( *. 없이 쉼표로 구분해서 여러 개 입력)",
                       "A filter button → Custom",
                       "Type the extensions yourself - no *. , and comma-separated for several"),
+                    // 빈 폴더로 오해하고 지우는 것을 막는 줄이므로 필터 쪽에 둔다 -
+                    // 이 줄을 보는 사람은 필터를 켜 둔 사람이다.
+                    R("필터가 전부 감춘 폴더", "감춰진 파일 개수를 폴더 안에 표시",
+                      "A folder the filter empties",
+                      "Shows how many files it is hiding, in the folder's own place"),
                     // The same list twice, and it earns the second line: this
                     // section is where someone hunting the filter looks, and
                     // they will not scroll up to 트리 to find out that the

@@ -76,8 +76,28 @@ public class FileSystemItem : INotifyPropertyChanged
     // What differs is the label and what a click does.
     public bool IsShowLess { get; }
 
+    // THE THIRD USE OF THE SAME SLOT, and the only one that is not a button.
+    // A folder whose files are all taken out by the file-type filter shows no
+    // rows at all, and a folder with no rows reads as an empty folder - which
+    // is a folder people delete, taking with it what they could not see. This
+    // row stands in that empty folder and says how much is really there.
+    //
+    // IsShowMore rides along for the same reason IsShowLess does: every "not a
+    // real file" filter in the tree keeps excluding it without being taught a
+    // new kind. What differs is the label, and that a click does NOTHING - it
+    // is a note, not a way in (see TreeViewItem_PreviewMouseLeftButtonDown).
+    public bool IsFilterNotice { get; private init; }
+
     public string ShowMoreLabel => string.Format(
-        IsShowLess ? Strings.ShowLessFormat : Strings.ShowMoreFormat, RemainingCount);
+        IsFilterNotice ? Strings.FilterHiddenFormat
+            : IsShowLess ? Strings.ShowLessFormat
+            : Strings.ShowMoreFormat,
+        RemainingCount);
+
+    // How many files the file-type filter took out of this FOLDER's own
+    // listing, recorded where the filter is applied (FileSystemService's read)
+    // so nothing has to enumerate a second time to find out.
+    public int FilteredOutCount { get; set; }
 
     // WHAT A ROW'S TOOLTIP SAYS (2026-08-17). Its own path for a real row; for
     // the synthetic 더 보기 · 접기 row, the PARENT's - that row has no path of its
@@ -471,6 +491,9 @@ public class FileSystemItem : INotifyPropertyChanged
     public static FileSystemItem CreateShowLess(FileSystemItem parent, int remainingCount)
         => new(parent, remainingCount, showLess: true);
 
+    public static FileSystemItem CreateFilterNotice(FileSystemItem parent, int hiddenCount)
+        => new(parent, hiddenCount, showLess: false) { IsFilterNotice = true };
+
     // Lets MainWindow's whole-tree refresh (RefreshAllLoadedFolders) skip
     // folders that were never expanded - nothing loaded means nothing stale to
     // re-read from disk.
@@ -550,6 +573,16 @@ public class FileSystemItem : INotifyPropertyChanged
     {
         _overflow.Clear();
         _showingAll = false;
+
+        // THE FOLDER THAT LOOKS EMPTY AND IS NOT. Nothing left to show AND the
+        // filter took something out means the emptiness on screen is the
+        // filter's doing, not the folder's - so the folder says so rather
+        // than presenting itself as empty to whoever is about to delete it.
+        if (loaded.Count == 0 && FilteredOutCount > 0)
+        {
+            Children.ReplaceAll(new List<FileSystemItem> { CreateFilterNotice(this, FilteredOutCount) });
+            return;
+        }
 
         if (loaded.Count <= DisplayCap)
         {

@@ -14714,6 +14714,18 @@ public partial class MainWindow : Window
         // The synthetic "더 보기" row reveals the rest of its folder instead of
         // selecting anything. Marked handled so the base TreeViewItem doesn't
         // also select this non-file placeholder row.
+        // THE FILTER NOTICE IS A NOTE, NOT A WAY IN. It shares IsShowMore so
+        // every "not a real file" guard in the tree already skips it, which
+        // brings it here too - and there is nothing here for it to do: it has
+        // no overflow to reveal. Handled so the row underneath it cannot be
+        // selected either; a row that answers a click by doing nothing is the
+        // exact thing the menu audit spent 2026-08-25 removing.
+        if (treeViewItem.DataContext is FileSystemItem { IsFilterNotice: true })
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (treeViewItem.DataContext is FileSystemItem { IsShowMore: true } showMore)
         {
             // LOGGED HERE because this branch returns before the LogTreeClick
