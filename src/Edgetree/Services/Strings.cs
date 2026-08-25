@@ -19,9 +19,6 @@ public static class Strings
     public static string MenuBookmarkList = "북마크 목록";
     public static string MenuBookmarkListEmpty = "북마크 없음";
     public static string MenuBookmarkClearAll = "전체 해제";
-    // "이 폴더" rather than just "숨기기": the row under the cursor is what goes,
-    // and a bare verb next to 잘라내기/삭제 reads like it might mean the
-    // selection or the whole view.
     // File-kind filter. "전체" is deliberately worded as a state, not a
     // category - picking it clears the rest.
     // "파일 형식"만으로 시작했다가 바꿈 - 그것만으로는 무엇을 하는 줄인지 안
@@ -137,10 +134,16 @@ public static class Strings
     public static string MenuSidePanel = "북마크 패널";
     public static string MenuSidePanelShow = "표시";
 
-    public static string MenuHideFolder = "이 폴더 숨기기";
-    // Replaces the line above while several rows are picked. Files among them
-    // are skipped, so it names folders rather than "선택 항목".
-    public static string MenuHideSelectedFolders = "선택한 폴더 숨기기";
+    // A BARE VERB, because every attempt to name the subject was wrong for some
+    // of what this row acts on (2026-08-25, on report). It began as "이 폴더
+    // 숨기기" to say the row under the cursor was what went; then drives were
+    // allowed to hide the same way, then several rows at once, and a second
+    // string ("선택한 폴더 숨기기") was added to cover the plural. Three
+    // subjects, two labels, and the one on screen was still wrong often enough
+    // to read as a mistake. The row is only ever enabled over something it can
+    // hide, and 잘라내기/삭제 beside it name no subject either, so the verb
+    // alone is the one wording that is never wrong.
+    public static string MenuHideFolder = "숨기기";
     public static string MenuHiddenFolderList = "숨긴 폴더";
     public static string MenuHiddenFolderListEmpty = "숨긴 폴더 없음";
     public static string MenuUnhideFolder = "숨김 해제";
@@ -955,8 +958,7 @@ public static class Strings
         MenuFontWeightFilesOnly = "Bold Files Only";
         MenuSidePanel = "Bookmark Panel";
         MenuSidePanelShow = "Show";
-        MenuHideFolder = "Hide This Folder";
-        MenuHideSelectedFolders = "Hide Selected Folders";
+        MenuHideFolder = "Hide";
         MenuHiddenFolderList = "Hidden Folders";
         MenuHiddenFolderListEmpty = "No hidden folders";
         MenuUnhideFolder = "Unhide";

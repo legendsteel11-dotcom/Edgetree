@@ -273,9 +273,9 @@ public static class HelpContent
                       "Reorders it - the numbers are the Ctrl+Alt+L order"),
                     // The parenthesis is the part a menu label cannot say, and
                     // it is what a whole paragraph used to say instead.
-                    R("우클릭 → 폴더 숨기기", "트리에서 폴더를 감춤, 검색에서는 보이나 작업 시 폴더 숨김 해제 필요",
-                      "Right-click → Hide this folder",
-                      "Hidden from the tree; search still finds it, but working on it means unhiding it first"),
+                    R("우클릭 → 숨기기", "트리에서 폴더나 드라이브를 감춤, 검색에서는 보이나 작업 시 숨김 해제 필요",
+                      "Right-click → Hide",
+                      "Takes a folder or a drive out of the tree; search still finds it, but working on it means unhiding it first"),
                     // THE MENU WITH NO ROW UNDER IT. Everything else in this
                     // section acts on the row that was clicked, so a menu that
                     // needs the absence of one is the gesture nobody arrives at

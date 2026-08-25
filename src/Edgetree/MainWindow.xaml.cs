@@ -16168,16 +16168,18 @@ public partial class MainWindow : Window
             // greyed out there. The way this feature actually gets used is
             // "clear away everything I never open", and one right-click per
             // folder was the entire cost of doing that. Files in the selection
-            // are skipped, so the row only needs SOME folder to act on, and the
-            // label says which it is - "이 폴더" is a lie with five rows picked.
+            // are skipped, so the row only needs SOME folder to act on.
+            //
+            // The header is no longer written from here. It named its subject
+            // and there are three of them - a folder, a drive, a set of rows -
+            // so whichever wording was on screen was wrong for two of them
+            // (2026-08-25, on report). It is the bare verb now; only whether
+            // the row is available still depends on what is picked.
             if (FindTaggedMenuElement<MenuItem>(menu, "hideFolder") is { } hideItem)
             {
                 bool anyFolderSelected = _multiSelection
                     .Any(i => i is { IsPlaceholder: false, IsShowMore: false, IsDirectory: true });
                 hideItem.IsEnabled = isMultiSelection ? anyFolderSelected : isFolder;
-                hideItem.Header = isMultiSelection
-                    ? Strings.MenuHideSelectedFolders
-                    : Strings.MenuHideFolder;
             }
 
             // Deliberately NOT greyed out when nothing is hidden. It was, and a

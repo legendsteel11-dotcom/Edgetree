@@ -2078,7 +2078,7 @@
             <!-- Places added by hand, for the shares Windows has not been given
                  a drive letter for. The list and the way to add to it are one
                  item because they are one feature - the same argument that put
-                 이 폴더 숨기기 next to 숨긴 폴더. -->
+                 숨기기 next to 숨긴 폴더. -->
             <MenuItem Header="{x:Static services:Strings.MenuNetworkLocations}"
                     AutomationProperties.AutomationId="networkLocations"
                     SubmenuOpened="NetworkLocationSubmenu_Opened">
