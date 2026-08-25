@@ -28380,24 +28380,51 @@ public partial class MainWindow : Window
             return double.PositiveInfinity;
         }
 
-        int columns = FilmstripColumns;
-        if (columns <= 1 && Resources["FilmstripCellFootprintWidth"] is double cellWidth &&
-            cellWidth > 0)
-        {
-            // Before the panel exists there is nothing to ask, so the same
-            // division it will do is done here. It only has to be right on the
-            // FIRST layout - after that the panel itself answers.
-            double available = ViewerFilmstrip.ActualWidth
-                - ViewerFilmstrip.Padding.Left - ViewerFilmstrip.Padding.Right;
-            if (available > 0)
-            {
-                columns = Math.Max(1, (int)(available / cellWidth));
-            }
-        }
+        // Not the panel's own count - see FilmstripColumnsForHeight for the loop
+        // that reading it live used to close.
+        int columns = FilmstripColumnsForHeight();
 
         int rows = (count + Math.Max(1, columns) - 1) / Math.Max(1, columns);
         return (rows * rowHeight)
             + ViewerFilmstrip.Padding.Top + ViewerFilmstrip.Padding.Bottom;
+    }
+
+    // THE COLUMN COUNT THE HEIGHT IS ALLOWED TO SEE, and it is deliberately NOT
+    // the panel's live one.
+    //
+    // The height above is the strip's CONTENT, and applying it decides whether
+    // the vertical scrollbar is needed - which takes width off the presenter,
+    // which changes how many cells fit across, which changes the row count, and
+    // the height comes back a different number. Measured 2026-08-24 at
+    // stripW=3367 with 60px cells: 3367/60 = 56.1 sits right on a column
+    // boundary, so the count alternated 56 ↔ 55 and the height with it, 150 ↔
+    // 197, for as long as the panel stayed open. Both states are internally
+    // consistent - three rows with no bar, four with one - which is exactly why
+    // nothing settles it on its own.
+    //
+    // So the height counts the bar's width ALWAYS, shown or not. The number
+    // then depends only on the control's width and the cell's, neither of which
+    // the bar can move, and the loop has nowhere to close. Reserving the width
+    // by actually keeping the bar on screen would work too and was the first
+    // thought; it draws an empty track under every folder small enough to fit,
+    // which is most of them.
+    //
+    // WHAT THIS COSTS: at a width sitting on a column boundary this answers one
+    // column low, so the strip is a row taller than the pictures need and shows
+    // a row of empty floor. Away from a boundary the bar's dozen pixels do not
+    // change the division and nothing moves at all. A row of floor in the one
+    // case is the price of a number that cannot argue with itself.
+    private int FilmstripColumnsForHeight()
+    {
+        if (Resources["FilmstripCellFootprintWidth"] is not double cellWidth || cellWidth <= 0)
+        {
+            return FilmstripColumns;
+        }
+
+        double bar = TryFindResource("ScrollBarThickness") is double thickness ? thickness : 12;
+        double available = ViewerFilmstrip.ActualWidth
+            - ViewerFilmstrip.Padding.Left - ViewerFilmstrip.Padding.Right - bar;
+        return available > 0 ? Math.Max(1, (int)(available / cellWidth)) : FilmstripColumns;
     }
 
     private double MaxFilmstripGridHeightNow()
