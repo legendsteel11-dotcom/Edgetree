@@ -1366,6 +1366,7 @@
                      as the icon menu's row. -->
                 <MenuItem Header="{x:Static services:Strings.MenuFollowParentSort}"
                         IsCheckable="True"
+                        Tag="followParent"
                         Click="FolderSortFollowGlobalMenuItem_Click"/>
             </MenuItem>
             <Separator/>
@@ -1598,6 +1599,7 @@
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuFollowParentSort}"
                     IsCheckable="True"
+                    Tag="followParent"
                     Click="FolderSortFollowGlobalMenuItem_Click"/>
         </ContextMenu>
 

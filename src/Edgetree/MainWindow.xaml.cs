@@ -8615,13 +8615,8 @@ public partial class MainWindow : Window
                 LogClickLine("options menu: a 글꼴 굵기 row is missing");
             }
 
-            if (sortMenu.Items is [MenuItem byName, MenuItem byDate, MenuItem byType, MenuItem bySize, _, MenuItem ascending, MenuItem descending])
-            {
-                CheckSortFieldItems(ReadSortField(_settings.SortField, _settings.SortByDate),
-                    byName, byDate, byType, bySize);
-                ascending.IsChecked = !_settings.SortDescending;
-                descending.IsChecked = _settings.SortDescending;
-            }
+            CheckSortMenuRows(sortMenu, ReadSortField(_settings.SortField, _settings.SortByDate),
+                _settings.SortDescending);
 
             // Each stepper's value and its two buttons' enabled state, so a row
             // already sitting at a limit shows that the moment the menu opens
@@ -9930,38 +9925,25 @@ public partial class MainWindow : Window
     // items in the same order, so one routine can tick them: the folder's own
     // sort if it has one, otherwise the app-wide default, which is exactly
     // what that folder would sort by if it were reloaded right now.
-    private void ApplyFolderSortMenuState(ItemCollection items, bool isFolder)
+    private void ApplyFolderSortMenuState(ItemsControl menu, bool isFolder)
     {
-        if (items is not [MenuItem byName, MenuItem byDate, MenuItem byType, MenuItem bySize, _,
-                MenuItem ascending, MenuItem descending, _, MenuItem followGlobal])
-        {
-            return;
-        }
-
         bool hasOverride = isFolder && ExplorerTree.SelectedItem is FileSystemItem { HasSortOverride: true };
         var (field, sortDescending) = isFolder && ExplorerTree.SelectedItem is FileSystemItem folderItem
             ? GetEffectiveFolderSort(folderItem)
             : (ReadSortField(_settings.SortField, _settings.SortByDate), _settings.SortDescending);
 
-        CheckSortFieldItems(field, byName, byDate, byType, bySize);
-        ascending.IsChecked = !sortDescending;
-        descending.IsChecked = sortDescending;
+        CheckSortMenuRows(menu, field, sortDescending);
+
         // 부모 폴더 따르기 is CHECKED while the folder has no override of its
         // own - following is the default state, not an action that became
         // available (2026-08-23). Enabled either way: picking it while
         // already following changes nothing (ClearFolderSortOverride returns
         // at once), where a greyed-out checked row reads as unavailable.
-        followGlobal.IsChecked = isFolder && !hasOverride;
-        followGlobal.IsEnabled = isFolder;
-    }
-
-    private static void CheckSortFieldItems(FileSortField field, MenuItem byName, MenuItem byDate,
-        MenuItem byType, MenuItem bySize)
-    {
-        byName.IsChecked = field == FileSortField.Name;
-        byDate.IsChecked = field == FileSortField.Date;
-        byType.IsChecked = field == FileSortField.Type;
-        bySize.IsChecked = field == FileSortField.Size;
+        if (FindTaggedMenuElement<MenuItem>(menu, "followParent") is { } followGlobal)
+        {
+            followGlobal.IsChecked = isFolder && !hasOverride;
+            followGlobal.IsEnabled = isFolder;
+        }
     }
 
     private void FolderSortContextMenu_Opened(object sender, RoutedEventArgs e)
@@ -9970,7 +9952,7 @@ public partial class MainWindow : Window
 
         if (sender is ContextMenu menu)
         {
-            ApplyFolderSortMenuState(menu.Items,
+            ApplyFolderSortMenuState(menu,
                 isFolder: ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true });
         }
     }
@@ -16340,7 +16322,7 @@ public partial class MainWindow : Window
             if (sortMenu is not null)
             {
                 sortMenu.IsEnabled = isFolder;
-                ApplyFolderSortMenuState(sortMenu.Items, isFolder);
+                ApplyFolderSortMenuState(sortMenu, isFolder);
             }
 
             // "Open with" only makes sense for files - folders don't have a
@@ -16367,6 +16349,45 @@ public partial class MainWindow : Window
     // ExplorerItemContextMenu_Opened for what position-addressing cost.
     private static T? FindTaggedMenuElement<T>(ItemsControl menu, string tag) where T : FrameworkElement
         => menu.Items.OfType<T>().FirstOrDefault(item => (item.Tag as string) == tag);
+
+    // The same rule applied to SETTING a row: a tag that is not there costs
+    // that one row and nothing else.
+    //
+    // All three 정렬 menus used to be read as a fixed-length list pattern -
+    // nine slots for the folder menu, seven for 기본 설정, six for the search
+    // results - and a list pattern that does not match falls through to a bare
+    // return. That is the shape that cost eight days on 2026-08-17: one row
+    // moved, and every row below the check went unset in silence. A separator
+    // gained or lost anywhere in a 정렬 menu would have done the same here.
+    private static void SetMenuItemChecked(ItemsControl menu, string tag, bool isChecked)
+    {
+        if (FindTaggedMenuElement<MenuItem>(menu, tag) is { } item)
+        {
+            item.IsChecked = isChecked;
+        }
+    }
+
+    private static void SetMenuItemEnabled(ItemsControl menu, string tag, bool isEnabled)
+    {
+        if (FindTaggedMenuElement<MenuItem>(menu, tag) is { } item)
+        {
+            item.IsEnabled = isEnabled;
+        }
+    }
+
+    // The four field rows and the two direction rows, wherever the 정렬 menu
+    // is - 기본 설정 and both folder menus carry the same six tags, which is
+    // what lets one routine tick all of them. The search results have their
+    // own set (폴더 그룹 instead of 유형/크기) and tick themselves.
+    private static void CheckSortMenuRows(ItemsControl menu, FileSortField field, bool descending)
+    {
+        SetMenuItemChecked(menu, "name", field == FileSortField.Name);
+        SetMenuItemChecked(menu, "date", field == FileSortField.Date);
+        SetMenuItemChecked(menu, "type", field == FileSortField.Type);
+        SetMenuItemChecked(menu, "size", field == FileSortField.Size);
+        SetMenuItemChecked(menu, "asc", !descending);
+        SetMenuItemChecked(menu, "desc", descending);
+    }
 
     // The image formats worth even asking the shell for a thumbnail of -
     // gating by extension keeps a right-click on an exe/txt from paying a
@@ -33430,25 +33451,22 @@ public partial class MainWindow : Window
     {
         AnyMenu_Opened(sender, e);
 
-        if (sender is not ContextMenu
-            {
-                Items: [MenuItem group, MenuItem byName, MenuItem byDate, _, MenuItem ascending, MenuItem descending]
-            })
+        if (sender is not ContextMenu menu)
         {
             return;
         }
 
         bool grouping = _searchSortMode == SearchSortMode.FolderGroup;
-        group.IsChecked = grouping;
-        byName.IsChecked = !grouping && SearchSortFieldOf(_searchSortMode) == FileSortField.Name;
-        byDate.IsChecked = !grouping && SearchSortFieldOf(_searchSortMode) == FileSortField.Date;
+        SetMenuItemChecked(menu, "group", grouping);
+        SetMenuItemChecked(menu, "name", !grouping && SearchSortFieldOf(_searchSortMode) == FileSortField.Name);
+        SetMenuItemChecked(menu, "date", !grouping && SearchSortFieldOf(_searchSortMode) == FileSortField.Date);
 
         // Grouping has no direction of its own, so the two rows stand down
-        // rather than showing a state that isn't in effect.
-        ascending.IsEnabled = !grouping;
-        descending.IsEnabled = !grouping;
-        ascending.IsChecked = !grouping && !IsSearchSortDescending;
-        descending.IsChecked = !grouping && IsSearchSortDescending;
+        // rather than showing a state that is not in effect.
+        SetMenuItemChecked(menu, "asc", !grouping && !IsSearchSortDescending);
+        SetMenuItemChecked(menu, "desc", !grouping && IsSearchSortDescending);
+        SetMenuItemEnabled(menu, "asc", !grouping);
+        SetMenuItemEnabled(menu, "desc", !grouping);
     }
 
     private void SearchSortFieldMenuItem_Click(object sender, RoutedEventArgs e)
