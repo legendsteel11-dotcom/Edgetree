@@ -3786,6 +3786,15 @@
                      that day was printing the name in the row itself, and its
                      cost was the row getting longer - a tooltip costs nothing
                      until it is asked for. -->
+                <!-- NEVER BOLD WITH THE FOLDERS, and set here rather than on
+                     the row: the weight is inherited from the TreeViewItem, and
+                     a row-level override did not reach this text (2026-08-26 -
+                     it was tried and the row stayed bold). A local value on the
+                     element itself is what settles it.
+                     The whole job of "폴더만 굵게" is telling a folder from a
+                     file, and none of the rows that use this text - 더 보기 ·
+                     접기 · 비어 있음 · 필터로 감춰진 - is either one. The weight
+                     was saying nothing here and only making them loud. -->
                 <TextBlock x:Name="ShowMoreText"
                            Grid.Column="1"
                            Text="{Binding ShowMoreLabel}"
@@ -3793,6 +3802,7 @@
                            VerticalAlignment="Center"
                            Visibility="Collapsed"
                            FontStyle="Italic"
+                           FontWeight="Normal"
                            Style="{StaticResource RowPathTooltip}"
                            TextTrimming="CharacterEllipsis"/>
                 <!-- Shown only when this folder has its own remembered sort
@@ -6364,6 +6374,7 @@
                                         Text="{Binding ShowMoreLabel}"
                                         Foreground="{DynamicResource ShowMoreForeground}"
                                         FontStyle="Italic"
+                                        FontWeight="Normal"
                                         FontSize="{DynamicResource SearchHeaderFontSize}"
                                         VerticalAlignment="Center"
                                         Visibility="Collapsed"/>
