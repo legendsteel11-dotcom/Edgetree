@@ -395,6 +395,21 @@ public static class Strings
     // left nothing else to show. {0} is how many it took out.
     public static string FilterHiddenFormat = "… 필터로 감춰진 파일 {0}개";
 
+    // THE SAME SLOT FOR THE OTHER EMPTY FOLDER - the one that really is empty.
+    // Clicking one already does something (the row answers, the sort icon
+    // appears), so the folder looks like it replied and then said nothing.
+    // Folders are never taken out by the filter, so this row only ever stands
+    // in a folder with no files AND NO SUBFOLDERS - which is why it says 비어
+    // 있음 rather than 파일 없음. 파일 없음 was where the wording started and the
+    // author changed it on that ground (2026-08-26): the tree carries the app's
+    // own particularities (a display cap, a filter that never touches folders),
+    // and a row that is nearly right is worse here than one that is plain.
+    //
+    // It cannot lie about a folder that could not be READ: a failed read never
+    // reaches PopulateCapped at all - it keeps the placeholder and stays
+    // unloaded so the next expand retries.
+    public static string FolderEmptyLabel = "… 비어 있음";
+
     // File search (Ctrl+F view - see MainWindow's search-view methods and
     // Services/FileSearchService)
     public static string ToolTipSearch = "검색 (Ctrl+F)";
@@ -1089,7 +1104,8 @@ public static class Strings
         MenuThumbnailMaxSize = "Max thumbnail size";
         ShowMoreFormat = "… Show {0} more";
         ShowLessFormat = "… Show {0} fewer";
-        FilterHiddenFormat = "… {0} file(s) hidden by the filter";
+        FilterHiddenFormat = "… {0} files hidden by the filter";
+        FolderEmptyLabel = "… Empty";
 
         ToolTipSearch = "Search (Ctrl+F)";
         ToolTipViewer = "Multimedia panel";

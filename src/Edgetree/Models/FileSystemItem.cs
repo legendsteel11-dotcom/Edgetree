@@ -88,11 +88,17 @@ public class FileSystemItem : INotifyPropertyChanged
     // is a note, not a way in (see TreeViewItem_PreviewMouseLeftButtonDown).
     public bool IsFilterNotice { get; private init; }
 
-    public string ShowMoreLabel => string.Format(
-        IsFilterNotice ? Strings.FilterHiddenFormat
-            : IsShowLess ? Strings.ShowLessFormat
-            : Strings.ShowMoreFormat,
-        RemainingCount);
+    // A NOTICE WITH A COUNT OF ZERO IS THE EMPTY FOLDER, which is why the two
+    // notes share one flag rather than getting one each: they stand in the same
+    // slot, refuse a click the same way, and differ only in whether anything is
+    // being hidden.
+    public string ShowMoreLabel => IsFilterNotice && RemainingCount <= 0
+        ? Strings.FolderEmptyLabel
+        : string.Format(
+            IsFilterNotice ? Strings.FilterHiddenFormat
+                : IsShowLess ? Strings.ShowLessFormat
+                : Strings.ShowMoreFormat,
+            RemainingCount);
 
     // How many files the file-type filter took out of this FOLDER's own
     // listing, recorded where the filter is applied (FileSystemService's read)
@@ -567,6 +573,23 @@ public class FileSystemItem : INotifyPropertyChanged
         PopulateCapped(loaded);
     }
 
+    // WHAT AN EMPTY FOLDER SHOWS, asked in ONE place because two of them disagreed
+    // (2026-08-26, on report: the note appeared and then vanished on the first
+    // collapse). The note rides on IsShowMore so the tree's "not a real file"
+    // guards skip it - and RecollapseOverflow uses that same flag to strip the
+    // overflow control out before rebuilding, so it stripped the note too and
+    // left the folder empty again. Both rebuild paths ask here now, so the
+    // answer cannot depend on which one ran last.
+    //
+    // Nothing left to show AND the filter took something out means the
+    // emptiness on screen is the FILTER's doing, not the folder's - and the
+    // folder says so rather than presenting itself as empty to whoever is about
+    // to delete it.
+    private List<FileSystemItem> WithFilterNotice(List<FileSystemItem> rows)
+        => rows.Count == 0
+            ? new List<FileSystemItem> { CreateFilterNotice(this, FilteredOutCount) }
+            : rows;
+
     // Fills Children with at most DisplayCap items; anything beyond that is
     // parked in _overflow behind a single trailing "더 보기" row.
     private void PopulateCapped(List<FileSystemItem> loaded)
@@ -574,19 +597,9 @@ public class FileSystemItem : INotifyPropertyChanged
         _overflow.Clear();
         _showingAll = false;
 
-        // THE FOLDER THAT LOOKS EMPTY AND IS NOT. Nothing left to show AND the
-        // filter took something out means the emptiness on screen is the
-        // filter's doing, not the folder's - so the folder says so rather
-        // than presenting itself as empty to whoever is about to delete it.
-        if (loaded.Count == 0 && FilteredOutCount > 0)
-        {
-            Children.ReplaceAll(new List<FileSystemItem> { CreateFilterNotice(this, FilteredOutCount) });
-            return;
-        }
-
         if (loaded.Count <= DisplayCap)
         {
-            Children.ReplaceAll(loaded);
+            Children.ReplaceAll(WithFilterNotice(loaded));
             return;
         }
 
@@ -756,10 +769,14 @@ public class FileSystemItem : INotifyPropertyChanged
         // standing for nothing has to go.
         if (real.Count <= DisplayCap)
         {
-            if (_overflow.Count == 0 && (_showingAll || Children.Count != real.Count))
+            // Through the same question PopulateCapped asks - see
+            // WithFilterNotice. `real` has had every IsShowMore row taken out of
+            // it above, and the filter note is one of those.
+            var settled = WithFilterNotice(real);
+            if (_overflow.Count == 0 && (_showingAll || Children.Count != settled.Count))
             {
                 _showingAll = false;
-                Children.ReplaceAll(real);
+                Children.ReplaceAll(settled);
             }
             return;
         }

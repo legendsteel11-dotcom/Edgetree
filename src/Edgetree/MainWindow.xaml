@@ -2910,21 +2910,29 @@
                     <Setter Property="ToolTipService.IsEnabled"
                             Value="False"/>
                 </DataTrigger>
-                <!-- "필터로 감춰진 파일 N개" is a note, not a button. It shares
-                     its slot and its template with 더 보기, which IS one, so
-                     without this it inherits the hand cursor and offers itself
-                     as something to press (reported 2026-08-26 with a shot of
-                     the pointer over it).
-                     Only the cursor and the keyboard stop are taken away, not
-                     hit testing: the tooltip names the folder the note belongs
-                     to, which is worth keeping on a row that has no name of its
-                     own. The click is already refused in code, where the reason
-                     to refuse it lives. -->
+                <!-- "… 비어 있음" and "… 필터로 감춰진 파일 N개" are notes,
+                     not buttons. They share their slot and their template with
+                     더 보기, which IS one, so without this they inherit the hand
+                     cursor and the hover highlight and offer themselves as
+                     something to press (reported 2026-08-26 with a shot of the
+                     pointer sitting on one).
+                     The same set of denials the bottom-gap rows above carry,
+                     and for the same reason: hover is this tree's way of saying
+                     a row answers the pointer, and these do not. The tooltip
+                     goes with hit testing, which is the one thing given up -
+                     the note sits directly under the folder it speaks for, so
+                     its place already says which folder that is.
+                     The click is still refused in code as well; that guard
+                     covers the paths a hit test does not. -->
                 <DataTrigger Binding="{Binding IsFilterNotice}"
                         Value="True">
                     <Setter Property="Cursor"
                             Value="Arrow"/>
                     <Setter Property="Focusable"
+                            Value="False"/>
+                    <Setter Property="IsHitTestVisible"
+                            Value="False"/>
+                    <Setter Property="ToolTipService.IsEnabled"
                             Value="False"/>
                 </DataTrigger>
             </Style.Triggers>
