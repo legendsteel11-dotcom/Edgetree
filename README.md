@@ -223,6 +223,8 @@ version out of the exe it packages, so bumping the csproj is enough.
 - Fixed rows in the tree’s right-click menu not greying out when they do not apply - Hide on a file, Extract on something that is not a zip, and others.
 - Fixed Edgetree closing along with another application when that application failed while a file was being dragged into it.
 - Hide This Folder in the tree’s right-click menu is now Hide, which is also what it says for a drive or several items.
+- Alt+Enter opens Properties from the tree, from the open menu, or from a search result.
+- Fixed the mark that says a menu continues past the screen not appearing until the wheel was touched.
 - Fixed the thumbnail list alternating between two heights because of the scrollbar’s width.
 
 ### v2.5.3 (2026-08-24)
