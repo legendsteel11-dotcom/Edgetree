@@ -1257,6 +1257,26 @@ public partial class MainWindow : Window
         SetBrushColor("FavoritesBackground", light ? _settings.LightHistoryBackgroundColorHex : _settings.HistoryBackgroundColorHex);
         SetBrushColor("TreeRowHoverBackground", light ? _settings.LightHoverBackgroundColorHex : _settings.HoverBackgroundColorHex);
 
+        // 선택을 담고 있는 폴더가 차지하는 구간의 바탕 (see
+        // TreeSelectionZoneBackground in the XAML). The background moved AWAY
+        // from itself - lighter on dark, darker on light - which is the
+        // direction rule read backwards on purpose: this one is not a quieter
+        // version of something, it is the only mark saying "this much of the
+        // tree is the folder you are in".
+        //
+        // It stays well under the hover step (the default palette hovers about
+        // 7% off its background) for two reasons. A band is large, and a large
+        // area needs far less contrast than one row to be seen at all. And the
+        // three states have an order to them - a band you have not touched must
+        // not read as stronger than the row under the pointer, or as strong as
+        // the selected row sitting inside it.
+        if (ColorConverter.ConvertFromString(
+                light ? _settings.LightBackgroundColorHex : _settings.BackgroundColorHex) is Color zoneBase)
+        {
+            SetBrushColor("TreeSelectionZoneBackground",
+                MoveTowardsBackground(zoneBase, !light, light ? SelectionZoneBlendLight : SelectionZoneBlend));
+        }
+
         // The footer's lit file-kind chip. Fixed per theme rather than taken
         // from the tree's selection colour, which is the user's to set and is
         // often a strong blue - that put a shout in a strip meant to be read at
@@ -1678,6 +1698,26 @@ public partial class MainWindow : Window
     // 0.65, i.e. 35% of the way to the background. Asked for by eye and then
     // taken from that row rather than guessed (2026-08-02).
     private const double MutedNameBlend = 0.35;
+
+    // How far the folder band sits off the background. Picked against
+    // the default palettes and meant to be turned: at 0.10 the dark theme lands
+    // on #313131, which is the default selection colour #323438 - the selected
+    // row would disappear into its own band - and brighter than the default
+    // hover as well. These are the two numbers to move if the band reads too
+    // faint or too loud.
+    //
+    // THE THEMES DO NOT TAKE THE SAME STEP. Both were tried at 0.05 and the
+    // light one came back stronger by eye (2026-08-26), which is the direction
+    // rule showing up again: the same fraction is a bigger perceived move on a
+    // near-white ground than on a near-black one, because the eye reads the
+    // whitest thing on screen as the reference and anything under it as ink.
+    //
+    // The light value is a third reading, not a guess: 0.05 came back too
+    // strong and 0.04 too weak, and on a white ground those are only three
+    // levels apart (#F2F2F2 and #F5F5F5), so the band is decided in single
+    // steps of grey. 0.045 is the level between them.
+    private const double SelectionZoneBlend = 0.05;
+    private const double SelectionZoneBlendLight = 0.045;
 
     // Blends a colour `amount` of the way towards the theme's own extreme -
     // black in the dark theme, white in the light one. A blend rather than an
