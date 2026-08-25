@@ -4302,16 +4302,57 @@
                                      presses away the row is. A smaller font
                                      rather than a faded one - dimming text to
                                      mark it as secondary is not done in this
-                                     app. -->
+                                     app.
+                                     AND IT TAKES THE FOLDER NAME'S COLOUR, not
+                                     the 더 보기 row's, which is what it used to
+                                     borrow. That colour is the user's and it is
+                                     one people deliberately push DOWN - it
+                                     marks a row that is only signage. The
+                                     number is not signage: it is the key you
+                                     press, on a font already the smallest in
+                                     the panel, and it went unreadable the
+                                     moment those rows were darkened
+                                     (2026-08-26, on report). Borrowing a colour
+                                     chosen to be quiet is only safe where being
+                                     quiet is the point. -->
                                 <TextBlock x:Name="BookmarkNumberText"
                                         Grid.Column="1"
                                         Text="{Binding Number}"
-                                        Foreground="{DynamicResource ShowMoreForeground}"
                                         FontSize="{DynamicResource PanelNumberFontSize}"
                                         MinWidth="{DynamicResource PanelNumberWidth}"
                                         TextAlignment="Right"
                                         Margin="0,0,4,0"
-                                        VerticalAlignment="Center"/>
+                                        VerticalAlignment="Center">
+                                    <!-- THE NAME'S COLOUR, all three states of
+                                         it, because the number rides the same
+                                         row and has to stay readable on the
+                                         same grounds: base, hover, selected.
+                                         Following only the base would leave it
+                                         to be read against a selection
+                                         background the name had already moved
+                                         off. The trigger order and the
+                                         FindAncestor form are the name's own,
+                                         a few lines down - one shape for the
+                                         row rather than two that can drift. -->
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground"
+                                                    Value="{DynamicResource PanelNameForeground}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                        Value="True">
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource PanelNameHoverForeground}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                        Value="True">
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource PanelNameHighlightForeground}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
 
                                 <Image x:Name="BookmarkRowIcon"
                                         Grid.Column="2"
