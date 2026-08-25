@@ -13834,12 +13834,34 @@ public partial class MainWindow : Window
         }
     }
 
+    // ALT CHANGES WHAT THE EVENT EVEN SAYS. Hold it and WPF routes the press as
+    // a system key: e.Key is Key.System and the key actually pressed is in
+    // e.SystemKey. So the obvious spelling - a Key.Enter case guarded on the Alt
+    // modifier - reads exactly right and matches nothing, which is how Alt+Enter
+    // shipped doing nothing on 2026-08-26. One place asks the question so the
+    // three handlers cannot disagree about it.
+    private static bool IsAltEnter(System.Windows.Input.KeyEventArgs e)
+        => (e.Key == Key.System ? e.SystemKey : e.Key) == Key.Enter
+           && Keyboard.Modifiers == ModifierKeys.Alt;
+
     // Explorer-style shortcuts for the operations already on the context menu:
     // F2 rename, Delete, Ctrl+C/V copy-paste, Enter open. Reuses the same
     // handlers as the menu items (they only read ExplorerTree.SelectedItem,
     // not the sender), so behavior stays identical either way.
     private void ExplorerTree_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        // BEFORE THE SWITCH, and not a case in it, because with Alt held WPF
+        // does not report the key at all: e.Key comes through as Key.System and
+        // the real one is parked in e.SystemKey. A `case Key.Enter when ... Alt`
+        // reads correctly and can never match (2026-08-26 - it shipped that way
+        // and did nothing).
+        if (IsAltEnter(e))
+        {
+            ShowProperties_Click(sender, e);
+            e.Handled = true;
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.F2:
@@ -14268,7 +14290,13 @@ public partial class MainWindow : Window
         // Escape and submenu navigation are never intercepted.
         bool menuItemHighlighted = Keyboard.FocusedElement is MenuItem;
 
-        Action? command = e.Key switch
+        // Answered before the map below for the reason IsAltEnter carries, and
+        // it does NOT wait for nothing to be highlighted the way the bare Enter
+        // arm does: Alt+Enter cannot be mistaken for "activate the highlighted
+        // row", so it works wherever the cursor is sitting in the menu.
+        Action? command = IsAltEnter(e)
+            ? () => ShowProperties_Click(sender, e)
+            : e.Key switch
         {
             Key.F2 => () => RenameItem_Click(sender, e),
             Key.Delete => () => DeleteItem_Click(sender, e),
@@ -34690,6 +34718,17 @@ public partial class MainWindow : Window
     {
         if (SearchResultsList.SelectedItem is not SearchRow { Entry: not null })
         {
+            return;
+        }
+
+        // Same key as the tree's, and out here for the same reason - see
+        // IsAltEnter. It has to work: the search menu carries 속성 too, and the
+        // note above this method is the rule that a label must never name a key
+        // that does nothing here.
+        if (IsAltEnter(e))
+        {
+            SearchProperties_Click(sender, e);
+            e.Handled = true;
             return;
         }
 

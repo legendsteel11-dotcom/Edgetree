@@ -1457,7 +1457,15 @@
             <MenuItem Header="{x:Static services:Strings.MenuRevealInExplorer}"
                     Click="RevealInExplorer_Click"/>
             <Separator/>
+            <!-- LAST, the way Explorer has it, and it stays last: the hand
+                 knows where 속성 is. What it gains instead is the key Windows
+                 already uses for it. This row is reached often and sits at the
+                 far end of a long menu, so on a short screen it is the first
+                 thing the scroll takes away (2026-08-26, on report) - a
+                 shortcut answers that without moving a row anyone can find
+                 blindfolded. -->
             <MenuItem Header="{x:Static services:Strings.MenuProperties}"
+                    InputGestureText="Alt+Enter"
                     Click="ShowProperties_Click"/>
         </ContextMenu>
 
@@ -1731,6 +1739,7 @@
                     Click="SearchReveal_Click"/>
             <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuProperties}"
+                    InputGestureText="Alt+Enter"
                     Click="SearchProperties_Click"/>
         </ContextMenu>
 

@@ -251,6 +251,7 @@ public static class HelpContent
                     R("Ctrl+C · Ctrl+X · Ctrl+V", "복사 · 잘라내기 · 붙여넣기",
                       "Ctrl+C · Ctrl+X · Ctrl+V", "Copy · cut · paste"),
                     R("Ctrl+Shift+C", "경로 복사", "Ctrl+Shift+C", "Copy path"),
+                    R("Alt+Enter", "속성", "Alt+Enter", "Properties"),
                     // Said as COPY since 2026-08-13. It always was one - the row
                     // had claimed 이동 since the drag shipped, which is the kind
                     // of line that sends someone looking for a feature that is
