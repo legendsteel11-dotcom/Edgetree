@@ -15199,9 +15199,7 @@ public partial class MainWindow : Window
         // drag leaves behind, capture is not allowed to outlive this method.
         try
         {
-            long t0 = Environment.TickCount64;
-            var effect = DragDrop.DoDragDrop(ExplorerTree, data, DragDropEffects.Copy);
-            LogDragOut("tree", dragPaths.Length, Environment.TickCount64 - t0, effect);
+            DragOutFiles(ExplorerTree, data, "tree", dragPaths.Length);
         }
         finally
         {
@@ -30749,9 +30747,7 @@ public partial class MainWindow : Window
         // that outlives the drag would leave the app deaf to the next click.
         try
         {
-            long t0 = Environment.TickCount64;
-            var effect = DragDrop.DoDragDrop(ViewerFilmstrip, data, DragDropEffects.Copy);
-            LogDragOut("filmstrip", files.Length, Environment.TickCount64 - t0, effect);
+            DragOutFiles(ViewerFilmstrip, data, "filmstrip", files.Length);
         }
         finally
         {
@@ -34432,8 +34428,42 @@ public partial class MainWindow : Window
     // 즉시 돌아오는데도 멈췄다면 원인은 다른 데 있고, COM 배관을 만들 이유가
     // 없어진다.
     [System.Diagnostics.Conditional("DEBUG")]
-    private void LogDragOut(string source, int count, long ms, DragDropEffects result)
+    private void LogDragOut(string source, int count, long ms, object result)
         => LogClickLine($"dragout: {source} files={count} held={ms}ms result={result}");
+
+    // ONE PLACE FOR ALL THREE DRAGS OUT, and the reason it exists is the catch.
+    //
+    // DoDragDrop runs the drop TARGET's code - another application's, over an
+    // OLE channel - and when that code throws, the failure arrives back here as
+    // RPC_E_SERVERFAULT: an exception raised by a different program, delivered
+    // on our UI thread, out of a modal loop no handler can be placed inside.
+    // Uncaught it ends the process. It reached a user (exit.log 2026-08-25
+    // 17:10:22 - COMException 0x80010105 dragging a row out of the tree), and
+    // all three call sites had a finally for the mouse capture and no catch at
+    // all.
+    //
+    // There is nothing to recover. The drag did not complete and nothing was
+    // delivered, so the app goes on exactly as it does when a drag is released
+    // over empty desktop. Swallowed rather than reported: a dialog here would
+    // put another application's fault in front of the user as ours.
+    //
+    // WHAT THIS HIDES: a COM failure on OUR side of the same call now looks the
+    // same and passes silently. The log line is the only trace it leaves, which
+    // is why it carries the HRESULT rather than just saying it failed.
+    private void DragOutFiles(DependencyObject source, DataObject data, string label, int count)
+    {
+        long start = Environment.TickCount64;
+        try
+        {
+            var effect = DragDrop.DoDragDrop(source, data, DragDropEffects.Copy);
+            LogDragOut(label, count, Environment.TickCount64 - start, effect);
+        }
+        catch (System.Runtime.InteropServices.COMException ex)
+        {
+            LogDragOut(label, count, Environment.TickCount64 - start,
+                $"FAILED 0x{ex.HResult:X8}");
+        }
+    }
 
     [System.Diagnostics.Conditional("DEBUG")]
     private void LogClickLine(string line)
@@ -34506,9 +34536,7 @@ public partial class MainWindow : Window
         // on a mouse capture outliving the drag.
         try
         {
-            long t0 = Environment.TickCount64;
-            var effect = DragDrop.DoDragDrop(SearchResultsList, data, DragDropEffects.Copy);
-            LogDragOut("search", 1, Environment.TickCount64 - t0, effect);
+            DragOutFiles(SearchResultsList, data, "search", 1);
         }
         finally
         {
