@@ -229,6 +229,35 @@ const BRIT = /\b(colours?|coloured|behaviour\w*|favourite\w*|minimis\w+|maximis\
   report('Strings.cs 밖에 박힌 화면 텍스트', hits)
 }
 
+// -------------------------------------------------- 메뉴 태그가 살아 있는가
+//
+// 2026-08-25에 이것 때문에 8일을 날렸다. 즐겨찾기를 북마크로 합치면서 XAML의
+// `Tag="addFavorite"` 행이 사라졌는데, 우클릭 메뉴를 설정하는 코드는 그 태그를
+// 계속 찾았다. 못 찾으면 전부 포기하고 돌아가는 검사가 앞에 있어서, 그 아래
+// 설정이 한 줄도 안 돌았다 - 파일에서 아무 행도 안 흐려지고, 압축 풀기가 zip이
+// 아닌 행에 뜨고, "N개 항목 선택됨"이 안 나왔다. 유일한 신호는 Release에는
+// 존재하지도 않는 Debug 로그 한 줄이었다.
+//
+// 코드가 이름으로 찾는 메뉴 행이 XAML에 실제로 있는지 본다. 행을 지우거나
+// 이름을 바꾸면 여기서 걸린다.
+{
+  const cs = read('src/Edgetree/MainWindow.xaml.cs')
+  const xaml = read('src/Edgetree/MainWindow.xaml')
+  const asked = new Set([
+    ...[...cs.matchAll(/FindTaggedMenuElement<[^>]+>([^,]+,s*'([^']+)')/g)].map((m) => m[1]),
+    ...[...cs.matchAll(/FindTaggedMenuElement<[^>]+>([^,]+,s*"([^"]+)")/g)].map((m) => m[1]),
+    ...[...cs.matchAll(/FindMenuItem([^,]+,s*"([^"]+)")/g)].map((m) => m[1]),
+  ])
+  const have = new Set([
+    ...[...xaml.matchAll(/Tag="([^"]+)"/g)].map((m) => m[1]),
+    ...[...xaml.matchAll(/AutomationProperties.AutomationId="([^"]+)"/g)].map((m) => m[1]),
+    ...[...xaml.matchAll(/x:Name="([^"]+)"/g)].map((m) => m[1]),
+  ])
+  const hits = [...asked].filter((tag) => !have.has(tag))
+    .map((tag) => tag + ' - 코드가 찾는데 XAML에 없음')
+  report('메뉴 태그가 XAML에 있는가', hits, asked.size + '개 확인')
+}
+
 // ------------------------------------------------------------------ 버전
 //
 // 2026-08-18: 버전을 올린 뒤 Debug 를 다시 안 만들고 띄워서, 사용자가 2.4.0

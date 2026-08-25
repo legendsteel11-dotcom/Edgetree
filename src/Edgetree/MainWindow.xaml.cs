@@ -16009,7 +16009,6 @@ public partial class MainWindow : Window
             var thumbnailSeparator = FindTaggedMenuElement<Separator>(menu, "thumbnailSep");
             var multiInfoItem = FindTaggedMenuElement<MenuItem>(menu, "multiInfo");
             var multiInfoSeparator = FindTaggedMenuElement<Separator>(menu, "multiInfoSep");
-            var addFavoriteItem = FindTaggedMenuElement<MenuItem>(menu, "addFavorite");
             var newFolderItem = FindTaggedMenuElement<MenuItem>(menu, "newFolder");
             var refreshItem = FindTaggedMenuElement<MenuItem>(menu, "refresh");
             var searchInFolderItem = FindTaggedMenuElement<MenuItem>(menu, "searchInFolder");
@@ -16080,16 +16079,38 @@ public partial class MainWindow : Window
                 folderPlayItem.Visibility = canPlayFolder ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            if (thumbnailItem is null || thumbnailSeparator is null || multiInfoItem is null ||
-                multiInfoSeparator is null || addFavoriteItem is null || newFolderItem is null ||
-                refreshItem is null || searchInFolderItem is null || sortMenu is null ||
-                openWithItem is null || compressItem is null || extractItem is null ||
-                renameItem is null || copyPathItem is null || openWithCodeItem is null)
+            // ONE MISSING TAG USED TO TAKE THE WHOLE MENU DOWN, and it did
+            // (2026-08-17 → 2026-08-25). The row this block looked up as
+            // "addFavorite" went away when favourites were merged into the
+            // bookmark list, and the all-or-nothing check that stood here
+            // returned before ANY of the configuration below ran. So for eight
+            // days no row greyed out on a file, no "N개 항목 선택됨" header
+            // appeared, 압축 풀기 showed on rows that are not archives, and
+            // 숨기기 sat there looking available over a file while its handler
+            // quietly refused it - which is what it was reported as.
+            //
+            // The check was meant as a safety device and it was the opposite of
+            // one: it converted one wrong row into every wrong row, and its one
+            // symptom was a Debug-only log line nobody was reading. It NAMES
+            // what is missing now and carries on, so a dropped tag costs the
+            // row it belongs to and nothing else.
+            //
+            // The 2026-07-30 lesson was "address rows by tag, not by position".
+            // This is its other half: a tag that stops matching must cost one
+            // row, the way a position that stops matching never did.
+            string[] absent = new (string Name, object? Item)[]
             {
-                // A tag was renamed or dropped in the XAML. Debug builds say so
-                // rather than leaving the menu quietly half-configured.
-                LogClickLine("row menu: a tagged item is missing - menu half-configured");
-                return;
+                ("thumbnail", thumbnailItem), ("thumbnailSep", thumbnailSeparator),
+                ("multiInfo", multiInfoItem), ("multiInfoSep", multiInfoSeparator),
+                ("newFolder", newFolderItem), ("refresh", refreshItem),
+                ("searchInFolder", searchInFolderItem), ("sort", sortMenu),
+                ("openWith", openWithItem), ("compress", compressItem),
+                ("extract", extractItem), ("rename", renameItem),
+                ("copyPath", copyPathItem), ("openWithCode", openWithCodeItem),
+            }.Where(t => t.Item is null).Select(t => t.Name).ToArray();
+            if (absent.Length > 0)
+            {
+                LogClickLine($"row menu: tags missing - {string.Join(", ", absent)}");
             }
 
             // The thumbnail row is NOT configured here - see
@@ -16100,7 +16121,8 @@ public partial class MainWindow : Window
             // (e.g. the keyboard menu key): a row left over from an earlier
             // open that doesn't match the current selection is hidden rather
             // than showing the wrong file's picture.
-            if (thumbnailItem.Visibility == Visibility.Visible &&
+            if (thumbnailItem is not null && thumbnailSeparator is not null &&
+                thumbnailItem.Visibility == Visibility.Visible &&
                 _pendingThumbnailPath != (ExplorerTree.SelectedItem as FileSystemItem)?.FullPath)
             {
                 thumbnailItem.Visibility = Visibility.Collapsed;
@@ -16112,9 +16134,17 @@ public partial class MainWindow : Window
             // is active, so the menu stays exactly as it always was for the
             // everyday single-row case.
             bool isMultiSelection = _multiSelection.Count > 1;
-            multiInfoItem.Visibility = isMultiSelection ? Visibility.Visible : Visibility.Collapsed;
-            multiInfoSeparator.Visibility = multiInfoItem.Visibility;
-            if (isMultiSelection && multiInfoItem.Header is TextBlock multiInfoText)
+            if (multiInfoItem is not null)
+            {
+                multiInfoItem.Visibility = isMultiSelection ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (multiInfoSeparator is not null && multiInfoItem is not null)
+            {
+                multiInfoSeparator.Visibility = multiInfoItem.Visibility;
+            }
+
+            if (isMultiSelection && multiInfoItem?.Header is TextBlock multiInfoText)
             {
                 multiInfoText.Text = string.Format(Strings.MenuMultiSelectionInfo, _multiSelection.Count);
             }
@@ -16125,8 +16155,8 @@ public partial class MainWindow : Window
             // operations) and 이름 바꾸기 (renaming several rows at once isn't a
             // thing this menu offers). RenameItem_Click carries the same guard
             // for the F2 path, which doesn't come through this menu.
-            copyPathItem.IsEnabled = !isMultiSelection;
-            renameItem.IsEnabled = !isMultiSelection;
+            if (copyPathItem is not null) { copyPathItem.IsEnabled = !isMultiSelection; }
+            if (renameItem is not null) { renameItem.IsEnabled = !isMultiSelection; }
 
             // The bookmark submenu configures itself when it opens (see
             // BookmarkRowSubmenu_Opened) - its label depends on the row and is
@@ -16135,31 +16165,36 @@ public partial class MainWindow : Window
             // The zip lands next to the right-clicked row, so a drive root -
             // the one kind of row with no parent folder - has nowhere to put
             // it and is the only case this greys out.
-            compressItem.IsEnabled =
-                ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false, Parent: not null };
+            if (compressItem is not null)
+            {
+                compressItem.IsEnabled =
+                    ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false, Parent: not null };
+            }
 
             // Shown only on an actual .zip row, and never on a multi-selection
             // (unpacking several archives at once isn't offered).
-            extractItem.Visibility =
+            if (extractItem is not null)
+            {
+                extractItem.Visibility =
                 _multiSelection.Count <= 1 &&
                 ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: false, Parent: not null } zipRow &&
                 ArchiveService.IsZipPath(zipRow.FullPath)
                     ? Visibility.Visible
                     : Visibility.Collapsed;
+            }
 
             bool isFolder = ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: true };
-            addFavoriteItem.IsEnabled = isFolder;
 
             // New folder is created as a child of the selected folder - it
             // doesn't make sense (and there's nowhere to put it) off a file.
-            newFolderItem.IsEnabled = isFolder;
+            if (newFolderItem is not null) { newFolderItem.IsEnabled = isFolder; }
 
             // Refresh re-reads the selected folder's own contents from disk -
             // there's nothing to refresh on a plain file.
-            refreshItem.IsEnabled = isFolder;
+            if (refreshItem is not null) { refreshItem.IsEnabled = isFolder; }
 
             // The search scope is always a folder (see StartScopeScan).
-            searchInFolderItem.IsEnabled = isFolder;
+            if (searchInFolderItem is not null) { searchInFolderItem.IsEnabled = isFolder; }
 
             // Drive roots included: they hide exactly the way a folder does
             // (2026-08-02) - an unused drive is the noisiest thing a tree of
@@ -16192,20 +16227,29 @@ public partial class MainWindow : Window
             // that folder's own override if it has one (GetEffectiveFolderSort),
             // otherwise the app-wide default - either way this submenu always
             // reflects what THIS folder would sort by if (re)loaded right now.
-            sortMenu.IsEnabled = isFolder;
-            ApplyFolderSortMenuState(sortMenu.Items, isFolder);
+            if (sortMenu is not null)
+            {
+                sortMenu.IsEnabled = isFolder;
+                ApplyFolderSortMenuState(sortMenu.Items, isFolder);
+            }
 
             // "Open with" only makes sense for files - folders don't have a
             // file-association picker.
-            openWithItem.IsEnabled =
-                ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: false };
+            if (openWithItem is not null)
+            {
+                openWithItem.IsEnabled =
+                    ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsDirectory: false };
+            }
 
             // Files and folders both make sense here - Code.exe opens either
             // one directly - so this only gates on whether Code is actually
             // installed (see ShellFileService.IsCodeRegistered), not on
             // isFolder.
-            openWithCodeItem.IsEnabled =
-                ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false } && ShellFileService.IsCodeRegistered();
+            if (openWithCodeItem is not null)
+            {
+                openWithCodeItem.IsEnabled =
+                    ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false } && ShellFileService.IsCodeRegistered();
+            }
         }
     }
 
@@ -34809,7 +34853,8 @@ public partial class MainWindow : Window
             // Guard for opens that bypassed the right-click handler (keyboard
             // menu key): hide a slot left over from an earlier open rather
             // than show the wrong file's picture - same rule as the tree's.
-            if (thumbnailItem.Visibility == Visibility.Visible &&
+            if (thumbnailItem is not null && thumbnailSeparator is not null &&
+                thumbnailItem.Visibility == Visibility.Visible &&
                 _pendingThumbnailPath != SelectedSearchResult?.FullPath)
             {
                 thumbnailItem.Visibility = Visibility.Collapsed;
