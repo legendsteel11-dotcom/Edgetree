@@ -219,7 +219,8 @@ version out of the exe it packages, so bumping the csproj is enough.
 
 ### v2.5.4 (2026-08-26)
 
-- A folder whose files are all hidden by the file type filter now says how many it is hiding.
+- An expanded folder says when it is empty, and when the file type filter is what emptied it, how many files it is hiding.
+- The numbers in the bookmark panel take the bookmark name’s colour. They used to borrow the Show More row’s, so darkening that colour took the numbers with it.
 - Fixed rows in the tree’s right-click menu not greying out when they do not apply - Hide on a file, Extract on something that is not a zip, and others.
 - Fixed Edgetree closing along with another application when that application failed while a file was being dragged into it.
 - Hide This Folder in the tree’s right-click menu is now Hide, which is also what it says for a drive or several items.

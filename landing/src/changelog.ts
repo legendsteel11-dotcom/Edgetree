@@ -51,7 +51,7 @@ export const changelog: ChangelogEntry[] = [
     // someone could recognise having SEEN.
     version: 'v2.5.4',
     ko: [
-      '파일 형식 필터가 폴더의 파일을 모두 감춘 경우, 감춰진 파일 개수가 폴더 안에 표시됩니다.',
+      '펼친 폴더가 비어 있으면 `비어 있음`, 파일 형식 필터가 파일을 모두 감춘 경우에는 감춰진 파일 개수가 폴더 안에 표시됩니다.',
       '트리 우클릭 메뉴에서 해당되지 않는 항목이 흐리게 표시되지 않던 문제를 수정했습니다. 파일에서의 `숨기기`, zip이 아닌 파일에서의 `압축 풀기` 등이 해당합니다.',
       '다른 앱으로 파일을 끌어놓는 중 그 앱에서 오류가 발생하면 Edgetree도 함께 종료되던 문제를 수정했습니다.',
       '트리 우클릭의 `이 폴더 숨기기`가 `숨기기`로 바뀌었습니다. 드라이브와 여러 항목에도 같은 표기를 사용합니다.',
@@ -59,7 +59,7 @@ export const changelog: ChangelogEntry[] = [
       '메뉴가 화면보다 길 때 아래에 내용이 더 있다는 표시가 바로 나타나지 않던 문제를 수정했습니다.',
     ],
     en: [
-      'A folder whose files are all hidden by the file type filter now says how many it is hiding.',
+      'An expanded folder says when it is empty, and when the file type filter is what emptied it, how many files it is hiding.',
       'Fixed rows in the tree’s right-click menu not greying out when they do not apply - Hide on a file, Extract on something that is not a zip, and others.',
       'Fixed Edgetree closing along with another application when that application failed while a file was being dragged into it.',
       'Hide This Folder in the tree’s right-click menu is now Hide, which is also what it says for a drive or several items.',
