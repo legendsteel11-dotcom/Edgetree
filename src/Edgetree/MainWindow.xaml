@@ -2994,6 +2994,36 @@
             </Style.Triggers>
         </Style>
 
+        <!-- THE GRAB LINE'S THREE STATES, declared here rather than taken from
+             the palette: a line that says "this edge can be dragged" is a
+             pointer state, like the scroll thumb's own ladder and the footer
+             chips' hover ink, and a pointer state has to read the same however
+             the palette has been set.
+             REST arrived 2026-08-26, on report. The line these thumbs ride was
+             drawn by the CONTAINER in PanelDividerBrush, and 영역 구분선 off
+             takes that brush to zero alpha - so switching off a decoration also
+             took away the only resting mark on the three edges that can be
+             DRAGGED (the strip, the tree/panel split, favorites). One switch
+             answering two questions. The line belongs to the control, so the
+             switch no longer reaches it, and those three containers hand the
+             edge over: BorderThickness stays (the pixel is laid out against),
+             only the brush goes transparent.
+             Rest was picked against the seek bar's unplayed track, named in the
+             report as the strength to match. At 1px it needs more alpha than
+             that 3px track to weigh the same, and #60 lands within a level or
+             two of what the default palette already drew on both themes - so a
+             default install keeps the line it always had.
+             ALPHA rather than darker greys, for the reason the style below
+             gives: fixed across both themes, blending toward whatever is behind.
+             REST IS THE RUNG TO NUDGE if the line reads wrong; hover was left
+             where it was so this round changes one thing. -->
+        <SolidColorBrush x:Key="GrabLineRestBrush"
+                Color="#606B6B6B"/>
+        <SolidColorBrush x:Key="GrabLineHoverBrush"
+                Color="#8C6B6B6B"/>
+        <SolidColorBrush x:Key="GrabLineDragBrush"
+                Color="#4D6B6B6B"/>
+
         <!-- The grab line for every resize edge (and the viewer's divider).
              The two states carry ALPHA rather than darker greys, and that is
              deliberate: these values are fixed across both themes, so a darker
@@ -3027,23 +3057,32 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
                         <Grid Background="Transparent">
+                            <!-- Template-bound so the RESTING line is opt-in per
+                                 instance: the style's own Background setter is
+                                 Transparent, which is what the window's outer
+                                 edges want (a resting line on all four would be
+                                 a frame around the window, not a hint). The two
+                                 internal dividers set GrabLineRestBrush on
+                                 themselves. The triggers below still win over
+                                 this binding, so hover and drag are unchanged
+                                 either way. -->
                             <Border x:Name="Bar"
                                     Width="1"
                                     HorizontalAlignment="Center"
-                                    Background="Transparent"/>
+                                    Background="{TemplateBinding Background}"/>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"
                                     Value="True">
                                 <Setter TargetName="Bar"
                                         Property="Background"
-                                        Value="#8C6B6B6B"/>
+                                        Value="{StaticResource GrabLineHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsDragging"
                                     Value="True">
                                 <Setter TargetName="Bar"
                                         Property="Background"
-                                        Value="#4D6B6B6B"/>
+                                        Value="{StaticResource GrabLineDragBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -3063,23 +3102,24 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
                         <Grid Background="Transparent">
+                            <!-- Opt-in resting line, same as the vertical copy. -->
                             <Border x:Name="Bar"
                                     Height="1"
                                     VerticalAlignment="Center"
-                                    Background="Transparent"/>
+                                    Background="{TemplateBinding Background}"/>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver"
                                     Value="True">
                                 <Setter TargetName="Bar"
                                         Property="Background"
-                                        Value="#8C6B6B6B"/>
+                                        Value="{StaticResource GrabLineHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsDragging"
                                     Value="True">
                                 <Setter TargetName="Bar"
                                         Property="Background"
-                                        Value="#4D6B6B6B"/>
+                                        Value="{StaticResource GrabLineDragBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -5225,10 +5265,16 @@
                  splitter's grab zone is unaffected - it floats over this row
                  at a fixed 9px and simply centres on whatever height the
                  line takes. -->
+            <!-- GrabLineRestBrush, not PanelDividerBrush (2026-08-26): this
+                 line marks an edge that DRAGS, and 영역 구분선 off was taking
+                 the whole of that mark away with the decoration. Rest only -
+                 the splitter is a GridSplitter, not a Thumb, so there is no
+                 IsDragging to hang the other two rungs on, and it has read as
+                 one static line since it was built. -->
             <Border Grid.Row="2"
                     Grid.Column="1"
                     Height="1"
-                    Background="{DynamicResource PanelDividerBrush}"/>
+                    Background="{StaticResource GrabLineRestBrush}"/>
             <!-- Functionality unchanged (drag-resize, double-click fit); only
                  WHERE the grab zone lives did: negative margins float it over
                  the last few pixels of the panels on either side of the line
@@ -6536,7 +6582,10 @@
                  boundary above the picture rather than a scratch across it.
                  Full screen clears this along with the border and the margins -
                  see SetViewerFullscreen, where every pixel goes back to the
-                 picture. -->
+                 picture.
+                 THE BORDER IS THICKNESS ONLY - ViewerSplitThumb paints this
+                 edge now (see GrabLineRestBrush). Which side it sits on is
+                 flipped from code, so the brush stays out of the way here. -->
             <Border x:Name="ViewerPanel"
                     Grid.Row="1"
                     Grid.RowSpan="4"
@@ -6544,7 +6593,7 @@
                     Visibility="Collapsed"
                     Padding="0,2,0,0"
                     Background="{DynamicResource ViewerBackground}"
-                    BorderBrush="{DynamicResource PanelDividerBrush}"
+                    BorderBrush="Transparent"
                     BorderThickness="1,0,0,0"
                     PreviewMouseDown="ViewerPanel_PreviewMouseDown"
                     PreviewMouseMove="ViewerPanel_PreviewMouseMove"
@@ -7818,19 +7867,24 @@
 
                          No animation anywhere in here. Following the selection
                          is an instant jump - see SyncFilmstripToSelection. -->
-                    <!-- The border is the divider the strip needed: without a
-                         line the frames simply began, and the picture and the
-                         strip read as one crowded thing. At rest it is barely
-                         there - the panel's own divider ink, one pixel - and the
-                         grip on top of it does the rest (see the Thumb below):
-                         a touch stronger under the cursor, FAINTER again while
-                         being dragged, which is this app's standing rule for
-                         grab lines (the hand is already on it; it does not need
-                         to be told twice). -->
+                    <!-- The strip needed a divider: without a line the frames
+                         simply began, and the picture and the strip read as one
+                         crowded thing. THE THUMB BELOW DRAWS IT NOW, all three
+                         states from one ladder - barely there at rest, a touch
+                         stronger under the cursor, FAINTER again while being
+                         dragged, which is this app's standing rule for grab
+                         lines (the hand is already on it; it does not need to be
+                         told twice).
+                         The border keeps its 1px of THICKNESS because the strip
+                         is laid out against it, and gives up its brush: drawing
+                         the line here as well would put two owners on one pixel,
+                         and this one went invisible whenever 영역 구분선 was off
+                         (2026-08-26, on report - the resting line was the only
+                         thing saying the edge could be dragged at all). -->
                     <Border x:Name="ViewerFilmstripHost"
                             Grid.Row="2"
                             BorderThickness="0,1,0,0"
-                            BorderBrush="{DynamicResource PanelDividerBrush}"
+                            BorderBrush="Transparent"
                             Visibility="Collapsed">
                       <Grid>
                         <!-- LEFT PADDING 4 → 0 (2026-08-11), so the first frame
@@ -8360,6 +8414,7 @@
                                 Height="6"
                                 Margin="0,-3,0,0"
                                 VerticalAlignment="Top"
+                                Background="{StaticResource GrabLineRestBrush}"
                                 Cursor="SizeNS"
                                 Style="{StaticResource ResizeThumbHorizontalStyle}"
                                 DragDelta="ViewerFilmstripThumb_DragDelta"
@@ -9224,6 +9279,7 @@
                     Grid.Column="2"
                     Width="8"
                     Margin="-4,0,0,0"
+                    Background="{StaticResource GrabLineRestBrush}"
                     HorizontalAlignment="Left"
                     Panel.ZIndex="2"
                     Style="{StaticResource ResizeThumbStyle}"
