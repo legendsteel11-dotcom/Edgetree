@@ -3013,12 +3013,18 @@
              REST arrived 2026-08-26, on report. The line these thumbs ride was
              drawn by the CONTAINER in PanelDividerBrush, and 영역 구분선 off
              takes that brush to zero alpha - so switching off a decoration also
-             took away the only resting mark on the three edges that can be
-             DRAGGED (the strip, the tree/panel split, favorites). One switch
-             answering two questions. The line belongs to the control, so the
-             switch no longer reaches it, and those three containers hand the
-             edge over: BorderThickness stays (the pixel is laid out against),
-             only the brush goes transparent.
+             took away the only resting mark on an edge that can be DRAGGED.
+             ONE EDGE TAKES THIS, the thumbnail strip's. The first cut gave it to
+             all three (the split and favorites too) and that was too much: with
+             the dividers off, three lines came back and the option stopped
+             meaning what it says. The strip's boundary is the one that earns the
+             exemption, because the rows above it stack up - carousel, name,
+             metadata, zoom, transport - so one more horizontal line among a
+             dozen cannot be picked out. Nothing stacks against the other two,
+             and the split has a collapse chevron marking it besides.
+             So the strip's host hands its edge over - BorderThickness stays,
+             the pixel is laid out against, only the brush goes transparent -
+             and the other two containers keep painting their own.
              Rest was picked against the seek bar's unplayed track, named in the
              report as the strength to match. At 1px it needs more alpha than
              that 3px track to weigh the same, and #60 lands within a level or
@@ -3072,9 +3078,10 @@
                                  instance: the style's own Background setter is
                                  Transparent, which is what the window's outer
                                  edges want (a resting line on all four would be
-                                 a frame around the window, not a hint). The two
-                                 internal dividers set GrabLineRestBrush on
-                                 themselves. The triggers below still win over
+                                 a frame around the window, not a hint) and what
+                                 the tree/panel split wants too. Only the
+                                 thumbnail strip's thumb sets GrabLineRestBrush
+                                 on itself. The triggers below still win over
                                  this binding, so hover and drag are unchanged
                                  either way. -->
                             <Border x:Name="Bar"
@@ -5276,16 +5283,17 @@
                  splitter's grab zone is unaffected - it floats over this row
                  at a fixed 9px and simply centres on whatever height the
                  line takes. -->
-            <!-- GrabLineRestBrush, not PanelDividerBrush (2026-08-26): this
-                 line marks an edge that DRAGS, and 영역 구분선 off was taking
-                 the whole of that mark away with the decoration. Rest only -
-                 the splitter is a GridSplitter, not a Thumb, so there is no
-                 IsDragging to hang the other two rungs on, and it has read as
-                 one static line since it was built. -->
+            <!-- This one FOLLOWS 영역 구분선, unlike the strip's edge, and that
+                 asymmetry was chosen rather than arrived at (2026-08-26). The
+                 strip's boundary earns its exemption because the rows above it
+                 stack up - carousel, name, metadata, zoom, transport - and one
+                 more horizontal line among a dozen is not findable. Nothing
+                 stacks either side of this one; there is a list, a line, and a
+                 list. -->
             <Border Grid.Row="2"
                     Grid.Column="1"
                     Height="1"
-                    Background="{StaticResource GrabLineRestBrush}"/>
+                    Background="{DynamicResource PanelDividerBrush}"/>
             <!-- Functionality unchanged (drag-resize, double-click fit); only
                  WHERE the grab zone lives did: negative margins float it over
                  the last few pixels of the panels on either side of the line
@@ -6594,9 +6602,11 @@
                  Full screen clears this along with the border and the margins -
                  see SetViewerFullscreen, where every pixel goes back to the
                  picture.
-                 THE BORDER IS THICKNESS ONLY - ViewerSplitThumb paints this
-                 edge now (see GrabLineRestBrush). Which side it sits on is
-                 flipped from code, so the brush stays out of the way here. -->
+                 This edge FOLLOWS 영역 구분선, unlike the thumbnail strip's -
+                 see the strip's own host for the asymmetry and why it was
+                 chosen (2026-08-26). The split has a collapse chevron riding it
+                 that says where it is even with the line switched off, which is
+                 the other half of the reason. -->
             <Border x:Name="ViewerPanel"
                     Grid.Row="1"
                     Grid.RowSpan="4"
@@ -6604,7 +6614,7 @@
                     Visibility="Collapsed"
                     Padding="0,2,0,0"
                     Background="{DynamicResource ViewerBackground}"
-                    BorderBrush="Transparent"
+                    BorderBrush="{DynamicResource PanelDividerBrush}"
                     BorderThickness="1,0,0,0"
                     PreviewMouseDown="ViewerPanel_PreviewMouseDown"
                     PreviewMouseMove="ViewerPanel_PreviewMouseMove"
@@ -9312,7 +9322,6 @@
                     Grid.Column="2"
                     Width="8"
                     Margin="-4,0,0,0"
-                    Background="{StaticResource GrabLineRestBrush}"
                     HorizontalAlignment="Left"
                     Panel.ZIndex="2"
                     Style="{StaticResource ResizeThumbStyle}"
