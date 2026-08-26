@@ -3095,8 +3095,30 @@ public partial class MainWindow : Window
     // the first version had them the other way round and read backwards).
     // Multiples of each other on purpose, so every Shift line is also a Ctrl
     // line and refining never means starting over.
-    private const int DockedSnapDivisionsCoarse = 16;
-    private const int DockedSnapDivisionsFine = 32;
+    //
+    // 16/32 UNTIL 2026-08-26, and it was chosen on a 4K screen. Carried to a
+    // 1080 one it was unusable, and re-measured it turned out to be too coarse
+    // on the 4K as well - the first screen had simply never been checked
+    // against anything. Two rounds: 32/64, still too coarse on both, then
+    // 64/128, which is Shift landing where Ctrl used to and Ctrl halving again.
+    //
+    // WHAT THE OLD NUMBERS MISSED is that these divide the WHOLE WORK AREA
+    // while the window being fitted does not fill it. Vertically the docked band
+    // usually does, so a sixteenth of the height was merely coarse; the WIDTH
+    // grid is the one that was hopeless, because a sidebar occupies a small
+    // fraction of a 3840-wide screen and a sixteenth of the screen put barely
+    // three lines across its whole usable range.
+    //
+    // On a 3840x2160 work area at 100%: Shift is 60 wide / 34 tall, Ctrl is
+    // 30 / 17. On 1920x1080: Shift 30 / 17, Ctrl 15 / 8.
+    //
+    // A fraction is still the right shape - a grid in fixed pixels would put the
+    // lines somewhere different on each monitor, and the point is that an edge
+    // lands somewhere the eye can name. The COUNT was the part tuned against one
+    // screen. If it ever needs splitting, width and height are the seam: they
+    // measure the same fraction against very different amounts of window.
+    private const int DockedSnapDivisionsCoarse = 64;
+    private const int DockedSnapDivisionsFine = 128;
 
     // Null means no snapping. The FINER grid wins when both are down: adding
     // a second key reads as asking for more precision, not less.
