@@ -317,6 +317,17 @@
              주 텍스트를 넘지 않게 하는 clamp는 ApplyLayoutMetrics에 있다.
              11은 기본 글꼴(12pt)에서의 값. -->
         <system:Double x:Key="ViewerNowPlayingFontSize">11</system:Double>
+        <!-- THE APP'S HOVER CONTRACT, one number for the three lists that state
+             it (tree rows, favorites/panel lists, search results). It was the
+             same literal typed three times, with each site's comment pointing at
+             the other two as the reason it matched - so it was already one value
+             pretending to be three, and the first time it moved (900 → 750,
+             2026-08-26) that had to be got right in three places.
+             Long enough that brushing past a row on the way somewhere else pops
+             nothing up. The viewer's thumbnail strip deliberately does NOT take
+             this - see its own setter for why a strip with no filenames drawn
+             cannot afford the same wait. -->
+        <system:Int32 x:Key="TooltipShowDelay">750</system:Int32>
         <!-- The chip's own box and the gap to its neighbour. Literals on the
              three chip templates until 2026-08-15, which left the strip's text
              following Ctrl +/- while the padding around it did not - so at a
@@ -3769,7 +3780,7 @@
         <Style x:Key="RowPathTooltip"
                 TargetType="TextBlock">
             <Setter Property="ToolTipService.InitialShowDelay"
-                    Value="900"/>
+                    Value="{StaticResource TooltipShowDelay}"/>
             <Setter Property="ToolTipService.ShowDuration"
                     Value="20000"/>
             <Setter Property="ToolTip">
@@ -4347,7 +4358,7 @@
             <!-- Same reasoning as the favorites tooltip: a flat list of leaf
                  names, where several rows can read identically. -->
             <Setter Property="ToolTipService.InitialShowDelay"
-                    Value="900"/>
+                    Value="{StaticResource TooltipShowDelay}"/>
             <Setter Property="ToolTipService.ShowDuration"
                     Value="20000"/>
             <Setter Property="ToolTip">
@@ -4697,7 +4708,7 @@
                  because a tooltip is its own window and inherits nothing. The
                  surface itself comes from the implicit ToolTip style. -->
             <Setter Property="ToolTipService.InitialShowDelay"
-                    Value="900"/>
+                    Value="{StaticResource TooltipShowDelay}"/>
             <Setter Property="ToolTipService.ShowDuration"
                     Value="20000"/>
             <Setter Property="ToolTip">
@@ -7995,6 +8006,28 @@
                                          the name refuses to appear. Name carries
                                          the extension, which is half of what the
                                          strip cannot show. -->
+                                    <!-- THE ONE TOOLTIP THAT DOES NOT TAKE
+                                         TooltipShowDelay, and the reason is that
+                                         it is not an aside: every other list
+                                         draws the name and the tooltip only adds
+                                         the path, so a slow reveal costs nothing.
+                                         THIS strip draws no name at all, so the
+                                         tooltip IS the name, and a cell has
+                                         nothing to say about itself until the
+                                         tooltip arrives (2026-08-26, on report).
+                                         Its own literal on purpose: it is not a
+                                         fraction of the shared number and must
+                                         not follow it when that one is tuned.
+                                         250 rather than 0: a cell still has to be
+                                         RESTED on, so sweeping the strip on the
+                                         way somewhere else pops nothing up.
+                                         BetweenShowDelay is left at its default,
+                                         which is what makes the SECOND cell and
+                                         every one after it answer immediately -
+                                         scanning a strip is one gesture, not a
+                                         fresh decision per frame. -->
+                                    <Setter Property="ToolTipService.InitialShowDelay"
+                                            Value="250"/>
                                     <Setter Property="ToolTip" Value="{Binding Name}"/>
                                     <Setter Property="Template">
                                         <Setter.Value>
