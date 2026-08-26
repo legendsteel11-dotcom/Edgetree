@@ -1183,21 +1183,38 @@
                             MouseLeftButtonUp="AutoHideHandleSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <!-- 기본값 sits at the far left, away from 닫기. It throws away
-                     every colour on this page and the two used to be neighbours,
-                     one button-width apart - the kind of miss that costs the
-                     whole palette. Opposite ends of the row is the usual place
-                     for a discard action, and the confirm prompt stays either
-                     way. -->
+                <!-- 닫기 at one end, everything that acts on the palette at the
+                     other. 기본값 throws away every colour on this page, and the
+                     two were once neighbours a single button-width apart, which
+                     is the miss that costs the whole palette - the width of this
+                     window now stands between them instead, and it is wider than
+                     the button-width that used to. The confirm prompt stays
+                     either way.
+
+                     닫기 was deliberately absent until 2026-08-26: the title bar
+                     already carries an X, and a second way out crowded the
+                     buttons that do the work. The page has since grown to
+                     twenty-six rows, so the row it would have crowded is now
+                     mostly empty - the reason went away with the width (asked
+                     for by the author, who reaches the bottom of this page and
+                     wants the way out there). Esc still closes it through
+                     ColorSettingsWindow_PreviewKeyDown, which gives the picker
+                     first refusal on the key, so this button carries no
+                     IsCancel of its own. -->
                 <Grid Grid.Row="28"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0">
+                    <Button Content="{x:Static services:Strings.ButtonClose}"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource DialogButtonStyle}"
+                            Width="{DynamicResource DialogButtonWidth}"
+                            Click="CloseButton_Click"/>
                     <!-- 내보내기/불러오기 stand with 기본값 rather than beside
-                         닫기: all three act on the whole palette, and none of
+                         닫기: all four act on the whole palette, and none of
                          them is what someone reaches for on the way out. -->
                     <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Left">
+                            HorizontalAlignment="Right">
                         <Button x:Name="ResetDefaultsButton"
                                 Content="{x:Static services:Strings.ButtonDefaults}"
                                 Style="{StaticResource DialogButtonStyle}"
@@ -1227,12 +1244,6 @@
                                 IsEnabled="False"
                                 Click="UndoRandom_Click"/>
                     </StackPanel>
-                    <!-- No 닫기 here. The title bar already carries an X, and a
-                         second way out was crowding the three buttons that do
-                         the actual work of this window. Esc still closes it -
-                         that used to come from this button's IsCancel and now
-                         lives in ColorSettingsWindow_PreviewKeyDown, which
-                         gives the picker first refusal on the key. -->
                 </Grid>
             </Grid>
 
