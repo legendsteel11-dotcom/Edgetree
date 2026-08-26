@@ -936,16 +936,22 @@
                         BorderThickness="0,0,0,1"
                         Margin="{DynamicResource DialogDividerMargin}"/>
 
+                <!-- NO DialogRowSpacing, unlike almost every row on this page.
+                     A row directly under a divider takes its gap from the
+                     divider's own margin (see DialogDividerMargin, which is
+                     even above and below for exactly this) - carrying one as
+                     well adds the two together. This row did, and the second
+                     divider sat ten pixels further from its label than the
+                     first (reported 2026-08-26). 제목 표시줄 배경 under the other
+                     divider is the shape to copy. -->
                 <TextBlock Grid.Row="19"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelGuideLine}"
-                        Style="{StaticResource ColorRowLabelStyle}"
-                        Margin="{DynamicResource DialogRowSpacing}"/>
+                        Style="{StaticResource ColorRowLabelStyle}"/>
                 <StackPanel Grid.Row="19"
                         Grid.Column="1"
                         Orientation="Horizontal"
-                        HorizontalAlignment="Right"
-                        Margin="{DynamicResource DialogRowSpacing}">
+                        HorizontalAlignment="Right">
                     <ToggleButton x:Name="GuideLineSwatchChain"
                             Tag="GuideLineSwatch"
                             Style="{StaticResource ChainToggleStyle}"
