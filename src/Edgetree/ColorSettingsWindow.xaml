@@ -498,7 +498,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <!-- Two more than the colour rows, because two of them are
-                     dividers rather than colours (10 and 17) - see their own
+                     dividers rather than colours (10 and 18) - see their own
                      comments for where each boundary falls and why. -->
                 <RowDefinition Height="Auto"/>
                 <!-- 7~9 패널 이름 셋(2026-08-17), 20 펼침기호, 22~25 필터 칩 넷
@@ -515,6 +515,13 @@
                     <!-- 패널 이름 셋. -->
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <!-- 선택된 폴더 영역 (2026-08-26). THERE MUST BE ONE MORE ROW
+                         HERE THAN THE HIGHEST Grid.Row BELOW. WPF does not
+                         complain about a row that was never defined - it puts
+                         the content in the LAST one instead, and what showed
+                         was the button bar drawn on top of 자동 숨김 손잡이.
+                         check-text counts these against the rows now. -->
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
@@ -856,13 +863,43 @@
                             MouseLeftButtonUp="SelectionSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
+                <!-- Directly under 선택된 항목, because the two mark one moment:
+                     that row, and the folder the row sits in. Unlike every
+                     other entry on this page this one starts EMPTY - it is
+                     derived from the background until it is picked (see
+                     AppSettings.SelectionZoneColorHex), and 기본값으로 되돌리기
+                     puts it back to following rather than writing a colour in.
+                     It became pickable because a step off the background is
+                     not the same step on every monitor. -->
                 <TextBlock Grid.Row="16"
+                        Grid.Column="0"
+                        Text="{x:Static services:Strings.ColorLabelSelectionZone}"
+                        Style="{StaticResource ColorRowLabelStyle}"
+                        Margin="{DynamicResource DialogRowSpacing}"/>
+                <StackPanel Grid.Row="16"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="{DynamicResource DialogRowSpacing}">
+                    <ToggleButton x:Name="SelectionZoneSwatchChain"
+                            Tag="SelectionZoneSwatch"
+                            Style="{StaticResource ChainToggleStyle}"
+                            ToolTip="{x:Static services:Strings.ColorChainTip}"
+                            Click="ChainToggle_Click"/>
+                    <TextBox Tag="SelectionZoneSwatch"
+                            Style="{StaticResource ColorHexBoxStyle}"/>
+                    <Border x:Name="SelectionZoneSwatch"
+                            Style="{StaticResource ColorSwatchStyle}"
+                            MouseLeftButtonUp="SelectionZoneSwatch_MouseLeftButtonUp"/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="17"
                         Grid.Column="0"
                         x:Name="LabelHoverBackground"
                         Text="{x:Static services:Strings.ColorLabelHoverBackground}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="16"
+                <StackPanel Grid.Row="17"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -892,19 +929,19 @@
                      Same treatment as the divider at row 7 rather than a
                      heading: the labels already name each row, and a heading
                      over a group this short would be a word for every four. -->
-                <Border Grid.Row="17"
+                <Border Grid.Row="18"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         BorderBrush="{DynamicResource PanelBorder}"
                         BorderThickness="0,0,0,1"
                         Margin="{DynamicResource DialogDividerMargin}"/>
 
-                <TextBlock Grid.Row="18"
+                <TextBlock Grid.Row="19"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelGuideLine}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="18"
+                <StackPanel Grid.Row="19"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -921,12 +958,12 @@
                             MouseLeftButtonUp="GuideLineSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="19"
+                <TextBlock Grid.Row="20"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelGuideLineActive}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="19"
+                <StackPanel Grid.Row="20"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -943,12 +980,12 @@
                             MouseLeftButtonUp="GuideLineActiveSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="20"
+                <TextBlock Grid.Row="21"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelExpander}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="20"
+                <StackPanel Grid.Row="21"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -965,12 +1002,12 @@
                             MouseLeftButtonUp="ExpanderSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="21"
+                <TextBlock Grid.Row="22"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelPanelDivider}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="21"
+                <StackPanel Grid.Row="22"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -1026,12 +1063,12 @@
                      strip draws at Opacity 0.65, so the colour picked for 제외 칩
                      글자 appears lighter than the swatch. The lit rows do not -
                      their trigger takes the opacity back to 1. -->
-                <TextBlock Grid.Row="22"
+                <TextBlock Grid.Row="23"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelFilterChipChecked}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="22"
+                <StackPanel Grid.Row="23"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -1048,12 +1085,12 @@
                             MouseLeftButtonUp="FilterChipCheckedSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="23"
+                <TextBlock Grid.Row="24"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelFilterChipCheckedFont}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="23"
+                <StackPanel Grid.Row="24"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -1070,12 +1107,12 @@
                             MouseLeftButtonUp="FilterChipCheckedFontSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="25"
+                <TextBlock Grid.Row="26"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelFilterChipExclude}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="25"
+                <StackPanel Grid.Row="26"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -1092,12 +1129,12 @@
                             MouseLeftButtonUp="FilterChipExcludeSwatch_MouseLeftButtonUp"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="24"
+                <TextBlock Grid.Row="25"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelFilterChipExcludeChecked}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="24"
+                <StackPanel Grid.Row="25"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -1118,12 +1155,12 @@
                      that is not seen against the app at all - the sidebar has
                      to be hidden first, so there is nothing to compare it with
                      while it is being set. -->
-                <TextBlock Grid.Row="26"
+                <TextBlock Grid.Row="27"
                         Grid.Column="0"
                         Text="{x:Static services:Strings.ColorLabelAutoHideHandle}"
                         Style="{StaticResource ColorRowLabelStyle}"
                         Margin="{DynamicResource DialogRowSpacing}"/>
-                <StackPanel Grid.Row="26"
+                <StackPanel Grid.Row="27"
                         Grid.Column="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"
@@ -1146,7 +1183,7 @@
                      whole palette. Opposite ends of the row is the usual place
                      for a discard action, and the confirm prompt stays either
                      way. -->
-                <Grid Grid.Row="27"
+                <Grid Grid.Row="28"
                         Grid.Column="0"
                         Grid.ColumnSpan="2"
                         Margin="0,18,0,0">

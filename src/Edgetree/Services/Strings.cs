@@ -721,6 +721,9 @@ public static class Strings
     public static string ColorLabelFileNameFont = "파일 이름";
     public static string ColorLabelFileNameHighlightFont = "파일 이름 강조";
     public static string ColorLabelSelection = "선택된 항목";
+    // 선택된 항목 바로 다음 자리. 둘은 같은 순간을 말하고 하나는 행, 하나는 그
+    // 행이 속한 폴더가 차지하는 구간이다.
+    public static string ColorLabelSelectionZone = "선택된 폴더 영역";
     // 맨 "패널 배경"이었다. 이 목록 안에 멀티미디어 패널 배경이 같이 있어서 둘이
     // 문맥으로 안 갈렸다 - 이름이 아니라 자리가 문제였고, 그래서 수식을 붙였다
     // (2026-08-17). 이 브러시는 북마크 목록과 검색 화면의 범위 줄을 함께 칠한다
@@ -1219,6 +1222,7 @@ public static class Strings
         ColorLabelFileNameFont = "File Name";
         ColorLabelFileNameHighlightFont = "File Name Highlight";
         ColorLabelSelection = "Selected Item";
+        ColorLabelSelectionZone = "Selected Folder Area";
         ColorLabelHistory = "Bookmark Panel Background";
         ColorLabelHoverBackground = "Mouse Hover";
         ColorLabelFolderNameHoverFont = "Folder Name Mouse Hover";

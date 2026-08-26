@@ -121,6 +121,7 @@ public partial class ColorSettingsWindow : Window
         FileNameFontSwatch.Background = ParseBrush(CurrentFileNameColorHex);
         FileNameHighlightFontSwatch.Background = ParseBrush(CurrentFileNameHighlightColorHex);
         SelectionSwatch.Background = ParseBrush(CurrentSelectionColorHex);
+        SelectionZoneSwatch.Background = ParseBrush(CurrentSelectionZoneColorHex);
         HistorySwatch.Background = ParseBrush(CurrentHistoryBackgroundColorHex);
         HoverBackgroundSwatch.Background = ParseBrush(CurrentHoverBackgroundColorHex);
         FolderNameHoverFontSwatch.Background = ParseBrush(CurrentFolderNameHoverColorHex);
@@ -394,6 +395,16 @@ public partial class ColorSettingsWindow : Window
         set { if (_settings.IsLightMode) _settings.LightAutoHideHandleColorHex = value; else _settings.AutoHideHandleColorHex = value; }
     }
 
+    // Reads the same as the rest even though nothing may be stored: the
+    // property behind it answers with the value derived from the background
+    // until someone picks one, so the swatch always shows the colour actually
+    // on screen rather than an empty row.
+    private string CurrentSelectionZoneColorHex
+    {
+        get => _settings.IsLightMode ? _settings.LightSelectionZoneColorHex : _settings.SelectionZoneColorHex;
+        set { if (_settings.IsLightMode) _settings.LightSelectionZoneColorHex = value; else _settings.SelectionZoneColorHex = value; }
+    }
+
     private void DarkMode_Click(object sender, RoutedEventArgs e) => SetThemeMode(light: false);
 
     private void LightMode_Click(object sender, RoutedEventArgs e) => SetThemeMode(light: true);
@@ -512,6 +523,7 @@ public partial class ColorSettingsWindow : Window
             && CurrentFileNameColorHex == GetDefault(defaults, s => s.FileNameColorHex, s => s.LightFileNameColorHex)
             && CurrentFileNameHighlightColorHex == GetDefault(defaults, s => s.FileNameHighlightColorHex, s => s.LightFileNameHighlightColorHex)
             && CurrentSelectionColorHex == GetDefault(defaults, s => s.SelectionColorHex, s => s.LightSelectionColorHex)
+            && CurrentSelectionZoneColorHex == GetDefault(defaults, s => s.SelectionZoneColorHex, s => s.LightSelectionZoneColorHex)
             && CurrentHistoryBackgroundColorHex == GetDefault(defaults, s => s.HistoryBackgroundColorHex, s => s.LightHistoryBackgroundColorHex)
             && CurrentHoverBackgroundColorHex == GetDefault(defaults, s => s.HoverBackgroundColorHex, s => s.LightHoverBackgroundColorHex)
             && CurrentFolderNameHoverColorHex == GetDefault(defaults, s => s.FolderNameHoverColorHex, s => s.LightFolderNameHoverColorHex)
@@ -709,6 +721,13 @@ public partial class ColorSettingsWindow : Window
     // is covered without anyone remembering this exists.
     private Dictionary<string, string>? _preRandomSnapshot;
 
+    // Taken beside the snapshot above, and needed because that one goes
+    // through ColorProperties() - which reads 선택된 폴더 영역 as whatever it
+    // currently RESOLVES to, never as "nothing chosen". Restoring from it
+    // alone would pin the row to a colour on the way back, and the row would
+    // quietly stop following the background from then on.
+    private (string? Dark, string? Light)? _preRandomZone;
+
     // Both dice roll the theme being LOOKED AT. That was already the rule when
     // there was a pair per theme - the inactive theme's pair was disabled - so
     // collapsing them to one pair changed which buttons exist, not what a roll
@@ -817,6 +836,12 @@ public partial class ColorSettingsWindow : Window
             }
         }
 
+        if (_preRandomZone is { } zone)
+        {
+            _settings.StoredSelectionZoneColor = zone.Dark;
+            _settings.StoredLightSelectionZoneColor = zone.Light;
+        }
+
         // The snapshot survives the undo: roll → undo → roll again → undo
         // still lands on the pre-first-roll palette.
         RefreshSwatches();
@@ -836,6 +861,7 @@ public partial class ColorSettingsWindow : Window
         ClosePicker(keep: true);
         _preRandomSnapshot ??= ColorProperties().ToDictionary(
             p => p.Name, p => (string?)p.GetValue(_settings) ?? string.Empty);
+        _preRandomZone ??= (_settings.StoredSelectionZoneColor, _settings.StoredLightSelectionZoneColor);
         UndoRandomButton.IsEnabled = true;
 
         LockRollButtons();
@@ -925,6 +951,21 @@ public partial class ColorSettingsWindow : Window
         // The handle is the roll's one loud voice - see RollHandle for why it
         // is no longer just the rolled background.
         CurrentAutoHideHandleColorHex = Write(palette.Handle);
+
+        // 선택된 폴더 영역 is NOT rolled - it is handed back to the background
+        // that was just rolled, which is the level it sat at before this row
+        // existed (the author's call, 2026-08-26). A roll that gave it a
+        // colour of its own would be picking the one value on this page whose
+        // job is to stay a step behind whatever the ground turned out to be,
+        // and mono would have to drain it too.
+        if (_settings.IsLightMode)
+        {
+            _settings.StoredLightSelectionZoneColor = null;
+        }
+        else
+        {
+            _settings.StoredSelectionZoneColor = null;
+        }
 
         RefreshSwatches();
         _onChanged();
@@ -1323,6 +1364,20 @@ public partial class ColorSettingsWindow : Window
         // its own - which is what the button says it does.
         CurrentAutoHideHandleColorHex = defaults.IsLightMode ? defaults.LightAutoHideHandleColorHex : defaults.AutoHideHandleColorHex;
 
+        // The OPPOSITE of the line above, on purpose. The handle row is written
+        // out so every row on this page ends up holding a colour of its own;
+        // this one is CLEARED, so it goes back to following the background -
+        // which is the state it is meant to be in, and the only state that
+        // stays right when the background is repicked later.
+        if (_settings.IsLightMode)
+        {
+            _settings.StoredLightSelectionZoneColor = null;
+        }
+        else
+        {
+            _settings.StoredSelectionZoneColor = null;
+        }
+
         RefreshSwatches();
         _onChanged();
     }
@@ -1344,6 +1399,9 @@ public partial class ColorSettingsWindow : Window
 
     private void SelectionSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(SelectionSwatch, () => CurrentSelectionColorHex, hex => CurrentSelectionColorHex = hex);
+
+    private void SelectionZoneSwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        => PickColor(SelectionZoneSwatch, () => CurrentSelectionZoneColorHex, hex => CurrentSelectionZoneColorHex = hex);
 
     private void HistorySwatch_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         => PickColor(HistorySwatch, () => CurrentHistoryBackgroundColorHex, hex => CurrentHistoryBackgroundColorHex = hex);
@@ -1440,9 +1498,16 @@ public partial class ColorSettingsWindow : Window
         FileNameFontSwatch, FileNameHighlightFontSwatch, FileNameHoverFontSwatch,
         PanelNameFontSwatch, PanelNameHighlightFontSwatch, PanelNameHoverFontSwatch,
         ShowMoreFontSwatch, HeaderSwatch, HistorySwatch, BackgroundSwatch,
-        ViewerBackgroundSwatch, SelectionSwatch, HoverBackgroundSwatch,
+        ViewerBackgroundSwatch, SelectionSwatch, SelectionZoneSwatch, HoverBackgroundSwatch,
         GuideLineSwatch, GuideLineActiveSwatch, PanelDividerSwatch,
         AutoHideHandleSwatch,
+        // 펼침기호 and the four filter chips were absent until 2026-08-26, which
+        // made them ASYMMETRIC: lit, they could drag the group along, and the
+        // group could never drag them - the loop below only visits this array.
+        // Every row carries the toggle, so every row has to be here, or the
+        // mark says something about that row that is not true.
+        ExpanderSwatch, FilterChipCheckedSwatch, FilterChipCheckedFontSwatch,
+        FilterChipExcludeSwatch, FilterChipExcludeCheckedSwatch,
     };
 
     private bool IsChained(Border swatch)
@@ -1549,6 +1614,8 @@ public partial class ColorSettingsWindow : Window
             return (() => CurrentPanelNameHoverColorHex, hex => CurrentPanelNameHoverColorHex = hex);
         if (ReferenceEquals(swatch, SelectionSwatch))
             return (() => CurrentSelectionColorHex, hex => CurrentSelectionColorHex = hex);
+        if (ReferenceEquals(swatch, SelectionZoneSwatch))
+            return (() => CurrentSelectionZoneColorHex, hex => CurrentSelectionZoneColorHex = hex);
         if (ReferenceEquals(swatch, HistorySwatch))
             return (() => CurrentHistoryBackgroundColorHex, hex => CurrentHistoryBackgroundColorHex = hex);
         if (ReferenceEquals(swatch, HoverBackgroundSwatch))

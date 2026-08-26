@@ -589,6 +589,88 @@ public class AppSettings
         set => StoredLightAutoHideHandleColor = value;
     }
 
+    // 선택을 담고 있는 폴더가 차지하는 구간의 바탕. Null until it is picked, and
+    // DERIVED from the background until then - a step away from it, lighter on
+    // the dark theme and darker on the light one. Same shape as the auto-hide
+    // handle above: a row that is usually right without being asked, and can
+    // still be answered.
+    //
+    // IT BECAME ANSWERABLE ON 2026-08-26 FOR A REASON NO DERIVATION COULD FIX.
+    // The band was clear on the monitor it was tuned on and almost invisible on
+    // the author's other screens - a fixed percentage off the background cannot
+    // know what a given panel does with it. The first design deliberately kept
+    // this out of the palette so it could not be set louder than hover; that
+    // was a worry about what someone might do, against a report of what a
+    // second monitor actually did.
+    [JsonPropertyName("SelectionZoneColorHex")]
+    public string? StoredSelectionZoneColor { get; set; }
+
+    [JsonPropertyName("LightSelectionZoneColorHex")]
+    public string? StoredLightSelectionZoneColor { get; set; }
+
+    [JsonIgnore]
+    public string SelectionZoneColorHex
+    {
+        get => StoredSelectionZoneColor ?? DeriveSelectionZone(BackgroundColorHex, light: false);
+        set => StoredSelectionZoneColor = value;
+    }
+
+    [JsonIgnore]
+    public string LightSelectionZoneColorHex
+    {
+        get => StoredLightSelectionZoneColor ?? DeriveSelectionZone(LightBackgroundColorHex, light: true);
+        set => StoredLightSelectionZoneColor = value;
+    }
+
+    // How far the derived band sits off the background. The two themes do not
+    // take the same step: both were tried at 0.05 and the light one came back
+    // stronger by eye, because the same fraction is a bigger perceived move on
+    // a near-white ground. On white the whole decision fits inside three levels
+    // of grey (#F2F2F2 / #F4F4F4 / #F5F5F5), which is the other half of why
+    // this ended up pickable.
+    private const double SelectionZoneBlend = 0.05;
+    private const double SelectionZoneBlendLight = 0.045;
+
+    // Kept HERE rather than beside the app's other colour maths, because the
+    // property above has to answer with it before any window is up - the
+    // colour page shows this row the same way it shows a stored one, so the
+    // derived value has to be a real hex string, not something the main window
+    // works out on its way to a brush.
+    public static string DeriveSelectionZone(string backgroundHex, bool light)
+    {
+        string hex = backgroundHex.TrimStart('#');
+        string alpha = "FF";
+        if (hex.Length == 8)
+        {
+            alpha = hex[..2];
+            hex = hex[2..];
+        }
+        else if (hex.Length != 6)
+        {
+            // Unreadable rather than wrong: hand the background straight back,
+            // which draws no band at all. A colour invented here would be a
+            // band nobody chose sitting under the selection.
+            return backgroundHex;
+        }
+
+        int target = light ? 0 : 255;
+        double amount = light ? SelectionZoneBlendLight : SelectionZoneBlend;
+        var moved = new char[6];
+        for (int i = 0; i < 3; i++)
+        {
+            if (!int.TryParse(hex.AsSpan(i * 2, 2), NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture, out int channel))
+            {
+                return backgroundHex;
+            }
+            int next = (int)Math.Round(channel + (target - channel) * amount);
+            string pair = Math.Clamp(next, 0, 255).ToString("X2", CultureInfo.InvariantCulture);
+            moved[i * 2] = pair[0];
+            moved[i * 2 + 1] = pair[1];
+        }
+        return "#" + alpha + new string(moved);
+    }
+
     // "라이트/다크 모드" toggle above the color rows in ColorSettingsWindow -
     // which of the two palettes below is currently active/persisted/applied.
     public bool IsLightMode { get; set; } = false;
