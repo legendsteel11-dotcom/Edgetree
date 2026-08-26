@@ -3034,6 +3034,166 @@
              gives: fixed across both themes, blending toward whatever is behind.
              REST IS THE RUNG TO NUDGE if the line reads wrong; hover was left
              where it was so this round changes one thing. -->
+        <!-- THE SOUND MARK - four bars breathing out of step, saying that a
+             track is running. It stands in TWO places now (the footer's held-
+             track row and the viewer's 지금 재생 중 line), which is why it is a
+             template and not two copies: the four periods below are the whole
+             design, and a second set of them would have to be tuned twice.
+             ONE INSTANCE PER PLACE, each with its own clock, because the
+             storyboard lives inside the template and a ControlTemplate carries
+             its own namescope - the target names resolve per instance.
+
+             IT IS NOT A METER. MediaElement hands out no samples, so nothing
+             here can follow the music, and the shape must not claim to. What it
+             says truthfully is the one thing it is wired to: it MOVES WHILE THE
+             TRACK PLAYS AND STANDS STILL WHEN IT IS PAUSED.
+
+             Tag is the switch, as a string rather than a bool - a DataTrigger
+             comparing to a typed value goes through a conversion that is easy
+             to get subtly wrong, and "on" against null cannot be misread. The
+             two callers are UpdateFooterNowPlayingMotion and
+             UpdateViewerNowPlayingMotion.
+
+             CENTRED, not standing on a floor: both rows are one thin line with
+             no baseline to sit on, so the bars grow both ways from the middle
+             and land on the same centre line the text uses.
+             RenderTransformOrigin is the only thing to change for the other
+             shape - 1 instead of 0.5 stands them on their feet.
+
+             EVERY BAR REPEATS ON ITS OWN, and that is the whole difference
+             between this reading as a loop and reading as a restart. The first
+             cut put RepeatBehavior and AutoReverse on the STORYBOARD, so each
+             bar finished early, held its last value until the longest one caught
+             up, and then all four turned round together on that shared boundary
+             - four periods that were never allowed to be four (2026-08-26, on
+             report: "루프라기 보다는 단방향 재시작 같은 느낌"). On the children
+             there is no shared boundary left to fall onto.
+
+             The four periods divide into each other only after about eleven
+             seconds, which is long enough that nothing reads as a beat. Nudging
+             one is safe; making two of them tidy multiples is what would bring
+             the block-blinking back.
+
+             BeginTime staggers the START so the bars do not all leave the same
+             line at once - it reads as a ripple crossing the mark, and once the
+             periods have pulled apart it stops mattering.
+
+             Acceleration AND Deceleration: with AutoReverse the turn happens at
+             both ends, and easing only one end leaves the other snapping into
+             the return.
+
+             ScaleY ONLY. Nothing here touches a property that measures - height
+             would put a layout pass through the whole row on every frame of
+             every bar, and this runs for as long as the music does. -->
+        <Style x:Key="SoundPulseStyle"
+                TargetType="ContentControl">
+            <Setter Property="Focusable" Value="False"/>
+            <!-- Decoration: it must never take a click meant for the row it
+                 sits in, and neither row has anything else that would want the
+                 pointer here. -->
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContentControl">
+                        <StackPanel Orientation="Horizontal">
+                            <StackPanel.Resources>
+                                <Style TargetType="Rectangle">
+                                    <Setter Property="Width" Value="2"/>
+                                    <Setter Property="Height" Value="11"/>
+                                    <Setter Property="Margin" Value="1,0,0,0"/>
+                                    <Setter Property="RadiusX" Value="1"/>
+                                    <Setter Property="RadiusY" Value="1"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+                                    <!-- The ink of whatever row it lands in, so
+                                         the mark belongs to that strip rather
+                                         than bringing a white of its own. Dynamic
+                                         because the viewer's own copy of this key
+                                         is replaced under the full-screen plate. -->
+                                    <Setter Property="Fill"
+                                            Value="{DynamicResource ForegroundText}"/>
+                                </Style>
+                            </StackPanel.Resources>
+                            <!-- The resting scales differ from each other on
+                                 purpose: a paused mark is a still WAVE, not four
+                                 bars of one height. -->
+                            <Rectangle>
+                                <Rectangle.RenderTransform>
+                                    <ScaleTransform x:Name="Pulse1" ScaleY="0.45"/>
+                                </Rectangle.RenderTransform>
+                            </Rectangle>
+                            <Rectangle>
+                                <Rectangle.RenderTransform>
+                                    <ScaleTransform x:Name="Pulse2" ScaleY="0.9"/>
+                                </Rectangle.RenderTransform>
+                            </Rectangle>
+                            <Rectangle>
+                                <Rectangle.RenderTransform>
+                                    <ScaleTransform x:Name="Pulse3" ScaleY="0.6"/>
+                                </Rectangle.RenderTransform>
+                            </Rectangle>
+                            <Rectangle>
+                                <Rectangle.RenderTransform>
+                                    <ScaleTransform x:Name="Pulse4" ScaleY="0.3"/>
+                                </Rectangle.RenderTransform>
+                            </Rectangle>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <!-- A PLAIN Trigger ON THE TEMPLATED TYPE'S OWN
+                                 PROPERTY, which is the only form that works
+                                 here. The first cut used a DataTrigger bound
+                                 with RelativeSource TemplatedParent and the
+                                 bars simply stood still in both places: that
+                                 RelativeSource resolves inside a template's
+                                 VISUAL TREE, not inside ControlTemplate.
+                                 Triggers, so the binding never produced a value
+                                 and the trigger never matched. Nothing said so
+                                 - no error, no warning, just no motion. -->
+                            <Trigger Property="Tag" Value="on">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard x:Name="PulseRun">
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Pulse1"
+                                                    Storyboard.TargetProperty="ScaleY"
+                                                    From="0.30" To="1.0" Duration="0:0:0.36"
+                                                    BeginTime="0:0:0"
+                                                    AutoReverse="True" RepeatBehavior="Forever"
+                                                    AccelerationRatio="0.4" DecelerationRatio="0.4"/>
+                                            <DoubleAnimation Storyboard.TargetName="Pulse2"
+                                                    Storyboard.TargetProperty="ScaleY"
+                                                    From="1.0" To="0.35" Duration="0:0:0.53"
+                                                    BeginTime="0:0:0.08"
+                                                    AutoReverse="True" RepeatBehavior="Forever"
+                                                    AccelerationRatio="0.4" DecelerationRatio="0.4"/>
+                                            <DoubleAnimation Storyboard.TargetName="Pulse3"
+                                                    Storyboard.TargetProperty="ScaleY"
+                                                    From="0.45" To="0.95" Duration="0:0:0.31"
+                                                    BeginTime="0:0:0.16"
+                                                    AutoReverse="True" RepeatBehavior="Forever"
+                                                    AccelerationRatio="0.4" DecelerationRatio="0.4"/>
+                                            <DoubleAnimation Storyboard.TargetName="Pulse4"
+                                                    Storyboard.TargetProperty="ScaleY"
+                                                    From="0.85" To="0.25" Duration="0:0:0.45"
+                                                    BeginTime="0:0:0.24"
+                                                    AutoReverse="True" RepeatBehavior="Forever"
+                                                    AccelerationRatio="0.4" DecelerationRatio="0.4"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <!-- Stop, not Pause: the bars go back to the
+                                         resting scales above rather than freezing
+                                         on whatever frame the pause landed on. -->
+                                    <StopStoryboard BeginStoryboardName="PulseRun"/>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <SolidColorBrush x:Key="GrabLineRestBrush"
                 Color="#606B6B6B"/>
         <SolidColorBrush x:Key="GrabLineHoverBrush"
@@ -3660,6 +3820,37 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- The same chip, plus the half-step up while the ROW is hovered
+             (0.65 -> 0.9, the mark's own numbers) - so the whole held-track
+             strip brightens as one thing under the pointer ("요소들이 전부 좀
+             밝아지면", 2026-08-13).
+             The second condition keeps this out of the way of a DIRECT hover: a
+             Style trigger outranks the template's own IsMouseOver, so without it
+             the button pointed at directly would sit at 0.9 instead of its full
+             1.0.
+             Keyed rather than written inline (2026-08-26): it was one button's
+             private Style until the row gained a play/pause beside the stop, and
+             a hover contract that says "the strip brightens as ONE thing" cannot
+             be stated once per button and stay true. -->
+        <Style x:Key="FooterNowPlayingChipStyle"
+                TargetType="Button"
+                BasedOn="{StaticResource FooterActionGlyphChipStyle}">
+            <Style.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Value="True"
+                                Binding="{Binding IsMouseOver,
+                                    ElementName=FooterNowPlayingRow}"/>
+                        <Condition Value="False"
+                                Binding="{Binding IsMouseOver,
+                                    RelativeSource={RelativeSource Self}}"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Opacity"
+                            Value="0.9"/>
+                </MultiDataTrigger>
+            </Style.Triggers>
         </Style>
 
         <!-- The little chevron that closes the viewer from the divider, so the
@@ -5806,9 +5997,18 @@
                     <Grid x:Name="FooterNowPlayingRow"
                             Margin="8,2,8,6"
                             Visibility="Collapsed">
+                        <!-- FIVE: mark, name, the sound mark, play/pause, stop.
+                             Columns 2 and 3 both arrived 2026-08-26 and each
+                             time the plate's ColumnSpan and the stop button's
+                             own column had to move with them - WPF says nothing
+                             about a child addressing a column that was never
+                             defined, it just files the overflow into the last
+                             one. Three places, every time. -->
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <!-- THE SAME PLATE THE TRANSPORT WEARS, on purpose
@@ -5857,7 +6057,7 @@
                              the two are saying different things - the plate
                              says this row is live, the fill says which part of
                              it you are about to hit. -->
-                        <Border Grid.ColumnSpan="3"
+                        <Border Grid.ColumnSpan="5"
                                 Margin="-4,-2,-4,-2"
                                 Background="{DynamicResource ControlBackground}"
                                 CornerRadius="6">
@@ -6038,39 +6238,80 @@
                              transport, and the transport is gone - so the button
                              here has to be the one that lets go, or the lock
                              stays with no way out of it. -->
-                        <Button x:Name="FooterNowPlayingStop"
+                        <!-- A SOUND MARK THAT MOVES, because the row itself was
+                             not catching the eye of someone working in the tree
+                             (2026-08-26, relayed request). See SoundPulseStyle
+                             for the shape, the periods, and why it is not a
+                             meter. The viewer's 지금 재생 중 line carries the
+                             same mark.
+
+                             Only for a TRACK. This row also carries a held
+                             FILM, which has no sound going at all, and a mark
+                             that means "playing" cannot appear over one that is
+                             not (UpdateFooterNowPlaying hides it).
+
+                             Opacity here rather than in the template: this is
+                             the row's own resting ink and the row's own
+                             half-step under the pointer, so the whole strip
+                             brightens as ONE thing ("요소들이 전부 좀 밝아지면",
+                             2026-08-13). The viewer's copy sits in a different
+                             strip with a different contract. -->
+                        <ContentControl x:Name="FooterNowPlayingPulse"
                                 Grid.Column="2"
-                                Click="FooterNowPlayingStop_Click"
-                                ToolTip="{x:Static services:Strings.ViewerStop}">
-                            <!-- The chip, plus a half-step up while the ROW is
-                                 hovered (0.65 -> 0.9, the mark's own numbers) -
-                                 so the whole strip brightens as one thing under
-                                 the pointer ("요소들이 전부 좀 밝아지면",
-                                 2026-08-13). The second condition keeps this
-                                 trigger out of the way of a direct hover: a
-                                 Style trigger outranks the template's own
-                                 IsMouseOver, so without it the button pointed
-                                 at directly would sit at 0.9 instead of its
-                                 full 1.0. -->
-                            <Button.Style>
-                                <Style TargetType="Button"
-                                        BasedOn="{StaticResource FooterActionGlyphChipStyle}">
+                                Margin="0,0,6,0"
+                                Visibility="Collapsed">
+                            <ContentControl.Style>
+                                <Style TargetType="ContentControl"
+                                        BasedOn="{StaticResource SoundPulseStyle}">
+                                    <Setter Property="Opacity" Value="0.65"/>
                                     <Style.Triggers>
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Value="True"
-                                                        Binding="{Binding IsMouseOver,
-                                                            ElementName=FooterNowPlayingRow}"/>
-                                                <Condition Value="False"
-                                                        Binding="{Binding IsMouseOver,
-                                                            RelativeSource={RelativeSource Self}}"/>
-                                            </MultiDataTrigger.Conditions>
-                                            <Setter Property="Opacity"
-                                                    Value="0.9"/>
-                                        </MultiDataTrigger>
+                                        <DataTrigger Value="True"
+                                                Binding="{Binding IsMouseOver,
+                                                    ElementName=FooterNowPlayingRow}">
+                                            <Setter Property="Opacity" Value="0.9"/>
+                                        </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </Button.Style>
+                            </ContentControl.Style>
+                        </ContentControl>
+                        <!-- PLAY/PAUSE, added 2026-08-26 on request. The row was
+                             STOP-only because letting go of the file is half of
+                             what it is for (see the note above the stop button),
+                             and that reason has not changed - so this is a
+                             SECOND button rather than a replacement, and the way
+                             out is still there beside it.
+                             The transport's own handler, not a copy: pause and
+                             resume already exist, and a second idea of what the
+                             button does is how the two would drift apart. Same
+                             two glyphs for the same reason; SetViewerVideoPlaying
+                             swaps this pair with the transport's own. -->
+                        <Button x:Name="FooterNowPlayingPlayPause"
+                                Grid.Column="3"
+                                Style="{StaticResource FooterNowPlayingChipStyle}"
+                                Click="ViewerMediaPlayPause_Click">
+                            <Grid>
+                                <Path x:Name="FooterNowPlayingPlayIcon"
+                                        Data="M336-216v-528l408 264-408 264Zm73-265Zm-1 133 204-132-204-132v264Z"
+                                        Visibility="Collapsed"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                <Path x:Name="FooterNowPlayingPauseIcon"
+                                        Data="M528-192v-576h240v576H528Zm-336 0v-576h240v576H192Zm408-72h96v-432h-96v432Zm-336 0h96v-432h-96v432Zm0-432v432-432Zm336 0v432-432Z"
+                                        Stretch="Uniform"
+                                        Width="{DynamicResource ViewerChipIconSize}"
+                                        Height="{DynamicResource ViewerChipIconSize}"
+                                        Fill="{Binding Foreground,
+                                            RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Grid>
+                        </Button>
+                        <Button x:Name="FooterNowPlayingStop"
+                                Grid.Column="4"
+                                Style="{StaticResource FooterNowPlayingChipStyle}"
+                                Click="FooterNowPlayingStop_Click"
+                                ToolTip="{x:Static services:Strings.ViewerStop}">
                             <Path Data="M336-624v288-288Zm-72 360v-432h432v432H264Zm72-72h288v-288H336v288Z"
                                     Stretch="Uniform"
                                     Width="{DynamicResource ViewerChipIconSize}"
@@ -8924,6 +9165,31 @@
                                         DockPanel.Dock="Right"
                                         Orientation="Horizontal"
                                         VerticalAlignment="Center">
+                                    <!-- THE SAME SOUND MARK THE FOOTER CARRIES
+                                         (2026-08-26, asked for once the footer's
+                                         was in). Sound only - a film cannot be
+                                         in this line's detached state at all,
+                                         and a film that is merely shown is not
+                                         playing.
+
+                                         IN THIS PANEL, so the name stays
+                                         centred without a second measurement:
+                                         ViewerNowPlayingJumpSpacer already
+                                         mirrors this panel's ActualWidth on the
+                                         other side of the name, so anything put
+                                         in here is balanced for free. Putting it
+                                         against the name instead would have
+                                         meant bounding the name's width by hand,
+                                         and the name is the part that has to
+                                         keep trimming.
+
+                                         Right end of the row, which is where the
+                                         footer's copy sits too. -->
+                                    <ContentControl x:Name="ViewerNowPlayingPulse"
+                                            Margin="0,0,4,0"
+                                            Opacity="0.65"
+                                            Visibility="Collapsed"
+                                            Style="{StaticResource SoundPulseStyle}"/>
                                     <Button x:Name="ViewerNowPlayingJump"
                                             Visibility="Hidden"
                                             VerticalAlignment="Center"

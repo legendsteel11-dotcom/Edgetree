@@ -21498,6 +21498,11 @@ public partial class MainWindow : Window
         FooterNowPlayingRow.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         FooterNowPlayingMusicMark.Visibility = track ? Visibility.Visible : Visibility.Collapsed;
         FooterNowPlayingFilmMark.Visibility = film ? Visibility.Visible : Visibility.Collapsed;
+        // track, NOT show: a held film puts this same row on screen with nothing
+        // playing, and a mark that means "playing" cannot appear over one that
+        // is not.
+        FooterNowPlayingPulse.Visibility = track ? Visibility.Visible : Visibility.Collapsed;
+        UpdateFooterNowPlayingMotion();
 
         if (show)
         {
@@ -21511,6 +21516,34 @@ public partial class MainWindow : Window
                 : $"{name}\n{Strings.FooterHeldFilmResume}";
         }
     }
+
+    // Whether a sound mark is breathing. Same shape as UpdateSubtitleTimer: ask
+    // the conditions, act, and let every caller be a plain call with no state of
+    // its own.
+    //
+    // TWO HALVES TO EVERY ANSWER, and they live apart - the row's own update
+    // decides whether there is a track to mark, SetViewerVideoPlaying decides
+    // whether it is running. Neither knows the other's half, so both call here
+    // rather than either one setting a mark directly.
+    //
+    // The mark itself is a DataTrigger on Tag (see SoundPulseStyle), so setting
+    // the same value twice does nothing at all - no restart, no twitch when
+    // something unrelated in the row moves. That is why this can be called as
+    // freely as its callers run.
+    private const string SoundPulseOn = "on";
+
+    private void SetSoundPulse(ContentControl mark, bool running)
+        => mark.Tag = running ? SoundPulseOn : null;
+
+    private void UpdateFooterNowPlayingMotion()
+        => SetSoundPulse(
+            FooterNowPlayingPulse,
+            FooterNowPlayingPulse.Visibility == Visibility.Visible && _viewerVideoPlaying);
+
+    private void UpdateViewerNowPlayingMotion()
+        => SetSoundPulse(
+            ViewerNowPlayingPulse,
+            ViewerNowPlayingPulse.Visibility == Visibility.Visible && _viewerVideoPlaying);
 
     // ----- 보다 만 영상 (2026-08-19, 요청) ------------------------------------
     //
@@ -23426,6 +23459,25 @@ public partial class MainWindow : Window
         // Hidden, not Collapsed - see the button's own note. Collapsing it moved
         // the band's height and the name's centre on every attach/detach.
         ViewerNowPlayingJump.Visibility = detached ? Visibility.Visible : Visibility.Hidden;
+
+        // THE SOUND MARK GOES WITH THE DETACHMENT TOO, on the same question as
+        // the jump beside it (2026-08-26, on report). Attached, the line already
+        // reads 지금 재생 중 about the very file on screen - there is nothing a
+        // moving mark could add to a sentence that says it in words. Detached
+        // the line carries a NAME instead, and then the mark is the only thing
+        // saying that name is sounding right now rather than merely remembered.
+        //
+        // Collapsed rather than Hidden, unlike the jump: this one sits INSIDE
+        // the panel the name's spacer mirrors, so giving its width back is
+        // answered on the other side automatically and the name stays put.
+        //
+        // Sound only. A film can never reach the detached state at all - see the
+        // note at the top of this method.
+        ViewerNowPlayingPulse.Visibility =
+            detached && _viewerVideoPath is { } sounding && IsViewerAudio(sounding)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        UpdateViewerNowPlayingMotion();
 
         ApplyViewerCaptionEmphasis();
         ViewerNowPlaying.IsHitTestVisible = detached;
@@ -26212,9 +26264,19 @@ public partial class MainWindow : Window
     {
         _viewerVideoPlaying = playing;
         UpdateSubtitleTimer();
+        UpdateFooterNowPlayingMotion();
+        UpdateViewerNowPlayingMotion();
         ViewerMediaPlayIcon.Visibility = playing ? Visibility.Collapsed : Visibility.Visible;
         ViewerMediaPauseIcon.Visibility = playing ? Visibility.Visible : Visibility.Collapsed;
         ViewerMediaPlayPause.ToolTip = playing ? Strings.ViewerPause : Strings.ViewerPlay;
+
+        // The held-track row's own pair, which is the SAME BUTTON in a second
+        // place - one handler, one state, and therefore one line that swaps
+        // both. The two are never on screen together (that row only exists
+        // while the panel is shut), so nothing here has to keep them apart.
+        FooterNowPlayingPlayIcon.Visibility = ViewerMediaPlayIcon.Visibility;
+        FooterNowPlayingPauseIcon.Visibility = ViewerMediaPauseIcon.Visibility;
+        FooterNowPlayingPlayPause.ToolTip = ViewerMediaPlayPause.ToolTip;
 
         // THE BUTTON ON THE PICTURE COMES BACK WHEN IT IS PAUSED (2026-08-11).
         // It used to return only at the end of a file, so clicking album art to
