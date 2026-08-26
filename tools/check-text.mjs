@@ -266,6 +266,49 @@ const BRIT = /\b(colours?|coloured|behaviour\w*|favourite\w*|minimis\w+|maximis\
   report('메뉴 태그가 XAML에 있는가', hits, asked.size + '개 확인')
 }
 
+// ------------------------------------------- 색상 줄이 여덟 군데를 다 거쳤는가
+//
+// 2026-08-26. 색상 설정에 줄 하나를 넣는 데 여덟 군데가 그 줄을 알아야 하는데,
+// 그중 둘을 빠뜨렸다 - ColorBindingFor(스와치가 값에 닿는 유일한 통로)와
+// ColorSwatches(묶기가 도는 목록). 증상은 오류가 아니라 침묵이었다: 헥스 상자가
+// 비어 있고, 색을 골라도 스와치만 잠깐 물들고 아무것도 저장되지 않았다.
+//
+// XAML 의 스와치 하나하나가 코드의 그 두 목록에 들어 있는지 본다. 새 줄을 넣고
+// 하나라도 빠뜨리면 여기서 걸린다.
+{
+  const cs = read('src/Edgetree/ColorSettingsWindow.xaml.cs')
+  const xaml = read('src/Edgetree/ColorSettingsWindow.xaml')
+  const swatches = [...xaml.matchAll(/x:Name="(\w+Swatch)"/g)].map((m) => m[1])
+  const bound = new Set([...cs.matchAll(/ReferenceEquals\(swatch, (\w+Swatch)\)/g)].map((m) => m[1]))
+  const listed = new Set(
+    (cs.match(/private Border\[\] ColorSwatches[\s\S]*?};/)?.[0] ?? '')
+      .match(/\w+Swatch/g) ?? [])
+  const hits = []
+  for (const name of swatches) {
+    if (!bound.has(name)) hits.push(name + ' - ColorBindingFor 에 없음 (헥스 상자가 비고 고른 색이 저장되지 않는다)')
+    if (!listed.has(name)) hits.push(name + ' - ColorSwatches 에 없음 (묶기가 이 줄을 건너뛴다)')
+  }
+  if (swatches.length < 20) hits.push('XAML 에서 스와치를 ' + swatches.length + '개밖에 못 찾음 - 위 정규식을 볼 것')
+  report('색상 줄이 코드의 두 목록에 다 있는가', hits, swatches.length + '줄 확인')
+
+  // 줄을 하나 끼우면 Grid.Row 를 전부 다시 매기고 RowDefinition 도 하나 늘려야
+  // 한다. 늘리는 것을 잊으면 WPF 는 아무 말도 안 하고 넘치는 것을 마지막 행에
+  // 넣어 버린다 - 2026-08-26 에 버튼 줄이 자동 숨김 손잡이 위에 겹쳐 그려졌다.
+  // 정의된 행 수는 가장 큰 Grid.Row 보다 하나 많아야 한다.
+  const defsBlock = [...xaml.matchAll(/<Grid.RowDefinitions>[\s\S]*?<\/Grid.RowDefinitions>/g)]
+  const rows = [...xaml.matchAll(/Grid.Row="(\d+)"/g)].map((m) => +m[1])
+  const maxRow = rows.length ? Math.max(...rows) : -1
+  const biggest = defsBlock
+    .map((m) => (m[0].match(/<RowDefinition/g) ?? []).length)
+    .reduce((a, b) => Math.max(a, b), 0)
+  const rowHits = []
+  if (biggest < maxRow + 1) {
+    rowHits.push('행 정의가 ' + biggest + '개인데 Grid.Row 는 ' + maxRow +
+      ' 까지 씀 - 넘치는 줄이 마지막 행에 겹쳐 그려진다')
+  }
+  report('색상 창의 행 정의가 모자라지 않는가', rowHits, biggest + '행 / 최대 Grid.Row ' + maxRow)
+}
+
 // ------------------------------------------------------------------ 버전
 //
 // 2026-08-18: 버전을 올린 뒤 Debug 를 다시 안 만들고 띄워서, 사용자가 2.4.0
