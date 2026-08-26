@@ -16072,6 +16072,7 @@ public partial class MainWindow : Window
             var refreshItem = FindTaggedMenuElement<MenuItem>(menu, "refresh");
             var searchInFolderItem = FindTaggedMenuElement<MenuItem>(menu, "searchInFolder");
             var sortMenu = FindTaggedMenuElement<MenuItem>(menu, "sort");
+            var openItem = FindTaggedMenuElement<MenuItem>(menu, "open");
             var openWithItem = FindTaggedMenuElement<MenuItem>(menu, "openWith");
             var compressItem = FindTaggedMenuElement<MenuItem>(menu, "compress");
             var extractItem = FindTaggedMenuElement<MenuItem>(menu, "extract");
@@ -16290,6 +16291,25 @@ public partial class MainWindow : Window
             {
                 sortMenu.IsEnabled = isFolder;
                 ApplyFolderSortMenuState(sortMenu, isFolder);
+            }
+
+            // The same row, said three ways. NOT disabled for a folder: it does
+            // something there, and so does Enter, which this row shows - greying
+            // it would put "unavailable" on a row whose own key works. What was
+            // wrong was the word, since a folder has no default program.
+            //
+            // And the word has to follow the STATE, not just the kind. 펼치기
+            // over an already-open folder was the same defect one step along:
+            // a row naming an action it would then decline to perform. The
+            // action toggles now (see OpenItem_Click), so both words are always
+            // true and the row is never dead.
+            if (openItem is not null)
+            {
+                openItem.Header = isFolder
+                    ? (ExplorerTree.SelectedItem is FileSystemItem { IsExpanded: true }
+                        ? Strings.MenuCollapseFolder
+                        : Strings.MenuExpandFolder)
+                    : Strings.MenuOpen;
             }
 
             // "Open with" only makes sense for files - folders don't have a
@@ -19319,7 +19339,11 @@ public partial class MainWindow : Window
             // the way it always has (see _lastTreeUserInputTicks).
             _lastTreeUserInputTicks = Environment.TickCount64;
             _lastTreeInputSource = $"menu-open:{item.Name}";
-            item.IsExpanded = true;
+            // TOGGLES, since 2026-08-26. It used to set IsExpanded = true and
+            // nothing else, so on an already-open folder both ways in here -
+            // the context menu row and Enter - did nothing at all, and the row
+            // named an action it would then decline to perform.
+            item.IsExpanded = !item.IsExpanded;
         }
         else if (!IsUnreachableNetworkItem(item))
         {

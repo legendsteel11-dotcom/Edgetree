@@ -1396,7 +1396,12 @@
                     Visibility="Collapsed"
                     Header="{x:Static services:Strings.MenuPlayHere}"
                     Click="FolderPlayHere_Click"/>
-            <MenuItem Header="{x:Static services:Strings.MenuOpen}"
+            <!-- The word follows the kind, the way 보기/재생 above it does:
+                 a folder has no default program, and what this actually does
+                 for one is expand it in the tree. Set in
+                 ExplorerItemContextMenu_Opened. -->
+            <MenuItem Tag="open"
+                    Header="{x:Static services:Strings.MenuOpen}"
                     InputGestureText="Enter"
                     Click="OpenItem_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuOpenWith}"

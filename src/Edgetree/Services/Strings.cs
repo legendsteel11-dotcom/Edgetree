@@ -184,6 +184,10 @@ public static class Strings
     // viewer's own menu has always called this exact action (see
     // ViewerOpenExternally, which shares its handler).
     public static string MenuOpen = "기본 프로그램에서 열기";
+    // 같은 줄이 폴더일 때 쓰는 말. 폴더에는 기본 프로그램이라는 것이 없고,
+    // 이 줄이 폴더에 대해 실제로 하는 일은 트리에서 펼치는 것이다.
+    public static string MenuExpandFolder = "펼치기";
+    public static string MenuCollapseFolder = "접기";
     // One item whose word follows the file: a picture is looked at, a track or a
     // film is played.
     public static string MenuViewHere = "보기";
@@ -1014,6 +1018,8 @@ public static class Strings
         CollapseAllConfirmTitle = "Collapse All Expanded Folders";
         CollapseAllConfirmBody = "Collapse every folder that is currently expanded?";
         MenuOpen = "Open in default app";
+        MenuExpandFolder = "Expand";
+        MenuCollapseFolder = "Collapse";
         MenuViewHere = "View";
         MenuPlayHere = "Play";
         MenuOpenWith = "Open With";
