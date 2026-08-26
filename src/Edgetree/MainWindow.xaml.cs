@@ -12595,6 +12595,14 @@ public partial class MainWindow : Window
         double rowGlyphBox = Math.Max(8.0, Math.Round(16.0 * scale - rowSqueeze));
         Resources["IconSize"] = rowGlyphBox;
 
+        // The badge that rides the corner of one of those icons (the
+        // hidden-folder list's network mark). Derived from the icon rather than
+        // from the font again, for the same reason the header's glyph box is
+        // derived from the header: two independent clamps let a mark outgrow
+        // the thing it sits on. Floored at 4 - below that it stops being a dot
+        // and becomes a stray pixel.
+        Resources["IconBadgeSize"] = Math.Max(4.0, Math.Round(rowGlyphBox * 0.42));
+
         // The header, and the glyph box inside it. DERIVED FROM THE HEADER, not
         // from the font a second time: the two were 36 and 18 independently, and
         // two independent clamps would have let a glyph outgrow the bar it sits
@@ -18802,31 +18810,126 @@ public partial class MainWindow : Window
             StaysOpenOnClick = true,
         });
 
+        // icon (with its badge) | name | 해제
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
+        // The icon and its mark share one cell, so the mark rides the folder
+        // instead of standing beside it - which is how the tree already says
+        // "network" about a drive, on the icon rather than next to it. The
+        // spacing to the name moves out here with them.
+        var iconCell = new Grid
+        {
+            Margin = new Thickness(0, 0, 8, 0),
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+        };
+
         var icon = new System.Windows.Controls.Image
         {
             Source = Resources["FavoriteFolderIconSource"] as ImageSource,
             Stretch = Stretch.Uniform,
-            Margin = new Thickness(0, 0, 8, 0),
-            VerticalAlignment = System.Windows.VerticalAlignment.Center,
             SnapsToDevicePixels = true,
         };
         icon.SetResourceReference(WidthProperty, "IconSize");
         icon.SetResourceReference(HeightProperty, "IconSize");
-        Grid.SetColumn(icon, 0);
-        grid.Children.Add(icon);
+        iconCell.Children.Add(icon);
+
+        // GREEN MARKS A NETWORK DRIVE (2026-08-26, on request). The letter
+        // alone leaves the two kinds looking alike, and the split that matters
+        // when reading this list is local against the NAS - a letter says which
+        // disk, this says which KIND of place.
+        //
+        // NOT a "connected" light, which is what the first cut built and was
+        // not the ask. That version is worth remembering if it ever comes up:
+        // it can be answered without touching a drive at all - the letter from
+        // GetLogicalDrives' bitmask, the mapping's health from
+        // FileSystemService.IsNetworkPathUnreachable, both memory reads. What
+        // must never be done is DriveInfo.IsReady on a wedged mapping, which
+        // blocks for as long as the read would.
+        //
+        // HIDDEN, NOT COLLAPSED, on a local row: the slot stays and the names
+        // line up down the list whichever kind each row is.
+        //
+        // IsNetworkFolder is the app's existing answer and is reused rather
+        // than restated. Its fallback for a path it cannot parse is "remote",
+        // chosen for the settle-pace caller where the gentler guess is the safe
+        // one; here it would put a mark on a row that could not be read. The
+        // case is a malformed path rather than a missing drive - DriveType
+        // answers for a letter with no media without throwing - so it is left
+        // alone rather than forked.
+        // BOTTOM LEFT, which is where Windows puts an overlay on an icon - the
+        // shortcut arrow and the network mark both live there, and the drive
+        // icons in the tree carry their green low on the glyph for the same
+        // reason. It was bottom right for one build and read as hanging off the
+        // corner rather than sitting on the folder (2026-08-26).
+        //
+        // COLLAPSED when it does not apply: riding the icon it takes no width
+        // of its own, so there is no slot to hold open and nothing shifts along
+        // the row either way.
+        //
+        // Sized from IconBadgeSize so it grows and shrinks with the icon under
+        // it through Ctrl +/-; a fixed dot would swallow a small folder and
+        // vanish on a large one.
+        // RINGED IN THE MENU'S OWN SURFACE, so it reads as cut out of the icon
+        // rather than dropped on top of it - which is what the shell's own
+        // overlays do and what made the flat dot look pasted on beside them
+        // (2026-08-26). The ring separates green from a gold folder in either
+        // theme, because it is the same colour as the paper the row is on.
+        var network = new System.Windows.Shapes.Ellipse
+        {
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
+            VerticalAlignment = System.Windows.VerticalAlignment.Bottom,
+            StrokeThickness = 1,
+            Visibility = IsNetworkFolder(path)
+                ? Visibility.Visible
+                : Visibility.Collapsed,
+        };
+        network.SetResourceReference(WidthProperty, "IconBadgeSize");
+        network.SetResourceReference(HeightProperty, "IconBadgeSize");
+        network.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "NetworkDriveMarkBrush");
+        network.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "PanelBackground");
+        iconCell.Children.Add(network);
+
+        Grid.SetColumn(iconCell, 0);
+        grid.Children.Add(iconCell);
 
         var name = new TextBlock
         {
-            Text = BookmarkLeafName(path),
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = System.Windows.VerticalAlignment.Center,
         };
         name.SetResourceReference(TextBlock.ForegroundProperty, "FolderNameForeground");
+
+        // WHERE IT WAS, because in this list there is no other way to find out
+        // (2026-08-26, on report). The same idea was built for the BOOKMARK
+        // list and dropped on 2026-07-28 as clutter, and that verdict still
+        // holds THERE: a bookmark row jumps to its folder, so "which one is
+        // this" can be answered by going and looking. A hidden folder cannot be
+        // gone to - the row deliberately does nothing - so the tooltip was the
+        // only answer and it only serves one row at a time.
+        //
+        // A RUN INSIDE THE NAME, not a column of its own. Separate Grids do not
+        // share an Auto column's width, so a per-row column would start every
+        // name at a different x once a UNC label sat among the two-character
+        // drives. In the flow they simply read as one line, and the trimming
+        // still eats the END, which is the part that was never the question.
+        //
+        // Smaller, not dimmer - the same step and the same resource the 해제
+        // chip beside it uses, so it follows Ctrl +/- with everything else.
+        string root = PlaceRootLabel(path);
+        string leaf = BookmarkLeafName(path);
+        // A hidden drive ROOT would otherwise read "D:  D:\".
+        if (root.Length > 0 && !string.Equals(root, leaf.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+        {
+            var drive = new System.Windows.Documents.Run($"{root}  ");
+            drive.SetResourceReference(System.Windows.Documents.TextElement.FontSizeProperty, "MenuChipFontSize");
+            drive.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "MenuForeground");
+            name.Inlines.Add(drive);
+        }
+
+        name.Inlines.Add(new System.Windows.Documents.Run(leaf));
         Grid.SetColumn(name, 1);
         grid.Children.Add(name);
 
@@ -18972,6 +19075,26 @@ public partial class MainWindow : Window
                 AppendBookmarkListTo(submenu);
             }
         }
+    }
+
+    // The shortest thing that answers "which disk was that on". A drive letter
+    // for anything with one - a mapped network drive included, which is what
+    // the user sees for it everywhere else in the app.
+    //
+    // For a UNC path the answer is the MACHINE, not the share: \\NAS\media and
+    // \\NAS\backup are the same place in the sense this list is being asked
+    // about, and the share would push the label past the width a prefix can
+    // have. The full path is still on the row's tooltip either way.
+    private static string PlaceRootLabel(string path)
+    {
+        string root = Path.GetPathRoot(path) ?? string.Empty;
+        if (!root.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            return root.TrimEnd('\\');
+        }
+
+        int share = root.IndexOf('\\', 2);
+        return share > 0 ? root[..share] : root.TrimEnd('\\');
     }
 
     private static string BookmarkLeafName(string path)
