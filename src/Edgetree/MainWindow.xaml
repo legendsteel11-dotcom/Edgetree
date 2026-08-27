@@ -1,4 +1,4 @@
-<!-- Crispness settings on the Window below, inherited by everything in it.
+﻿<!-- Crispness settings on the Window below, inherited by everything in it.
 
      UseLayoutRounding: without it, layout lands on fractional device pixels, so
      a 1px divider gets spread across two pixels as two grey halves. Subtle at
@@ -2155,6 +2155,43 @@
                      off three different menus - see that handler. -->
                 <MenuItem Header=""/>
             </MenuItem>
+            <!-- LAST IN THE GROUP THAT DECIDES WHAT THE TREE SHOWS (2026-08-27,
+                 on request), under 북마크 목록 · 숨긴 폴더 · 네트워크 위치 ·
+                 표시할 파일 형식. It spent a while below the steppers, where it
+                 sat among rows about how the tree LOOKS - size, spacing,
+                 thickness - and it is not one of those: the order of a folder's
+                 rows belongs with which rows there are at all.
+                 Moving it is safe to do at any time. Nothing in this menu is
+                 addressed by position; this row answers to its AutomationId
+                 (see OptionsMenu_Opened). -->
+            <MenuItem Header="{x:Static services:Strings.MenuDefaultSort}"
+                    AutomationProperties.AutomationId="sortMenu">
+                <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
+                        IsCheckable="True"
+                        Tag="name"
+                        Click="SortFieldMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortByDate}"
+                        IsCheckable="True"
+                        Tag="date"
+                        Click="SortFieldMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortByType}"
+                        IsCheckable="True"
+                        Tag="type"
+                        Click="SortFieldMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortBySize}"
+                        IsCheckable="True"
+                        Tag="size"
+                        Click="SortFieldMenuItem_Click"/>
+                <Separator/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortAscending}"
+                        IsCheckable="True"
+                        Tag="asc"
+                        Click="SortDirectionMenuItem_Click"/>
+                <MenuItem Header="{x:Static services:Strings.MenuSortDescending}"
+                        IsCheckable="True"
+                        Tag="desc"
+                        Click="SortDirectionMenuItem_Click"/>
+            </MenuItem>
             <Separator/>
             <!-- ITS OWN PLACE, fenced both sides, above 색상 설정 (2026-08-24).
                  It sat under 글꼴 크기 among the steppers, where it was found by
@@ -2428,41 +2465,16 @@
             <!-- Kept next to Language: both open a submenu, so they read as a
                  pair at the end of the settings block rather than one submenu
                  stranded above a run of steppers. -->
-            <MenuItem Header="{x:Static services:Strings.MenuDefaultSort}"
-                    AutomationProperties.AutomationId="sortMenu">
-                <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
-                        IsCheckable="True"
-                        Tag="name"
-                        Click="SortFieldMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuSortByDate}"
-                        IsCheckable="True"
-                        Tag="date"
-                        Click="SortFieldMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuSortByType}"
-                        IsCheckable="True"
-                        Tag="type"
-                        Click="SortFieldMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuSortBySize}"
-                        IsCheckable="True"
-                        Tag="size"
-                        Click="SortFieldMenuItem_Click"/>
-                <Separator/>
-                <MenuItem Header="{x:Static services:Strings.MenuSortAscending}"
-                        IsCheckable="True"
-                        Tag="asc"
-                        Click="SortDirectionMenuItem_Click"/>
-                <MenuItem Header="{x:Static services:Strings.MenuSortDescending}"
-                        IsCheckable="True"
-                        Tag="desc"
-                        Click="SortDirectionMenuItem_Click"/>
-            </MenuItem>
             <!-- Applies live (no restart) - see IconStyleMenuItem_Click.
                  Sits above 언어 rather than below it: this one changes how the
                  tree looks, like the rows of settings it follows, while a
                  language change restarts the app and belongs at the end with
-                 the other things that leave. OptionsMenu_Opened matches this
-                 menu's items by POSITION, so keep its pattern in sync when
-                 touching anything here. -->
+                 the other things that leave.
+                 This used to warn that OptionsMenu_Opened matched the menu's
+                 items BY POSITION and had to be kept in step. It has not since
+                 2026-08-02 - every row is found by AutomationId now, and that
+                 handler's own comment records why. The warning outlived the
+                 rule it described and is removed here (2026-08-27). -->
             <MenuItem Header="{x:Static services:Strings.MenuIconStyle}"
                     AutomationProperties.AutomationId="iconStyleMenu">
                 <MenuItem Header="{x:Static services:Strings.MenuIconStyleDefault}"
