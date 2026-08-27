@@ -16766,6 +16766,25 @@ public partial class MainWindow : Window
         _driveMask &= ~left;
         LogDriveChange($"device change: arrived [{LettersText(arrived)}] left [{LettersText(left)}]");
 
+        // THE CLOUD LETTERS ARE RE-ASKED, because a letter moving is exactly
+        // what that set is an answer about. It is read once and kept (see
+        // ReadCloudDriveRoots) on the reasoning that a provider is not installed
+        // while the app is up - which is true, and beside the point: Google
+        // Drive STARTING is a letter arriving, not an install, and the tree's
+        // own drive row learns it here (TryBuildDriveRoot reads the label as the
+        // row is built) while this set did not. So the same folder came back
+        // marked cloud in the tree and unmarked in the 숨긴 폴더 list, which is
+        // one question with two answers (2026-08-27, found in review).
+        //
+        // Dropped rather than rebuilt: the next caller is a menu opening, and
+        // that is a better moment to ask a drive for a volume label than the
+        // tail of a device message.
+        //
+        // The SYNC ROOT list beside it is deliberately left alone - those are
+        // provider registrations for folder-mounted clouds (OneDrive), and a
+        // letter appearing says nothing about them.
+        _cloudDriveRoots = null;
+
         foreach (string rootPath in DriveLetters(left))
         {
             RemoveDriveRoot(rootPath);
