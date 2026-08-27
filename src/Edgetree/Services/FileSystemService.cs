@@ -356,15 +356,18 @@ public static class FileSystemService
     // would put IsReady and a volume label for the whole machine - a sleeping
     // NAS among them - in front of whatever asked. Returns null for the two
     // cases the loop used to walk past.
-    // 클라우드가 드라이브 문자로 붙었을 때 알아볼 수 있는 유일한 신호가 볼륨
-    // 레이블이다. 2026-08-26에 구글 드라이브를 두고 잰 결과 - DriveType은 Fixed,
-    // 루트 속성은 Directory 뿐, 레지스트리에도 문자 정보가 없었고, 윈도우가 관리하는
-    // 동기화 루트 목록(SyncRootManager)에도 등록되지 않는다. 자체 드라이버로 마운트되기
-    // 때문이다. **폴더로 붙는 쪽(OneDrive 등)은 그 목록이 답하므로** MainWindow가 그쪽을
-    // 맡고, 여기는 문자로 붙는 쪽만 본다.
+    // THE VOLUME LABEL IS THE ONLY SIGNAL a cloud provider mounted as a drive
+    // letter gives off. Measured against Google Drive on 2026-08-26: DriveType
+    // reads Fixed, the root carries no attribute of its own, its own registry
+    // keys never name the letter, and it is absent from the sync-root list
+    // Windows keeps (SyncRootManager) because it mounts through a driver of its
+    // own rather than the Cloud Files API. Providers that mount as a FOLDER
+    // (OneDrive and the rest) are in that list, so MainWindow answers those and
+    // this only has to cover the lettered kind.
     //
-    // 목록인 것은 한계이지 설계가 아니다. 레이블을 바꾸거나 새 제공자가 나오면 표시가
-    // 안 붙을 뿐 엉뚱한 곳에 붙지는 않는다. 더 나은 신호를 찾으면 그때 여기를 고친다.
+    // The list is a limit, not a design. A renamed label or a provider nobody
+    // has heard of loses the mark; neither puts one in the wrong place. Replace
+    // this the day a better signal turns up.
     private static readonly string[] CloudDriveLabels =
     {
         "Google Drive",

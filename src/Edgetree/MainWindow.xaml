@@ -3084,9 +3084,9 @@
              cut put RepeatBehavior and AutoReverse on the STORYBOARD, so each
              bar finished early, held its last value until the longest one caught
              up, and then all four turned round together on that shared boundary
-             - four periods that were never allowed to be four (2026-08-26, on
-             report: "루프라기 보다는 단방향 재시작 같은 느낌"). On the children
-             there is no shared boundary left to fall onto.
+             - four periods that were never allowed to be four. It read as one
+             restart rather than a loop (2026-08-26). On the children there is
+             no shared boundary left to fall onto.
 
              The four periods divide into each other only after about eleven
              seconds, which is long enough that nothing reads as a beat. Nudging
@@ -3885,8 +3885,7 @@
 
         <!-- The same chip, plus the half-step up while the ROW is hovered
              (0.65 -> 0.9, the mark's own numbers) - so the whole held-track
-             strip brightens as one thing under the pointer ("요소들이 전부 좀
-             밝아지면", 2026-08-13).
+             strip brightens as one thing under the pointer (2026-08-13).
              The second condition keeps this out of the way of a DIRECT hover: a
              Style trigger outranks the template's own IsMouseOver, so without it
              the button pointed at directly would sit at 0.9 instead of its full
@@ -6339,8 +6338,7 @@
                              Opacity here rather than in the template: this is
                              the row's own resting ink and the row's own
                              half-step under the pointer, so the whole strip
-                             brightens as ONE thing ("요소들이 전부 좀 밝아지면",
-                             2026-08-13). The viewer's copy sits in a different
+                             brightens as ONE thing (2026-08-13). The viewer's copy sits in a different
                              strip with a different contract. -->
                         <ContentControl x:Name="FooterNowPlayingPulse"
                                 Grid.Column="2"

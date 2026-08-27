@@ -44,6 +44,7 @@ DDPM.Subagent.User_*.png
 
 # Personal working notes, not for the public repo
 src/Edgetree/TODO.md
+CLAUDE.md
 edgetree-spec.md
 
 # Local copies of built release exes (also uploaded to GitHub Releases -
