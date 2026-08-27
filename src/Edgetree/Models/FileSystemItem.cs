@@ -366,6 +366,13 @@ public class FileSystemItem : INotifyPropertyChanged
     // Explorer badges the network drive icon itself.
     public bool IsOnNetworkDrive { get; set; }
 
+    // The same for a CLOUD drive - Google Drive and the rest of the providers
+    // that mount themselves as a letter. Its own flag rather than a value on the
+    // one above, because a place can be neither and the two marks answer
+    // different questions; a cloud drive reports DriveType.Fixed, so nothing
+    // about it is a shade of "network" (2026-08-26).
+    public bool IsOnCloudDrive { get; set; }
+
     // Whether that network drive is answering right now. Drives the badge's
     // colour (green connected / red not), kept up to date by MainWindow's own
     // poll rather than asked per row - one question per drive, not per folder,
@@ -424,6 +431,7 @@ public class FileSystemItem : INotifyPropertyChanged
         IsDirectory = isDirectory;
         Parent = parent;
         IsOnNetworkDrive = parent?.IsOnNetworkDrive ?? false;
+        IsOnCloudDrive = parent?.IsOnCloudDrive ?? false;
         // Inherited so a row built while the drive is out (a merge running on
         // a stale listing, a folder expanded from cache) starts out looking
         // the same as its neighbours instead of alone in full colour.

@@ -18836,10 +18836,15 @@ public partial class MainWindow : Window
         icon.SetResourceReference(HeightProperty, "IconSize");
         iconCell.Children.Add(icon);
 
-        // GREEN MARKS A NETWORK DRIVE (2026-08-26, on request). The letter
-        // alone leaves the two kinds looking alike, and the split that matters
-        // when reading this list is local against the NAS - a letter says which
-        // disk, this says which KIND of place.
+        // GREEN MARKS A NETWORK DRIVE, BLUE A CLOUD ONE (2026-08-26, on
+        // request, blue added right after). The letter alone leaves every kind
+        // looking alike, and the split that matters when reading this list is
+        // local against the NAS against the cloud - a letter says which disk,
+        // this says which KIND of place.
+        //
+        // CLOUD WINS when something answers both, which a cloud drive mounted
+        // over SMB would: it is the more particular of the two answers, and the
+        // green would otherwise say the less useful thing about it.
         //
         // NOT a "connected" light, which is what the first cut built and was
         // not the ask. That version is worth remembering if it ever comes up:
@@ -18877,19 +18882,26 @@ public partial class MainWindow : Window
         // overlays do and what made the flat dot look pasted on beside them
         // (2026-08-26). The ring separates green from a gold folder in either
         // theme, because it is the same colour as the paper the row is on.
+        string? placeMark = IsCloudFolder(path)
+            ? "PlaceBadgeCloudBrush"
+            : IsNetworkFolder(path)
+                ? "PlaceBadgeNetworkBrush"
+                : null;
+
         var network = new System.Windows.Shapes.Ellipse
         {
             HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
             VerticalAlignment = System.Windows.VerticalAlignment.Bottom,
             StrokeThickness = 1,
-            Visibility = IsNetworkFolder(path)
-                ? Visibility.Visible
-                : Visibility.Collapsed,
+            Visibility = placeMark is null
+                ? Visibility.Collapsed
+                : Visibility.Visible,
         };
         network.SetResourceReference(WidthProperty, "IconBadgeSize");
         network.SetResourceReference(HeightProperty, "IconBadgeSize");
-        network.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "NetworkDriveMarkBrush");
-        network.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "PanelBackground");
+        network.SetResourceReference(
+            System.Windows.Shapes.Shape.FillProperty, placeMark ?? "PlaceBadgeNetworkBrush");
+        network.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "PlaceBadgeRimBrush");
         iconCell.Children.Add(network);
 
         Grid.SetColumn(iconCell, 0);
@@ -19085,6 +19097,157 @@ public partial class MainWindow : Window
     // \\NAS\backup are the same place in the sense this list is being asked
     // about, and the share would push the label past the width a prefix can
     // have. The full path is still on the row's tooltip either way.
+    // ----- 클라우드 자리 판정 --------------------------------------------------
+    //
+    // 두 가지 모양이 있고 신호가 서로 다르다. 하나로 답하는 방법이 없어서 둘을 함께
+    // 쓴다 (2026-08-26, 요청).
+    //
+    // ① 폴더로 붙는 것 (OneDrive 등). 윈도우가 Cloud Files API 제공자를 레지스트리에
+    //    등록해 두므로 **경로를 윈도우에게 물어보면 된다.** 이름 목록이 아니라 시스템의
+    //    답이고, 같은 API를 쓰는 다른 제공자도 함께 잡힌다.
+    // ② 드라이브 문자로 붙는 것 (구글 드라이브). ①에 등록되지 않는다 - 자체 드라이버로
+    //    마운트되기 때문이다. 그리고 **다른 신호가 없다**: 2026-08-26에 측정한 결과
+    //    `G:` 는 DriveType=Fixed, 루트 속성은 Directory 뿐, 레지스트리에도 문자 정보가
+    //    없었다. 남는 것은 볼륨 레이블뿐이라 아래 목록으로 맞춘다.
+    //
+    // ②의 이름 목록은 FileSystemService.IsCloudDriveLabel에 있다. 트리의 드라이브
+    // 행도 같은 판정을 쓰므로(TryBuildDriveRoot가 IsOnCloudDrive를 세운다) 목록이 두
+    // 벌이 되면 안 된다.
+    //
+    // 윈도우에 등록된 동기화 루트의 경로들. 한 번 읽고 그대로 둔다 - 제공자가 설치되고
+    // 지워지는 것은 앱이 떠 있는 동안 일어나는 일이 아니다.
+    private string[]? _cloudSyncRoots;
+
+    private string[] CloudSyncRoots => _cloudSyncRoots ??= ReadCloudSyncRoots();
+
+    private static string[] ReadCloudSyncRoots()
+    {
+        var found = new List<string>();
+        try
+        {
+            using var manager = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SyncRootManager");
+            if (manager is null)
+            {
+                return Array.Empty<string>();
+            }
+
+            foreach (string provider in manager.GetSubKeyNames())
+            {
+                using var roots = manager.OpenSubKey($@"{provider}\UserSyncRoots");
+                if (roots is null)
+                {
+                    continue;
+                }
+
+                foreach (string account in roots.GetValueNames())
+                {
+                    // 값 하나가 경로 하나. 계정마다 따로 있으므로 여러 개일 수 있다.
+                    if (roots.GetValue(account) is string place && place.Length > 0)
+                    {
+                        found.Add(place.TrimEnd('\\'));
+                    }
+                }
+            }
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException
+                                       or UnauthorizedAccessException or IOException)
+        {
+            // 못 읽으면 표시가 안 붙을 뿐이다. 레지스트리 하나 때문에 목록이 안 뜨는
+            // 쪽이 훨씬 나쁘다.
+            return Array.Empty<string>();
+        }
+
+        return found.ToArray();
+    }
+
+    // 메모리만 본다. 드라이브에 아무것도 묻지 않는다 - 레이블은 트리가 루트를 만들 때
+    // 이미 읽어서 표시 이름에 담아 둔 것을 도로 쓰는 것이고 ("Google Drive (G:)"),
+    // 동기화 루트는 위에서 한 번 읽은 배열이다.
+    private bool IsCloudFolder(string path)
+    {
+        foreach (string root in CloudSyncRoots)
+        {
+            if (PathIsWithin(path, root))
+            {
+                return true;
+            }
+        }
+
+        string? drive = Path.GetPathRoot(path);
+        return drive is { Length: > 0 } && CloudDriveRoots.Contains(drive);
+    }
+
+    // 클라우드로 마운트된 드라이브의 루트들("G:\"). 한 번 만들고 그대로 둔다.
+    private HashSet<string>? _cloudDriveRoots;
+
+    private HashSet<string> CloudDriveRoots => _cloudDriveRoots ??= ReadCloudDriveRoots();
+
+    // **트리의 루트 목록을 쓰지 않는다.** 처음에는 거기서 레이블을 가져왔는데,
+    // 숨긴 드라이브는 그 목록에서 통째로 빠진다(TryBuildDriveRoot의 IsHiddenByUser).
+    // 그래서 드라이브 하나를 통째로 숨긴 경우 - 이 표시가 가장 필요한 경우 - 에만
+    // 답을 못 하고 있었다 (2026-08-26).
+    //
+    // Fixed만 묻는다. 이것이 이 읽기를 안전하게 만드는 조건이다: 네트워크 드라이브의
+    // IsReady는 서버가 멎어 있으면 읽기만큼 오래 붙잡고, 빈 카드 리더의 Removable도
+    // 마찬가지다. 로컬 고정 디스크는 즉시 답한다. 클라우드 드라이브는 전부 Fixed로
+    // 붙으므로(2026-08-26 측정: 구글 드라이브 G: = Fixed/FAT32) 걸러도 잃는 것이 없다.
+    private static HashSet<string> ReadCloudDriveRoots()
+    {
+        var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (var drive in DriveInfo.GetDrives())
+            {
+                if (drive.DriveType != DriveType.Fixed)
+                {
+                    continue;
+                }
+
+                string? label = null;
+                try
+                {
+                    if (drive.IsReady)
+                    {
+                        label = drive.VolumeLabel;
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                if (label is null or "")
+                {
+                    continue;
+                }
+
+                if (FileSystemService.IsCloudDriveLabel(label))
+                {
+                    found.Add(drive.RootDirectory.FullName);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+
+        return found;
+    }
+
+    // "C:\Users\X\OneDrive" 아래인가. 문자열 StartsWith만 쓰면
+    // "...\OneDriveTemp" 도 걸리므로 경계를 함께 본다.
+    private static bool PathIsWithin(string path, string root)
+    {
+        if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return path.Length == root.Length
+            || path[root.Length] == '\\';
+    }
+
     private static string PlaceRootLabel(string path)
     {
         string root = Path.GetPathRoot(path) ?? string.Empty;

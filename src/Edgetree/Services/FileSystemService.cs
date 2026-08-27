@@ -356,6 +356,44 @@ public static class FileSystemService
     // would put IsReady and a volume label for the whole machine - a sleeping
     // NAS among them - in front of whatever asked. Returns null for the two
     // cases the loop used to walk past.
+    // 클라우드가 드라이브 문자로 붙었을 때 알아볼 수 있는 유일한 신호가 볼륨
+    // 레이블이다. 2026-08-26에 구글 드라이브를 두고 잰 결과 - DriveType은 Fixed,
+    // 루트 속성은 Directory 뿐, 레지스트리에도 문자 정보가 없었고, 윈도우가 관리하는
+    // 동기화 루트 목록(SyncRootManager)에도 등록되지 않는다. 자체 드라이버로 마운트되기
+    // 때문이다. **폴더로 붙는 쪽(OneDrive 등)은 그 목록이 답하므로** MainWindow가 그쪽을
+    // 맡고, 여기는 문자로 붙는 쪽만 본다.
+    //
+    // 목록인 것은 한계이지 설계가 아니다. 레이블을 바꾸거나 새 제공자가 나오면 표시가
+    // 안 붙을 뿐 엉뚱한 곳에 붙지는 않는다. 더 나은 신호를 찾으면 그때 여기를 고친다.
+    private static readonly string[] CloudDriveLabels =
+    {
+        "Google Drive",
+        "Dropbox",
+        "iCloud Drive",
+        "MEGA",
+        "pCloud",
+        "Box",
+        "Nextcloud",
+    };
+
+    public static bool IsCloudDriveLabel(string? label)
+    {
+        if (string.IsNullOrEmpty(label))
+        {
+            return false;
+        }
+
+        foreach (string provider in CloudDriveLabels)
+        {
+            if (label.StartsWith(provider, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static FileSystemItem? TryBuildDriveRoot(DriveInfo drive)
     {
         // A hidden drive is dropped exactly like a hidden folder is - one
@@ -404,6 +442,10 @@ public static class FileSystemService
         return new FileSystemItem(displayName, drive.RootDirectory.FullName, isDirectory: true)
         {
             IsOnNetworkDrive = isNetwork,
+            // Decided HERE because this is the one moment the volume label is
+            // already read - see IsCloudDriveLabel for why a label is all there
+            // is to go on.
+            IsOnCloudDrive = IsCloudDriveLabel(label),
             // Recorded, not asked for again later: this is the one moment the
             // drive's type is already in hand, and the row's icon reads it
             // (see FileSystemItem.Icon).

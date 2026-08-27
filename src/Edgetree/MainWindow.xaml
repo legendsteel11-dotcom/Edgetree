@@ -3194,21 +3194,47 @@
             </Setter>
         </Style>
 
-        <!-- "This one is on a network drive", on a hidden-folder row. Fixed on
-             both themes and not a palette row, for the reason the bookmark
-             ribbon's blue is fixed: a mark of this kind is worth having only if
-             it is the same mark everywhere. One place to change it.
+        <!-- THE PLACE BADGE: the dot that rides a folder icon's lower-left
+             corner to say what kind of place the folder is on. The tree has
+             drawn it for network folders since long before these keys existed;
+             they were pulled out of that template on 2026-08-26 when the
+             hidden-folder list needed the same mark, because the same mark in
+             two places cannot be two sets of literals.
+             Fixed on both themes and not palette rows, for the reason the
+             bookmark ribbon's blue is fixed: a mark of this kind is worth
+             having only if it is the same mark everywhere.
 
-             TAKEN FROM THE SHELL'S OWN NETWORK-DRIVE ICON (SIID_DRIVENET, the
-             one ShellIconService already puts on those drives in the tree), by
-             reading its pixels rather than by matching it from memory - the
-             first cut was a Material green and sat visibly darker beside it
-             (2026-08-26). That icon runs #148E47 to #67F373 as a gradient, and
-             its two commonest bands are this and #67F373. A flat dot has to sit
-             a little above a gradient's mean to read as the same colour, which
-             is what this is. -->
-        <SolidColorBrush x:Key="NetworkDriveMarkBrush"
-                Color="#FF5CE56D"/>
+             GREEN IS THE TREE'S OWN, unchanged. A round of matching it to the
+             shell's SIID_DRIVENET icon instead (#5CE56D, its own gradient's
+             commonest band) was wrong about which green was being pointed at -
+             the report said "the tree's", and the tree's is this.
+
+             BLUE IS MATCHED TO IT ON PERCEIVED BRIGHTNESS, not on HSL
+             lightness, and that distinction is the whole of its history. The
+             first cut rotated a green's hue keeping saturation and lightness,
+             which is the obvious thing to do and lands at about half the
+             brightness - blue simply carries less luminance than green at the
+             same L. Measured: green 0.394, and an exact luminance match (0.401)
+             then read slightly BRIGHTER than the green in the hand - a
+             saturated light blue carries more attention than the number says.
+             This is one step under it, 0.353, which is where the pair settled.
+             So: match by luminance to get close, then take a step down for
+             blue. Not by lightness, and not by the number alone.
+             The bookmark blue was considered and is 0.269, i.e. darker again
+             than a rotation that had already been reported as too dark. -->
+        <SolidColorBrush x:Key="PlaceBadgeNetworkBrush"
+                Color="#FF3FBF6B"/>
+        <SolidColorBrush x:Key="PlaceBadgeCloudBrush"
+                Color="#FF54A6EE"/>
+        <!-- A NAS that is asleep is normal rather than an error, so the badge
+             goes quiet instead of red - the row is already dimmed around it. -->
+        <SolidColorBrush x:Key="PlaceBadgeOfflineBrush"
+                Color="#FF8C9196"/>
+        <!-- A rim, so the dot reads on top of a yellow folder. Black at 40%
+             rather than the surface colour: it has to work over the icon, which
+             is what is actually behind it, not over the row. -->
+        <SolidColorBrush x:Key="PlaceBadgeRimBrush"
+                Color="#66000000"/>
 
         <SolidColorBrush x:Key="GrabLineRestBrush"
                 Color="#606B6B6B"/>
@@ -4045,12 +4071,20 @@
                      while a colour change on a shape already in the eye's
                      memory reads instantly. -->
 
+                <!-- CLOUD DRIVES TAKE THE SAME DOT IN BLUE (2026-08-26, on
+                     request). One element, not two: a folder is on one kind of
+                     place, and a second ellipse would eventually be asked what
+                     it means when both are lit. The cloud trigger is declared
+                     AFTER the network one so it wins if a provider ever mounts
+                     itself over SMB - the more particular answer.
+                     Colours are shared with the hidden-folder list's copy of
+                     this badge; see the PlaceBadge* brushes. -->
                 <Ellipse x:Name="NetworkBadge"
                         Grid.Column="0"
                         Width="7"
                         Height="7"
-                        Fill="#FF3FBF6B"
-                        Stroke="#66000000"
+                        Fill="{DynamicResource PlaceBadgeNetworkBrush}"
+                        Stroke="{DynamicResource PlaceBadgeRimBrush}"
                         StrokeThickness="1"
                         Margin="{DynamicResource FolderRowIconMargin}"
                         HorizontalAlignment="Left"
@@ -4343,6 +4377,23 @@
                             Property="Visibility"
                             Value="Visible"/>
                 </MultiDataTrigger>
+                <!-- Same three conditions, the other kind of place. -->
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsOnCloudDrive}"
+                                Value="True"/>
+                        <Condition Binding="{Binding IsDirectory}"
+                                Value="True"/>
+                        <Condition Binding="{Binding Visibility, ElementName=RowIcon}"
+                                Value="Visible"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="NetworkBadge"
+                            Property="Visibility"
+                            Value="Visible"/>
+                    <Setter TargetName="NetworkBadge"
+                            Property="Fill"
+                            Value="{DynamicResource PlaceBadgeCloudBrush}"/>
+                </MultiDataTrigger>
                 <DataTrigger Binding="{Binding IsDirectory}"
                         Value="False">
                     <Setter TargetName="RowIcon"
@@ -4515,7 +4566,7 @@
                         Value="True">
                     <Setter TargetName="NetworkBadge"
                             Property="Fill"
-                            Value="#FF8C9196"/>
+                            Value="{DynamicResource PlaceBadgeOfflineBrush}"/>
                     <Setter TargetName="RowIcon"
                             Property="Opacity"
                             Value="0.5"/>
