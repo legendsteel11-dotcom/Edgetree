@@ -18,11 +18,20 @@ const LANG_KEY = 'edgetree.lang'
 // returning null, so both halves are wrapped; an unreadable store just means
 // the browser decides again, which is the same answer a first visit gets.
 //
-// KOREAN IS THE MATCH, NOT THE DEFAULT. Everything that is not a Korean
-// browser goes to English, including the languages this page has no words for
-// - an English page is a page they can read something of, and the Korean one
-// is not. `navigator.languages` before `.language` so a Korean second
-// preference still counts.
+// THE LIST IS ORDERED, AND THE ORDER IS THE ANSWER. Whichever of the two
+// languages this page has appears FIRST wins; anything it has no words for is
+// stepped over rather than counted against either.
+//
+// The first cut asked whether Korean appeared anywhere in the list at all, and
+// that was wrong on the very machine it was written for (2026-08-27). Chrome's
+// `navigator.languages` is the PREFERRED LANGUAGES list in settings, not the
+// display language - so switching Chrome to English leaves 한국어 sitting in
+// that list, usually below English, and "Korean is in there somewhere" sent a
+// reader who had just asked for English to the Korean page.
+//
+// English is what is left when neither is named: a page in a language someone
+// cannot read at all is worth less to them than one they can read something
+// of, and Korean is the narrower of the two by far.
 function initialLang(): Lang {
   try {
     const saved = localStorage.getItem(LANG_KEY)
@@ -40,7 +49,17 @@ function initialLang(): Lang {
         ? navigator.languages
         : [navigator.language]
 
-  return tags.some((tag) => tag && tag.toLowerCase().startsWith('ko')) ? 'ko' : 'en'
+  for (const tag of tags) {
+    const code = (tag ?? '').toLowerCase()
+    if (code.startsWith('ko')) {
+      return 'ko'
+    }
+    if (code.startsWith('en')) {
+      return 'en'
+    }
+  }
+
+  return 'en'
 }
 
 export const lang = ref<Lang>(initialLang())
