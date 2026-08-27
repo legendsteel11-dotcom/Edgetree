@@ -45,6 +45,71 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // SEVEN LINES OUT OF A ROUND OF THIRTY COMMITS.
+    //
+    // THE RANGE IS THE TAG, NOT THE UNPUSHED SET, and getting that wrong is how
+    // this card was first written four lines short. Twenty-one commits were
+    // sitting local; nine more had been pushed on 08-26 and never shipped, and
+    // the biggest thing in the release - the band that marks how far the folder
+    // you are in reaches, and being able to set its colour - was among them.
+    // The author noticed it was missing. Diff from `v2.5.4..HEAD`, never from
+    // what `git log origin/main..HEAD` happens to show.
+    //
+    // The cuts are still worth recording: the author took out the English
+    // review (it goes in the release notes instead) and the divider line that
+    // survives 영역 구분선 being switched off; the snap grid, the ScrollBar's
+    // context menu, the 정렬 기본값 move and the colour window's button layout
+    // never made the draft.
+    //
+    // TWO FIX LINES, and every other fix in this round is left out on the
+    // standing rule: they repaired something the round itself introduced, and
+    // listing those says the new features shipped broken. Both that stayed are
+    // older than this round.
+    //
+    // THE ONE THAT STAYED IS OLD, and it is here in the AUTHOR'S framing rather
+    // than in the symptom's. The first draft named what was actually offered -
+    // a whole drive copied into the folder it landed on - and was cut under the
+    // v1.2.0 judgement, that a symptom which alarms a reader who never hit it
+    // does not belong directly above a download button. The author put it back
+    // differently: name the CAUSE (a slight drag while moving folders), not the
+    // consequence. "신뢰감도 주고" - a list with no fixes in it reads as a
+    // release that fixed nothing, and the cause is the half a reader can
+    // actually recognise in their own hands. The consequence is in the release
+    // notes, where whoever wants it has already arrived.
+    version: 'v2.5.5',
+    ko: [
+      '선택한 항목이 들어 있는 폴더의 영역에 배경색이 표시되어, 지금 어느 폴더 안에 있는지 한눈에 보입니다. 색상 설정에서 이 영역의 배경색을 별개로 지정할 수 있습니다.',
+      '트리 하단의 재생 줄에 재생/일시정지 버튼이 추가되었습니다. 음악이 재생 중일 때는 움직이는 표시로 나타납니다.',
+      '숨긴 폴더 목록에 각 폴더가 있던 드라이브가 함께 표시됩니다. 네트워크와 클라우드 위치는 아이콘의 표시로 구분됩니다.',
+      '숨긴 폴더만 들어 있는 폴더가 `비어 있음`으로 표시되지 않습니다. 폴더를 삭제할 때 안에 숨긴 폴더가 있으면 개수를 알려 줍니다.',
+      '썸네일 바/목록의 툴팁이 더 빠르게 나타납니다.',
+      '폴더 우클릭의 `기본 프로그램에서 열기`가 폴더에서는 `펼치기`·`접기`로 표시됩니다. 이미 펼친 폴더에서 이 줄과 `Enter`가 동작하지 않던 문제를 수정했습니다.',
+      '폴더 이동 시 미세한 드래그로 발생하던 문제를 수정했습니다.',
+    ],
+    // THE ENGLISH WENT THROUGH A NATIVE REVIEW OF ITS OWN (2026-08-27), and
+    // three of its notes are worth keeping. "marks how far the folder reaches"
+    // reads as distance rather than extent; a single verb carrying both the
+    // buttons and the moving mark packs two unlike objects onto one hinge; and
+    // "holding nothing but an excluded folder" was singular where the feature
+    // counts any number.
+    //
+    // TWO OF ITS EDITS WERE NOT TAKEN. It guessed the menu's English label as
+    // "Open with default program" - the app says `Open in default app`, and a
+    // card naming a label has to name the one on screen. And it read `color`
+    // against `colour`, which is right and is now checked for: the landing card
+    // was in none of the five files check-text scanned for British spellings,
+    // so those two `colour`s were on their way out with the release.
+    en: [
+      'A faint band now marks the full extent of the folder you are in, so you can see at a glance where you are. Its background color can be set separately in the color settings.',
+      'The playback row at the foot of the tree now has play and pause beside the stop button, and shows a moving mark while music is playing.',
+      'The list of excluded folders now shows which drive each folder is on. Network and cloud locations are marked on the icon.',
+      'A folder that contains nothing but excluded folders is no longer shown as empty. Deleting a folder now tells you how many excluded folders are inside it.',
+      'Tooltips in the thumbnail bar and list now appear faster.',
+      'In a folder’s right-click menu, Open in default app now reads Expand or Collapse. Fixed a problem where that row and Enter did nothing on a folder that was already expanded.',
+      'Fixed a problem caused by a slight unintended drag when moving a folder.',
+    ],
+  },
+  {
     // The column-count flip is NOT a line, and that is the same judgement the
     // margin fix got in v2.5.3: nobody using the app noticed it, the author
     // included - it was the brake's own log that found it. A card line is what

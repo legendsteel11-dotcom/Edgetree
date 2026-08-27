@@ -1,4 +1,4 @@
-# Edgetree v2.5.4
+# Edgetree v2.5.5
 
 [한국어 안내](README-ko.md)
 
@@ -216,6 +216,18 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v2.5.5 (2026-08-27)
+
+- A faint band now marks the full extent of the folder you are in, so you can see at a glance where you are. Its background color can be set separately in the color settings.
+- The playback row at the foot of the tree now has play and pause beside the stop button, and shows a moving mark while music is playing.
+- The list of excluded folders now shows which drive each folder is on. Network and cloud locations are marked on the icon.
+- A folder that contains nothing but excluded folders is no longer shown as empty. Deleting a folder now tells you how many excluded folders are inside it.
+- Tooltips in the thumbnail bar and list now appear faster.
+- In a folder's right-click menu, Open in default app now reads Expand or Collapse. Fixed a problem where that row and Enter did nothing on a folder that was already expanded.
+- The English wording has been reviewed throughout the app, and every label now reads in sentence case.
+- The color window's buttons were rearranged: Close on the far left, the four palette buttons on the right. Fixed the uneven spacing around one of its dividers.
+- Fixed a problem caused by a slight unintended drag when moving a folder: a drive row picked up that way offered to copy the whole drive into the folder it landed on, under a confirmation with no name in it.
 
 ### v2.5.4 (2026-08-26)
 

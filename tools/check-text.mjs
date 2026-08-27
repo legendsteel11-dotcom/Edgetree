@@ -184,8 +184,14 @@ const BILINGUAL_ON_PURPOSE = ['MenuLanguage', 'LanguageRestartNote']
 const BRIT = /\b(colours?|coloured|behaviour\w*|favourite\w*|minimis\w+|maximis\w+|customis\w+|organis\w+|recognis\w+|licence|defence|centre\w*|greyscale|grey|cancelled|labelled|travelling|programme|catalogue)\b/gi
 {
   const hits = []
-  const scan = (file, marker) => {
-    for (const [ln, line] of livingPart(file, marker)) {
+  // trim: 이 파일만의 "지금 쓰고 있는 부분" 을 marker 대신 정하는 방법.
+  const scan = (file, marker, trim) => {
+    let part = livingPart(file, marker)
+    if (trim) {
+      const kept = trim(part.map(([, l]) => l))
+      part = part.slice(0, kept.length)
+    }
+    for (const [ln, line] of part) {
       if (line.trim().startsWith('//')) continue
       if (/Apache Licen[cs]e|MIT Licen[cs]e/i.test(line)) continue
       // .cs 는 문자열 리터럴 안만, .md 는 줄 전체
@@ -198,7 +204,20 @@ const BRIT = /\b(colours?|coloured|behaviour\w*|favourite\w*|minimis\w+|maximis\
   scan('src/Edgetree/Services/Strings.cs', null)
   scan('src/Edgetree/Services/HelpContent.cs', null)
   scan('README.md', '## Changelog')
-  report('영국식 철자 (나가는 글)', hits, '변경 이력·주석 제외')
+  // 랜딩의 업데이트 카드. 2026-08-27 에 `colour` 두 개가 v2.5.5 카드에 그대로
+  // 실려 나갈 뻔했고 영문 검수자가 잡았다 - 이 검사가 도는 다섯 파일 어디에도
+  // 이 파일이 없었기 때문이다. 나가는 영문인데 안 보고 있었다.
+  //
+  // 가장 새 항목까지만 본다. 이미 발행된 카드는 그때의 기록이라 README 의 변경
+  // 이력과 같은 이유로 손대지 않으며, 실제로 옛 항목들에 영국식 철자가 열일곱
+  // 개 있다. 두 번째 `version:` 줄에서 자르는 것이 "이번 판에 쓰고 있는 항목"의
+  // 경계다.
+  scan('landing/src/changelog.ts', null, (lines) => {
+    const versions = lines.reduce((at, l, i) => (/^\s*version: '/.test(l) ? [...at, i] : at), [])
+    return versions.length > 1 ? lines.slice(0, versions[1]) : lines
+  })
+  scan('landing/src/i18n.ts', null)
+  report('영국식 철자 (나가는 글)', hits, '발행된 변경 이력·주석 제외')
 }
 
 // -------------------------------------------------- 앱 밖에 박힌 사용자 텍스트
