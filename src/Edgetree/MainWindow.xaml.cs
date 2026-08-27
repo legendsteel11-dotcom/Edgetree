@@ -16779,14 +16779,14 @@ public partial class MainWindow : Window
         // marked cloud in the tree and unmarked in the 숨긴 폴더 list, which is
         // one question with two answers (2026-08-27, found in review).
         //
-        // Dropped rather than rebuilt: the next caller is a menu opening, and
-        // that is a better moment to ask a drive for a volume label than the
-        // tail of a device message.
+        // Re-read on a Task, not here and not at the next menu: this runs
+        // inside the settled tail of a device message, and the letter that just
+        // arrived is the least likely on the machine to answer quickly.
         //
         // The SYNC ROOT list beside it is deliberately left alone - those are
         // provider registrations for folder-mounted clouds (OneDrive), and a
         // letter appearing says nothing about them.
-        _cloudDriveRoots = null;
+        RefreshCloudDriveRoots();
 
         foreach (string rootPath in DriveLetters(left))
         {
@@ -18389,6 +18389,14 @@ public partial class MainWindow : Window
         // at startup because every caller of this has just re-read the drives:
         // whatever the mask says now is what the tree is showing.
         _driveMask = NativeMethods.LogicalDriveMask();
+
+        // And which of those letters a cloud provider mounted, asked on a Task
+        // for the reason the field's own note gives. Kicked off HERE for the
+        // same reason the mask is written here - every caller has just re-read
+        // the drives, so this is where the question has just changed - and it
+        // is what covers startup, since nothing else would ask until a device
+        // message arrived.
+        RefreshCloudDriveRoots();
     }
 
     // save: false lets a batch (HideFolder_Click) write settings once at the end
@@ -19211,8 +19219,10 @@ public partial class MainWindow : Window
         return found.ToArray();
     }
 
-    // MEMORY ONLY - no drive is asked anything here. The sync roots are the
-    // array read once above, and the lettered answer is a set built once below.
+    // MEMORY ONLY - no drive is asked anything here, and that is now true of
+    // the lettered half as well: it reads a set some background pass has
+    // already left behind (see RefreshCloudDriveRoots). The sync roots are the
+    // array read once above, out of the registry.
     private bool IsCloudFolder(string path)
     {
         foreach (string root in CloudSyncRoots)
@@ -19224,14 +19234,50 @@ public partial class MainWindow : Window
         }
 
         string? drive = Path.GetPathRoot(path);
-        return drive is { Length: > 0 } && CloudDriveRoots.Contains(drive);
+        return drive is { Length: > 0 } && _cloudDriveRoots.Contains(drive);
     }
 
-    // The roots of every drive a cloud provider has mounted ("G:\"). Built once
-    // and kept.
-    private HashSet<string>? _cloudDriveRoots;
+    // The roots of every drive a cloud provider has mounted ("G:\").
+    //
+    // NEVER READ ON DEMAND, and that is the whole shape of it. It was a lazy
+    // ??= until 2026-08-27, which put a volume-label read on the UI THREAD at
+    // the moment a menu opened - the exact shape of the 21~59s freezes v1.3.2
+    // had, and the reason AddDriveRootWhenReady does its own label read on a
+    // Task. Restricting it to DriveType.Fixed made it safe against the case
+    // that was being thought about (a sleeping NAS) and not against the ones
+    // that were not: a secondary HDD spun down answers IsReady by spinning up,
+    // and a cloud drive - which reports Fixed, which is the entire reason this
+    // set exists - answers through its provider's own driver, so the one thing
+    // this is looking for is also the one thing that can be slow to reply.
+    //
+    // Starts EMPTY rather than null, so a caller arriving before the first pass
+    // lands gets "no cloud drives" instead of a read. What that costs is a
+    // badge missing from a menu opened in the first moments after launch; the
+    // refresh is kicked off where the drives are read anyway, so the window is
+    // short and it closes on its own.
+    private HashSet<string> _cloudDriveRoots = new(StringComparer.OrdinalIgnoreCase);
 
-    private HashSet<string> CloudDriveRoots => _cloudDriveRoots ??= ReadCloudDriveRoots();
+    // Tokened like the other background answers in this file: a device change
+    // during an in-flight read starts a second one, and the two can land in
+    // either order. Only the newest is allowed to win, so a slow read of the
+    // old set cannot overwrite a fast read of the new one.
+    private int _cloudDriveReadToken;
+
+    private void RefreshCloudDriveRoots()
+    {
+        int token = ++_cloudDriveReadToken;
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            var found = ReadCloudDriveRoots();
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (token == _cloudDriveReadToken)
+                {
+                    _cloudDriveRoots = found;
+                }
+            }));
+        });
+    }
 
     // NOT FROM THE TREE'S ROOT LIST, which is where the first cut read the
     // label. A drive the user has hidden is dropped from that list outright
@@ -19239,11 +19285,20 @@ public partial class MainWindow : Window
     // case this mark is most wanted for - was the one case it could not answer
     // (2026-08-26).
     //
-    // FIXED ONLY, and that filter is what makes this read safe. IsReady against
-    // a network drive whose server is down blocks for as long as the read would,
-    // and an empty card reader answers no faster. A local fixed disk answers at
-    // once. Cloud drives all mount as Fixed (measured 2026-08-26: Google Drive
-    // reports Fixed/FAT32), so the filter costs nothing here.
+    // FIXED ONLY, which cuts the worst of it: IsReady against a network drive
+    // whose server is down blocks for as long as the read would, and an empty
+    // card reader answers no faster. Cloud drives all mount as Fixed (measured
+    // 2026-08-26: Google Drive reports Fixed/FAT32), so the filter costs
+    // nothing here.
+    //
+    // THAT FILTER WAS CALLED "WHAT MAKES THIS READ SAFE" UNTIL 2026-08-27 AND
+    // IT IS NOT. Fixed narrows which drives can be slow; it does not make any
+    // of them fast. A secondary HDD that has spun down answers IsReady by
+    // spinning up, and a cloud drive answers through its provider's own driver
+    // - so the one kind of drive this is looking for is also a kind that can be
+    // slow to reply. What makes it safe is the thread it runs on, and nothing
+    // else: this is called from RefreshCloudDriveRoots and from nowhere, which
+    // is the rule to keep rather than the filter below.
     private static HashSet<string> ReadCloudDriveRoots()
     {
         var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
