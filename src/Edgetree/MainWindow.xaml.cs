@@ -20363,15 +20363,26 @@ public partial class MainWindow : Window
     // enumerate the folder, and it stays right for a branch that is not loaded.
     private bool ConfirmDeletingHiddenFolders(IReadOnlyList<string> paths)
     {
+        // TRIMMED ONCE, OUTSIDE BOTH LOOPS. It was done inside the inner one,
+        // and twice per turn at that, so a fixed property of the targets was
+        // being recomputed hidden-count x target-count x 2 times. Neither list
+        // is ever big enough for that to be felt - this is about the trim
+        // sitting in the wrong place rather than about the time it took.
+        var targets = new List<string>(paths.Count);
+        foreach (string path in paths)
+        {
+            targets.Add(path.TrimEnd('\\'));
+        }
+
         int count = 0;
         foreach (string hidden in _settings.HiddenFolderPaths)
         {
-            foreach (string target in paths)
+            foreach (string target in targets)
             {
                 // Strictly INSIDE. Deleting the hidden folder itself is a thing
                 // the author can see and chose; this is only about the ones
                 // riding along underneath something else.
-                if (hidden.Length > target.TrimEnd('\\').Length && PathIsWithin(hidden, target.TrimEnd('\\')))
+                if (hidden.Length > target.Length && PathIsWithin(hidden, target))
                 {
                     count++;
                     break;
