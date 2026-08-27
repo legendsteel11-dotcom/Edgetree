@@ -701,6 +701,25 @@
             </Setter>
         </Style>
 
+        <!-- AND THE SAME STYLE IMPLICITLY, for the menus this app does not
+             build (2026-08-26, on report). WPF's own ScrollBar carries a
+             context menu - 여기로 스크롤 / 맨 위 / 페이지 위로 and the rest -
+             and it was arriving in the default light theme in the middle of a
+             dark app. The MenuItem style below was already implicit and had
+             been reaching those items all along, which is why the thing looked
+             half-dressed rather than simply foreign: app-coloured text on the
+             theme's own white surface.
+             It is a style with a key AND an implicit twin rather than one
+             implicit style, because the fourteen menus that ask for it by name
+             are stating a decision, and a menu that stops asking should not go
+             on getting it by accident.
+             NOTHING TO TRANSLATE: WPF supplies those seven items' text from the
+             system in the user's own language. Building our own menu instead
+             would have meant seven new strings in two languages to say what
+             Windows already says. -->
+        <Style TargetType="ContextMenu"
+                BasedOn="{StaticResource DarkContextMenuStyle}"/>
+
         <!-- Implicit (no x:Key) rather than assigned via ItemContainerStyle:
              ItemContainerStyle applies to every item in the ContextMenu
              regardless of type, and crashes outright when a Separator
