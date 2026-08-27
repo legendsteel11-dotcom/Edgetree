@@ -1,8 +1,13 @@
 <!doctype html>
-<!-- lang is ko because that is what the page renders by default (i18n.ts opens
-     on 'ko'); it said en while showing Korean. The toggle does not rewrite it -
-     a language switch is a visitor's choice, and the document's declared
-     language is what a crawler reads before any of that runs. -->
+<!-- lang is ko because it describes THIS DOCUMENT, which is Korean: the title
+     and the meta below are the only text that exists before JavaScript runs,
+     and they are what a crawler reads.
+     It no longer describes what a visitor sees. Since 2026-08-27 the rendered
+     page opens in the browser's own language (see initialLang in i18n.ts), so
+     a non-Korean visitor gets English while this line still says ko. That is
+     the right way round: the toggle does not rewrite it either, because a
+     language switch is one visitor's choice and this is the document's own
+     declaration. -->
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />

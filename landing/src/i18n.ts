@@ -2,10 +2,56 @@ import { ref, computed, watchEffect } from 'vue'
 
 export type Lang = 'ko' | 'en'
 
-export const lang = ref<Lang>('ko')
+const LANG_KEY = 'edgetree.lang'
+
+// WHICH LANGUAGE A VISITOR ARRIVES IN (2026-08-27, on report).
+//
+// It was the literal 'ko' until now, so an English speaker landed on a Korean
+// page with a Korean tab title and had to find the toggle to leave it. The
+// 2026-08-19 round moved the title into this dictionary so that switching
+// updates the tab - which fixed the title for whoever pressed the switch, and
+// left untouched the fact that nobody arrives on the other side of it.
+//
+// A SAVED CHOICE WINS OVER THE BROWSER, because pressing the toggle is a
+// visitor saying the browser guessed wrong, and it should not have to be said
+// twice. localStorage throws outright in some privacy modes rather than
+// returning null, so both halves are wrapped; an unreadable store just means
+// the browser decides again, which is the same answer a first visit gets.
+//
+// KOREAN IS THE MATCH, NOT THE DEFAULT. Everything that is not a Korean
+// browser goes to English, including the languages this page has no words for
+// - an English page is a page they can read something of, and the Korean one
+// is not. `navigator.languages` before `.language` so a Korean second
+// preference still counts.
+function initialLang(): Lang {
+  try {
+    const saved = localStorage.getItem(LANG_KEY)
+    if (saved === 'ko' || saved === 'en') {
+      return saved
+    }
+  } catch {
+    // Unreadable store - fall through to the browser.
+  }
+
+  const tags =
+    typeof navigator === 'undefined'
+      ? []
+      : navigator.languages && navigator.languages.length > 0
+        ? navigator.languages
+        : [navigator.language]
+
+  return tags.some((tag) => tag && tag.toLowerCase().startsWith('ko')) ? 'ko' : 'en'
+}
+
+export const lang = ref<Lang>(initialLang())
 
 export function toggleLang() {
   lang.value = lang.value === 'ko' ? 'en' : 'ko'
+  try {
+    localStorage.setItem(LANG_KEY, lang.value)
+  } catch {
+    // Not being able to remember the choice does not stop it taking effect now.
+  }
 }
 
 const dict = {
