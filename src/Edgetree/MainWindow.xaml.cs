@@ -15255,12 +15255,33 @@ public partial class MainWindow : Window
         // A drag that starts on a multi-selection member carries the whole set
         // (files and folders alike); otherwise the single pressed file, as
         // before.
-        string[] dragPaths = item.IsMultiSelected && _multiSelection.Count > 1
-            ? _multiSelection
-                .Where(i => File.Exists(i.FullPath) || Directory.Exists(i.FullPath))
-                .Select(i => i.FullPath)
-                .ToArray()
-            : new[] { item.FullPath };
+        //
+        // A WHOLE VOLUME IS NOT PICKED UP (2026-08-27, on report). "FOLDERS
+        // COUNT NOW" was written about folders, and the drive rows came along
+        // with it unnoticed - a press on G:\ with a few pixels of travel handed
+        // "G:\" to a drop as an ordinary item to copy.
+        //
+        // What that looked like: Path.GetFileName("G:\") is the EMPTY STRING,
+        // so the destination it combined to was the target folder itself, which
+        // of course already exists - and the question that came up read
+        // '' 이(가) 이미 있습니다. 덮어쓸까요? with nothing between the quotes.
+        // Answering 예 would have copied the entire drive over that folder.
+        //
+        // Filtered HERE rather than at the two places the candidate is armed,
+        // because this is where the paths become the DataObject: the single row
+        // and the multi-selection both pass through it, and so does the drag
+        // that leaves for Explorer - where nothing of ours gets another say.
+        //
+        // A root is refused by SHAPE, not by being a drive letter: \\NAS\media
+        // is a root too and names itself fine, so it is the empty leaf name
+        // that decides, which is the same thing the copy would have choked on.
+        string[] dragPaths = (item.IsMultiSelected && _multiSelection.Count > 1
+                ? _multiSelection
+                    .Where(i => File.Exists(i.FullPath) || Directory.Exists(i.FullPath))
+                    .Select(i => i.FullPath)
+                : new[] { item.FullPath }.AsEnumerable())
+            .Where(p => Path.GetFileName(p.TrimEnd('\\')).Length > 0)
+            .ToArray();
         if (dragPaths.Length == 0)
         {
             return;

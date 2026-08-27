@@ -377,6 +377,30 @@ public static class FileOperationService
             try
             {
                 string name = Path.GetFileName(sourcePath.TrimEnd(Path.DirectorySeparatorChar));
+
+                // A SOURCE WITH NO LEAF NAME IS A WHOLE VOLUME, and it is put
+                // down again untouched (2026-08-27, on report).
+                //
+                // Path.GetFileName("G:\") is the empty string, so everything
+                // below it went wrong quietly rather than throwing: Path.Combine
+                // returned the DESTINATION FOLDER unchanged, that folder exists
+                // by definition, and the question that reached the screen read
+                // '' 이(가) 이미 있습니다. 덮어쓸까요? with nothing named in it.
+                // Answering 예 would have copied the entire drive over the
+                // target folder with overwrite: true.
+                //
+                // WHAT THIS DEVICE HIDES: one dropped path, silently. The tree
+                // no longer offers a volume to a drag at all (see
+                // TreeViewItem_PreviewMouseMove), so the only way to arrive
+                // here is a drive letter dragged in from Explorer - which this
+                // app does not do; it is a sidebar, and copying a volume is not
+                // a thing it should be asked to start. The rest of the drop is
+                // carried out normally.
+                if (name.Length == 0)
+                {
+                    continue;
+                }
+
                 string destPath = Path.Combine(destinationFolder, name);
                 bool exists = File.Exists(destPath) || Directory.Exists(destPath);
 
