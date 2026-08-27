@@ -45,7 +45,7 @@ public static class HelpContent
     public static IReadOnlyList<string> Tips() => new[]
     {
         T("고정/자동 숨김 선택 및 크기(높이) 조정", "Pin it or let it auto-hide, and set the size"),
-        T("안 쓰는 폴더 감추기", "Hide the folders you never open"),
+        T("안 쓰는 폴더 감추기", "Exclude the folders you never open"),
         // Which of the two wins is the part nobody guesses, and it is the part
         // that makes the pair usable at all.
         T("자주 쓰는 파일 형식(확장자) 지정하기 (제외 확장자 입력시 최우선 적용)",
@@ -275,8 +275,8 @@ public static class HelpContent
                     // The parenthesis is the part a menu label cannot say, and
                     // it is what a whole paragraph used to say instead.
                     R("우클릭 → 숨기기", "트리에서 폴더나 드라이브를 감춤, 검색에서는 보이나 작업 시 숨김 해제 필요",
-                      "Right-click → Hide",
-                      "Takes a folder or a drive out of the tree; search still finds it, but working on it means unhiding it first"),
+                      "Right-click → Exclude",
+                      "Takes a folder or a drive out of the tree; search still finds it, but working on it means putting it back first"),
                     // THE MENU WITH NO ROW UNDER IT. Everything else in this
                     // section acts on the row that was clicked, so a menu that
                     // needs the absence of one is the gesture nobody arrives at
@@ -291,7 +291,7 @@ public static class HelpContent
                     R("빈 곳 우클릭",
                       "전체 새로고침 · 새 폴더 · 북마크 · 숨긴 폴더 · 네트워크 위치 · 표시할 파일 형식",
                       "Right-click empty space",
-                      "Refresh everything · New Folder · Bookmark · Hidden Folders · Network Locations · File types"),
+                      "Refresh everything · New folder · Bookmark · Excluded folders · Network Locations · File types"),
                 }),
             }),
 
@@ -551,7 +551,7 @@ public static class HelpContent
                     R("P · Insert", "영상 북마크 표시 · 해제",
                       "P · Insert", "Bookmark this moment, or take it back"),
                     R("우클릭 → 영상 북마크 목록", "표시 위치로 이동 · 전체 삭제",
-                      "Right-click → Video Bookmarks", "Jump to one, or clear them all"),
+                      "Right-click → Video bookmarks", "Jump to one, or clear them all"),
                     R("재생 중 ↑ ↓", "볼륨 조절 (일시정지하면 항목 이동으로 복귀)",
                       "↑ ↓ while playing", "Volume - they walk the folder again once it is paused"),
                     R("재생 중 M", "음소거", "M while playing", "Mute"),
@@ -697,7 +697,7 @@ public static class HelpContent
             {
                 new Group(string.Empty, new[]
                 {
-                    R("옵션 → 색상 설정", "직접 선택 · 랜덤 지정", "Options → Color Settings", "Pick them, or roll the dice"),
+                    R("옵션 → 색상 설정", "직접 선택 · 랜덤 지정", "Options → Color settings", "Pick them, or roll the dice"),
                     // THE THREE THINGS IN THAT WINDOW A LABEL CANNOT TEACH
                     // (2026-08-16). The chain is the clearest case this file's
                     // own rule has: a small link mark sits on all seventeen
@@ -711,11 +711,11 @@ public static class HelpContent
                     // whole app), and the cost of that choice is that anyone
                     // hunting the options menu for it never finds it.
                     R("색상 설정 → 행의 고리", "색을 묶어 함께 변경, 함께 활성화한 줄끼리 같은 색",
-                      "Color Settings → the link on a row", "Ties rows together - the ones lit together share a color"),
+                      "Color settings → the link on a row", "Ties rows together - the ones lit together share a color"),
                     R("색상 설정 → 모노", "팔레트 전체를 회색톤으로 한 번에",
-                      "Color Settings → Mono", "The whole palette to grayscale in one press"),
+                      "Color settings → Mono", "The whole palette to grayscale in one press"),
                     R("색상 설정 → 그림자", "트리와 북마크 패널의 위아래 끝을 옅게 덮음",
-                      "Color Settings → Shading", "Veils the top and bottom ends of the tree and the bookmark panel"),
+                      "Color settings → Shading", "Veils the top and bottom ends of the tree and the bookmark panel"),
                     R("옵션 → 기본 설정", "자동 시작 · 트레이 · 아이콘 · 자동 숨김", "Options → General", "Autostart · tray · icons · auto-hide"),
                     // "아이콘" in the row above reads as ONE switch, and it is
                     // three. The drive one arrived last (2026-08-16) and the
@@ -730,9 +730,9 @@ public static class HelpContent
                     // The cost goes on the row, not in a paragraph: it is the
                     // one setting here that can make the tree slower.
                     R("옵션 → 폴더에 표시할 항목 개수 → 전체 표시", "더 보기 없이 전부, 큰 폴더에서는 느려짐",
-                      "Options → Items per folder → Show All", "No Show more row at all - a big folder will feel it"),
+                      "Options → Items per folder → Show all", "No show more row at all - a big folder will feel it"),
                     R("옵션 → 네트워크 위치", "드라이브 문자 없는 공유 추가 (\\\\서버\\공유)",
-                      "Options → Network Locations", "Add a share with no drive letter (\\\\server\\share)"),
+                      "Options → Network locations", "Add a share with no drive letter (\\\\server\\share)"),
                 }),
             }),
     };

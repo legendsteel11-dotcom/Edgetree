@@ -7346,8 +7346,15 @@
                                      back while full screen stays on, which is
                                      what a toggle in front of the thing it
                                      changes should do. -->
+                                <!-- The tooltip carries the ONE thing that
+                                     separates this row from 전체화면 above it,
+                                     because the label cannot (2026-08-27, from
+                                     the English review): "바탕화면" hints at the
+                                     area outside the taskbar, and "Fill desktop"
+                                     does not hint at anything. -->
                                 <MenuItem x:Name="ViewerFullDesktopItem"
                                         Header="{x:Static services:Strings.ViewerFullDesktop}"
+                                        ToolTip="{x:Static services:Strings.ViewerFullDesktopHint}"
                                         IsCheckable="True"
                                         Visibility="Collapsed"
                                         Click="ViewerFullDesktopMenuItem_Click"/>

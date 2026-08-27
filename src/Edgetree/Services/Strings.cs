@@ -1,4 +1,4 @@
-namespace SidebarExplorer.App.Services;
+﻿namespace SidebarExplorer.App.Services;
 
 // Language switch is restart-only (not live): fields default to Korean and
 // Initialize(), called once in App.OnStartup before base.OnStartup(e) builds
@@ -221,7 +221,12 @@ public static class Strings
     public static string MenuAutoCollapse = "폴더 자동 접기";
     public static string MenuCollapseAllExpanded = "폴더 전체 접기";
     public static string CollapseAllConfirmTitle = "폴더 전체 접기";
-    public static string CollapseAllConfirmBody = "펼쳐진 폴더를 전체 접겠습니까?";
+    // 되돌릴 수 없다는 것을 함께 말한다 (2026-08-27). 제목 표시줄의 접기 버튼은
+    // 펼쳐져 있던 것을 기억했다가 한 번 더 누르면 되돌리는데, 이 메뉴는 일회성이고
+    // 그 기억까지 일부러 지운다(CollapseAllExpandedMenuItem_Click). 겉으로는 같은
+    // 동작이라 물어보는 자리에서 구분해 주지 않으면 알 길이 없다.
+    public static string CollapseAllConfirmBody =
+        "펼쳐진 폴더를 전체 접겠습니까?\n\n펼침 상태는 기억되지 않아 되돌릴 수 없습니다.";
     public static string MenuAlwaysOnTop = "항상 위에 표시";
     // The submenu holding the set-once housekeeping toggles (autostart, tray
     // icon, folder/file icons, title bar text) - they sat as top-level rows
@@ -288,7 +293,7 @@ public static class Strings
     // as MenuLanguage just above: whichever language a user currently reads,
     // they need to understand this note about the *other* one before they
     // click it, so it always shows both.
-    public static readonly string LanguageRestartNote = "(재시작 필요 / Restart Required)";
+    public static readonly string LanguageRestartNote = "(재시작 필요 / Restart required)";
 
     // Per-folder right-click menu's own sort submenu ("정렬 방식") reuses
     // MenuSort/MenuSortByName/etc. below - this is only the options-menu
@@ -498,6 +503,11 @@ public static class Strings
     // 대신 `바탕화면`인 것이 요점 - 앱 전체화면 자체가 이미 "화면"을 쓰고 있어서
     // 그 말로는 둘이 구분되지 않는다.
     public static string ViewerFullDesktop = "바탕화면 채우기";
+    // 라벨만으로는 옆줄의 `전체화면`과 구분되지 않는다 (2026-08-27, 영문 검수).
+    // 한국어는 `바탕화면`이라는 단어가 "작업 표시줄이 아닌 그 화면"을 어느 정도
+    // 실어 나르지만 `Fill desktop`은 그것을 못 한다. 차이가 하나뿐이므로 툴팁도
+    // 그 하나만 말한다.
+    public static string ViewerFullDesktopHint = "작업 표시줄 유지";
     // 들어가고 나오는 문. 지금까지 휠클릭 하나뿐이었고, 그건 배워야 아는 것이라
     // 이 모드가 있다는 사실 자체가 안 보였다 (2026-08-17). 단축키를 아는 사람은
     // 계속 그걸 쓰면 되고, 이 행은 처음 쓰는 사람을 위한 것이다. 바로 아래
@@ -978,8 +988,8 @@ public static class Strings
 
         IsEnglish = true;
         MenuBookmark = "Bookmark";
-        MenuBookmarkAdd = "Add Bookmark";
-        MenuBookmarkRemove = "Remove Bookmark";
+        MenuBookmarkAdd = "Add bookmark";
+        MenuBookmarkRemove = "Remove bookmark";
         MenuBookmarkList = "Bookmarks";
         MenuBookmarkListEmpty = "No bookmarks";
         MenuPresetAdd = "Add preset";
@@ -1006,34 +1016,34 @@ public static class Strings
         MenuFileFilterDocument = "Documents";
         MenuFileFilterMedia = "Media";
         MenuFileFilterArchive = "Archives";
-        MenuFileFilterExecutable = "Programs & Shortcuts";
+        MenuFileFilterExecutable = "Programs & shortcuts";
         MenuFileFilterOther = "Other";
         MenuFileFilterCustomEdit = "Custom…";
-        FilterCustomTitle = "Custom Extensions";
+        FilterCustomTitle = "Custom extensions";
         FilterCustomHint = "Separate with commas · txt, png, .mp3";
         FilterCustomEmptyHint = "Leaving this empty removes the custom kind";
         MenuFileFilterExcludeEdit = "Exclude…";
-        FilterExcludeTitle = "Excluded Extensions";
+        FilterExcludeTitle = "Excluded extensions";
         FilterExcludeHint = "Separate with commas · these are always hidden";
         FilterExcludeEmptyHint = "Leaving this empty removes the exclusion";
         ButtonOk = "OK";
         ButtonCancel = "Cancel";
-        MenuFontWeight = "Font Weight";
+        MenuFontWeight = "Font weight";
         MenuFontWeightNormal = "Normal";
         MenuFontWeightBold = "Bold";
-        MenuFontWeightFoldersOnly = "Bold Folders Only";
-        MenuFontWeightFilesOnly = "Bold Files Only";
-        MenuSidePanel = "Bookmark Panel";
+        MenuFontWeightFoldersOnly = "Bold folders only";
+        MenuFontWeightFilesOnly = "Bold files only";
+        MenuSidePanel = "Bookmark panel";
         MenuSidePanelShow = "Show";
-        MenuHideFolder = "Hide";
-        MenuHiddenFolderList = "Hidden Folders";
-        MenuHiddenFolderListEmpty = "No hidden folders";
-        MenuUnhideFolder = "Unhide";
-        MenuNetworkLocations = "Network Locations";
-        MenuNetworkLocationAdd = "Add Location…";
+        MenuHideFolder = "Exclude";
+        MenuHiddenFolderList = "Excluded folders";
+        MenuHiddenFolderListEmpty = "No excluded folders";
+        MenuUnhideFolder = "Stop excluding";
+        MenuNetworkLocations = "Network locations";
+        MenuNetworkLocationAdd = "Add location…";
         MenuNetworkLocationsEmpty = "No locations added";
         MenuNetworkLocationRemove = "Remove from list";
-        NetworkLocationPromptTitle = "Add Network Location";
+        NetworkLocationPromptTitle = "Add network location";
         NetworkLocationPromptHint =
             "Enter it as \\\\server\\share, or a folder path. Anything mapped to a drive letter is already in the list.";
         NetworkLocationUnreachableTitle = "Cannot connect";
@@ -1041,25 +1051,25 @@ public static class Strings
             "{0}\n\nThere was no response. Add it to the list anyway?";
         NetworkLocationDuplicateTitle = "Already in the list";
         MenuListRowRemove = "Remove";
-        HiddenClearAllConfirmTitle = "Unhide All Folders";
-        HiddenClearAllConfirmBody = "Show every hidden folder again? ({0})";
+        HiddenClearAllConfirmTitle = "Clear all exclusions";
+        HiddenClearAllConfirmBody = "Show every excluded folder again? ({0})";
         MenuBookmarkClearAll = "Clear all";
-        BookmarkClearAllConfirmTitle = "Clear All Bookmarks";
+        BookmarkClearAllConfirmTitle = "Clear all bookmarks";
         BookmarkClearAllConfirmBody = "Clear every bookmark? ({0})";
         BookmarkShortcutNext = "Next bookmark";
         BookmarkShortcutPrev = "Previous bookmark";
-        MenuNewFolder = "New Folder";
+        MenuNewFolder = "New folder";
         MenuRefresh = "Refresh";
-        MenuAutoCollapse = "Auto-Collapse Folders";
+        MenuAutoCollapse = "Auto-collapse folders";
         MenuCollapseAllExpanded = "Collapse all folders";
         CollapseAllConfirmTitle = "Collapse all folders";
-        CollapseAllConfirmBody = "Collapse all expanded folders?";
+        CollapseAllConfirmBody = "Collapse all expanded folders?\n\nWhat was expanded is not remembered, so this cannot be undone.";
         MenuOpen = "Open in default app";
         MenuExpandFolder = "Expand";
         MenuCollapseFolder = "Collapse";
         MenuViewHere = "View";
         MenuPlayHere = "Play";
-        MenuOpenWith = "Open With";
+        MenuOpenWith = "Open with";
         MenuCut = "Cut";
         MenuCopy = "Copy";
         MenuPaste = "Paste";
@@ -1068,47 +1078,47 @@ public static class Strings
         MenuExtract = "Extract";
         MenuRename = "Rename";
         MenuDelete = "Delete";
-        MenuCopyPath = "Copy Path";
+        MenuCopyPath = "Copy path";
         MenuMultiSelectionInfo = "{0} items selected";
-        MenuOpenTerminal = "Open in Terminal";
+        MenuOpenTerminal = "Open in terminal";
         MenuOpenWithCode = "Open with Code";
         MenuRevealInExplorer = "Reveal in Explorer";
-        MenuRevealInTree = "Show in Tree";
+        MenuRevealInTree = "Show in tree";
         GestureDoubleClick = "Double-click";
         MenuProperties = "Properties";
 
-        MenuAlwaysOnTop = "Always on Top";
+        MenuAlwaysOnTop = "Always on top";
         MenuGeneralSettings = "General";
         MenuStartWithWindows = "Start with Windows";
-        MenuAlwaysShowTrayIcon = "Always Show Tray Icon";
-        MenuShowHiddenItems = "Windows hidden and system items";
-        MenuShowFolderIcons = "Show Folder Icons";
-        MenuShowFileIcons = "Show File Icons";
-        MenuShowDriveIcons = "Show Drive Icons";
+        MenuAlwaysShowTrayIcon = "Always show tray icon";
+        MenuShowHiddenItems = "Show hidden and system items";
+        MenuShowFolderIcons = "Show folder icons";
+        MenuShowFileIcons = "Show file icons";
+        MenuShowDriveIcons = "Show drive icons";
         MenuTitleBarTitle = "Title bar text";
-        MenuDragMoves = "Drag Moves (hold Ctrl to copy)";
-        MenuShowPanelDividers = "Panel Dividers";
-        MenuSidePanelAtBottom = "Show at Bottom";
+        MenuDragMoves = "Drag moves (hold Ctrl to copy)";
+        MenuShowPanelDividers = "Panel dividers";
+        MenuSidePanelAtBottom = "Show at bottom";
         ButtonEdgeShades = "Shading";
         ButtonEdgeShadesTip = "Veils the top and bottom ends of a list";
-        MenuViewerSideSwapped = "Swap Sides";
-        MenuDockOnRight = "Pin to Right Edge";
-        MenuAutoHideCloseOnLeave = "Close on Mouse Leave";
-        MenuAutoHideUseHandle = "Handle Instead of Full Edge";
-        MenuAutoHideSlide = "Slide Animation";
-        MenuAutoHideSliverWidth = "Auto-Hide Thickness";
-        MenuColorSettings = "Color Settings";
+        MenuViewerSideSwapped = "Swap sides";
+        MenuDockOnRight = "Pin to right edge";
+        MenuAutoHideCloseOnLeave = "Close on mouse leave";
+        MenuAutoHideUseHandle = "Handle instead of full edge";
+        MenuAutoHideSlide = "Slide animation";
+        MenuAutoHideSliverWidth = "Auto-hide thickness";
+        MenuColorSettings = "Color settings";
         ColorSwatchTooltip = "Click: color picker · Right-click: enter a color code";
         ColorHexInputHint = "#RRGGBB · Enter to apply, Esc to cancel";
         MenuRestart = "Restart";
         MenuHelp = "Help";
         MenuAbout = "About";
         HelpTitle = "Edgetree help";
-        MenuIconStyle = "Icon Style";
+        MenuIconStyle = "Icon style";
         MenuIconStyleDefault = "Default";
         MenuIconStyleShell = "Windows Explorer";
 
-        MenuDefaultSort = "Default Sort";
+        MenuDefaultSort = "Default sort";
         MenuSort = "Sort by";
         MenuSortByName = "Name";
         MenuSortByDate = "Date modified";
@@ -1117,7 +1127,7 @@ public static class Strings
         MenuSortAscending = "Ascending";
         MenuSortDescending = "Descending";
         MenuFollowParentSort = "Inherit sort";
-        MenuSearchInFolder = "Search in This Folder";
+        MenuSearchInFolder = "Search in this folder";
         SortTooltipFormat = "Sorted by {0}";
         SortModeFollowGlobal = "Inherited sort";
         SortModeFolderGroup = "Group by folder";
@@ -1125,25 +1135,25 @@ public static class Strings
         SortModeNameDesc = "Name descending";
         SortModeDateAsc = "Date ascending";
         SortModeDateDesc = "Date descending";
-        MenuFontSize = "Font Size (Ctrl +/-)";
+        MenuFontSize = "Font size (Ctrl +/-)";
         MenuMaxItemsPerFolder = "Items per folder";
-        MenuMaxItemsAll = "Show All";
-        MenuTabSpacing = "Indent Width";
-        MenuRowSpacing = "Row Spacing";
-        MenuScrollBarThickness = "Scrollbar Width";
-        MenuExportSettings = "Export Settings...";
-        MenuImportSettings = "Import Settings...";
-        MenuResetSettings = "Reset All Settings...";
+        MenuMaxItemsAll = "Show all";
+        MenuTabSpacing = "Indent width";
+        MenuRowSpacing = "Row spacing";
+        MenuScrollBarThickness = "Scrollbar width";
+        MenuExportSettings = "Export settings...";
+        MenuImportSettings = "Import settings...";
+        MenuResetSettings = "Reset all settings...";
 
-        ToolTipPinLeft = "Pin to Left";
-        ToolTipPinRight = "Pin to Right";
-        ToolTipPinAutoHide = "Auto Hide";
-        ToolTipPinStayOpen = "Pin Open";
+        ToolTipPinLeft = "Pin to left";
+        ToolTipPinRight = "Pin to right";
+        ToolTipPinAutoHide = "Auto hide";
+        ToolTipPinStayOpen = "Pin open";
         ToolTipCollapseAll = "Collapse all folders (Shift+click: no restore)";
         ToolTipRestoreExpanded = "Restore expanded folders (Shift+click: collapse, no restore)";
         ToolTipOptions = "Options";
         ToolTipUpdateAvailable = "Version {0} available for download";
-        ToolTipMinimize = "Minimize to Tray";
+        ToolTipMinimize = "Minimize to tray";
         ToolTipPutAway = "Put the app away";
         ToolTipClose = "Exit";
         RootPathLabel = "This PC";
@@ -1151,8 +1161,8 @@ public static class Strings
         ShowMoreFormat = "… Show {0} more";
         ShowLessFormat = "… Show {0} fewer";
         FilterHiddenFormat = "… Hidden by filter: {0}";
-        HiddenFolderNoticeFormat = "… Hidden folders: {0}";
-        FilterAndHiddenFormat = "… Hidden by filter: {0} · Hidden folders: {1}";
+        HiddenFolderNoticeFormat = "… Excluded folders: {0}";
+        FilterAndHiddenFormat = "… Hidden by filter: {0} · Excluded folders: {1}";
         FolderEmptyLabel = "… Empty";
 
         ToolTipSearch = "Search (Ctrl+F)";
@@ -1177,6 +1187,7 @@ public static class Strings
         ViewerFullscreen = "Full screen";
         GestureWheelClick = "Wheel click";
         ViewerFullDesktop = "Fill desktop";
+        ViewerFullDesktopHint = "Keeps the taskbar visible";
         MenuImageViewer = "Multimedia panel";
         MenuPrecacheThumbnails = "Preload image thumbnails";
         MenuOpenMediaInViewer = "Open on double-click";
@@ -1193,8 +1204,8 @@ public static class Strings
         MenuClearThumbnailCacheSized = "Clean up thumbnail files ({0})";
         ViewerPrecaching = "Preloading {0}";
         ViewerMarkedCount = "{0} selected";
-        ViewerMarkAdd = "Video Bookmark";
-        ViewerMarkList = "Video Bookmarks";
+        ViewerMarkAdd = "Video bookmark";
+        ViewerMarkList = "Video bookmarks";
         ViewerRewind = "Back to start";
         ViewerPrevTrack = "Previous track";
         ViewerNextTrack = "Next track";
@@ -1260,40 +1271,40 @@ public static class Strings
         SearchStatusEmpty = "Substring · * ? wildcards · ↑↓ history";
         SearchStatusScopeMissing = "Folder missing · refresh or re-pick";
 
-        ColorSettingsTitle = "Color Settings";
-        ColorLabelBackground = "Explorer Background";
-        ColorLabelFolderNameFont = "Folder Name";
-        ColorLabelFolderNameHighlightFont = "Folder Name Highlight";
-        ColorLabelFileNameFont = "File Name";
-        ColorLabelFileNameHighlightFont = "File Name Highlight";
-        ColorLabelSelection = "Selected Item";
+        ColorSettingsTitle = "Color settings";
+        ColorLabelBackground = "Explorer background";
+        ColorLabelFolderNameFont = "Folder name";
+        ColorLabelFolderNameHighlightFont = "Folder name highlight";
+        ColorLabelFileNameFont = "File name";
+        ColorLabelFileNameHighlightFont = "File name highlight";
+        ColorLabelSelection = "Selected item";
         ColorLabelSelectionZone = "Selected folder area";
-        ColorLabelHistory = "Bookmark Panel Background";
-        ColorLabelHoverBackground = "Mouse Hover";
-        ColorLabelFolderNameHoverFont = "Folder Name Mouse Hover";
-        ColorLabelFileNameHoverFont = "File Name Mouse Hover";
-        ColorLabelShowMore = "Show More";
-        ColorLabelPanelNameFont = "Bookmark Name";
-        ColorLabelPanelNameHighlightFont = "Bookmark Name Highlight";
-        ColorLabelPanelNameHoverFont = "Bookmark Name Mouse Hover";
-        ColorLabelGuideLine = "Guide Line";
-        ColorLabelGuideLineActive = "Guide Line Highlight";
-        ColorLabelExpander = "Expand Arrow";
-        ColorLabelFilterChipChecked = "Filter Chip On";
-        ColorLabelFilterChipCheckedFont = "Chip On Text";
-        ColorLabelFilterChipExclude = "Exclude Chip Off Text";
-        ColorLabelFilterChipExcludeChecked = "Exclude Chip On";
-        ColorLabelHeader = "Title Bar Background";
-        ColorLabelPanelDivider = "Panel Divider";
-        ColorLabelViewerBackground = "Multimedia Panel Background";
-        ColorLabelAutoHideHandle = "Auto-Hide Handle/Bar";
+        ColorLabelHistory = "Bookmark panel background";
+        ColorLabelHoverBackground = "Mouse hover";
+        ColorLabelFolderNameHoverFont = "Folder name mouse hover";
+        ColorLabelFileNameHoverFont = "File name mouse hover";
+        ColorLabelShowMore = "Show more";
+        ColorLabelPanelNameFont = "Bookmark name";
+        ColorLabelPanelNameHighlightFont = "Bookmark name highlight";
+        ColorLabelPanelNameHoverFont = "Bookmark name mouse hover";
+        ColorLabelGuideLine = "Guide line";
+        ColorLabelGuideLineActive = "Guide line highlight";
+        ColorLabelExpander = "Expand arrow";
+        ColorLabelFilterChipChecked = "Filter chip on";
+        ColorLabelFilterChipCheckedFont = "Chip on text";
+        ColorLabelFilterChipExclude = "Exclude chip off text";
+        ColorLabelFilterChipExcludeChecked = "Exclude chip on";
+        ColorLabelHeader = "Title bar background";
+        ColorLabelPanelDivider = "Panel divider";
+        ColorLabelViewerBackground = "Multimedia panel background";
+        ColorLabelAutoHideHandle = "Auto-hide handle/bar";
         ButtonDefaults = "Defaults";
         ButtonClose = "Close";
         ButtonExportColors = "Export";
         ButtonImportColors = "Import";
         ColorFileFilter = "Edgetree colors (*.json)|*.json";
         ColorFileDefaultName = "edgetree-colors.json";
-        ColorImportFailedTitle = "Import Colors";
+        ColorImportFailedTitle = "Import colors";
         ColorImportFailedBody = "That file holds no colors.";
         SettingsSaveFailedTitle = "Settings";
         SettingsSaveFailedBody =
@@ -1312,16 +1323,16 @@ public static class Strings
         ButtonDaringColors = "Bold";
         ButtonDaringColorsTip = "Bolder combinations, starting from a primary hue";
         ButtonUndoRandom = "Undo";
-        ColorThemeDarkLabel = "Dark Mode";
-        ColorThemeLightLabel = "Light Mode";
-        ColorResetConfirmTitle = "Reset Colors";
+        ColorThemeDarkLabel = "Dark mode";
+        ColorThemeLightLabel = "Light mode";
+        ColorResetConfirmTitle = "Reset colors";
         ColorResetConfirmBody = "This will reset the colors you've set in {0}. Continue?";
 
         AboutTitle = "About";
         AboutVersionLabel = "Version";
         AboutAuthorLabel = "Author";
         AboutDateLabel = "Date";
-        AboutLicenseLabel = "License Summary";
+        AboutLicenseLabel = "License summary";
         AboutWebsiteLabel = "Website";
         AboutOtherToolLabel = "Another tool by the same maker";
         AboutUpdateAvailableFormat = "Download update {0}";
@@ -1334,55 +1345,55 @@ public static class Strings
         AboutIconLicenseOpen = "Read the Apache License 2.0";
 
         TrayOpen = "Open";
-        TrayHide = "Send to Tray";
+        TrayHide = "Send to tray";
         TrayAbout = "About";
         TrayExit = "Exit";
         UpdateAvailableRow = "New update - v{0}";
 
-        PasteFailedTitle = "Paste Failed";
+        PasteFailedTitle = "Paste failed";
         MoveIntoSelfError = "A folder can't be moved into itself or into one of its own subfolders.";
         CopyIntoSelfError = "A folder can't be copied into itself or into one of its own subfolders.";
-        NewFolderFailedTitle = "Failed to Create Folder";
-        RenameFailedTitle = "Rename Failed";
-        NewFolderDefaultName = "New Folder";
+        NewFolderFailedTitle = "Failed to create folder";
+        RenameFailedTitle = "Rename failed";
+        NewFolderDefaultName = "New folder";
         RenameFailedBody = "Could not rename this item.";
-        DeleteConfirmTitle = "Confirm Delete";
+        DeleteConfirmTitle = "Confirm delete";
         DeleteConfirmBody = "Send \"{0}\" to the Recycle Bin?";
         DeleteConfirmBodyMultiple = "Send {0} selected items to the Recycle Bin?";
         DeleteFailedShellBody = "Could not delete. (error {0})";
-        DeleteNoRecycleBinTitle = "Delete from a Network Location";
+        DeleteNoRecycleBinTitle = "Delete from a network location";
         DeleteNoRecycleBinBody =
             "Delete \"{0}\"?\n\nA network location has no Recycle Bin, so this cannot be undone.";
         DeleteNoRecycleBinBodyMultiple =
             "Delete {0} items from a network location?\n\nThere is no Recycle Bin, so this cannot be undone.";
-        DeleteHiddenInsideTitle = "Hidden folders inside";
+        DeleteHiddenInsideTitle = "Excluded folders inside";
         // THREE PARTS, not two sentences: what is going, what is inside it,
         // then the question. English has no plural machinery here, and a count
         // on a label line agrees with any number where "{1} hidden folders"
         // would read "1 hidden folders" (review, 2026-08-27). The label also
         // repeats this box's own title, which ties the two together.
         DeleteHiddenInsideBody =
-            "\"{0}\" will be deleted.\n\nHidden folders inside: {1}\n\nDelete anyway?";
+            "\"{0}\" will be deleted.\n\nExcluded folders inside: {1}\n\nDelete anyway?";
         DeleteHiddenInsideBodyMultiple =
-            "The selected items will be deleted.\n\nHidden folders inside: {0}\n\nDelete anyway?";
-        DeleteFailedTitle = "Delete Failed";
-        CompressFailedTitle = "Compress Failed";
-        ExtractFailedTitle = "Extract Failed";
+            "The selected items will be deleted.\n\nExcluded folders inside: {0}\n\nDelete anyway?";
+        DeleteFailedTitle = "Delete failed";
+        CompressFailedTitle = "Compress failed";
+        ExtractFailedTitle = "Extract failed";
         CompressSkippedBody = "Skipped {0} that could not be read.";
         StartWithWindowsFailedTitle = "Start with Windows";
         StartWithWindowsFailedBody = "Failed to register as a startup program. It may be restricted by administrator policy.";
-        LanguageChangeTitle = "Change Language";
+        LanguageChangeTitle = "Change language";
         LanguageChangeBody = "Changing the language requires restarting the app. Restart now?";
-        ImportFailedTitle = "Import Failed";
-        OverwriteConfirmTitle = "Confirm Overwrite";
+        ImportFailedTitle = "Import failed";
+        OverwriteConfirmTitle = "Confirm overwrite";
         OverwriteConfirmBody = "\"{0}\" already exists. Overwrite it?";
 
-        ExportSettingsFailedTitle = "Failed to Export Settings";
-        ImportSettingsFailedTitle = "Failed to Import Settings";
-        SettingsImportedTitle = "Settings Imported";
+        ExportSettingsFailedTitle = "Failed to export settings";
+        ImportSettingsFailedTitle = "Failed to import settings";
+        SettingsImportedTitle = "Settings imported";
         SettingsImportedBody = "Settings were imported. Restarting the app is required to apply them. Restart now?";
 
-        ResetSettingsConfirmTitle = "Reset Settings";
+        ResetSettingsConfirmTitle = "Reset settings";
         ResetSettingsConfirmBody = "All settings and bookmarks will be reset to the app's default state. This cannot be undone.\n\nThe app will restart afterward to apply it. Continue?";
 
 #if INSTRUMENT
