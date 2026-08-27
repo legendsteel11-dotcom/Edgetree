@@ -8632,20 +8632,23 @@ public partial class MainWindow : Window
                 collapsedWidth.Value, collapsedWidth.Min, collapsedWidth.Max);
             UpdateStepperRow(scrollBarThicknessRow, _settings.ScrollBarThickness, 6, 20);
 
-            // languageMenu's first child is the non-interactive restart note
-            // (see the XAML) - skipped here via the leading discard.
-            if (languageMenu.Items is [_, MenuItem koItem, MenuItem enItem])
-            {
-                koItem.IsChecked = _settings.Language != "en";
-                enItem.IsChecked = _settings.Language == "en";
-            }
+            // THE LAST TWO PLACES IN THIS HANDLER THAT READ A MENU BY POSITION,
+            // and they are gone (2026-08-27, found in review). Everything above
+            // has been found by AutomationId since 2026-08-02 and the six 정렬
+            // rows by Tag since 2026-08-26 - these two kept fixed-length list
+            // patterns, which is the shape that cost eight days on 08-17: a row
+            // added or a separator gained and the pattern stops matching, so
+            // every checkmark it was going to set goes unset with nothing said.
+            //
+            // The rows already carried the tags. Only the reading was old, and
+            // it read `[_, MenuItem, MenuItem]` for 언어 - a pattern that also
+            // had to know the restart note leads the list, so the note and the
+            // reader were two places holding one fact.
+            SetMenuItemChecked(languageMenu, "ko", _settings.Language != "en");
+            SetMenuItemChecked(languageMenu, "en", _settings.Language == "en");
 
-            if (iconStyleMenu.Items is [MenuItem defaultIcons, MenuItem shellIcons])
-            {
-                defaultIcons.IsChecked = !_settings.UseShellIcons;
-                shellIcons.IsChecked = _settings.UseShellIcons;
-            }
-
+            SetMenuItemChecked(iconStyleMenu, "default", !_settings.UseShellIcons);
+            SetMenuItemChecked(iconStyleMenu, "shell", _settings.UseShellIcons);
         }
         else
         {
