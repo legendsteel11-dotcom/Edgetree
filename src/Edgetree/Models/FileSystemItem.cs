@@ -92,18 +92,56 @@ public class FileSystemItem : INotifyPropertyChanged
     // notes share one flag rather than getting one each: they stand in the same
     // slot, refuse a click the same way, and differ only in whether anything is
     // being hidden.
-    public string ShowMoreLabel => IsFilterNotice && RemainingCount <= 0
-        ? Strings.FolderEmptyLabel
-        : string.Format(
-            IsFilterNotice ? Strings.FilterHiddenFormat
-                : IsShowLess ? Strings.ShowLessFormat
-                : Strings.ShowMoreFormat,
-            RemainingCount);
+    //
+    // The notice reads its two counts off the PARENT rather than carrying them,
+    // because it already holds a reference to the folder it stands in and a
+    // second copy of a number is a second thing that can go stale.
+    public string ShowMoreLabel
+    {
+        get
+        {
+            if (!IsFilterNotice)
+            {
+                return string.Format(
+                    IsShowLess ? Strings.ShowLessFormat : Strings.ShowMoreFormat,
+                    RemainingCount);
+            }
+
+            int filtered = Parent?.FilteredOutCount ?? 0;
+            int hidden = Parent?.HiddenFolderCount ?? 0;
+
+            // NAMING BOTH WHEN BOTH APPLY. One number would be honest about the
+            // total and useless about the remedy - the filter is released at the
+            // chips, a hidden folder from the options menu.
+            if (filtered > 0 && hidden > 0)
+            {
+                return string.Format(Strings.FilterAndHiddenFormat, filtered, hidden);
+            }
+
+            if (hidden > 0)
+            {
+                return string.Format(Strings.HiddenFolderNoticeFormat, hidden);
+            }
+
+            if (filtered > 0)
+            {
+                return string.Format(Strings.FilterHiddenFormat, filtered);
+            }
+
+            return Strings.FolderEmptyLabel;
+        }
+    }
 
     // How many files the file-type filter took out of this FOLDER's own
     // listing, recorded where the filter is applied (FileSystemService's read)
     // so nothing has to enumerate a second time to find out.
     public int FilteredOutCount { get; set; }
+
+    // And how many SUBFOLDERS the 숨긴 폴더 list took out of it. Counted for the
+    // same reason and in the same pass: a folder whose only child was hidden was
+    // announcing itself as 비어 있음 while that child held files (2026-08-26, on
+    // report), which is the exact case the notice exists to prevent.
+    public int HiddenFolderCount { get; set; }
 
     // WHAT A ROW'S TOOLTIP SAYS (2026-08-17). Its own path for a real row; for
     // the synthetic 더 보기 · 접기 row, the PARENT's - that row has no path of its
@@ -589,13 +627,17 @@ public class FileSystemItem : INotifyPropertyChanged
     // left the folder empty again. Both rebuild paths ask here now, so the
     // answer cannot depend on which one ran last.
     //
-    // Nothing left to show AND the filter took something out means the
-    // emptiness on screen is the FILTER's doing, not the folder's - and the
-    // folder says so rather than presenting itself as empty to whoever is about
-    // to delete it.
+    // Nothing left to show AND something was taken out means the emptiness on
+    // screen is the APP's doing, not the folder's - and the folder says so
+    // rather than presenting itself as empty to whoever is about to delete it.
+    // Two ways to be emptied, and both count: the file-type filter, and the
+    // 숨긴 폴더 list.
     private List<FileSystemItem> WithFilterNotice(List<FileSystemItem> rows)
         => rows.Count == 0
-            ? new List<FileSystemItem> { CreateFilterNotice(this, FilteredOutCount) }
+            ? new List<FileSystemItem>
+            {
+                CreateFilterNotice(this, FilteredOutCount + HiddenFolderCount),
+            }
             : rows;
 
     // Fills Children with at most DisplayCap items; anything beyond that is

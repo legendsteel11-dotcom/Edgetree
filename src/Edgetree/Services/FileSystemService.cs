@@ -843,6 +843,7 @@ public static class FileSystemService
         readFailed = false;
         var result = new List<FileSystemItem>();
         int filteredOut = 0;
+        int hiddenFolders = 0;
         var (field, descending) = ResolveSortFor(path);
 
         try
@@ -852,10 +853,24 @@ public static class FileSystemService
             foreach (var dir in directories)
             {
                 var name = Path.GetFileName(dir);
-                if (!string.IsNullOrEmpty(name) && !IsHiddenByUser(dir))
+                if (string.IsNullOrEmpty(name))
                 {
-                    result.Add(new FileSystemItem(name, dir, isDirectory: true, parent));
+                    continue;
                 }
+
+                if (IsHiddenByUser(dir))
+                {
+                    // COUNTED WHERE IT IS DROPPED, exactly like the filtered
+                    // files below. Until 2026-08-26 it was dropped silently, so
+                    // a folder holding nothing but a hidden subfolder showed
+                    // 비어 있음 - the folder presenting itself as empty to
+                    // whoever was about to delete it, which is the one thing
+                    // that notice exists to prevent.
+                    hiddenFolders++;
+                    continue;
+                }
+
+                result.Add(new FileSystemItem(name, dir, isDirectory: true, parent));
             }
         }
         catch (UnauthorizedAccessException) { readFailed = true; }
@@ -896,6 +911,7 @@ public static class FileSystemService
         catch (IOException) { readFailed = true; }
 
         parent.FilteredOutCount = filteredOut;
+        parent.HiddenFolderCount = hiddenFolders;
 
         // A failure on a network path, or a read that took long enough to be
         // felt as a freeze, closes the door on that root for a few seconds.

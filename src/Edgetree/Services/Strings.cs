@@ -399,15 +399,32 @@ public static class Strings
     // left nothing else to show. {0} is how many it took out.
     public static string FilterHiddenFormat = "… 필터로 감춰진 파일 {0}개";
 
+    // THE SAME NOTE FOR THE OTHER WAY A FOLDER GETS EMPTIED: its subfolders are
+    // on the 숨긴 폴더 list (2026-08-26, on report - a folder whose one child was
+    // hidden was calling itself 비어 있음 while that child held files). Its own
+    // wording rather than a share of the filter's, because the two are undone in
+    // different places: the filter chips sit at the bottom of the window, this
+    // one is released from 숨긴 폴더 in the options menu.
+    public static string HiddenFolderNoticeFormat = "… 숨긴 폴더 {0}개";
+
+    // Both at once. One row, and it has to name both or it invites a hunt for
+    // the wrong switch.
+    public static string FilterAndHiddenFormat = "… 필터로 감춰진 파일 {0}개 · 숨긴 폴더 {1}개";
+
     // THE SAME SLOT FOR THE OTHER EMPTY FOLDER - the one that really is empty.
     // Clicking one already does something (the row answers, the sort icon
     // appears), so the folder looks like it replied and then said nothing.
-    // Folders are never taken out by the filter, so this row only ever stands
-    // in a folder with no files AND NO SUBFOLDERS - which is why it says 비어
-    // 있음 rather than 파일 없음. 파일 없음 was where the wording started and the
-    // author changed it on that ground (2026-08-26): the tree carries the app's
-    // own particularities (a display cap, a filter that never touches folders),
-    // and a row that is nearly right is worse here than one that is plain.
+    // This row stands in a folder with nothing left to show FOR ANY REASON -
+    // no files, no subfolders, nothing taken out by the filter and nothing
+    // hidden - which is why it says 비어 있음 rather than 파일 없음. 파일 없음
+    // was where the wording started and the author changed it on that ground
+    // (2026-08-26): the tree carries the app's own particularities (a display
+    // cap, a filter, a hidden-folder list), and a row that is nearly right is
+    // worse here than one that is plain.
+    //
+    // The note above this one used to say folders are never taken out. They
+    // are - by 숨긴 폴더 - and that is exactly how this row came to stand in a
+    // folder that was not empty.
     //
     // It cannot lie about a folder that could not be READ: a failed read never
     // reaches PopulateCapped at all - it keeps the placeholder and stays
@@ -500,7 +517,7 @@ public static class Strings
     // 다른 값은 Space · Home · Insert · F1처럼 키에 적힌 글자 그대로다. 휠클릭
     // 하나만 한글이면 같은 칸에서 혼자 다른 종류의 말이 된다. F1의 같은 칸도 이
     // 말로 맞췄다 - 같은 동작을 두 이름으로 부르면 두 기능으로 읽힌다.
-    public static string GestureWheelClick = "Wheel Click";
+    public static string GestureWheelClick = "Wheel click";
     public static string MenuImageViewer = "멀티미디어 패널";
     // 캐싱 rather than 미리 불러오기, reversing the earlier choice to name it for
     // what it does instead of for the machinery: 캐싱 is the word Korean users
@@ -889,6 +906,26 @@ public static class Strings
         "'{0}'을(를) 삭제할까요?\n\n네트워크 위치에는 휴지통이 없어 복구할 수 없습니다.";
     public static string DeleteNoRecycleBinBodyMultiple =
         "네트워크 위치의 {0}개 항목을 삭제할까요?\n\n휴지통이 없어 복구할 수 없습니다.";
+    // THE SECOND QUESTION, and it exists because the tree cannot show what is
+    // about to go (2026-08-26, raised by the author). A folder holding nothing
+    // but a hidden folder now says so, but the note only stands where there are
+    // no other rows - put one ordinary folder beside the hidden one and the
+    // parent reads as almost empty again while the hidden branch is still
+    // underneath it. This names the count at the moment it matters instead of
+    // parking a row in every folder that has ever had something hidden in it.
+    //
+    // Same shape as the network question above: the REASON first, because
+    // "안 보이는 폴더가 들어 있습니다" is the fact that makes the rest true.
+    // WHAT IS ABOUT TO HAPPEN, then what the screen did not show, then ONE
+    // question (2026-08-26, author's wording). The network box opens with
+    // "삭제할까요?" and closes on the reason; this one is the other way round
+    // because the reason is the whole point of asking - and stating the action
+    // rather than asking it twice keeps a single question mark in the box.
+    public static string DeleteHiddenInsideTitle = "숨긴 폴더가 들어 있음";
+    public static string DeleteHiddenInsideBody =
+        "'{0}'을(를) 삭제합니다.\n\n안에 숨긴 폴더 {1}개가 있습니다. 그래도 삭제하겠습니까?";
+    public static string DeleteHiddenInsideBodyMultiple =
+        "선택한 항목을 삭제합니다.\n\n안에 숨긴 폴더 {0}개가 있습니다. 그래도 삭제하겠습니까?";
     public static string DeleteFailedTitle = "삭제 실패";
     public static string CompressFailedTitle = "압축 실패";
     public static string ExtractFailedTitle = "압축 풀기 실패";
@@ -1114,6 +1151,8 @@ public static class Strings
         ShowMoreFormat = "… Show {0} more";
         ShowLessFormat = "… Show {0} fewer";
         FilterHiddenFormat = "… {0} files hidden by the filter";
+        HiddenFolderNoticeFormat = "… Hidden folders: {0}";
+        FilterAndHiddenFormat = "… Hidden by filter: {0} · Hidden folders: {1}";
         FolderEmptyLabel = "… Empty";
 
         ToolTipSearch = "Search (Ctrl+F)";
@@ -1316,6 +1355,16 @@ public static class Strings
             "Delete '{0}'?\n\nA network location has no Recycle Bin, so this cannot be undone.";
         DeleteNoRecycleBinBodyMultiple =
             "Delete {0} items from a network location?\n\nThere is no Recycle Bin, so this cannot be undone.";
+        DeleteHiddenInsideTitle = "Hidden folders inside";
+        // THREE PARTS, not two sentences: what is going, what is inside it,
+        // then the question. English has no plural machinery here, and a count
+        // on a label line agrees with any number where "{1} hidden folders"
+        // would read "1 hidden folders" (review, 2026-08-27). The label also
+        // repeats this box's own title, which ties the two together.
+        DeleteHiddenInsideBody =
+            "\"{0}\" will be deleted.\n\nHidden folders inside: {1}\n\nDelete anyway?";
+        DeleteHiddenInsideBodyMultiple =
+            "The selected items will be deleted.\n\nHidden folders inside: {0}\n\nDelete anyway?";
         DeleteFailedTitle = "Delete Failed";
         CompressFailedTitle = "Compress Failed";
         ExtractFailedTitle = "Extract Failed";

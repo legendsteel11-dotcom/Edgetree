@@ -20284,6 +20284,57 @@ public partial class MainWindow : Window
             MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
     }
 
+    // THE OTHER QUESTION IN FRONT OF A DELETE, and it asks about what the tree
+    // is not showing (2026-08-26, raised by the author). A folder emptied by the
+    // 숨긴 폴더 list says so in its own row, but only while it has no other rows:
+    // put one ordinary folder beside the hidden one and the parent reads as
+    // almost empty again with the hidden branch still under it. Deleting it
+    // takes that branch along, silently.
+    //
+    // ASKED HERE RATHER THAN MARKED IN THE TREE. The alternative was a notice
+    // row wherever anything is hidden, which on this machine would have parked a
+    // permanent line in C:\, Documents, E:\ and five more - the folders 숨긴
+    // 폴더 was used to quieten in the first place. The risk lives at the delete,
+    // so the sentence does too. Same shape as ConfirmUnrecyclableDelete: silent
+    // unless it has something to say, a question rather than a guard.
+    //
+    // NO DISK IS TOUCHED. The hidden list is a flat list of paths in settings,
+    // so this is string comparison against what is being deleted - it does not
+    // enumerate the folder, and it stays right for a branch that is not loaded.
+    private bool ConfirmDeletingHiddenFolders(IReadOnlyList<string> paths)
+    {
+        int count = 0;
+        foreach (string hidden in _settings.HiddenFolderPaths)
+        {
+            foreach (string target in paths)
+            {
+                // Strictly INSIDE. Deleting the hidden folder itself is a thing
+                // the author can see and chose; this is only about the ones
+                // riding along underneath something else.
+                if (hidden.Length > target.TrimEnd('\\').Length && PathIsWithin(hidden, target.TrimEnd('\\')))
+                {
+                    count++;
+                    break;
+                }
+            }
+        }
+
+        if (count == 0)
+        {
+            return true;
+        }
+
+        string body = paths.Count == 1
+            ? string.Format(
+                Strings.DeleteHiddenInsideBody,
+                Path.GetFileName(paths[0].TrimEnd('\\')),
+                count)
+            : string.Format(Strings.DeleteHiddenInsideBodyMultiple, count);
+
+        return MessageBox.Show(this, body, Strings.DeleteHiddenInsideTitle,
+            MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+    }
+
     private void DeleteItem_Click(object sender, RoutedEventArgs e)
     {
         var items = GetEffectiveSelection();
@@ -20316,8 +20367,22 @@ public partial class MainWindow : Window
         // Recycle Bin holding nothing from that drive. So the question comes
         // back for that case alone, ours this time.
         bool permanent = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        var targets = items.Select(i => i.FullPath).ToList();
 
-        if (!permanent && !ConfirmUnrecyclableDelete(items.Select(i => i.FullPath).ToList()))
+        // BEFORE the Recycle Bin question, and it is asked even for a Shift
+        // delete: what the two say is different. This one is about content the
+        // screen never showed, which is true whether or not the delete can be
+        // taken back - and on a Shift delete it is the only warning there is
+        // about it, since the shell's own dialog counts what it can see.
+        // Both firing at once needs a hidden folder inside a network folder
+        // being deleted, which is rare enough to leave as two questions rather
+        // than invent a sentence that says both.
+        if (!ConfirmDeletingHiddenFolders(targets))
+        {
+            return;
+        }
+
+        if (!permanent && !ConfirmUnrecyclableDelete(targets))
         {
             return;
         }
