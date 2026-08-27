@@ -543,8 +543,18 @@ public class FileSystemItem : INotifyPropertyChanged
     public static FileSystemItem CreateShowLess(FileSystemItem parent, int remainingCount)
         => new(parent, remainingCount, showLess: true);
 
-    public static FileSystemItem CreateFilterNotice(FileSystemItem parent, int hiddenCount)
-        => new(parent, hiddenCount, showLess: false) { IsFilterNotice = true };
+    // NO COUNT, unlike the two above, and the zero is the point rather than a
+    // placeholder: this row's label reads FilteredOutCount and HiddenFolderCount
+    // off the PARENT (see ShowMoreLabel), because it already holds a reference
+    // to the folder it stands in and a second copy of a number is a second thing
+    // that can go stale.
+    //
+    // It was handed the SUM of those two for a day (2026-08-26 to 08-27) - made
+    // at the call site, stored in RemainingCount, and read by nothing, because
+    // the label had already moved to the parent. Exactly the second copy the
+    // comment on ShowMoreLabel says not to keep.
+    public static FileSystemItem CreateFilterNotice(FileSystemItem parent)
+        => new(parent, remainingCount: 0, showLess: false) { IsFilterNotice = true };
 
     // Lets MainWindow's whole-tree refresh (RefreshAllLoadedFolders) skip
     // folders that were never expanded - nothing loaded means nothing stale to
@@ -634,11 +644,37 @@ public class FileSystemItem : INotifyPropertyChanged
     // 숨긴 폴더 list.
     private List<FileSystemItem> WithFilterNotice(List<FileSystemItem> rows)
         => rows.Count == 0
-            ? new List<FileSystemItem>
-            {
-                CreateFilterNotice(this, FilteredOutCount + HiddenFolderCount),
-            }
+            ? new List<FileSystemItem> { CreateFilterNotice(this) }
             : rows;
+
+    // A CHILD TAKEN OUT FROM OUTSIDE THE READ PATH still has to be counted.
+    //
+    // HiddenFolderCount is filled where the 숨긴 폴더 list is applied, which is
+    // FileSystemService's read - and hiding a folder deliberately does NOT read
+    // the parent again (MainWindow.HideFolder: a reload would collapse whatever
+    // else is open under it). So the one moment the notice is most wanted, the
+    // moment the row leaves, was the one moment nothing was counting: hide the
+    // only subfolder of a folder and it went back to presenting itself as empty
+    // until the next read, which for a folder nobody refreshes means until the
+    // app restarts (EnsureChildrenLoaded caches, so collapsing and expanding
+    // does not re-ask either). Found 2026-08-27 reviewing the round that built
+    // the notice.
+    //
+    // Called INSTEAD OF a re-read, not alongside one - the caller has already
+    // removed the row, and this brings the two numbers that describe the result
+    // back in step with it.
+    public void NoteChildHidden()
+    {
+        HiddenFolderCount++;
+
+        // Only the empty case has anything to add: while real rows remain there
+        // is no notice on screen, and the count above is enough to make the next
+        // rebuild say the right thing.
+        if (Children.Count == 0)
+        {
+            Children.ReplaceAll(WithFilterNotice(new List<FileSystemItem>()));
+        }
+    }
 
     // Fills Children with at most DisplayCap items; anything beyond that is
     // parked in _overflow behind a single trailing "더 보기" row.

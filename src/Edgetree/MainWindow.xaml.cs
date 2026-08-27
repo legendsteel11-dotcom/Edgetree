@@ -18400,7 +18400,21 @@ public partial class MainWindow : Window
             // reload would collapse whatever else is open under that parent
             // (the defect found 2026-07-25 when every file operation still
             // rebuilt).
-            parent.Children.Remove(folder);
+            //
+            // And the parent is told, because not re-reading means nothing else
+            // will count this (2026-08-27). The whole point of the notice is the
+            // folder that LOOKS empty and is not - and hiding the last row is
+            // the one moment that is guaranteed to be true, so it cannot be the
+            // moment the count is skipped. See FileSystemItem.NoteChildHidden.
+            //
+            // ON THE REMOVAL ACTUALLY HAPPENING, so the count can never run
+            // ahead of the rows: a row parked in the overflow past the display
+            // cap is not in Children, and a count raised for one still on the
+            // listing would be describing a folder that is not empty.
+            if (parent.Children.Remove(folder))
+            {
+                parent.NoteChildHidden();
+            }
         }
         else
         {
