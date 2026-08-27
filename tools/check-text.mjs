@@ -309,6 +309,75 @@ const BRIT = /\b(colours?|coloured|behaviour\w*|favourite\w*|minimis\w+|maximis\
   report('색상 창의 행 정의가 모자라지 않는가', rowHits, biggest + '행 / 최대 Grid.Row ' + maxRow)
 }
 
+// ------------------------------------------------------- 문자열의 중괄호와 짝
+//
+// 2026-08-27. 영문 검수로 100여 개 문구를 한 판에 다시 썼다. 그 작업에서 가장
+// 흔한 사고는 오타가 아니라 중괄호다 - `{0}` 이 하나 빠지면 그 문구를 쓰는
+// 자리가 화면에 뜨는 순간 FormatException 으로 죽고, `{` 하나가 새로 들어가도
+// 마찬가지다. 컴파일러는 아무 말도 안 한다.
+//
+// 두 가지를 본다.
+//   1. 모든 리터럴이 string.Format 이 읽을 수 있는 모양인가. `{n}` · `{n,a}` ·
+//      `{n:fmt}` · `{{` · `}}` 만 허용한다.
+//   2. 한국어와 영어가 같은 자리표시자를 쓰는가. 한쪽에만 `{1}` 이 있으면 그
+//      언어에서만 죽으므로, 국어로 쓰고 국어로 테스트하면 영어에서 터진다.
+//
+// 이 검사가 그날 실제로 잡은 것은 0건이었다. 잡을 것이 없다는 것을 확인하는 데
+// 스크립트를 한 번 짰으므로 버리지 않고 둔다.
+{
+  const src = read('src/Edgetree/Services/Strings.cs')
+    .split(/\r?\n/)
+    .filter((l) => !l.trim().startsWith('//'))
+    .join('\n')
+  const split = src.indexOf('IsEnglish = true;')
+
+  // 이름 = "리터럴"; - 여러 줄에 걸친 것과 + 로 이어 붙인 것까지 한 덩어리로.
+  const ASSIGN = /(\w+)\s*=\s*((?:@?"(?:[^"\\]|\\.)*"\s*\+?\s*)+);/g
+  const LITERAL = /"((?:[^"\\]|\\.)*)"/g
+  const ko = new Map(), en = new Map()
+
+  const braceHits = []
+  for (const m of src.matchAll(ASSIGN)) {
+    const name = m[1]
+    const parts = [...m[2].matchAll(LITERAL)].map((x) => x[1])
+    const holes = new Set()
+    for (const text of parts) {
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i]
+        if (c === '{') {
+          if (text[i + 1] === '{') { i++; continue }
+          const close = text.indexOf('}', i)
+          if (close < 0) { braceHits.push(name + '  닫히지 않은 {  ' + text.slice(0, 50)); break }
+          const inner = text.slice(i + 1, close)
+          if (/^\d+(,-?\d+)?(:[^{}]*)?$/.test(inner)) holes.add(+inner.split(/[,:]/)[0])
+          else braceHits.push(name + '  읽을 수 없는 {' + inner + '}  ' + text.slice(0, 50))
+          i = close
+        } else if (c === '}') {
+          if (text[i + 1] === '}') { i++; continue }
+          braceHits.push(name + '  짝 없는 }  ' + text.slice(0, 50))
+        }
+      }
+    }
+    // 번호에 구멍이 있으면(0 과 2 만) string.Format 이 인자를 셋 요구한다.
+    const list = [...holes].sort((a, b) => a - b)
+    if (list.length && (list[0] !== 0 || list[list.length - 1] !== list.length - 1)) {
+      braceHits.push(name + '  자리표시자 번호가 이어지지 않음 {' + list.join(',') + '}')
+    }
+    ;(m.index < split ? ko : en).set(name, list.join(','))
+  }
+
+  if (ko.size < 300) braceHits.push('국어 문자열을 ' + ko.size + '개밖에 못 찾음 - 위 정규식을 볼 것')
+  report('문자열의 중괄호가 성한가', braceHits, ko.size + ' + ' + en.size + '개 확인')
+
+  const pairHits = []
+  for (const [name, k] of ko) {
+    const e = en.get(name)
+    if (e === undefined || e === k) continue
+    pairHits.push(name + '  국어 {' + k + '} / 영문 {' + e + '} - 한쪽 언어에서만 죽는다')
+  }
+  report('두 언어가 같은 자리표시자를 쓰는가', pairHits, en.size + '쌍 대조')
+}
+
 // ------------------------------------------------------------------ 버전
 //
 // 2026-08-18: 버전을 올린 뒤 Debug 를 다시 안 만들고 띄워서, 사용자가 2.4.0
