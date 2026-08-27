@@ -990,7 +990,7 @@ public static class Strings
         PresetRenameTitle = "Rename preset";
         MenuPresetDelete = "Delete";
         PresetNameTitle = "Preset name";
-        PresetNameHint = "Saves position, size, docking, colors, file types and the current folder";
+        PresetNameHint = "Saves position, size, docking, colors, file types, and the current folder";
         PresetDefaultName = "Preset {0}";
         PresetSavedToast = "Preset saved";
         PlaceMissingTitle = "Folder not found";
@@ -998,7 +998,7 @@ public static class Strings
         PresetSlotEmptyTitle = "Presets";
         PresetSlotEmptyBody = "There is no preset {0} yet.\nSave the current setup there?";
 
-        MenuFileFilter = "Show File Types";
+        MenuFileFilter = "File types";
         FilterChipExecutable = "Programs";
         MenuFileFilterAll = "All";
         MenuFileFilterCode = "Code";
@@ -1051,9 +1051,9 @@ public static class Strings
         MenuNewFolder = "New Folder";
         MenuRefresh = "Refresh";
         MenuAutoCollapse = "Auto-Collapse Folders";
-        MenuCollapseAllExpanded = "Collapse All Expanded Folders";
-        CollapseAllConfirmTitle = "Collapse All Expanded Folders";
-        CollapseAllConfirmBody = "Collapse every folder that is currently expanded?";
+        MenuCollapseAllExpanded = "Collapse all folders";
+        CollapseAllConfirmTitle = "Collapse all folders";
+        CollapseAllConfirmBody = "Collapse all expanded folders?";
         MenuOpen = "Open in default app";
         MenuExpandFolder = "Expand";
         MenuCollapseFolder = "Collapse";
@@ -1081,11 +1081,11 @@ public static class Strings
         MenuGeneralSettings = "General";
         MenuStartWithWindows = "Start with Windows";
         MenuAlwaysShowTrayIcon = "Always Show Tray Icon";
-        MenuShowHiddenItems = "Show Hidden and System Items";
+        MenuShowHiddenItems = "Windows hidden and system items";
         MenuShowFolderIcons = "Show Folder Icons";
         MenuShowFileIcons = "Show File Icons";
         MenuShowDriveIcons = "Show Drive Icons";
-        MenuTitleBarTitle = "Title Bar Text";
+        MenuTitleBarTitle = "Title bar text";
         MenuDragMoves = "Drag Moves (hold Ctrl to copy)";
         MenuShowPanelDividers = "Panel Dividers";
         MenuSidePanelAtBottom = "Show at Bottom";
@@ -1116,17 +1116,17 @@ public static class Strings
         MenuSortBySize = "Size";
         MenuSortAscending = "Ascending";
         MenuSortDescending = "Descending";
-        MenuFollowParentSort = "Follow Parent Folder";
+        MenuFollowParentSort = "Inherit sort";
         MenuSearchInFolder = "Search in This Folder";
         SortTooltipFormat = "Sorted by {0}";
-        SortModeFollowGlobal = "Follow default";
+        SortModeFollowGlobal = "Inherited sort";
         SortModeFolderGroup = "Group by folder";
         SortModeNameAsc = "Name ascending";
         SortModeNameDesc = "Name descending";
         SortModeDateAsc = "Date ascending";
         SortModeDateDesc = "Date descending";
         MenuFontSize = "Font Size (Ctrl +/-)";
-        MenuMaxItemsPerFolder = "Items per Folder";
+        MenuMaxItemsPerFolder = "Items per folder";
         MenuMaxItemsAll = "Show All";
         MenuTabSpacing = "Indent Width";
         MenuRowSpacing = "Row Spacing";
@@ -1139,8 +1139,8 @@ public static class Strings
         ToolTipPinRight = "Pin to Right";
         ToolTipPinAutoHide = "Auto Hide";
         ToolTipPinStayOpen = "Pin Open";
-        ToolTipCollapseAll = "Collapse All (Shift+click: no restore)";
-        ToolTipRestoreExpanded = "Restore Expanded (Shift+click: collapse, no restore)";
+        ToolTipCollapseAll = "Collapse all folders (Shift+click: no restore)";
+        ToolTipRestoreExpanded = "Restore expanded folders (Shift+click: collapse, no restore)";
         ToolTipOptions = "Options";
         ToolTipUpdateAvailable = "Version {0} available for download";
         ToolTipMinimize = "Minimize to Tray";
@@ -1150,7 +1150,7 @@ public static class Strings
         MenuThumbnailMaxSize = "Max thumbnail size";
         ShowMoreFormat = "… Show {0} more";
         ShowLessFormat = "… Show {0} fewer";
-        FilterHiddenFormat = "… {0} files hidden by the filter";
+        FilterHiddenFormat = "… Hidden by filter: {0}";
         HiddenFolderNoticeFormat = "… Hidden folders: {0}";
         FilterAndHiddenFormat = "… Hidden by filter: {0} · Hidden folders: {1}";
         FolderEmptyLabel = "… Empty";
@@ -1163,7 +1163,7 @@ public static class Strings
         ViewerNavigator = "Navigator";
         ViewerClose = "Close the multimedia panel";
         FooterNowPlayingOpen = "Open in the multimedia panel";
-        FooterHeldFilmResume = "Pick up where you left off";
+        FooterHeldFilmResume = "Resume";
         ViewerNowPlayingLabel = "Now playing";
         ViewerBackToPlaying = "Back to the playing track";
         MenuSetWallpaper = "Set as desktop background";
@@ -1173,10 +1173,10 @@ public static class Strings
         ViewerPrevImage = "Previous image";
         ViewerNextImage = "Next image";
         ViewerFilmstrip = "Thumbnail bar";
-        MenuFilmstripGrid = "Thumbnail list layout";
+        MenuFilmstripGrid = "Thumbnail grid";
         ViewerFullscreen = "Full screen";
-        GestureWheelClick = "Wheel Click";
-        ViewerFullDesktop = "Fill the desktop";
+        GestureWheelClick = "Wheel click";
+        ViewerFullDesktop = "Fill desktop";
         MenuImageViewer = "Multimedia panel";
         MenuPrecacheThumbnails = "Preload image thumbnails";
         MenuOpenMediaInViewer = "Open on double-click";
@@ -1267,7 +1267,7 @@ public static class Strings
         ColorLabelFileNameFont = "File Name";
         ColorLabelFileNameHighlightFont = "File Name Highlight";
         ColorLabelSelection = "Selected Item";
-        ColorLabelSelectionZone = "Selected Folder Area";
+        ColorLabelSelectionZone = "Selected folder area";
         ColorLabelHistory = "Bookmark Panel Background";
         ColorLabelHoverBackground = "Mouse Hover";
         ColorLabelFolderNameHoverFont = "Folder Name Mouse Hover";
@@ -1347,12 +1347,12 @@ public static class Strings
         NewFolderDefaultName = "New Folder";
         RenameFailedBody = "Could not rename this item.";
         DeleteConfirmTitle = "Confirm Delete";
-        DeleteConfirmBody = "Send '{0}' to the Recycle Bin?";
+        DeleteConfirmBody = "Send \"{0}\" to the Recycle Bin?";
         DeleteConfirmBodyMultiple = "Send {0} selected items to the Recycle Bin?";
         DeleteFailedShellBody = "Could not delete. (error {0})";
         DeleteNoRecycleBinTitle = "Delete from a Network Location";
         DeleteNoRecycleBinBody =
-            "Delete '{0}'?\n\nA network location has no Recycle Bin, so this cannot be undone.";
+            "Delete \"{0}\"?\n\nA network location has no Recycle Bin, so this cannot be undone.";
         DeleteNoRecycleBinBodyMultiple =
             "Delete {0} items from a network location?\n\nThere is no Recycle Bin, so this cannot be undone.";
         DeleteHiddenInsideTitle = "Hidden folders inside";
@@ -1375,7 +1375,7 @@ public static class Strings
         LanguageChangeBody = "Changing the language requires restarting the app. Restart now?";
         ImportFailedTitle = "Import Failed";
         OverwriteConfirmTitle = "Confirm Overwrite";
-        OverwriteConfirmBody = "'{0}' already exists. Overwrite it?";
+        OverwriteConfirmBody = "\"{0}\" already exists. Overwrite it?";
 
         ExportSettingsFailedTitle = "Failed to Export Settings";
         ImportSettingsFailedTitle = "Failed to Import Settings";

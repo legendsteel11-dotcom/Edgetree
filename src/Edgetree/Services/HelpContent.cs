@@ -291,7 +291,7 @@ public static class HelpContent
                     R("빈 곳 우클릭",
                       "전체 새로고침 · 새 폴더 · 북마크 · 숨긴 폴더 · 네트워크 위치 · 표시할 파일 형식",
                       "Right-click empty space",
-                      "Refresh everything · New Folder · Bookmark · Hidden Folders · Network Locations · Show File Types"),
+                      "Refresh everything · New Folder · Bookmark · Hidden Folders · Network Locations · File types"),
                 }),
             }),
 
@@ -326,7 +326,7 @@ public static class HelpContent
                     // gesture exists. The row there answers "what is that menu";
                     // this one answers "where else can I set this".
                     R("트리 빈 곳 우클릭 → 표시할 파일 형식", "필터 버튼 줄과 같은 목록",
-                      "Right-click empty tree space → Show File Types",
+                      "Right-click empty tree space → File types",
                       "The same list the filter buttons carry"),
                     R("폴더 행의 정렬 아이콘", "그 폴더의 개별 정렬, 하위 폴더는 상위 폴더의 정렬을 따름(단, 하위 폴더를 개별 정렬할 경우 별개로 유지)",
                       "The sort icon on a folder row",
@@ -436,7 +436,7 @@ public static class HelpContent
                     // 같이 찾는 것이 이번 판에서 세 번 걸린 일이다.
                     R("전체 화면에서 우클릭 → 바탕화면 채우기",
                       "비활성화하면 창 크기를 그대로 두고 그림만 꽉 채움 (기본은 화면 전체로)",
-                      "Right-click in full screen → Fill the desktop",
+                      "Right-click in full screen → Fill desktop",
                       "Off keeps the window's own size and fills that instead; on (the default) grows it to the whole screen"),
                     // 이미 되는 것을 적던 줄. 헤더가 사라져도 그 자리는 제목
                     // 표시줄이라 창이 끌리는데, 화면에 아무 표시가 없어서 아는
@@ -669,7 +669,7 @@ public static class HelpContent
                     // shape after an update - same reasoning as the full-screen
                     // row above: an unexplained change reads as a fault.
                     R("옵션 → 멀티미디어 패널 → 썸네일 목록으로 보기", "여러 줄 목록(기본)과 한 줄 바 중 선택",
-                      "Options → Multimedia panel → Thumbnail list layout",
+                      "Options → Multimedia panel → Thumbnail grid",
                       "The multi-row list (the default) or the single-row bar"),
                     // ONE ROW FOR THE TWO GRIPS. The same edge does different
                     // work per shape, and two rows would read as two edges.
@@ -730,7 +730,7 @@ public static class HelpContent
                     // The cost goes on the row, not in a paragraph: it is the
                     // one setting here that can make the tree slower.
                     R("옵션 → 폴더에 표시할 항목 개수 → 전체 표시", "더 보기 없이 전부, 큰 폴더에서는 느려짐",
-                      "Options → Items per Folder → Show All", "No Show more row at all - a big folder will feel it"),
+                      "Options → Items per folder → Show All", "No Show more row at all - a big folder will feel it"),
                     R("옵션 → 네트워크 위치", "드라이브 문자 없는 공유 추가 (\\\\서버\\공유)",
                       "Options → Network Locations", "Add a share with no drive letter (\\\\server\\share)"),
                 }),
