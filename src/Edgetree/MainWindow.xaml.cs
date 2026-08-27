@@ -19180,9 +19180,19 @@ public partial class MainWindow : Window
                 {
                     // One value, one path. There is a value per account, so a
                     // provider can contribute more than one.
-                    if (roots.GetValue(account) is string place && place.Length > 0)
+                    //
+                    // MEASURED AFTER THE TRIM, not before. The length was
+                    // checked on the raw value until 2026-08-27, so a value of
+                    // a single backslash - and nothing else in the registry
+                    // says it cannot be one - passed the check and went in as
+                    // the EMPTY STRING, which PathIsWithin answers true for
+                    // against every UNC path there is. Never observed; found by
+                    // reading. Two things had to hold for it to bite and one of
+                    // them was this line.
+                    if (roots.GetValue(account) is string place
+                        && place.TrimEnd('\\') is { Length: > 0 } root)
                     {
-                        found.Add(place.TrimEnd('\\'));
+                        found.Add(root);
                     }
                 }
             }
@@ -19278,6 +19288,23 @@ public partial class MainWindow : Window
     // "...\OneDriveTemp", so the boundary is checked with it.
     private static bool PathIsWithin(string path, string root)
     {
+        // AN EMPTY ROOT IS NOT "EVERYWHERE", which is what the rest of this
+        // method would otherwise make of it: every string starts with "", so a
+        // UNC path would then be judged inside it on the boundary test below.
+        //
+        // A SECOND ANSWER TO ONE QUESTION, on purpose. Both callers already see
+        // to it that no empty root reaches here - the sync-root reader filters
+        // after trimming, and the delete question trims a real FullPath - so
+        // this guard is the one that has nothing to do, and it is here because
+        // the cost of it being wanted is a path answering "yes, inside" to a
+        // folder nobody named. What it HIDES if it ever fires is a caller
+        // passing a root it never meant to: this simply says "not inside" and
+        // says nothing about it (2026-08-27).
+        if (root.Length == 0)
+        {
+            return false;
+        }
+
         if (!path.StartsWith(root, StringComparison.OrdinalIgnoreCase))
         {
             return false;
