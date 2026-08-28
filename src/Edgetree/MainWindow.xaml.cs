@@ -1793,6 +1793,35 @@ public partial class MainWindow : Window
             return;
         }
 
+        // SHIFT+BACKSPACE IS THE COLLAPSE THAT DOES NOT COME BACK (2026-08-29,
+        // on request). The gesture already existed on the header's icon as
+        // Shift+click; this is the same call, reached without going to the
+        // header - which is the whole ask, since the tree is where the hand
+        // already is.
+        //
+        // It cannot collide with the panel-close above: that branch requires
+        // NO modifier, and this one requires Shift. The two readings of
+        // Backspace stay apart by the same rule the header button uses -
+        // plain is the reversible one, Shift is the one that means it.
+        //
+        // NO CONFIRMATION, for the reason CollapseAllButton_Click gives at
+        // length: the options menu keeps its dialog for someone browsing
+        // options, and a chord is already deliberate. A dialog on a keyboard
+        // shortcut would also make the fast path the slow one.
+        //
+        // The TextBoxBase guard is not optional here the way it might look.
+        // Shift+Backspace is an ORDINARY EDITING KEY inside a text box, so
+        // without it renaming a row or typing in the path bar would fold the
+        // tree instead of deleting a character.
+        if (e.Key == Key.Back &&
+            Keyboard.Modifiers == ModifierKeys.Shift &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+        {
+            CollapseEverything();
+            e.Handled = true;
+            return;
+        }
+
         // < > 로 자막 싱크 (사용자 요청 2026-08-19). 자막 판의 다른 조절들은
         // 한 번 맞추고 마는 것이라 메뉴로 충분한데, **싱크만 성격이 다르다** -
         // 안 맞는 자막을 만나면 맞을 때까지 계속 눌러야 하고, 그때마다 우클릭

@@ -222,6 +222,11 @@ public static class HelpContent
                     R("전체 접기 아이콘 Shift+클릭", "펼침 상태를 완전히 접음 (복원 안 됨)",
                       "Shift-clicking the Collapse All icon",
                       "Folds for good (no restore)"),
+                    // 바로 위 줄과 같은 동작이라 그 아래 붙는다. 키가 따로 있는
+                    // 이유는 손이 트리에 있을 때 제목 표시줄까지 가지 않으려는
+                    // 것이므로, 설명은 되풀이하지 않고 같은 것이라고만 말한다.
+                    R("Shift+Backspace", "위와 같음 (복원 안 됨)",
+                      "Shift+Backspace", "The same, from the keyboard (no restore)"),
                     // Named for the places rather than for the rows: it moves
                     // between folders you have been in, not between every row
                     // you clicked, and someone who expects the second one will
