@@ -1467,6 +1467,15 @@
                  deliberately squeezed to save. 압축 풀기 is Collapsed unless the
                  row IS a .zip (ExplorerItemContextMenu_Opened) for the same
                  reason - a permanently-dead row would tax every other menu. -->
+            <!-- Beside 압축 because it belongs to the same family and nowhere
+                 else: both put a NEW file down next to the row that was
+                 clicked, which is also why both grey out on a drive root -
+                 that is the one kind of row with no folder to put it in.
+                 The shell does the work through its own "link" verb, so the
+                 name it gives the file is Explorer's, not ours. -->
+            <MenuItem Header="{x:Static services:Strings.MenuCreateShortcut}"
+                    Tag="createShortcut"
+                    Click="CreateShortcut_Click"/>
             <MenuItem Header="{x:Static services:Strings.MenuCompress}"
                     Tag="compress"
                     Click="CompressItem_Click"/>

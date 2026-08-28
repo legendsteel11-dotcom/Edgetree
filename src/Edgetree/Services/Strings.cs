@@ -209,6 +209,10 @@ public static class Strings
     public static string MenuRevealInExplorer = "탐색기에서 위치 열기";
     public static string MenuRevealInTree = "트리에서 보기";
     public static string GestureDoubleClick = "더블클릭";
+    // 탐색기의 같은 줄과 글자까지 같게 둔다. 이 줄이 하는 일이 셸에게 그
+    // 동사를 그대로 넘기는 것이라, 결과물의 이름(`… - 바로 가기`)도 탐색기가
+    // 짓는다 - 이름을 우리가 다르게 부르면 메뉴와 결과가 어긋난다.
+    public static string MenuCreateShortcut = "바로 가기 만들기";
     public static string MenuProperties = "속성";
 
     // Options ("...") menu
@@ -1090,6 +1094,7 @@ public static class Strings
         MenuRevealInExplorer = "Reveal in Explorer";
         MenuRevealInTree = "Show in tree";
         GestureDoubleClick = "Double-click";
+        MenuCreateShortcut = "Create shortcut";
         MenuProperties = "Properties";
 
         MenuAlwaysOnTop = "Always on top";

@@ -16262,6 +16262,7 @@ public partial class MainWindow : Window
             var extractItem = FindTaggedMenuElement<MenuItem>(menu, "extract");
             var renameItem = FindTaggedMenuElement<MenuItem>(menu, "rename");
             var copyPathItem = FindTaggedMenuElement<MenuItem>(menu, "copyPath");
+            var createShortcutItem = FindTaggedMenuElement<MenuItem>(menu, "createShortcut");
             var openWithCodeItem = FindTaggedMenuElement<MenuItem>(menu, "openWithCode");
             var viewHereItem = FindTaggedMenuElement<MenuItem>(menu, "viewHere");
 
@@ -16351,6 +16352,7 @@ public partial class MainWindow : Window
                 ("openWith", openWithItem), ("compress", compressItem),
                 ("extract", extractItem), ("rename", renameItem),
                 ("copyPath", copyPathItem), ("openWithCode", openWithCodeItem),
+                ("createShortcut", createShortcutItem),
             }.Where(t => t.Item is null).Select(t => t.Name).ToArray();
             if (absent.Length > 0)
             {
@@ -16405,6 +16407,17 @@ public partial class MainWindow : Window
             // The bookmark submenu configures itself when it opens (see
             // BookmarkRowSubmenu_Opened) - its label depends on the row and is
             // read at the moment it is shown.
+
+            // The shortcut lands beside the row for the same reason the zip
+            // below does, so it goes dead on the same one case: a drive root
+            // has no folder to put it in. Unlike 경로 복사 and 이름 바꾸기 it is
+            // NOT greyed on a multi-selection - Explorer gives five files five
+            // shortcuts, and so does this.
+            if (createShortcutItem is not null)
+            {
+                createShortcutItem.IsEnabled =
+                    ExplorerTree.SelectedItem is FileSystemItem { IsPlaceholder: false, IsShowMore: false, Parent: not null };
+            }
 
             // The zip lands next to the right-clicked row, so a drive root -
             // the one kind of row with no parent folder - has nowhere to put
@@ -20832,6 +20845,63 @@ public partial class MainWindow : Window
     // runs off the UI thread because a large folder takes long enough to
     // freeze the window, and nothing appears in the tree until it finishes
     // (see ArchiveService's hidden-temp-then-rename note).
+    // 바로 가기 만들기 (2026-08-29, on request). Handed to the shell's own
+    // "link" verb rather than built here with IShellLink.
+    //
+    // WHAT THAT BUYS is that the result is Explorer's in every respect: where
+    // the .lnk lands, what it is called, how the name is numbered when one is
+    // already there, and what it does for the kinds of row that are not plain
+    // files. Writing the link ourselves would be a second idea of all four, and
+    // the first time one of them differed it would read as a defect.
+    //
+    // Same door 속성 already goes through - SEE_MASK_INVOKEIDLIST, so the
+    // target's own IContextMenu is consulted rather than a bare verb lookup.
+    //
+    // ONE CALL PER ITEM, which is what Explorer does with a multi-selection:
+    // five files give five shortcuts, not one shortcut to five things. So this
+    // is NOT one of the rows greyed out on a multi-selection.
+    //
+    // No dialog on failure. The verb is refused rather than throwing, and by
+    // things the user can see for themselves - a read-only folder, a row the
+    // shell has no link for. A message box per item on a five-item selection
+    // would be worse than the missing file.
+    private void CreateShortcut_Click(object sender, RoutedEventArgs e)
+    {
+        var items = GetEffectiveSelection();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        // The folders that will gain a row. A multi-selection is normally all
+        // in one folder, but nothing guarantees it, and refreshing the wrong
+        // one would leave the shortcut invisible until something else looked.
+        var touched = new List<FileSystemItem>();
+        foreach (var item in items)
+        {
+            if (item is { IsPlaceholder: false, IsShowMore: false, Parent: { } parent })
+            {
+                NativeMethods.TryOpenWithShellVerb(item.FullPath, "link");
+                if (!touched.Contains(parent))
+                {
+                    touched.Add(parent);
+                }
+            }
+        }
+
+        // Diff-merged for the reason the zip beside this one gives: the new
+        // .lnk is one added row in a folder being looked at, and a rebuild
+        // would take every expanded subtree beside it down.
+        //
+        // The watcher would find it on its own, and this does not wait for it:
+        // the row appearing a moment after the menu closes reads as the click
+        // having done nothing.
+        foreach (var parent in touched)
+        {
+            RefreshFolderPreservingState(parent);
+        }
+    }
+
     private async void CompressItem_Click(object sender, RoutedEventArgs e)
     {
         var items = GetEffectiveSelection();
