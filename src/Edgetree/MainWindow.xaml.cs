@@ -1252,6 +1252,29 @@ public partial class MainWindow : Window
                 _selectionActiveBrush = new SolidColorBrush(selectionColor);
                 _selectionInactiveBrush = new SolidColorBrush(inactiveColor);
             }
+
+            // THE CHECK INSIDE THE THUMBNAIL'S MARK, derived from the very
+            // colour it sits on (2026-08-28, on report: 라이트 모드에서 체크가
+            // 너무 안 보임).
+            //
+            // That badge takes the selection colour for its ground and had a
+            // hardcoded white check on it. On dark that reads - the default
+            // there is #323438 - and on light it does not: the default is
+            // #CCE4FF, a pale blue, and white on pale blue is very nearly
+            // nothing. **The theme was not the fault.** The ground follows a
+            // colour the user picks, so picking a bright selection colour hides
+            // the check on EITHER theme, and a per-theme literal would have
+            // fixed today's two defaults and nothing else.
+            //
+            // Same two inks and the same test the caption derives its text with
+            // (see the ContrastRatio pair above): whichever wins against the
+            // ground it is actually on. Full black and white rather than the
+            // stepped-back pair used for text, because this is a mark and not a
+            // paragraph - it has one glyph's worth of area to be read in.
+            SetBrushColor("SelectionMarkForeground",
+                ContrastRatio(Colors.White, selectionColor) >= ContrastRatio(Colors.Black, selectionColor)
+                    ? Colors.White
+                    : Colors.Black);
         }
         UpdateSelectionBrushForActivation();
         SetBrushColor("FavoritesBackground", light ? _settings.LightHistoryBackgroundColorHex : _settings.HistoryBackgroundColorHex);

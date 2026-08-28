@@ -192,6 +192,14 @@
                 Color="#FFA8AAAE"/>
         <SolidColorBrush x:Key="TreeRowSelectedActiveBackground"
                 Color="#FF323438"/>
+        <!-- What is DRAWN on that colour: the check inside the thumbnail's
+             multi-select mark. Derived in ApplyColorSettings against whatever
+             the selection colour actually is, because that colour is the user's
+             to pick and a fixed ink is only right for one end of the range.
+             The value here is the default's answer (white on #323438) and
+             stands until the first ApplyColorSettings, which runs at startup. -->
+        <SolidColorBrush x:Key="SelectionMarkForeground"
+                Color="#FFFFFFFF"/>
         <!-- The band behind the folder the selection is in, and everything
              that folder currently has open - the row plus its whole expanded
              subtree, so where a folder starts and how far down it reaches can
@@ -8745,8 +8753,14 @@
                                                     </Style.Triggers>
                                                 </Style>
                                             </Border.Style>
+                                            <!-- Not White. It sits on the
+                                                 selection colour, which the user
+                                                 picks, so the ink is derived
+                                                 against that colour rather than
+                                                 assumed - see
+                                                 SelectionMarkForeground. -->
                                             <Path Data="F1 M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z M0-960H960M0 0H960"
-                                                    Fill="White"
+                                                    Fill="{DynamicResource SelectionMarkForeground}"
                                                     Stretch="Uniform"
                                                     Margin="2"/>
                                         </Border>
