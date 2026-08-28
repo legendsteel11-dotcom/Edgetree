@@ -250,11 +250,14 @@ public static class Strings
     // 보이는 쪽(`폴더 아이콘`·`드라이브 아이콘`·`영역 구분선`)인데 이 줄만 반대라,
     // 체크가 무엇을 뜻하는지 줄마다 다시 읽어야 했음.
     public static string MenuTitleBarTitle = "제목 표시줄 텍스트";
-    // 바로 위 줄과 짝. 그 줄이 글자를 맡고 이 줄이 그림을 맡으므로, 주어를
-    // 되풀이해서 둘이 같은 자리를 말한다는 것을 분명히 한다 - 이 묶음에는
-    // `폴더 아이콘`·`드라이브 아이콘` 처럼 트리를 맡는 아이콘 줄이 이미 있어서,
-    // `내 PC 아이콘` 만으로는 어느 아이콘인지 갈리지 않는다.
-    public static string MenuTitleBarMyComputerIcon = "제목 표시줄에 내 PC 아이콘";
+    // 바로 위 줄과 짝 - 그 줄이 글자를 맡고 이 줄이 그림을 맡는다.
+    //
+    // `제목 표시줄에 내 PC 아이콘` 이었다가 줄임(2026-08-29, 사용자: "길어서").
+    // 주어를 되풀이해서 어느 아이콘인지 갈라 주려던 것인데, 바로 위가 이미
+    // `제목 표시줄 텍스트` 라 자리가 그 일을 하고 있었다. `표시` 를 남긴 것은
+    // 옆의 `폴더 아이콘`·`드라이브 아이콘` 이 명사구라, 그것들과 같은 모양이면
+    // 트리 아이콘 줄로 읽히기 때문이다. `숨김·시스템 항목 표시` 와 같은 짜임.
+    public static string MenuTitleBarMyComputerIcon = "내 PC 아이콘 표시";
     // Names the way BACK, because that is what someone looks for first when a
     // drag did something they did not expect. The other half of the rule -
     // across drives it copies - is on the row in the help rather than here,
@@ -1106,7 +1109,7 @@ public static class Strings
         MenuShowFileIcons = "Show file icons";
         MenuShowDriveIcons = "Show drive icons";
         MenuTitleBarTitle = "Title bar text";
-        MenuTitleBarMyComputerIcon = "This PC icon in the title bar";
+        MenuTitleBarMyComputerIcon = "Show This PC icon";
         MenuDragMoves = "Drag moves (hold Ctrl to copy)";
         MenuShowPanelDividers = "Panel dividers";
         MenuSidePanelAtBottom = "Show at bottom";
