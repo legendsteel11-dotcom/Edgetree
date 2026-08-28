@@ -15683,7 +15683,7 @@ public partial class MainWindow : Window
         var importablePaths = droppedPaths.Where(p => !IsDropIntoOwnPlace(p, item.FullPath)).ToArray();
         if (importablePaths.Length == 0)
         {
-            LogSelfDropSkipped(droppedPaths.Length, item.FullPath);
+            LogSelfDropSkipped(droppedPaths.Length, item.FullPath, droppedPaths);
             return;
         }
 
@@ -15823,17 +15823,51 @@ public partial class MainWindow : Window
     // which doubles as the instrument for the micro-drag theory: if these
     // lines appear during ordinary clicking (no deliberate drag), clicks are
     // indeed occasionally turning into drags onto a neighboring row.
+    //
+    // THE THEORY IS CONFIRMED and this now measures the NEXT question instead
+    // (2026-08-29). Eighteen lines in one day settled that clicks do turn into
+    // drags; what is still unsettled is a report that a click on a FILE leaves
+    // the tree on the folder above it. Two things could look like that and the
+    // old line could tell them apart from neither:
+    //
+    //   - the drag paints the parent folder with the SELECTION brushes
+    //     (TreeViewItem_DragOver marks the resolved target, which for a file
+    //     row is its parent), so the folder above lights up for the length of
+    //     the gesture and nothing has actually moved;
+    //   - or the press really does leave the selection somewhere else, in
+    //     which case `sel` below is not the row that was pressed.
+    //
+    // So the line carries WHAT WAS DRAGGED and WHERE THE SELECTION IS at the
+    // moment the drop is swallowed. If `sel` is the dragged item itself, the
+    // report is the mark and the fix is a visual one; if it is the parent, the
+    // press is losing its selection and that is a different repair.
     [System.Diagnostics.Conditional("DEBUG")]
-    private static void LogSelfDropSkipped(int itemCount, string destinationFolder)
+    private void LogSelfDropSkipped(int itemCount, string destinationFolder, IReadOnlyList<string> droppedPaths)
     {
         try
         {
             string dir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Edgetree");
             Directory.CreateDirectory(dir);
+
+            // Leaf names only - the destination is on the same line and the
+            // whole point is which ROW, not which path.
+            string dragged = string.Join(
+                " · ", droppedPaths.Take(3).Select(p => Path.GetFileName(p.TrimEnd('\\'))));
+            if (droppedPaths.Count > 3)
+            {
+                dragged += $" +{droppedPaths.Count - 3}";
+            }
+
+            var selected = ExplorerTree.SelectedItem as FileSystemItem;
+            string sel = selected is null
+                ? "-"
+                : $"{selected.Name}{(selected.IsDirectory ? "/" : "")}";
+
             File.AppendAllText(
                 Path.Combine(dir, "selfdrop.log"),
-                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  skipped self-drop of {itemCount} item(s) into {destinationFolder}{Environment.NewLine}");
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  skipped self-drop of {itemCount} item(s) " +
+                $"into {destinationFolder}  dragged=[{dragged}]  sel={sel}{Environment.NewLine}");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
