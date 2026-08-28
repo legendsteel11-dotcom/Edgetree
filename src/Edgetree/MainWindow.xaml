@@ -4151,14 +4151,30 @@
                      IsEditing (see the DataTrigger below) instead of opening a
                      separate popup dialog. Focus/selection and commit/cancel
                      are handled in code-behind (RenameTextBox_* in MainWindow.xaml.cs). -->
+                <!-- THE FOUR COLOURS WERE THE DARK THEME'S, FROZEN (fixed
+                     2026-08-29, on report). `#FF3C3C3C` is not a chosen grey -
+                     it is exactly ControlBackground's dark value, taken before
+                     there was a light theme to take it from. So renaming a row
+                     in light mode opened a dark box in the middle of a pale
+                     tree, with white text in it.
+                     The three chrome keys follow the theme at App level, which
+                     is where every other surface in this app gets its ground,
+                     and the caret takes what the path bar and the search box
+                     take. Dark is unchanged apart from the border, which joins
+                     PanelBorder's family (#454545) instead of keeping a
+                     one-off #5A5A5A.
+                     It keeps a ground of its own rather than going transparent
+                     like those two boxes: they sit inside a container that
+                     draws the field, and this one sits directly on a tree row
+                     that may be selected or hovered underneath it. -->
                 <TextBox x:Name="NameEditBox"
                          Grid.Column="1"
                          Text="{Binding EditingName, UpdateSourceTrigger=PropertyChanged}"
                          Visibility="Collapsed"
-                         Background="#FF3C3C3C"
-                         Foreground="White"
-                         CaretBrush="White"
-                         BorderBrush="#FF5A5A5A"
+                         Background="{DynamicResource ControlBackground}"
+                         Foreground="{DynamicResource DialogForeground}"
+                         CaretBrush="{DynamicResource ForegroundText}"
+                         BorderBrush="{DynamicResource PanelBorder}"
                          BorderThickness="1"
                          Padding="2,0"
                          VerticalAlignment="Center"
