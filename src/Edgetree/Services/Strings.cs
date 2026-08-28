@@ -222,6 +222,12 @@ public static class Strings
     // switched language could not tell it was the same switch - and the word
     // carries a web page's weight rather than a file tree's. Hyphenated to
     // match the Auto-Hide rows it sits near.
+    // 체크가 기본이고, 체크된 상태를 말한다 - 이 묶음의 규칙대로.
+    //
+    // 풀면 닫힌 폴더도 두 번째 클릭에서 펼쳐진다. 그러면 규칙이 "첫 클릭은
+    // 거기로 가고, 두 번째 클릭이 토글한다" 한 줄이 되어 지금보다 오히려 짧다.
+    // 화살표는 어느 쪽이든 한 번에 여닫는다.
+    public static string MenuExpandOnSingleClick = "클릭 시 바로 펼침";
     public static string MenuAutoCollapse = "폴더 자동 접기";
     public static string MenuCollapseAllExpanded = "폴더 전체 접기";
     public static string CollapseAllConfirmTitle = "폴더 전체 접기";
@@ -1072,6 +1078,7 @@ public static class Strings
         BookmarkShortcutPrev = "Previous bookmark";
         MenuNewFolder = "New folder";
         MenuRefresh = "Refresh";
+        MenuExpandOnSingleClick = "Expand on a single click";
         MenuAutoCollapse = "Auto-collapse folders";
         MenuCollapseAllExpanded = "Collapse all folders";
         CollapseAllConfirmTitle = "Collapse all folders";

@@ -385,6 +385,21 @@ public class AppSettings
     public double FavoritesPanelHeight { get; set; } = 100;
 
     // Options ("...") menu toggles.
+    // WHETHER THE FIRST CLICK ON A CLOSED FOLDER OPENS IT (2026-08-29, on
+    // request). On - the default, and what the tree has always done - a closed
+    // folder opens the moment it is clicked.
+    //
+    // Off makes the rule symmetric instead: the first click GOES there, the
+    // second click toggles. That is one sentence where the on state needs two,
+    // because on it, opening is immediate while closing already asks twice
+    // (2026-08-17: the direction that reveals happens at once, the direction
+    // that takes something away asks again).
+    //
+    // The chevron is untouched either way, and that is what keeps this
+    // liveable: switched off, it becomes the only one-press way to open a
+    // folder, and an explicit control must never need two presses.
+    public bool ExpandFolderOnSingleClick { get; set; } = true;
+
     public bool AutoCollapseFolders { get; set; } = false;
     public bool AlwaysOnTop { get; set; } = false;
     // 슬라이드 쇼 - how long each picture is held, in seconds. The RUNNING

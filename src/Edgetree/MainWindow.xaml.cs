@@ -8600,6 +8600,7 @@ public partial class MainWindow : Window
                 // whole conjunction and takes every setting below it down
                 // silently, which is precisely the v1.3.4/v1.4.0 shape the note
                 // above warns about.
+                FindMenuItem(generalSettings, "expandOnSingleClick") is { } expandOnSingleClick &&
                 FindMenuItem(generalSettings, "autoCollapse") is { } autoCollapse &&
                 FindMenuItem(generalSettings, "autoHideCloseOnLeave") is { } autoHideCloseOnLeave &&
                 FindMenuItem(generalSettings, "autoHideUseHandle") is { } autoHideUseHandle &&
@@ -8616,6 +8617,7 @@ public partial class MainWindow : Window
                 titleBarTitle.IsChecked = _settings.ShowTitleBarTitle;
                 titleBarMyComputerIcon.IsChecked = _settings.UseMyComputerHeaderIcon;
                 showPanelDividers.IsChecked = _settings.ShowPanelDividers;
+                expandOnSingleClick.IsChecked = _settings.ExpandFolderOnSingleClick;
                 autoCollapse.IsChecked = _settings.AutoCollapseFolders;
                 dragMoves.IsChecked = _settings.DragMovesInsideTree;
                 autoHideCloseOnLeave.IsChecked = _settings.AutoHideCloseOnMouseLeave;
@@ -10607,6 +10609,18 @@ public partial class MainWindow : Window
         ExitLog.Record("restart after settings reset");
         System.Diagnostics.Process.Start(Environment.ProcessPath!);
         Application.Current.Shutdown();
+    }
+
+    // Nothing to apply: the setting is read at the moment of the press (see
+    // TreeViewItem_PreviewMouseLeftButtonDown), so there is no state on screen
+    // that has to be brought into line with it.
+    private void ExpandOnSingleClickMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.ExpandFolderOnSingleClick = menuItem.IsChecked;
+            _settingsService.Save(_settings);
+        }
     }
 
     private void AutoCollapseMenuItem_Click(object sender, RoutedEventArgs e)
@@ -15240,9 +15254,23 @@ public partial class MainWindow : Window
             // explicit control must not need two presses.
             bool arrivingAtOpenFolder = treeViewItem.IsExpanded && !treeViewItem.IsSelected;
 
+            // 클릭 시 바로 펼침, OFF (2026-08-29, on request). The rule above
+            // asks twice only in the direction that takes something away;
+            // switched off, BOTH directions ask twice and what is left is one
+            // sentence - the first click goes there, the second one toggles.
+            //
+            // Which makes it the same test in both cases: "was this row already
+            // selected". `arrivingAtOpenFolder` is that test narrowed to open
+            // folders, so turning the option off is just dropping the narrowing.
+            // IsSelected still reads the PRE-click state here, this being the
+            // tunneling preview, which is what both readings rest on.
+            bool arrivingAtFolder = _settings.ExpandFolderOnSingleClick
+                ? arrivingAtOpenFolder
+                : !treeViewItem.IsSelected;
+
             treeViewItem.IsSelected = true;
 
-            if (!arrivingAtOpenFolder)
+            if (!arrivingAtFolder)
             {
                 _deferredExpandItem = item;
                 _deferredExpandPressPoint = e.GetPosition(ExplorerTree);

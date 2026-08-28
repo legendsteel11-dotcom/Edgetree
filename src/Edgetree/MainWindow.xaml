@@ -1939,6 +1939,14 @@
                      MOVING with it, and an option that can hide a feature is not
                      an option, it is a way to lose one. Always on now. -->
                 <Separator/>
+                <!-- Above 폴더 자동 접기 because the two are the tree's pair of
+                     folding rules and this is the one about the press: what a
+                     click does, then what happens to the folders it left
+                     behind. -->
+                <MenuItem Header="{x:Static services:Strings.MenuExpandOnSingleClick}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="expandOnSingleClick"
+                        Click="ExpandOnSingleClickMenuItem_Click"/>
                 <MenuItem Header="{x:Static services:Strings.MenuAutoCollapse}"
                         IsCheckable="True"
                         AutomationProperties.AutomationId="autoCollapse"

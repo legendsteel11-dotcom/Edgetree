@@ -210,8 +210,17 @@ public static class HelpContent
                     R("폴더 클릭", "접힌 폴더는 펼치기 · 열린 폴더는 선택만, 다시 클릭하면 접기",
                       "Clicking a folder",
                       "A closed folder opens; an open one is only selected - press it again to close"),
-                    R("펼침기호 클릭", "누를 때마다 바로 접기 · 펼치기",
-                      "Clicking the expand arrow", "Opens and closes on every press"),
+                    // 2026-08-29: 위 줄이 설정에 따라 절반만 맞게 되었으므로 조건
+                    // 줄을 붙인다. 위 줄을 고쳐 두 상태를 한 문장에 담는 대신
+                    // 줄을 나눈 것은 바로 아래 `전체 접기 아이콘 Shift+클릭` 이
+                    // 이미 같은 짜임이기 때문 - 왼쪽 칸이 조건을 부르고 오른쪽이
+                    // 그때의 동작만 말한다.
+                    R("클릭 시 바로 펼침을 끄면", "첫 클릭은 선택 · 두 번째 클릭이 펼치기 · 접기",
+                      "With Expand on a single click off",
+                      "The first click selects; the second one opens or closes"),
+                    R("펼침기호 클릭", "설정과 무관하게 누를 때마다 바로 접기 · 펼치기",
+                      "Clicking the expand arrow",
+                      "Opens and closes on every press, whatever that setting says"),
                     // 두 줄인 이유는 버튼이 두 가지 일을 하기 때문이 아니라,
                     // 조합 쪽이 되돌릴 수 없기 때문이다. 툴팁이 말하고는 있지만
                     // 툴팁은 올려 놓아야 보이고, 복원이 안 되는 쪽은 누르기 전에
