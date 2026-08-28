@@ -310,22 +310,93 @@ const BRIT = /\b(colours?|coloured|behaviour\w*|favourite\w*|minimis\w+|maximis\
   if (swatches.length < 20) hits.push('XAML 에서 스와치를 ' + swatches.length + '개밖에 못 찾음 - 위 정규식을 볼 것')
   report('색상 줄이 코드의 두 목록에 다 있는가', hits, swatches.length + '줄 확인')
 
-  // 줄을 하나 끼우면 Grid.Row 를 전부 다시 매기고 RowDefinition 도 하나 늘려야
-  // 한다. 늘리는 것을 잊으면 WPF 는 아무 말도 안 하고 넘치는 것을 마지막 행에
-  // 넣어 버린다 - 2026-08-26 에 버튼 줄이 자동 숨김 손잡이 위에 겹쳐 그려졌다.
-  // 정의된 행 수는 가장 큰 Grid.Row 보다 하나 많아야 한다.
-  const defsBlock = [...xaml.matchAll(/<Grid.RowDefinitions>[\s\S]*?<\/Grid.RowDefinitions>/g)]
-  const rows = [...xaml.matchAll(/Grid.Row="(\d+)"/g)].map((m) => +m[1])
-  const maxRow = rows.length ? Math.max(...rows) : -1
-  const biggest = defsBlock
-    .map((m) => (m[0].match(/<RowDefinition/g) ?? []).length)
-    .reduce((a, b) => Math.max(a, b), 0)
-  const rowHits = []
-  if (biggest < maxRow + 1) {
-    rowHits.push('행 정의가 ' + biggest + '개인데 Grid.Row 는 ' + maxRow +
-      ' 까지 씀 - 넘치는 줄이 마지막 행에 겹쳐 그려진다')
+}
+
+// ------------------------------------------------------------ Grid.Row 넘침
+//
+// 줄을 하나 끼우면 Grid.Row 를 전부 다시 매기고 RowDefinition 도 하나 늘려야
+// 한다. 늘리는 것을 잊으면 WPF 는 아무 말도 안 하고 넘치는 것을 마지막 행에
+// 넣어 버린다 - 2026-08-26 에 색상 창의 버튼 줄이 자동 숨김 손잡이 위에 겹쳐
+// 그려졌다.
+//
+// 2026-08-29에 격자별로 보도록 다시 씀. 처음 판은 **파일 전체의 최대 Grid.Row**
+// 와 **가장 큰 RowDefinitions 블록**을 견줬는데, 그건 지배적인 격자가 하나인
+// 색상 창에서만 통한다. MainWindow 는 격자가 수십 개라 어딘가의 큰 블록이 다른
+// 데의 큰 번호를 늘 덮어 주고, 검사가 통과만 한다.
+//
+// 그래서 태그를 훑으며 열린 Grid 스택을 들고 간다. Grid.Row 는 그 요소를
+// 감싸는 가장 가까운 Grid 몫이고, **중첩 격자의 Grid.Row 는 자기가 아니라
+// 부모 몫**이라는 것이 파일 전체 최대값 방식이 놓치던 자리다.
+//
+// RowDefinitions 가 아예 없는 Grid 는 암묵적으로 1행이므로 Grid.Row="1" 도 같은
+// 결함이다. 스타일/템플릿의 <Setter Property="Grid.Row"> 는 문법이 달라 안 걸린다.
+function gridRowOverflows(xaml, file) {
+  const TAG = /<(\/?)([A-Za-z_][\w.]*)((?:[^<>"']|"[^"]*"|'[^']*')*?)(\/?)>/g
+  const stack = []   // 열려 있는 Grid, 안쪽이 뒤
+  const open = []    // 열려 있는 모든 요소 - Grid 가 언제 닫히는지 알기 위해
+  const grids = []
+  let m
+  while ((m = TAG.exec(xaml))) {
+    const [, slash, name, attrs = '', selfSlash] = m
+    const selfClosing = selfSlash === '/'
+    if (slash === '/') {
+      while (open.length) {
+        const e = open.pop()
+        if (e === 'Grid') stack.pop()
+        if (e === name) break
+      }
+      continue
+    }
+    if (name.includes('.')) {
+      if (name === 'Grid.RowDefinitions' && stack.length) {
+        const end = xaml.indexOf('</Grid.RowDefinitions>', m.index)
+        const block = end < 0 ? '' : xaml.slice(m.index, end)
+        stack[stack.length - 1].defined = (block.match(/<RowDefinition/g) ?? []).length
+      }
+      if (!selfClosing) open.push(name)
+      continue
+    }
+    const row = /\bGrid\.Row="(\d+)"/.exec(attrs)
+    if (row && stack.length) {
+      stack[stack.length - 1].used.push(
+        { row: +row[1], line: xaml.slice(0, m.index).split('\n').length, name })
+    }
+    if (name === 'Grid') {
+      const g = { line: xaml.slice(0, m.index).split('\n').length, defined: 0, used: [] }
+      stack.push(g)
+      if (selfClosing) stack.pop()
+      else { open.push(name); grids.push(g) }
+    } else if (!selfClosing) {
+      open.push(name)
+    }
   }
-  report('색상 창의 행 정의가 모자라지 않는가', rowHits, biggest + '행 / 최대 Grid.Row ' + maxRow)
+
+  const hits = []
+  for (const g of grids) {
+    if (g.used.length === 0) continue
+    const rows = g.defined === 0 ? 1 : g.defined
+    const max = Math.max(...g.used.map((u) => u.row))
+    if (max + 1 > rows) {
+      const worst = g.used.filter((u) => u.row >= rows).map((w) => w.name + '@' + w.line)
+      hits.push(file + ':' + g.line + '  행이 ' + rows + '개인데 Grid.Row 는 ' +
+        max + ' 까지 씀 - ' + worst.join(', '))
+    }
+  }
+  return { hits, count: grids.length }
+}
+{
+  const files = ['src/Edgetree/MainWindow.xaml', 'src/Edgetree/ColorSettingsWindow.xaml',
+                 'src/Edgetree/HelpWindow.xaml', 'src/Edgetree/AboutWindow.xaml',
+                 'src/Edgetree/FilterExtensionsWindow.xaml', 'src/Edgetree/PresetNameWindow.xaml']
+  const hits = []
+  let grids = 0
+  for (const f of files) {
+    if (!fs.existsSync(R(f))) continue
+    const r = gridRowOverflows(read(f), f)
+    hits.push(...r.hits)
+    grids += r.count
+  }
+  report('Grid.Row 가 정의된 행을 넘지 않는가', hits, grids + '개 격자 확인')
 }
 
 // ------------------------------------------------------- 문자열의 중괄호와 짝
