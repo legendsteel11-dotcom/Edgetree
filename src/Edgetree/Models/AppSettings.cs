@@ -821,6 +821,22 @@ public class AppSettings
     // Strings.Initialize) - that's a separate, unrelated concern.
     public bool HideTitleBarTitle { get; set; } = false;
 
+    // WHICH PICTURE SITS AT THE LEFT END OF THE TITLE BAR (2026-08-29, on
+    // request). Off is the app's own logo, which is what it has drawn since
+    // 2026-07-23 and stays the default; on is Windows' own 내 PC icon, so the
+    // picture and the words next to it name the same thing.
+    //
+    // A separate switch from HideTitleBarTitle above rather than a third state
+    // of it. They answer different questions - one is whether the TEXT is
+    // there, this is which ICON is - and folding them together would have made
+    // a checkbox carry three answers, which is the thing this app keeps taking
+    // apart rather than building.
+    //
+    // Nothing to do with 아이콘 종류 either: that decides what the TREE's rows
+    // draw with, and a bundled set with no drive art is a good reason for the
+    // tree to keep its own glyphs. This is one fixed picture in the chrome.
+    public bool UseMyComputerHeaderIcon { get; set; } = false;
+
     // WHAT THE MENU ASKS, which is the opposite (2026-08-17). Every other row in
     // 기본 설정 is a thing that is THERE when the box is ticked - 폴더 아이콘,
     // 드라이브 아이콘, 영역 구분선 - and this one row asked to REMOVE something, so

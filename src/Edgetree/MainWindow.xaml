@@ -1889,6 +1889,15 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="titleBarTitle"
                         Click="TitleBarTitleMenuItem_Click"/>
+                <!-- Directly under the text row because the two share a subject:
+                     that one is whether the words are there, this is which
+                     picture sits beside them. Checked means the machine's own
+                     icon; unchecked leaves the app's logo, which is what the
+                     header has drawn since 2026-07-23. -->
+                <MenuItem Header="{x:Static services:Strings.MenuTitleBarMyComputerIcon}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="titleBarMyComputerIcon"
+                        Click="TitleBarMyComputerIconMenuItem_Click"/>
                 <!-- Beside the two icon toggles because it answers the same kind
                      of question - what the window DRAWS - rather than what it
                      does. The colour rows for the line stay in 색상 설정; this is

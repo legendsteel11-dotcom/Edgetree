@@ -104,6 +104,41 @@ public static class ShellIconService
     // The bundled PNG set has no drive art, so 아이콘 방식: 기본 keeps the folder
     // glyph it has always had rather than being handed a Windows icon in the
     // middle of a hand-drawn set.
+    // THE MACHINE'S OWN ICON, for the title bar (2026-08-29, on request). The
+    // header carries the app's logo and the words 내 PC beside it; this is what
+    // lets the picture say the same thing the words do.
+    //
+    // NOT gated on UseShellIcons, unlike everything else here. That setting
+    // answers "which icon set do the TREE's rows use", and a hand-drawn set
+    // with no drive art is a good reason to keep the tree's folder glyph - but
+    // this is one fixed picture in the chrome, chosen by its own switch, and
+    // there is nothing in the bundled set that means "this computer" to fall
+    // back to. Asked for and it is drawn, or not asked for and the logo stays.
+    //
+    // The stock table again rather than SHGetFileInfo on a parsed PIDL: the
+    // shell namespace read would be I/O on the UI thread at startup, which is
+    // the shape GetDriveIcon's own note above is avoiding, and the stock entry
+    // is the same picture.
+    public static ImageSource? GetMyComputerIcon()
+    {
+        const string key = "v:mycomputer";
+        if (GenericShellCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var icon = ExtractStockIcon(SIID_MYCOMPUTER);
+        if (icon is not null)
+        {
+            GenericShellCache[key] = icon;
+        }
+
+        // Null is a real answer here and the caller keeps the logo on it - the
+        // same not-cached-on-refusal rule the drive icons follow, so a
+        // transient failure heals on the next ask instead of being remembered.
+        return icon;
+    }
+
     public static ImageSource? GetDriveIcon(DriveType driveType, string driveName, bool isExpanded)
     {
         if (!UseShellIcons)
@@ -476,12 +511,14 @@ public static class ShellIconService
     private const uint FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
     private const uint SHGSI_ICON = 0x000000100;
     private const uint SHGSI_LARGEICON = 0x000000000;
-    // SHSTOCKICONID, by position in the enum - the drive block only.
+    // SHSTOCKICONID, by position in the enum - the drive block, plus the one
+    // above it that names the whole machine.
     private const int SIID_DRIVEREMOVE = 7;
     private const int SIID_DRIVEFIXED = 8;
     private const int SIID_DRIVENET = 9;
     private const int SIID_DRIVECD = 11;
     private const int SIID_DRIVERAM = 12;
+    private const int SIID_MYCOMPUTER = 15;
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct SHFILEINFO

@@ -881,6 +881,7 @@ public partial class MainWindow : Window
         ApplyFileIconVisibility();
         ApplyDriveIconVisibility();
         ApplyTitleTextVisibility();
+        ApplyHeaderIcon();
 
         // Deferred rather than done inline above: restoring possibly many
         // expanded folders plus the last selection means synchronous disk
@@ -8592,6 +8593,7 @@ public partial class MainWindow : Window
                 FindMenuItem(generalSettings, "showFileIcons") is { } showFileIcons &&
                 FindMenuItem(generalSettings, "showDriveIcons") is { } showDriveIcons &&
                 FindMenuItem(generalSettings, "titleBarTitle") is { } titleBarTitle &&
+                FindMenuItem(generalSettings, "titleBarMyComputerIcon") is { } titleBarMyComputerIcon &&
                 FindMenuItem(generalSettings, "showPanelDividers") is { } showPanelDividers &&
                 // showPathBar left the menu on 2026-08-11 and had to leave this
                 // chain in the same edit: an id that no longer exists fails the
@@ -8612,6 +8614,7 @@ public partial class MainWindow : Window
                 showFileIcons.IsChecked = _settings.ShowFileIcons;
                 showDriveIcons.IsChecked = _settings.ShowDriveIcons;
                 titleBarTitle.IsChecked = _settings.ShowTitleBarTitle;
+                titleBarMyComputerIcon.IsChecked = _settings.UseMyComputerHeaderIcon;
                 showPanelDividers.IsChecked = _settings.ShowPanelDividers;
                 autoCollapse.IsChecked = _settings.AutoCollapseFolders;
                 dragMoves.IsChecked = _settings.DragMovesInsideTree;
@@ -10753,6 +10756,46 @@ public partial class MainWindow : Window
         }
     }
 
+    private void TitleBarMyComputerIconMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.UseMyComputerHeaderIcon = menuItem.IsChecked;
+            _settingsService.Save(_settings);
+            ApplyHeaderIcon();
+        }
+    }
+
+    // WHICH PICTURE THE TITLE BAR DRAWS. Live, like the icon-set switch beside
+    // it - a header picture that only changed on restart would read as the
+    // setting not having worked.
+    //
+    // The logo is a pack URI held here rather than left in the XAML alone,
+    // because going BACK to it has to be possible: the XAML value is only the
+    // starting one, and once this method has written over Source there is
+    // nothing else that remembers what was there.
+    //
+    // A refused shell icon keeps the logo rather than clearing to nothing. The
+    // stock table has no reason to fail, but an empty header would be a worse
+    // answer than the picture the user already had.
+    private void ApplyHeaderIcon()
+    {
+        if (_settings.UseMyComputerHeaderIcon &&
+            ShellIconService.GetMyComputerIcon() is { } machine)
+        {
+            AppIcon.Source = machine;
+            return;
+        }
+
+        AppIcon.Source = AppLogoSource;
+    }
+
+    private static ImageSource? _appLogoSource;
+
+    private static ImageSource AppLogoSource =>
+        _appLogoSource ??= new BitmapImage(
+            new Uri("pack://application:,,,/Resources/icon.png", UriKind.Absolute));
+
     private static string FormatCacheSize(long bytes)
         => bytes >= 1024L * 1024 * 1024
             ? $"{bytes / (1024.0 * 1024 * 1024):F1} GB"
@@ -12123,6 +12166,7 @@ public partial class MainWindow : Window
             ApplyFileIconVisibility();
             ApplyDriveIconVisibility();
             ApplyTitleTextVisibility();
+            ApplyHeaderIcon();
             ApplyPathBarVisibility();
             ApplyFavoritesPosition();
             ApplySidePanelMode();
