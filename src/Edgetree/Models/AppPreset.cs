@@ -287,7 +287,7 @@ public class AppPreset
     //
     //   ViewerHdr*, ViewerSubtitle*, ViewerRepeat, ViewerPrecacheThumbnails,
     //   OpenMediaInViewer, ViewerFollowsSelection, HelpWindow*, MaxItemsPerFolder, AutoCollapseFolders,
-    //   SearchSortMode, DragMovesInsideTree
+    //   SearchSortMode, DragMovesInsideTree, ExpandFolderOnSingleClick
     //     - preferences about how a job is done, which nobody expects to change
     //       when they move the window to the other edge.
 
