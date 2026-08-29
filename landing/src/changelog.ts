@@ -45,6 +45,39 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // SIX LINES OUT OF TWELVE COMMITS, and most of what was cut was never for
+    // this card. Four of them are invisible from outside the app: a DEBUG-only
+    // log line, a new check-text rule, and two landing changes (the page picks
+    // the browser's language now, and its footer carries a third tool). None of
+    // them is something a person could recognise having seen.
+    //
+    // BOTH FIX LINES ARE OLDER THAN THIS ROUND, which is the standing rule - a
+    // fix for something the round itself introduced would say the new features
+    // shipped broken. The rename box had carried the dark theme's four colors
+    // since before there was a light theme to take them from, and the check in
+    // the thumbnail mark had been white since the mark was drawn.
+    //
+    // The first line leads because of what the round turned out to be worth in
+    // use rather than what order it was built in (2026-08-29).
+    version: 'v2.5.6',
+    ko: [
+      '옵션 → 기본 설정에 `클릭 시 바로 펼침`이 추가되었습니다. 이 설정을 끄면 폴더의 첫 클릭은 선택, 두 번째 클릭이 펼치기·접기가 됩니다.',
+      '트리 우클릭 메뉴에 `바로 가기 만들기`가 추가되었습니다. 여러 항목을 선택한 경우 항목마다 하나씩 만들어집니다.',
+      '`Shift+Backspace`로 펼친 폴더를 모두 접을 수 있습니다. 전체 접기 아이콘의 `Shift+클릭`과 같습니다.',
+      '옵션 → 기본 설정의 `내 PC 아이콘 표시`로 제목 표시줄의 아이콘을 윈도우의 내 PC 아이콘으로 변경할 수 있습니다.',
+      '라이트 모드에서 썸네일 선택 표시의 체크가 잘 보이지 않던 문제를 수정했습니다. 체크 색은 선택 색상에 맞춰 결정됩니다.',
+      '라이트 모드에서 이름 바꾸기 입력창이 어둡게 표시되던 문제를 수정했습니다.',
+    ],
+    en: [
+      'A new setting, Expand on a single click, in Options → General. Switch it off and the first click on a folder selects it, while the second one expands or collapses.',
+      'Create shortcut has been added to the tree’s right-click menu. With several items selected it makes one for each.',
+      'Shift+Backspace collapses every expanded folder, the same as Shift+clicking the collapse-all icon.',
+      'Show This PC icon, in Options → General, puts Windows’ own This PC icon in the title bar.',
+      'Fixed the check on a selected thumbnail being hard to see in light mode. Its ink is now taken from the selection color.',
+      'Fixed the rename box appearing dark in light mode.',
+    ],
+  },
+  {
     // SEVEN LINES OUT OF A ROUND OF THIRTY COMMITS.
     //
     // THE RANGE IS THE TAG, NOT THE UNPUSHED SET, and getting that wrong is how
