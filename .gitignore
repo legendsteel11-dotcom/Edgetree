@@ -40,6 +40,13 @@ Thumbs.db
 # not just into screenshot/, so it's intentionally unanchored to catch it
 # wherever it lands.
 screenshot/mstsc_*.jpg
+# Intermediate captures of the landing card shots. Every FINAL one of them is
+# already committed under landing/public/screenshots (hashes checked
+# 2026-08-29: six match byte for byte, et-08-v3 is the shipped file, and -02
+# and -07 are the earlier take), so what is unique to this folder is three
+# dead drafts. Kept locally rather than deleted - there is nowhere else they
+# belong and nothing is gained by throwing them away.
+screenshot/new-screenShot/
 DDPM.Subagent.User_*.png
 
 # Personal working notes, not for the public repo
