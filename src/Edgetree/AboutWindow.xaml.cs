@@ -130,11 +130,22 @@ public partial class AboutWindow : Window
         }
     }
 
+    // Shared by every row under 같은 개발자의 다른 도구. Each of those TextBlocks
+    // carries its own address in Tag, so this does not grow a switch as tools are
+    // added, and the names stay declared in the XAML beside the label they sit
+    // under. Tag is also not one of the attributes check-text reads when it looks
+    // for screen text living outside Strings.cs, which is right: these are product
+    // names and there is nothing to translate.
     private void OtherToolLink_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if ((sender as FrameworkElement)?.Tag is not string url)
+        {
+            return;
+        }
+
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
-            FileName = "https://tabstick.com/",
+            FileName = url,
             UseShellExecute = true
         });
     }

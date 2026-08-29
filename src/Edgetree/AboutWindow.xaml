@@ -215,12 +215,40 @@
                         MouseLeftButtonDown="WebsiteLink_MouseLeftButtonDown"/>
 
                 <!-- The other half of a mutual link: TabStick's own site has
-                     pointed here since 2026-07-25. Last of the three link rows
-                     on purpose - it's the one line in this window that isn't
-                     about Edgetree. -->
+                     pointed here since 2026-07-25. Last of the link rows on
+                     purpose - these are the lines in this window that are not
+                     about Edgetree.
+
+                     STACKED, a name per line, where the landing footer sets the
+                     same three side by side. The window is a fixed DialogWidth
+                     with ResizeMode="NoResize", so a row of three names has
+                     nowhere to go once DialogFontSize is scaled up and would be
+                     clipped rather than wrapped. Height is the free direction
+                     here - SizeToContent="Height" is already on the window.
+
+                     The URL rides on each Tag instead of being switched on in
+                     the handler, so a fourth tool is one block of XAML and no
+                     code at all. -->
                 <TextBlock Text="{x:Static services:Strings.AboutOtherToolLabel}"
                         Style="{StaticResource AboutRowLabelStyle}"/>
                 <TextBlock Text="TabStick"
+                        Tag="https://tabstick.com/"
+                        Foreground="{DynamicResource AccentForeground}"
+                        FontSize="{DynamicResource DialogFontSize}"
+                        Cursor="Hand"
+                        TextDecorations="Underline"
+                        Margin="0,0,0,2"
+                        MouseLeftButtonDown="OtherToolLink_MouseLeftButtonDown"/>
+                <TextBlock Text="SweepCap"
+                        Tag="https://github.com/legendsteel11/SweepCap"
+                        Foreground="{DynamicResource AccentForeground}"
+                        FontSize="{DynamicResource DialogFontSize}"
+                        Cursor="Hand"
+                        TextDecorations="Underline"
+                        Margin="0,0,0,2"
+                        MouseLeftButtonDown="OtherToolLink_MouseLeftButtonDown"/>
+                <TextBlock Text="DeskNoise"
+                        Tag="https://desk-noise.vercel.app/"
                         Foreground="{DynamicResource AccentForeground}"
                         FontSize="{DynamicResource DialogFontSize}"
                         Cursor="Hand"

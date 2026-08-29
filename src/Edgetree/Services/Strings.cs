@@ -1355,7 +1355,7 @@ public static class Strings
         AboutDateLabel = "Date";
         AboutLicenseLabel = "License summary";
         AboutWebsiteLabel = "Website";
-        AboutOtherToolLabel = "Another tool by the same maker";
+        AboutOtherToolLabel = "Other tools by the same maker";
         AboutUpdateAvailableFormat = "Download update {0}";
         AboutLicenseSummary =
             "MIT License. Provided as-is, without warranty; use is at your own discretion.";
