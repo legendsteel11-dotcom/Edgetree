@@ -40,12 +40,15 @@ const EMAIL = 'pjh85336@gmail.com'
 
       <!-- 상호 링크는 푸터에(TabStick 랜딩과 같은 자리). Since 2026-08-23 the
            LABEL sits outside as plain text and each tool is a capsule of its
-           own (사용자 요청) - with two tools, a label locked inside the first
-           pill made that pill longer and the pair read as unequal. -->
+           own (사용자 요청) - a label locked inside the first pill made that
+           pill longer, so the row read as unequal rather than as a list. That
+           is what lets the row take a third (DeskNoise, 2026-08-29) without
+           being redrawn. -->
       <p class="others">
         <span class="others-label">{{ t.footer.otherTool }}</span>
         <a class="other" href="https://tabstick.com/" target="_blank" rel="noopener">{{ t.footer.otherToolName }}</a>
         <a class="other" href="https://github.com/legendsteel11/SweepCap" target="_blank" rel="noopener">{{ t.footer.otherTool2Name }}</a>
+        <a class="other" href="https://desk-noise.vercel.app/" target="_blank" rel="noopener">{{ t.footer.otherTool3Name }}</a>
       </p>
 
       <p class="copyright">{{ t.footer.copyright }}</p>
