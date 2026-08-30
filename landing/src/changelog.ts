@@ -45,6 +45,26 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // ONE FEATURE, ONE FIX, by the author’s own count for this round. What
+    // shipped in the binary but stays off the card: the first-click-collapse
+    // quirk on a folder reached through the bookmark panel - a symptom almost
+    // nobody would recognise having seen - and a .gitignore line.
+    //
+    // The fix line names the SYMPTOM (an item reported missing) and not what
+    // the dialog went on to offer (removing the bookmark): the offer is the
+    // scary half, and the standing rule keeps that out of a list that sits
+    // above a download button.
+    version: 'v2.5.7',
+    ko: [
+      '옵션 → 기본 설정에 `경로 표시줄 위에 표시`가 추가되었습니다. 활성화하면 경로 표시줄이 하단 대신 헤더 바로 아래에 표시됩니다. 검색 화면에서도 같은 위치를 유지합니다.',
+      '북마크에 추가한 파일을 클릭하면 항목을 찾을 수 없다는 안내가 표시되던 문제를 수정했습니다. 폴더와 파일 모두 정상적으로 이동합니다.',
+    ],
+    en: [
+      'A new setting, Show path bar at top, in Options → General. Switch it on and the path bar sits directly under the header instead of at the bottom. It keeps that place in the search view too.',
+      'Fixed clicking a bookmarked file reporting that the item could not be found. Folders and files both navigate correctly now.',
+    ],
+  },
+  {
     // SIX LINES OUT OF TWELVE COMMITS, and most of what was cut was never for
     // this card. Four of them are invisible from outside the app: a DEBUG-only
     // log line, a new check-text rule, and two landing changes (the page picks

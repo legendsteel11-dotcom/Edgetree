@@ -1,4 +1,4 @@
-# Edgetree v2.5.6
+# Edgetree v2.5.7
 
 [English](README.md)
 
