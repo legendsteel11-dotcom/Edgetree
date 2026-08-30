@@ -19590,10 +19590,23 @@ public partial class MainWindow : Window
     // point at a network drive that has gone to sleep.
     private async void JumpToBookmarkPath(string path)
     {
-        // The answer was being thrown away until 2026-08-16 - the check was
-        // written, run off the UI thread, and never read. See PlaceIsReachable,
-        // which is now where it lives and what the favourites use too.
-        if (!await PlaceIsReachable(path))
+        // ProbeExists, THE SAME TEST THE Ctrl+Alt+L CYCLE ALREADY USED, and
+        // this route not using it was the whole of a defect reported
+        // 2026-08-29: a bookmarked .exe was declared missing and the user was
+        // offered its deletion. The check here was PlaceIsReachable, which
+        // asked Directory.Exists and nothing else - correct while the list was
+        // 즐겨찾기 and held folders only, and never revisited when bookmarks
+        // began taking files. The two halves of one gesture had moved apart:
+        // the keyboard reached that bookmark perfectly well, the click did not.
+        //
+        // ProbeExists is the better test on every count, not merely the one
+        // that knows about files. It short-circuits on a root already found
+        // unreachable and remembers a root that made it wait, so a bookmark on
+        // a sleeping NAS does not pay the SMB timeout again on every press.
+        //
+        // Still off the UI thread, and still only the row that was pressed:
+        // one press is one disk call however long the list is.
+        if (!await Task.Run(() => FileSystemService.ProbeExists(path, out _)))
         {
             if (AskToForgetMissingPlace(path))
             {
@@ -19606,30 +19619,18 @@ public partial class MainWindow : Window
         NavigateToPath(path, source: "bookmark-list", collapseOthers: true);
     }
 
-    // ----- 가리키는 곳이 사라졌을 때 ---------------------------------------------
+    // ----- WHEN WHAT A ROW POINTS AT IS GONE ------------------------------------
     //
-    // 설정을 내보내 다른 PC에서 불러오면 드라이브 문자부터 안 맞는 일이 흔한데,
-    // 지금까지는 즐겨찾기를 눌러도 아무 일이 없었다 - NavigateToPath가 아는 루트
-    // 중에 없으면 조용히 돌아오기 때문이고, 그 무반응이 고장으로 읽혔다.
+    // Asking at all is the point of this pair. Export the settings, load them on
+    // another PC, and the drive letters are the first thing that will not match;
+    // clicking such a row used to do nothing at all, because NavigateToPath
+    // returns quietly when the path is under no root it knows, and that silence
+    // read as a broken app.
     //
-    // 목록을 훑지 않는다. 방금 누른 그 하나를, 누른 그 순간에 묻는다 - 백 개가
-    // 있어도 검사는 한 번이다.
-    //
-    // 그리고 UI 스레드에서 묻지 않는다. 죽은 네트워크 경로에 대한 Directory.Exists는
-    // SMB가 포기할 때까지 몇 초를 붙들 수 있고, 그건 오늘 고친 검색 프리징과 같은
-    // 계열이다. 북마크 쪽이 이미 이 형태로 짜여 있었다.
-    private static Task<bool> PlaceIsReachable(string path) => Task.Run(() =>
-    {
-        try
-        {
-            return Directory.Exists(path);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
-                                       or NotSupportedException)
-        {
-            return false;
-        }
-    });
+    // PlaceIsReachable lived here until 2026-08-29 and was deleted rather than
+    // taught about files: FileSystemService.ProbeExists already answered this
+    // question, better, for the keyboard cycle. Two helpers asking one question
+    // is how the two came to disagree in the first place.
 
     // 지울지 묻되 기본으로 지우지 않는다. 잠깐 빠진 외장 드라이브일 수도 있고,
     // 그 경우 목록에서 지우는 것은 되돌릴 수 없다 - 경로를 그대로 보여 주는 것이

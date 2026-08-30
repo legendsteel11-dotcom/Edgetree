@@ -78,8 +78,8 @@ public static class Strings
     // 지우는 것을 묻되 기본이 아니다 - 잠깐 빠진 외장 드라이브일 수도 있고, 그
     // 경우 목록에서 지우는 것은 되돌릴 수 없다. 경로를 그대로 보여 주는 것이
     // 어느 쪽인지 판단할 유일한 재료다.
-    public static string PlaceMissingTitle = "폴더 없음";
-    public static string PlaceMissingBody = "이 폴더를 찾을 수 없습니다.\n\n{0}\n\n목록에서 삭제할까요?";
+    public static string PlaceMissingTitle = "항목 없음";
+    public static string PlaceMissingBody = "이 항목을 찾을 수 없습니다.\n\n{0}\n\n목록에서 삭제할까요?";
     public static string PresetSlotEmptyTitle = "프리셋";
     public static string PresetSlotEmptyBody = "{0}번 프리셋이 아직 없습니다.\n지금 상태를 저장할까요?";
 
@@ -1021,8 +1021,8 @@ public static class Strings
         PresetNameHint = "Saves position, size, docking, colors, file types, and the current folder";
         PresetDefaultName = "Preset {0}";
         PresetSavedToast = "Preset saved";
-        PlaceMissingTitle = "Folder not found";
-        PlaceMissingBody = "This folder cannot be found.\n\n{0}\n\nRemove it from the list?";
+        PlaceMissingTitle = "Item not found";
+        PlaceMissingBody = "This item cannot be found.\n\n{0}\n\nRemove it from the list?";
         PresetSlotEmptyTitle = "Presets";
         PresetSlotEmptyBody = "There is no preset {0} yet.\nSave the current setup there?";
 
