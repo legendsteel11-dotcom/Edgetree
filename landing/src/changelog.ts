@@ -45,10 +45,12 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
-    // ONE FEATURE, ONE FIX, by the author’s own count for this round. What
-    // shipped in the binary but stays off the card: the first-click-collapse
-    // quirk on a folder reached through the bookmark panel - a symptom almost
-    // nobody would recognise having seen - and a .gitignore line.
+    // ONE FEATURE, TWO FIXES. The round went out as 1+1 on the author’s count
+    // and the first-click-collapse line was added the same evening, on their
+    // own second thought ("필요할것 같아서요") - the option it touches shipped
+    // only one release earlier, so the people most likely to have met the
+    // quirk are exactly the ones reading this card. Off the card: a
+    // .gitignore line.
     //
     // The fix line names the SYMPTOM (an item reported missing) and not what
     // the dialog went on to offer (removing the bookmark): the offer is the
@@ -58,10 +60,12 @@ export const changelog: ChangelogEntry[] = [
     ko: [
       '옵션 → 기본 설정에 `경로 표시줄 위에 표시`가 추가되었습니다. 활성화하면 경로 표시줄이 하단 대신 헤더 바로 아래에 표시됩니다. 검색 화면에서도 같은 위치를 유지합니다.',
       '북마크에 추가한 파일을 클릭하면 항목을 찾을 수 없다는 안내가 표시되던 문제를 수정했습니다. 폴더와 파일 모두 정상적으로 이동합니다.',
+      '`클릭 시 바로 펼침`을 비활성화한 상태에서 북마크로 이동한 폴더를 트리에서 클릭하면 바로 접히던 문제를 수정했습니다. 첫 클릭은 선택만 유지하고 두 번째 클릭이 접습니다.',
     ],
     en: [
       'A new setting, Show path bar at top, in Options → General. Switch it on and the path bar sits directly under the header instead of at the bottom. It keeps that place in the search view too.',
       'Fixed clicking a bookmarked file reporting that the item could not be found. Folders and files both navigate correctly now.',
+      'Fixed a folder reached through a bookmark collapsing on its first tree click with Expand on a single click off. The first click keeps the selection, and the second one collapses.',
     ],
   },
   {
