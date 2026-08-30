@@ -1933,11 +1933,25 @@
                         IsCheckable="True"
                         AutomationProperties.AutomationId="showHiddenItems"
                         Click="ShowHiddenItemsMenuItem_Click"/>
-                <!-- 경로 표시줄's toggle was here and is GONE (2026-08-11). The
-                     strip stopped being a display of where you are the moment it
-                     grew the history chevrons: turning it off took a way of
+                <!-- 경로 표시줄's SHOW/HIDE toggle was here and is GONE (2026-08-11).
+                     The strip stopped being a display of where you are the moment
+                     it grew the history chevrons: turning it off took a way of
                      MOVING with it, and an option that can hide a feature is not
-                     an option, it is a way to lose one. Always on now. -->
+                     an option, it is a way to lose one. Always on.
+
+                     WHAT STANDS HERE NOW IS A WHERE, NOT A WHETHER (2026-08-30).
+                     Nothing can be lost by it: the strip is on either way and both
+                     seats carry the same controls. It sits in this spot rather than
+                     beside 영역 구분선 above because the rows up there decide what
+                     the window DRAWS, and this one decides where a thing already
+                     drawn is put.
+
+                     Only the path line moves. The file-kind chips stay in the
+                     footer, and AppSettings.PathBarAtTop carries why. -->
+                <MenuItem Header="{x:Static services:Strings.MenuPathBarAtTop}"
+                        IsCheckable="True"
+                        AutomationProperties.AutomationId="pathBarAtTop"
+                        Click="PathBarAtTopMenuItem_Click"/>
                 <Separator/>
                 <!-- Above 폴더 자동 접기 because the two are the tree's pair of
                      folding rules and this is the one about the press: what a
@@ -3432,7 +3446,7 @@
                                  purpose. As siblings in the window's own grid
                                  they would be pinned to a row number, and
                                  ApplyFavoritesPosition swaps the tree between
-                                 Row1 and Row3 - the shades would stay behind at
+                                 RowUpper and RowLower - the shades would stay behind at
                                  the old edge. Here they travel with the tree,
                                  and the ScrollViewer they answer to is right
                                  beside them.
@@ -5197,17 +5211,22 @@
                 <ColumnDefinition x:Name="ViewerColumnRight"
                         Width="0"/>
             </Grid.ColumnDefinitions>
-            <!-- Row1/Row3 are deliberately neutral names, not "FavoritesRow"/
-                 "TreeRow": which one actually hosts the favorites panel vs the
-                 tree depends on the "즐겨찾기를 아래에 표시" option (see
-                 ApplyFavoritesPosition in code-behind), which swaps both the
-                 Grid.Row of FavoritesList/ExplorerTree below AND which of
-                 these two RowDefinitions gets the content-fit-height treatment
-                 vs Height="*" - MainWindow.xaml.cs's FavoritesRowDef/TreeRowDef
-                 properties are the single source of truth for "which is which"
-                 right now. FavoritesSplitterRow's own Grid.Row never changes -
-                 it always sits between whichever row is on top and whichever
-                 is on bottom. -->
+            <!-- RowUpper/RowLower name WHERE THEY ARE, never what they hold. Which
+                 one carries the bookmark panel and which the tree depends on the
+                 "즐겨찾기를 아래에 표시" option (see ApplyFavoritesPosition in the
+                 code-behind), which swaps both the Grid.Row of the two children
+                 AND which RowDefinition gets the content-fit-height treatment
+                 against Height="*". MainWindow.xaml.cs's FavoritesRowDef and
+                 TreeRowDef are the single source of truth for which is which at
+                 any moment; FavoritesSplitterRow always sits between them and
+                 never moves.
+
+                 THEY WERE Row1 AND Row3 UNTIL 2026-08-30, and that is precisely
+                 why they were renamed: a name that is a POSITION NUMBER is a
+                 lie the moment a row is inserted above it, and one was. The
+                 numbers had been chosen as the neutral option, which held only
+                 while the grid never grew. Position words survive the next
+                 insertion; ordinals do not. -->
             <Grid.RowDefinitions>
                 <!-- Fixed, not Auto - so hiding the header alone leaves the row
                      behind as a 36px band of background at the top of the
@@ -5219,11 +5238,18 @@
                      font's, held until ApplyLayoutMetrics first runs. -->
                 <RowDefinition x:Name="HeaderRow"
                         Height="{DynamicResource HeaderRowHeight}"/>
-                <RowDefinition x:Name="Row1"
+                <!-- 경로 표시줄 위에 표시: zero unless that option is on, which is
+                     what lets every child below keep ONE set of row numbers. The
+                     alternative was moving children between rows as the option
+                     changed, and this grid has thirteen of them - see
+                     PlacePathBar in the code-behind for the seat it feeds. -->
+                <RowDefinition x:Name="PathBarTopRow"
+                        Height="0"/>
+                <RowDefinition x:Name="RowUpper"
                         Height="0"/>
                 <RowDefinition x:Name="FavoritesSplitterRow"
                         Height="0"/>
-                <RowDefinition x:Name="Row3"
+                <RowDefinition x:Name="RowLower"
                         Height="*"/>
                 <!-- Auto, not the fixed 20 it was: the footer carries the file
                      -kind toggles now, and on a narrow window they wrap to a
@@ -5575,7 +5601,7 @@
                  AppSettings.MergeFavoritesIntoBookmarks for why. In "none" mode
                  it is collapsed (MainWindow.xaml.cs's ApplySidePanelMode). -->
             <ListBox x:Name="BookmarkPanelList"
-                    Grid.Row="1"
+                    Grid.Row="2"
                     Grid.Column="1"
                     Style="{StaticResource FavoritesListBoxStyle}"
                     Background="{DynamicResource FavoritesBackground}"
@@ -5596,7 +5622,7 @@
                  event to keep reaching the list underneath. Positioned from
                  code (북마크 드래그 재정렬 region). -->
             <Border x:Name="BookmarkDropIndicator"
-                    Grid.Row="1"
+                    Grid.Row="2"
                     Grid.Column="1"
                     Height="2"
                     Margin="0"
@@ -5628,7 +5654,7 @@
                  more horizontal line among a dozen is not findable. Nothing
                  stacks either side of this one; there is a list, a line, and a
                  list. -->
-            <Border Grid.Row="2"
+            <Border Grid.Row="3"
                     Grid.Column="1"
                     Height="1"
                     Background="{DynamicResource PanelDividerBrush}"/>
@@ -5639,7 +5665,7 @@
                  so the Auto row stays exactly the line). ZIndex wins the
                  overlapped strip's hit-testing from the rows beneath. -->
             <GridSplitter x:Name="FavoritesSplitter"
-                    Grid.Row="2"
+                    Grid.Row="3"
                     Grid.Column="1"
                     Height="9"
                     Margin="0,-4,0,-4"
@@ -5743,7 +5769,7 @@
                  arithmetic must be reworked before it can stay - both are built
                  on exact pixel offsets (see PinRowToTop's own comment). -->
             <TreeView x:Name="ExplorerTree"
-                    Grid.Row="3"
+                    Grid.Row="4"
                     Grid.Column="1"
                     Style="{StaticResource ExplorerTreeViewStyle}"
                       Background="{DynamicResource SidebarBackground}"
@@ -5776,9 +5802,9 @@
                  gone can already do that by picking a color that matches the
                  background. Declared last (not right after HeaderGrid) so it
                  paints on top of FavoritesList/ExplorerTree regardless of
-                 which one ApplyFavoritesPosition currently has in Row1 -
+                 which one ApplyFavoritesPosition currently has in RowUpper -
                  needed because the -2 bottom margin below deliberately
-                 overlaps 2px into whichever of them sits in Row1's top edge
+                 overlaps 2px into whichever of them sits in RowUpper's top edge
                  (see the TODO note: divider 2px lower, header content 1px
                  higher, without moving the header row's own height or the
                  OTHER divider between favorites and the tree). -->
@@ -5798,6 +5824,27 @@
                  of the split. ZIndex 3 clears both the panel (0) and the split
                  thumb (2). Full screen collapses this Border outright, so the
                  raised line can never appear over a picture. -->
+            <!-- The path strip's TOP seat (2026-08-30, on request: every other
+                 explorer puts it up here, and this window is tall and narrow so
+                 the bottom of it is a long way from the eye).
+
+                 EMPTY UNTIL ASKED FOR. PlacePathBar moves the one PathBarRow
+                 into whichever of three seats is right - this, the footer, or
+                 the search view's own host - so there is still exactly one
+                 strip and one set of handlers, which is what the footer/search
+                 pair already bought and is worth keeping.
+
+                 Column 1, like the footer border: the strip belongs to the
+                 SIDEBAR, not to the viewer beside it. That is also why the
+                 viewer's own four elements span this row rather than starting
+                 below it - a picture should not be shortened by the tree's
+                 address line. -->
+            <Border x:Name="PathBarTopHost"
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    BorderThickness="0,0,0,1"
+                    BorderBrush="{DynamicResource PanelDividerBrush}"/>
+
             <Border x:Name="HeaderUnderline"
                     Grid.Row="0"
                     Grid.ColumnSpan="3"
@@ -5814,20 +5861,23 @@
                  SetExpandedContentVisibility) when collapsed to the icon-only
                  rail - too narrow for this text, which used to just clip. -->
             <Border x:Name="VersionFooterBorder"
-                    Grid.Row="4"
+                    Grid.Row="5"
                     Grid.Column="1"
                     BorderThickness="0,1,0,0"
                     BorderBrush="{DynamicResource PanelDividerBrush}">
-                <!-- The path strip rides INSIDE the footer border rather than
-                     in a Grid row of its own. A new row would have meant
-                     renumbering the footer and bumping RowSpan on all five
-                     elements that span rows 1-4 (search overlay, viewer panel,
-                     its split thumb and both chevrons) - five chances to leave
-                     one behind, for a strip that is anchored to the bottom
-                     edge either way. Stacking it here also gets the rest for
-                     free: SetExpandedContentVisibility already hides this
-                     border and zeroes the row, and the search overlay already
-                     covers it. -->
+                <!-- This is the strip's BOTTOM seat, and it is still the default.
+                     It rides inside the footer border rather than in a row of
+                     its own, which costs nothing while it is down here:
+                     SetExpandedContentVisibility already hides this border and
+                     zeroes the row, and the search overlay already covers it.
+
+                     THE NOTE HERE USED TO ARGUE AGAINST A ROW AT ALL - the price
+                     being renumbering every child and bumping RowSpan on the five
+                     that spanned rows 1-4. That price was paid on 2026-08-30 for
+                     the top seat, and it came to thirteen edits made in one pass
+                     with check-text's Grid.Row rule watching. The argument was
+                     sound and simply stopped applying once the strip had somewhere
+                     else to be. -->
                 <StackPanel x:Name="FooterStack" Orientation="Vertical">
                     <!-- Collapsed unless the option is on (ApplyPathBarVisibility) -
                          a StackPanel child at Collapsed takes no height, so the
@@ -6478,7 +6528,7 @@
                  until the search button / Ctrl+F activates it (see
                  SetSearchViewActive). -->
             <Grid x:Name="SearchView"
-                    Grid.Row="1"
+                    Grid.Row="2"
                     Grid.RowSpan="4"
                     Grid.Column="1"
                     Background="{DynamicResource SidebarBackground}"
@@ -6996,7 +7046,7 @@
                  the other half of the reason. -->
             <Border x:Name="ViewerPanel"
                     Grid.Row="1"
-                    Grid.RowSpan="4"
+                    Grid.RowSpan="5"
                     Grid.Column="2"
                     Visibility="Collapsed"
                     Padding="0,2,0,0"
@@ -9743,7 +9793,7 @@
                  the panel took and flips its edge/margins. -->
             <Thumb x:Name="ViewerSplitThumb"
                     Grid.Row="1"
-                    Grid.RowSpan="4"
+                    Grid.RowSpan="5"
                     Grid.Column="2"
                     Width="8"
                     Margin="-4,0,0,0"
@@ -9767,7 +9817,7 @@
                  so it can wear theme brushes like everything else. -->
             <Button x:Name="ViewerCollapseButton"
                     Grid.Row="1"
-                    Grid.RowSpan="4"
+                    Grid.RowSpan="5"
                     Grid.Column="2"
                     Width="14"
                     Height="40"
@@ -9826,7 +9876,7 @@
                  (docked) the width grip - see UpdateViewerExpandButton. It
                  points the way the panel will come from. -->
             <Button x:Name="ViewerExpandButton"
-                    Grid.Row="1"
+                    Grid.Row="2"
                     Grid.RowSpan="4"
                     Grid.Column="1"
                     Width="14"

@@ -156,6 +156,9 @@ public class AppPreset
 
         // 옆 패널들.
         nameof(AppSettings.FavoritesAtBottom),
+        // In, where ShowPathBar is out. That one is a whether and it is always
+        // yes; this is a WHERE, and where things sit is what a preset is for.
+        nameof(AppSettings.PathBarAtTop),
         nameof(AppSettings.FavoritesPanelHeight),
         nameof(AppSettings.SidePanelMode),
     };

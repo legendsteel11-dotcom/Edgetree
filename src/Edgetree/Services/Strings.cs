@@ -227,6 +227,7 @@ public static class Strings
     // 풀면 닫힌 폴더도 두 번째 클릭에서 펼쳐진다. 그러면 규칙이 "첫 클릭은
     // 거기로 가고, 두 번째 클릭이 토글한다" 한 줄이 되어 지금보다 오히려 짧다.
     // 화살표는 어느 쪽이든 한 번에 여닫는다.
+    public static string MenuPathBarAtTop = "경로 표시줄 위에 표시";
     public static string MenuExpandOnSingleClick = "클릭 시 바로 펼침";
     public static string MenuAutoCollapse = "폴더 자동 접기";
     public static string MenuCollapseAllExpanded = "폴더 전체 접기";
@@ -1078,6 +1079,7 @@ public static class Strings
         BookmarkShortcutPrev = "Previous bookmark";
         MenuNewFolder = "New folder";
         MenuRefresh = "Refresh";
+        MenuPathBarAtTop = "Show path bar at top";
         MenuExpandOnSingleClick = "Expand on a single click";
         MenuAutoCollapse = "Auto-collapse folders";
         MenuCollapseAllExpanded = "Collapse all folders";

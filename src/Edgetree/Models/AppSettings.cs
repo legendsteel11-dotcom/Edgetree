@@ -879,6 +879,24 @@ public class AppSettings
     // who wants the row back turns it off in 기본 설정.
     public bool ShowPathBar { get; set; } = true;
 
+    // WHERE THAT STRIP SITS (2026-08-30, on request). Off is the footer,
+    // above the file-kind chips, which is where it has been since 2026-08-10
+    // and stays the default. On moves it directly under the header.
+    //
+    // The ask was plain enough: every other explorer puts the address line at
+    // the top, and this window is a tall narrow band, so the bottom of it is
+    // the furthest point on screen from wherever the eye is working.
+    //
+    // THE CHIPS DO NOT COME WITH IT, and that is the whole reason this is one
+    // strip moving rather than the footer moving. The chip row is a WrapPanel:
+    // its line count changes with the window width and with how many file
+    // kinds are listed. Down at the bottom that only thickens the footer.
+    // Above the tree, the same growth would push the top of the tree down a
+    // line at a time, every time an extension is added or the window is
+    // narrowed. The path line is one fixed line and is the only half of the
+    // footer that can safely move.
+    public bool PathBarAtTop { get; set; } = false;
+
     // Which colour rows are LINKED in the colour window - by the swatch name
     // the hex boxes already address them with. Setting one linked row sets
     // every other linked row in its group, so a palette can be kept in step
@@ -900,7 +918,7 @@ public class AppSettings
     public bool TreeEdgeShades { get; set; } = true;
 
     // Swaps the favorites panel and the tree between the top and bottom Grid
-    // row - see MainWindow.xaml's Row1/Row3 comment and
+    // row - see MainWindow.xaml's RowUpper/RowLower comment and
     // MainWindow.xaml.cs's ApplyFavoritesPosition.
     public bool FavoritesAtBottom { get; set; } = false;
 

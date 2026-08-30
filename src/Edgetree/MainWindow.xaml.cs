@@ -4632,6 +4632,10 @@ public partial class MainWindow : Window
         SetSidePanelVisibility(visibility);
         FavoritesSplitter.Visibility = visibility;
         VersionFooterBorder.Visibility = visibility;
+        // Same treatment as the footer border and for the same reason: the strip
+        // is sidebar chrome and the sliver is far too narrow for it. Its ROW is
+        // zeroed below, because a hidden child does not shrink a row on its own.
+        PathBarTopHost.Visibility = visibility;
 
         // The search overlay only shows when it's both expanded AND search is
         // the active view - collapsing to the auto-hide sliver hides it like
@@ -4649,6 +4653,7 @@ public partial class MainWindow : Window
             FavoritesRowDef.Height = new GridLength(0);
             FavoritesSplitterRow.Height = new GridLength(0);
             VersionFooterRow.Height = new GridLength(0);
+            PathBarTopRow.Height = new GridLength(0);
         }
         else
         {
@@ -4657,6 +4662,9 @@ public partial class MainWindow : Window
             // wrap to a second line on a narrow window, and a fixed height
             // would hide it.
             VersionFooterRow.Height = GridLength.Auto;
+            PathBarTopRow.Height = _settings.PathBarAtTop
+                ? GridLength.Auto
+                : new GridLength(0);
         }
 
         UpdateResizeThumbVisibility();
@@ -5620,14 +5628,14 @@ public partial class MainWindow : Window
         => ActivePanelList.Padding.Top + ActivePanelList.Padding.Bottom
            + ActivePanelList.BorderThickness.Top + ActivePanelList.BorderThickness.Bottom;
 
-    // Row1 and Row3 (see the XAML comment on Grid.RowDefinitions) are neutral
+    // RowUpper and RowLower (see the XAML comment on Grid.RowDefinitions) are neutral
     // top/bottom slots - whichever one currently holds the favorites panel is
     // the one every existing height/collapse/fit method below needs to act
     // on, so those methods go through this property instead of naming a row
     // directly. TreeRowDef is its mirror, used only to give the row NOT
     // hosting favorites Height="*" whenever the position changes.
-    private RowDefinition FavoritesRowDef => _settings.FavoritesAtBottom ? Row3 : Row1;
-    private RowDefinition TreeRowDef => _settings.FavoritesAtBottom ? Row1 : Row3;
+    private RowDefinition FavoritesRowDef => _settings.FavoritesAtBottom ? RowLower : RowUpper;
+    private RowDefinition TreeRowDef => _settings.FavoritesAtBottom ? RowUpper : RowLower;
 
     // Swaps which physical row (top or bottom) hosts the favorites panel vs
     // the tree, per the "즐겨찾기를 아래에 표시" option. Grid.Row is just an
@@ -5636,17 +5644,31 @@ public partial class MainWindow : Window
     // control is on top and whichever is on bottom.
     private void ApplyFavoritesPosition()
     {
+        // ASKED OF THE ROW DEFINITIONS, not written as numbers. These three
+        // assignments carried the literals 1 and 3 from before PathBarTopRow
+        // existed, and when that row was inserted (2026-08-30) the XAML was
+        // renumbered and this method was not - which put the panel into the
+        // strip's zero-height row and the TREE into the splitter's. The tree
+        // landing outside its star-sized row broke virtualization along with
+        // the layout: every row realized at once, 637MB at startup and a
+        // window too heavy to resize. Indices read off RowUpper/RowLower
+        // cannot repeat that, whatever is inserted above them.
+        var grid = (Grid)ExplorerTree.Parent;
+        int upper = grid.RowDefinitions.IndexOf(RowUpper);
+        int lower = grid.RowDefinitions.IndexOf(RowLower);
+
         // The list and the tree swap rows. While there were two lists this had
-        // to move BOTH of them - leaving one behind in row 1 while the tree
-        // moved into it made that panel simply vanish under the tree (reported
-        // 2026-08-02, the first thing tried after the mode switch shipped).
-        Grid.SetRow(BookmarkPanelList, _settings.FavoritesAtBottom ? 3 : 1);
-        Grid.SetRow(ExplorerTree, _settings.FavoritesAtBottom ? 1 : 3);
+        // to move BOTH of them - leaving one behind in the upper row while the
+        // tree moved into it made that panel simply vanish under the tree
+        // (reported 2026-08-02, the first thing tried after the mode switch
+        // shipped).
+        Grid.SetRow(BookmarkPanelList, _settings.FavoritesAtBottom ? lower : upper);
+        Grid.SetRow(ExplorerTree, _settings.FavoritesAtBottom ? upper : lower);
 
         // The drop line rides with the list it draws into. Its predecessor was
-        // left behind in row 1 (it was declared there and nothing moved it), so
-        // with 아래에 표시 on it would have drawn its line across the tree.
-        Grid.SetRow(BookmarkDropIndicator, _settings.FavoritesAtBottom ? 3 : 1);
+        // left behind in the upper row (it was declared there and nothing moved
+        // it), so with 아래에 표시 on it would have drawn its line across the tree.
+        Grid.SetRow(BookmarkDropIndicator, _settings.FavoritesAtBottom ? lower : upper);
 
         // The favorites-hosting row keeps whatever height the logic below
         // gives it (collapsed/fit/dragged); the other one just needs to fill
@@ -5821,7 +5843,7 @@ public partial class MainWindow : Window
             : new GridLength(0);
 
         // AND THE OTHER ROW HAS TO BE LET GO, because these two swap.
-        // Row1/Row3 take turns being the panel, and the three numbers above are
+        // RowUpper/RowLower take turns being the panel, and the three numbers above are
         // written to whichever is the panel RIGHT NOW - so the one that just
         // stopped being it was still carrying them (2026-08-17, reported as a
         // band of empty window below everything). The ceiling is the one that
@@ -8595,6 +8617,7 @@ public partial class MainWindow : Window
                 FindMenuItem(generalSettings, "titleBarTitle") is { } titleBarTitle &&
                 FindMenuItem(generalSettings, "titleBarMyComputerIcon") is { } titleBarMyComputerIcon &&
                 FindMenuItem(generalSettings, "showPanelDividers") is { } showPanelDividers &&
+                FindMenuItem(generalSettings, "pathBarAtTop") is { } pathBarAtTop &&
                 // showPathBar left the menu on 2026-08-11 and had to leave this
                 // chain in the same edit: an id that no longer exists fails the
                 // whole conjunction and takes every setting below it down
@@ -8617,6 +8640,7 @@ public partial class MainWindow : Window
                 titleBarTitle.IsChecked = _settings.ShowTitleBarTitle;
                 titleBarMyComputerIcon.IsChecked = _settings.UseMyComputerHeaderIcon;
                 showPanelDividers.IsChecked = _settings.ShowPanelDividers;
+                pathBarAtTop.IsChecked = _settings.PathBarAtTop;
                 expandOnSingleClick.IsChecked = _settings.ExpandFolderOnSingleClick;
                 autoCollapse.IsChecked = _settings.AutoCollapseFolders;
                 dragMoves.IsChecked = _settings.DragMovesInsideTree;
@@ -10614,6 +10638,19 @@ public partial class MainWindow : Window
     // Nothing to apply: the setting is read at the moment of the press (see
     // TreeViewItem_PreviewMouseLeftButtonDown), so there is no state on screen
     // that has to be brought into line with it.
+    // ApplyPathBarVisibility does the whole of it - seat, both hosts and the row
+    // height - so this is the same two lines every other toggle in this menu is,
+    // with one call after them rather than a sequence to get right.
+    private void PathBarAtTopMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem)
+        {
+            _settings.PathBarAtTop = menuItem.IsChecked;
+            _settingsService.Save(_settings);
+            ApplyPathBarVisibility();
+        }
+    }
+
     private void ExpandOnSingleClickMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is MenuItem menuItem)
@@ -11252,13 +11289,29 @@ public partial class MainWindow : Window
     // AppSettings.ShowPathBar is kept and left at its default rather than
     // deleted, so a settings file written by an older build still reads without
     // a missing-member fault; nothing asks it any more.
+    // THE ONE ENTRY POINT. It seats the strip and then makes the two hosts
+    // agree with where it went, so no caller has to do both and none can do
+    // only one - which is the trap the search toggle was already close to,
+    // calling MovePathBarInto and this one after it in a fixed order.
     private void ApplyPathBarVisibility()
     {
+        PlacePathBar();
+
         PathBarRow.Visibility = Visibility.Visible;
-        // The host is a bordered strip of its own, so it only stands while the
-        // search view it belongs to is up - showing it otherwise would draw a
-        // rule under the results with nothing beneath it.
-        SearchPathBarHost.Visibility = _isSearchViewActive
+
+        bool top = _settings.PathBarAtTop;
+
+        // Auto, not a number: the strip carries its own height and margin as
+        // resources that follow Ctrl +/-, and the row simply measures it. Zero
+        // when the strip is elsewhere - an empty host would still draw its
+        // bottom rule, a hairline under the header with nothing beneath it.
+        PathBarTopHost.Visibility = top ? Visibility.Visible : Visibility.Collapsed;
+        PathBarTopRow.Height = top ? GridLength.Auto : new GridLength(0);
+
+        // The search view has a bordered host of its own, so it only stands
+        // while that view is up AND the strip is actually in it - showing it
+        // otherwise would draw a rule under the results with nothing beneath.
+        SearchPathBarHost.Visibility = !top && _isSearchViewActive
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -11268,10 +11321,16 @@ public partial class MainWindow : Window
         UpdatePathBarFromSelection();
     }
 
-    // Moves the one path strip between the footer and the bottom of the search
-    // view, so whichever view is up has it. See the host's note in the XAML for
-    // why it is moved rather than copied.
-    private void MovePathBarInto(bool searchView)
+    // THREE SEATS, ONE STRIP (the third arrived 2026-08-30 with 경로 표시줄
+    // 위에 표시). Moved rather than copied, for the reason the XAML host notes
+    // give: a second copy would be a second set of handlers, a second pair of
+    // history chevrons, and a second thing to keep in step with the selection.
+    //
+    // The top seat WINS over the search seat rather than sitting beside it. It
+    // is above the search overlay rather than under it, so it answers "where am
+    // I" for both views from one place, and two address lines on screen at once
+    // - one of them stale - is worse than either.
+    private void PlacePathBar()
     {
         if (PathBarRow.Parent is System.Windows.Controls.Panel currentPanel)
         {
@@ -11282,16 +11341,21 @@ public partial class MainWindow : Window
             currentBorder.Child = null;
         }
 
-        if (searchView)
+        if (_settings.PathBarAtTop)
+        {
+            PathBarTopHost.Child = PathBarRow;
+            return;
+        }
+
+        if (_isSearchViewActive)
         {
             SearchPathBarHost.Child = PathBarRow;
+            return;
         }
-        else
-        {
-            // Back above the version and the filter chips, which is where it
-            // has always sat.
-            FooterStack.Children.Insert(0, PathBarRow);
-        }
+
+        // Back above the version and the filter chips, which is where it
+        // has always sat.
+        FooterStack.Children.Insert(0, PathBarRow);
     }
 
     // The folder the box should be naming right now.
@@ -28258,6 +28322,15 @@ public partial class MainWindow : Window
         // band of background across the top of the picture (reported with a
         // screenshot, 2026-08-08). The height has to go too.
         HeaderRow.Height = on ? new GridLength(0) : new GridLength(HeaderHeight);
+        // The strip goes with the header, for the reason full cover exists at
+        // all: nothing but the picture is meant to be on screen. The viewer
+        // spans this row either way, so zeroing it is not what makes room - it
+        // is what stops a band of sidebar chrome being the one thing left lying
+        // over the film.
+        PathBarTopHost.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        PathBarTopRow.Height = !on && _settings.PathBarAtTop
+            ? GridLength.Auto
+            : new GridLength(0);
         // Leaving full screen takes the overlay with it - otherwise the caption
         // would come back still wearing its overlay row and plate.
         if (!on)
@@ -34345,9 +34418,8 @@ public partial class MainWindow : Window
 
         _isSearchViewActive = active;
         SearchView.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
-        // Before the sync below, so the strip is already in the view it is
-        // about to be filled for.
-        MovePathBarInto(active);
+        // Seats the strip as well as showing it, and _isSearchViewActive is set
+        // just above - which is the whole of what the seat depends on.
         ApplyPathBarVisibility();
         SearchButtonIcon.Data = active ? SearchGlyphBack : SearchGlyphMagnifier;
         SearchButton.ToolTip = active ? Strings.ToolTipExitSearch : Strings.ToolTipSearch;
