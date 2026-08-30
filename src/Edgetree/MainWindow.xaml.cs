@@ -6326,6 +6326,10 @@ public partial class MainWindow : Window
         // after, so subsequent user-driven selections sync normally again.
         selected.IsSelected = true;
 
+        // AFTER the assignment, whose synchronous SelectedItemChanged clears
+        // this very flag - the order is what makes the mark survive.
+        _selectionPlacedByReveal = true;
+
         // Only when nothing is about to be pinned. A pin computes its own final
         // offset, and this call scrolling somewhere else first is exactly what
         // drew the intermediate frame reported as a single flash of the view
@@ -14668,6 +14672,22 @@ public partial class MainWindow : Window
     // spot, which is what made a folder impossible to pick up.
     private FileSystemItem? _deferredExpandItem;
 
+    // WHO put the current selection where it is (2026-08-30, reported: a
+    // folder opened from the bookmark panel collapsed on its FIRST tree
+    // click, where the same folder reached by clicking in the tree takes
+    // two). Both second-click tests below read "was this row already
+    // selected", and IsSelected cannot say whether the user selected it or
+    // a navigation walk did - so the walk was spending the first of the two
+    // asks on the user's behalf. One IsSelected answering two questions:
+    // where the selection is, and whether the user already asked once.
+    //
+    // True only between FinishReveal placing a selection and the next press
+    // or selection change, either of which is the user standing somewhere
+    // on purpose. While true, a press on the revealed row counts as the
+    // FIRST ask - it arrives, it does not toggle, and for a file it does
+    // not start the slow rename either.
+    private bool _selectionPlacedByReveal;
+
     // Where that press put the cursor, in tree coordinates - so the release
     // can tell "the hand moved" from "the CONTENT moved under a still hand".
     // Selecting a row only partly visible at the bottom edge makes WPF scroll
@@ -15295,6 +15315,13 @@ public partial class MainWindow : Window
         _deferredExpandItem = null;
         _deferredExpandPressPoint = null;
 
+        // "Already selected" for the two second-click tests below, narrowed to
+        // BY THE USER: a selection the bookmark/search walk placed does not
+        // count as the first ask (see _selectionPlacedByReveal), so the first
+        // press after a jump arrives instead of toggling - the same two-step
+        // the row would have cost if the user had walked to it by hand.
+        bool selectedBeforePress = treeViewItem.IsSelected && !_selectionPlacedByReveal;
+
         if (!clickedOnExpander && !clickedInIndent && e.ClickCount == 1 &&
             treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsDirectory: true, IsEditing: false } item)
         {
@@ -15316,7 +15343,7 @@ public partial class MainWindow : Window
             // The CHEVRON is untouched (clickedOnExpander is excluded from this
             // whole path): it is the explicit control for open/shut, and an
             // explicit control must not need two presses.
-            bool arrivingAtOpenFolder = treeViewItem.IsExpanded && !treeViewItem.IsSelected;
+            bool arrivingAtOpenFolder = treeViewItem.IsExpanded && !selectedBeforePress;
 
             // 클릭 시 바로 펼침, OFF (2026-08-29, on request). The rule above
             // asks twice only in the direction that takes something away;
@@ -15330,7 +15357,7 @@ public partial class MainWindow : Window
             // tunneling preview, which is what both readings rest on.
             bool arrivingAtFolder = _settings.ExpandFolderOnSingleClick
                 ? arrivingAtOpenFolder
-                : !treeViewItem.IsSelected;
+                : !selectedBeforePress;
 
             treeViewItem.IsSelected = true;
 
@@ -15354,7 +15381,7 @@ public partial class MainWindow : Window
         // the foreground from doubling as a rename gesture - it lands on
         // whatever is under the cursor, often the very row that was left
         // selected (see _lastActivatedTicks).
-        if (!clickedOnExpander && e.ClickCount == 1 && treeViewItem.IsSelected &&
+        if (!clickedOnExpander && e.ClickCount == 1 && selectedBeforePress &&
             Environment.TickCount64 - _lastActivatedTicks > ActivationClickGraceMs &&
             treeViewItem.DataContext is FileSystemItem { IsPlaceholder: false, IsShowMore: false, IsDirectory: false, IsEditing: false } file)
         {
@@ -15372,6 +15399,10 @@ public partial class MainWindow : Window
             ? e.GetPosition(ExplorerTree)
             : null;
         _itemDragCandidate = _itemDragStart is null ? null : treeViewItem.DataContext as FileSystemItem;
+
+        // This press is the user standing here, whatever else it did - the
+        // next one on the same row is legitimately the second ask.
+        _selectionPlacedByReveal = false;
     }
 
     private void TreeViewItem_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
@@ -16209,6 +16240,13 @@ public partial class MainWindow : Window
 
     private void SelectedItemChangedCore(RoutedPropertyChangedEventArgs<object> e)
     {
+        // Any selection move retires the reveal mark: arrow keys, a click on
+        // another row, a delete promoting a successor - all of them mean the
+        // user (or at least something newer) is standing here now. The one
+        // writer that must survive this, FinishReveal, sets the flag after
+        // its assignment returns, so this clear runs first.
+        _selectionPlacedByReveal = false;
+
         // The moment the native selection lands on a row OUTSIDE the
         // multi-selection - keyboard navigation, right-click on an unrelated
         // row, a favorites walk - the set no longer matches what reads as
