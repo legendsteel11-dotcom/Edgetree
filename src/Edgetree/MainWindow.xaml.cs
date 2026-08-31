@@ -35690,6 +35690,18 @@ public partial class MainWindow : Window
             return;
         }
 
+        // 폴더 머리글 (2026-08-31, on request). The one row whose click had NO
+        // job: every handler here acts on rows with an Entry, and a header
+        // carries none, so the folder line was the only thing in the list a
+        // click did nothing to. It does not wait for a double or ask whether
+        // the viewer is open the way file rows below must - a file click has
+        // two possible meanings (preview or go) and a header has one.
+        if (row.IsHeader)
+        {
+            ActivateSearchFolder(row.DirectoryPath);
+            return;
+        }
+
         if (_searchDoubleClicked is { } doubleClicked)
         {
             _searchDoubleClicked = null;
@@ -35729,6 +35741,19 @@ public partial class MainWindow : Window
     // must never name a key that doesn't work here).
     private void SearchResultsList_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        // A header row answers Enter the same way it answers a click - the
+        // list is keyboard-walkable and the folder line must not be the one
+        // row the keyboard cannot use. Everything below needs an Entry.
+        if (SearchResultsList.SelectedItem is SearchRow { IsHeader: true } headerRow)
+        {
+            if (e.Key == Key.Enter)
+            {
+                ActivateSearchFolder(headerRow.DirectoryPath);
+                e.Handled = true;
+            }
+            return;
+        }
+
         if (SearchResultsList.SelectedItem is not SearchRow { Entry: not null })
         {
             return;
@@ -35823,6 +35848,41 @@ public partial class MainWindow : Window
             {
                 SetSearchViewActive(false);
                 NavigateToPath(entry.FullPath, source: "search-result", collapseOthers: true);
+            }
+            finally
+            {
+                _searchLeavingForResult = false;
+            }
+        }, System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    // The header rows' own half of "take me there": same shape as
+    // ActivateSearchResult above - existence first, history committed, and the
+    // collapse DEFERRED past the ListBox's own release handling, for the
+    // stranded-capture reason documented there at length.
+    private void ActivateSearchFolder(string directoryPath)
+    {
+        // Directory.Exists where the file half asks File.Exists. A vanished
+        // folder cannot be dropped from the list the way a stale file row is -
+        // the header only exists because file rows under it do - so this just
+        // says so and leaves the list alone.
+        if (!Directory.Exists(directoryPath))
+        {
+            SearchStatusText.Text = Strings.SearchResultMissing;
+            return;
+        }
+
+        CommitSearchHistory(SearchBox.Text);
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            // Held for the same reason as the file jump: without it the panel
+            // blinks through the old tree selection on the way over.
+            _searchLeavingForResult = true;
+            try
+            {
+                SetSearchViewActive(false);
+                NavigateToPath(directoryPath, source: "search-header", collapseOthers: true);
             }
             finally
             {

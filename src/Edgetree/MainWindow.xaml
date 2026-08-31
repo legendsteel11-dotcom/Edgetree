@@ -5112,19 +5112,19 @@
                     <Setter Property="ToolTipService.IsEnabled"
                             Value="False"/>
                 </DataTrigger>
-                <!-- Folder header rows are labels, not targets: no hand cursor,
-                     no hover/selection highlight (IsHitTestVisible=False also
-                     lets a click land through to nothing rather than selecting
-                     a header), skipped by keyboard nav (Focusable=False), and
-                     tucked close to the files beneath them. -->
+                <!-- Folder header rows were LABELS, NOT TARGETS until 2026-08-31
+                     - no hit test, no focus, arrow cursor - and a click landed
+                     through to nothing. Reversed on request: the header now
+                     jumps the tree to its folder (see ActivateSearchFolder), so
+                     it takes the hand cursor, the hit test and keyboard focus
+                     like any row. What it does NOT take is the file menu the
+                     container style hangs on every item: a header has no Entry,
+                     so that menu over it would be all live-looking rows acting
+                     on nothing - the exact shape v2.5.4 fixed in the tree. -->
                 <DataTrigger Binding="{Binding IsHeader}"
                         Value="True">
-                    <Setter Property="Cursor"
-                            Value="Arrow"/>
-                    <Setter Property="Focusable"
-                            Value="False"/>
-                    <Setter Property="IsHitTestVisible"
-                            Value="False"/>
+                    <Setter Property="ContextMenu"
+                            Value="{x:Null}"/>
                     <Setter Property="Margin"
                             Value="0,3,0,0"/>
                     <Setter Property="Padding"
