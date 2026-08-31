@@ -6298,9 +6298,13 @@ public partial class MainWindow : Window
         treeViewItem.BringIntoView();
         container.UpdateLayout();
 
-        // Expand every folder in the chain, including the target itself
-        // (favorites are always directories - see AddFavorite's IsDirectory
-        // check), so navigating to a favorite reveals its contents too.
+        // Expand every folder in the chain, including a folder target itself,
+        // so navigating to it reveals its contents too. This note used to say
+        // "favorites are always directories", and stopped being true when
+        // bookmarks began taking files: the walk then marked a bookmarked
+        // FILE expanded, which drew a chevron over a 비어 있음 row and came
+        // back on every launch once saved (2026-08-31). IsExpanded itself
+        // refuses files now, so a file target here is simply a no-op.
         item.IsExpanded = true;
         treeViewItem.UpdateLayout();
 

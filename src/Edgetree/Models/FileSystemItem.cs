@@ -178,6 +178,23 @@ public class FileSystemItem : INotifyPropertyChanged
         get => _isExpanded;
         set
         {
+            // A FILE CANNOT BE EXPANDED, whoever asks (2026-08-31, reported: a
+            // bookmarked .exe wearing a chevron over a 비어 있음 row). Refused
+            // HERE rather than at the callers because the callers are why it
+            // happened: the reveal walk expands its whole chain on the note
+            // that favorites are always directories, and RestoreTreeState
+            // replays whatever CollectAllExpandedPaths saved - so once the
+            // walk marked a file, the state PERSISTED and every launch put it
+            // back. EnsureChildrenLoaded has refused files all along (its own
+            // IsDirectory guard); this setter was the half that never learned.
+            // With the refusal here, the stale saved entry washes out on the
+            // next save - the file is no longer expanded, so it is no longer
+            // collected.
+            if (value && !IsDirectory)
+            {
+                return;
+            }
+
             bool changed = _isExpanded != value;
 
             // RECORDED BEFORE THE NOTIFICATION, and that ordering is the whole
