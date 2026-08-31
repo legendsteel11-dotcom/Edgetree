@@ -40,6 +40,20 @@ public sealed class SearchRow : INotifyPropertyChanged
         : System.IO.Path.Combine(DirectoryPath, FileName);
     public FileSearchService.SearchEntry? Entry { get; init; }
 
+    // Set on file rows only while 폴더별 묶기 is OFF: with no header standing
+    // over them, two results with the same name in different folders would be
+    // the same row twice, and the tooltip above is not an answer somebody can
+    // read down a list. A real case, not a hypothetical - a *.png search over a
+    // projects drive returned en.png and og.png twice each within the first
+    // screen (2026-08-31), which is also why this shows the WHOLE path and not
+    // just the folder's own name: the two en.png files both sit in a folder
+    // called screenshots.
+    //
+    // The template gives DirectoryPath its own column so the paths line up down
+    // the list, in the header's smaller font and the muted folder colour, and
+    // drops the row's indent, which has nothing left to indent under.
+    public bool ShowsFolder { get; init; }
+
     // Mode-aware (PNG set vs. Windows shell icons - same switch as the tree,
     // see ShellIconService): a per-extension file icon for file rows, a folder
     // icon for header rows. Whether it actually shows is gated by the
@@ -107,7 +121,8 @@ public sealed class SearchRow : INotifyPropertyChanged
         ShowMoreLabel = label
     };
 
-    public static SearchRow File(FileSearchService.SearchEntry entry, int matchStart, int matchLength) => new()
+    public static SearchRow File(FileSearchService.SearchEntry entry, int matchStart, int matchLength,
+        bool showsFolder) => new()
     {
         IsHeader = false,
         DirectoryPath = entry.DirectoryPath,
@@ -115,6 +130,7 @@ public sealed class SearchRow : INotifyPropertyChanged
         Entry = entry,
         MatchStart = matchStart,
         MatchLength = matchLength,
+        ShowsFolder = showsFolder,
         IsCut = FileSystemService.CutPaths.Count > 0 && FileSystemService.CutPaths.Contains(entry.FullPath)
     };
 

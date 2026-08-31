@@ -1068,10 +1068,27 @@ public class AppSettings
     public List<string> SearchHistory { get; set; } = new();
 
     // Results-only sort/grouping for the search view, independent of the
-    // explorer tree's own sort. 0=folder group (default), 1=name asc, 2=name
-    // desc, 3=date asc, 4=date desc - see MainWindow's SearchSortMode enum and
-    // SearchSortButton_Click. Remembered across sessions.
+    // explorer tree's own sort. Remembered across sessions.
+    //
+    // THREE fields since 2026-08-31, and they were one until then.
+    // SearchSortMode was a single int over five states (0=folder group, 1=name
+    // asc, 2=name desc, 3=date asc, 4=date desc), which made the grouping and
+    // the ordering exclusive: choosing 폴더별 묶기 silently imposed a hidden
+    // fixed sort (folder path ascending, then filename ascending) and no other
+    // order could be asked for while it was on. One switch was answering two
+    // questions - "grouped?" and "in what order?" - so it is two switches now.
+    //
+    // SearchSortMode is READ-ONLY LEGACY, kept so an existing settings.json
+    // still lands where its owner left it. An EMPTY SearchSortField is what
+    // marks a file written before the split (the same tell SortField uses
+    // above); MainWindow.LoadSearchSortSettings owns the mapping and is the
+    // only place this int is still read.
     public int SearchSortMode { get; set; } = 0;
+
+    // "name" | "date". Empty means a file written before the split above.
+    public string SearchSortField { get; set; } = string.Empty;
+    public bool SearchSortDescending { get; set; } = false;
+    public bool SearchGroupByFolder { get; set; } = true;
 
     // The settings a machine gets the very FIRST time the app runs on it -
     // no settings.json anywhere, not even the pre-rebrand one (see

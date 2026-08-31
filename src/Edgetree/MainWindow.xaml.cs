@@ -16685,18 +16685,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void SetMenuItemEnabled(ItemsControl menu, string tag, bool isEnabled)
-    {
-        if (FindTaggedMenuElement<MenuItem>(menu, tag) is { } item)
-        {
-            item.IsEnabled = isEnabled;
-        }
-    }
-
     // The four field rows and the two direction rows, wherever the 정렬 menu
     // is - 기본 설정 and both folder menus carry the same six tags, which is
     // what lets one routine tick all of them. The search results have their
-    // own set (폴더 그룹 instead of 유형/크기) and tick themselves.
+    // own set (폴더별 묶기 on its own row above the fields) and tick themselves.
     private static void CheckSortMenuRows(ItemsControl menu, FileSortField field, bool descending)
     {
         SetMenuItemChecked(menu, "name", field == FileSortField.Name);
@@ -34124,11 +34116,15 @@ public partial class MainWindow : Window
     // Services/FileSearchService and the design note in TODO.md.
     // ===================================================================
 
-    // Folder group (default) or a global name/date sort, cycled by the sort
-    // button. FolderGroup clusters same-folder files under one header; the
-    // name/date modes sort globally and mostly break groups apart (with
-    // still-adjacent same-folder runs re-collapsing) - see RunSearchFilter.
-    private enum SearchSortMode { FolderGroup = 0, NameAsc = 1, NameDesc = 2, DateAsc = 3, DateDesc = 4 }
+    // Grouping and ordering, and they are INDEPENDENT since 2026-08-31 - see
+    // the note on AppSettings.SearchSortMode for the five-state enum these
+    // three replace and why it had to go. Both halves are always in effect:
+    // with grouping on, the field and direction order the files inside each
+    // folder AND the folders against each other (by the group's own
+    // representative value - see OrderSearchMatches).
+    private bool _searchGroupByFolder = true;
+    private FileSortField _searchSortField = FileSortField.Name;
+    private bool _searchSortDescending;
 
     // Materialized rows (folder headers interleaved with capped file rows).
     // Rebuilt and reassigned to SearchResultsList.ItemsSource wholesale on each
@@ -34152,10 +34148,6 @@ public partial class MainWindow : Window
     // a plain click still navigates and only a real drag copies the file out.
     private System.Windows.Point? _searchDragStart;
     private FileSearchService.SearchEntry? _searchDragCandidate;
-
-    // Results-only sort/grouping (independent of the tree's sort), cycled by
-    // the button in the scope row.
-    private SearchSortMode _searchSortMode = SearchSortMode.FolderGroup;
 
     // Re-filtering the whole growing list on every streamed batch would be
     // O(n^2) across a big scan; this throttles the mid-scan re-filter. A final,
@@ -34232,9 +34224,47 @@ public partial class MainWindow : Window
         };
 
         _searchScopeFolder = _settings.LastSearchFolder;
-        _searchSortMode = (SearchSortMode)Math.Clamp(_settings.SearchSortMode, 0, 4);
+        LoadSearchSortSettings();
         UpdateSearchScopeText();
         UpdateSearchSortIcon();
+    }
+
+    // The three live fields, from either the current settings shape or the
+    // single int that preceded it (AppSettings.SearchSortMode - see the note
+    // there). The upgrade rule is the one the project always works to: the
+    // screen does not change under anyone. Group mode carried an implicit
+    // name-ascending order, so 0 becomes exactly that with grouping on, and
+    // each of the four flat modes becomes itself with grouping off.
+    private void LoadSearchSortSettings()
+    {
+        if (_settings.SearchSortField is not { Length: > 0 } field)
+        {
+            int legacy = Math.Clamp(_settings.SearchSortMode, 0, 4);
+            _searchGroupByFolder = legacy == 0;
+            _searchSortField = legacy is 3 or 4 ? FileSortField.Date : FileSortField.Name;
+            _searchSortDescending = legacy is 2 or 4;
+
+            // Written back at once rather than on the next sort change: until
+            // the new fields exist in the file, every launch re-reads the int
+            // and any later change to the settings shape would have to keep
+            // answering for it.
+            SaveSearchSortSettings();
+            return;
+        }
+
+        _searchGroupByFolder = _settings.SearchGroupByFolder;
+        _searchSortField = string.Equals(field, "date", StringComparison.OrdinalIgnoreCase)
+            ? FileSortField.Date
+            : FileSortField.Name;
+        _searchSortDescending = _settings.SearchSortDescending;
+    }
+
+    private void SaveSearchSortSettings()
+    {
+        _settings.SearchGroupByFolder = _searchGroupByFolder;
+        _settings.SearchSortField = _searchSortField == FileSortField.Date ? "date" : "name";
+        _settings.SearchSortDescending = _searchSortDescending;
+        _settingsService.Save(_settings);
     }
 
     // Whether a search scope (a picked folder) is currently set at all.
@@ -34338,25 +34368,22 @@ public partial class MainWindow : Window
     // the prerequisite the theme work had been waiting on.
     private void UpdateSearchSortIcon()
     {
-        if (_searchSortMode == SearchSortMode.FolderGroup)
-        {
-            // The neutral "sort" glyph, the same one a folder following the
-            // app-wide default shows: no direction is being applied.
-            SearchSortIcon.Data = FileSystemService.FollowsGlobalSortGeometry;
-            SearchSortButton.ToolTip = string.Format(Strings.SortTooltipFormat, Strings.SortModeFolderGroup);
-            return;
-        }
+        // Always a direction now. The neutral "sort" glyph used to stand here
+        // for 폴더별 묶기, which was honest while grouping had no order of its
+        // own; it has one since the two were split, so showing "no direction
+        // applied" over a list that is plainly ordered would be the icon
+        // lying. FollowsGlobalSortGeometry still belongs to the tree, where a
+        // folder really can decline to have a sort of its own.
+        SearchSortIcon.Data = FileSystemService.SortOverrideGeometry(_searchSortDescending);
 
-        SearchSortIcon.Data = FileSystemService.SortOverrideGeometry(IsSearchSortDescending);
-        SearchSortButton.ToolTip = FileSystemService.FormatSortTooltip(SearchSortFieldOf(_searchSortMode),
-            IsSearchSortDescending);
+        // Grouping goes LAST in the tooltip. The sort is what the icon is
+        // showing, so it is what the tooltip has to name first; the grouping is
+        // the extra fact the glyph cannot carry.
+        string sort = FileSystemService.FormatSortTooltip(_searchSortField, _searchSortDescending);
+        SearchSortButton.ToolTip = _searchGroupByFolder
+            ? $"{sort} · {Strings.SortModeFolderGroup}"
+            : sort;
     }
-
-    private bool IsSearchSortDescending
-        => _searchSortMode is SearchSortMode.NameDesc or SearchSortMode.DateDesc;
-
-    private static FileSortField SearchSortFieldOf(SearchSortMode mode)
-        => mode is SearchSortMode.DateAsc or SearchSortMode.DateDesc ? FileSortField.Date : FileSortField.Name;
 
     // Opens the menu instead of stepping to the next mode. Five states behind
     // one button is a list, not a control - the same conclusion the tree's sort
@@ -34382,17 +34409,26 @@ public partial class MainWindow : Window
             return;
         }
 
-        bool grouping = _searchSortMode == SearchSortMode.FolderGroup;
-        SetMenuItemChecked(menu, "group", grouping);
-        SetMenuItemChecked(menu, "name", !grouping && SearchSortFieldOf(_searchSortMode) == FileSortField.Name);
-        SetMenuItemChecked(menu, "date", !grouping && SearchSortFieldOf(_searchSortMode) == FileSortField.Date);
+        // Nothing greys out any more. 오름차순/내림차순 used to stand down while
+        // 폴더별 묶기 was chosen, because the grouping owned a hidden order of
+        // its own that the two rows could not describe; both halves are always
+        // in effect now, so all five rows show the state that is actually
+        // running.
+        SetMenuItemChecked(menu, "group", _searchGroupByFolder);
+        SetMenuItemChecked(menu, "name", _searchSortField == FileSortField.Name);
+        SetMenuItemChecked(menu, "date", _searchSortField == FileSortField.Date);
+        SetMenuItemChecked(menu, "asc", !_searchSortDescending);
+        SetMenuItemChecked(menu, "desc", _searchSortDescending);
+    }
 
-        // Grouping has no direction of its own, so the two rows stand down
-        // rather than showing a state that is not in effect.
-        SetMenuItemChecked(menu, "asc", !grouping && !IsSearchSortDescending);
-        SetMenuItemChecked(menu, "desc", !grouping && IsSearchSortDescending);
-        SetMenuItemEnabled(menu, "asc", !grouping);
-        SetMenuItemEnabled(menu, "desc", !grouping);
+    // 폴더별 묶기 on its own row above the sort: a toggle, and the only one in
+    // this menu. IsCheckable draws the tick, so the click has to put the value
+    // back where the check state came from rather than reading the MenuItem -
+    // WPF has already flipped IsChecked by the time this runs.
+    private void SearchGroupMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        _searchGroupByFolder = !_searchGroupByFolder;
+        ApplySearchSort();
     }
 
     private void SearchSortFieldMenuItem_Click(object sender, RoutedEventArgs e)
@@ -34402,38 +34438,72 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Keeps whichever direction was already in effect when switching
-        // between 이름 and 날짜 - only the grouping mode discards it, having
-        // none.
-        bool descending = IsSearchSortDescending;
-        ApplySearchSortMode(tag switch
-        {
-            "name" => descending ? SearchSortMode.NameDesc : SearchSortMode.NameAsc,
-            "date" => descending ? SearchSortMode.DateDesc : SearchSortMode.DateAsc,
-            _ => SearchSortMode.FolderGroup,
-        });
+        _searchSortField = tag == "date" ? FileSortField.Date : FileSortField.Name;
+        ApplySearchSort();
     }
 
     private void SearchSortDirectionMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { Tag: string tag } || _searchSortMode == SearchSortMode.FolderGroup)
+        if (sender is not MenuItem { Tag: string tag })
         {
             return;
         }
 
-        bool descending = tag == "desc";
-        ApplySearchSortMode(SearchSortFieldOf(_searchSortMode) == FileSortField.Date
-            ? (descending ? SearchSortMode.DateDesc : SearchSortMode.DateAsc)
-            : (descending ? SearchSortMode.NameDesc : SearchSortMode.NameAsc));
+        _searchSortDescending = tag == "desc";
+        ApplySearchSort();
     }
 
-    private void ApplySearchSortMode(SearchSortMode mode)
+    private void ApplySearchSort()
     {
-        _searchSortMode = mode;
-        _settings.SearchSortMode = (int)mode;
-        _settingsService.Save(_settings);
+        SaveSearchSortSettings();
         UpdateSearchSortIcon();
         RunSearchFilter();
+    }
+
+    // The files of one group, or the whole flat list: the chosen field in the
+    // chosen direction. Name goes through the tree's natural comparer, so "10"
+    // lands after "9" in the results too.
+    private IOrderedEnumerable<FileSearchService.SearchEntry> SortSearchEntries(
+        IEnumerable<FileSearchService.SearchEntry> entries)
+        => _searchSortField == FileSortField.Date
+            ? (_searchSortDescending
+                ? entries.OrderByDescending(x => x.LastWriteTime)
+                : entries.OrderBy(x => x.LastWriteTime))
+            : (_searchSortDescending
+                ? entries.OrderByDescending(x => (string?)x.FileName, FileSystemService.NaturalNameComparer)
+                : entries.OrderBy(x => (string?)x.FileName, FileSystemService.NaturalNameComparer));
+
+    // Grouping on: the folders are ordered against each other by a
+    // REPRESENTATIVE value, not by a second rule of their own. By name that is
+    // the folder path itself (which is what the old fixed grouping did, so the
+    // default output is unchanged); by date it is the group's newest file going
+    // down and its oldest going up - the rule a mail client uses to stand a
+    // conversation where its latest message belongs. Anything else puts a
+    // folder whose files are all recent below one that holds a single old file.
+    //
+    // Grouping off: a flat sort and NO headers. The headers used to survive
+    // here for any run of same-folder files that happened to land next to each
+    // other, which read as grouping half switched on. The folder moved onto the
+    // file rows instead (SearchRow.ShowsFolder).
+    private IEnumerable<FileSearchService.SearchEntry> OrderSearchMatches(
+        List<FileSearchService.SearchEntry> matches)
+    {
+        if (!_searchGroupByFolder)
+        {
+            return SortSearchEntries(matches);
+        }
+
+        var groups = matches.GroupBy(x => x.DirectoryPath, StringComparer.OrdinalIgnoreCase);
+        IEnumerable<IGrouping<string, FileSearchService.SearchEntry>> orderedGroups =
+            _searchSortField == FileSortField.Date
+                ? (_searchSortDescending
+                    ? groups.OrderByDescending(g => g.Max(x => x.LastWriteTime))
+                    : groups.OrderBy(g => g.Min(x => x.LastWriteTime)))
+                : (_searchSortDescending
+                    ? groups.OrderByDescending(g => (string?)g.Key, FileSystemService.NaturalNameComparer)
+                    : groups.OrderBy(g => (string?)g.Key, FileSystemService.NaturalNameComparer));
+
+        return orderedGroups.SelectMany(SortSearchEntries);
     }
 
     private void SearchButton_Click(object sender, RoutedEventArgs e)
@@ -35133,23 +35203,15 @@ public partial class MainWindow : Window
         bool highlightable = trimmedQuery.Length > 0
             && !trimmedQuery.Contains('*') && !trimmedQuery.Contains('?');
 
-        // Order per the current mode. FolderGroup clusters by folder then name
-        // (so a folder's matches are contiguous -> one header each); the
-        // name/date modes sort globally (mostly breaking groups apart, with any
-        // still-adjacent same-folder run re-collapsing under one header below).
-        IEnumerable<FileSearchService.SearchEntry> ordered = _searchSortMode switch
-        {
-            SearchSortMode.NameAsc => matches.OrderBy(x => (string?)x.FileName, FileSystemService.NaturalNameComparer),
-            SearchSortMode.NameDesc => matches.OrderByDescending(x => (string?)x.FileName, FileSystemService.NaturalNameComparer),
-            SearchSortMode.DateAsc => matches.OrderBy(x => x.LastWriteTime),
-            SearchSortMode.DateDesc => matches.OrderByDescending(x => x.LastWriteTime),
-            _ => matches
-                .OrderBy(x => (string?)x.DirectoryPath, FileSystemService.NaturalNameComparer)
-                .ThenBy(x => (string?)x.FileName, FileSystemService.NaturalNameComparer),
-        };
+        // Grouping and ordering are separate questions - see OrderSearchMatches
+        // for how each answer shapes this sequence.
+        IEnumerable<FileSearchService.SearchEntry> ordered = OrderSearchMatches(matches);
 
-        // Collapse consecutive runs of the same folder into one header + its
-        // files; the cap counts FILE rows only, so headers never eat into it.
+        // Grouped: one header per folder, the folder's files under it (the
+        // sequence above already has them contiguous, so a header goes in
+        // wherever the folder changes). Flat: file rows only, each carrying its
+        // own folder. Either way the cap counts FILE rows only, so headers
+        // never eat into it.
         var rows = new List<SearchRow>();
         int total = matches.Count;
         int shownFiles = 0;
@@ -35160,7 +35222,8 @@ public partial class MainWindow : Window
             {
                 break;
             }
-            if (!string.Equals(entry.DirectoryPath, currentFolder, StringComparison.OrdinalIgnoreCase))
+            if (_searchGroupByFolder
+                && !string.Equals(entry.DirectoryPath, currentFolder, StringComparison.OrdinalIgnoreCase))
             {
                 currentFolder = entry.DirectoryPath;
                 rows.Add(SearchRow.Header(entry.DirectoryPath));
@@ -35169,7 +35232,8 @@ public partial class MainWindow : Window
             int matchStart = highlightable
                 ? entry.FileName.IndexOf(trimmedQuery, StringComparison.OrdinalIgnoreCase)
                 : -1;
-            rows.Add(SearchRow.File(entry, matchStart, matchStart >= 0 ? trimmedQuery.Length : 0));
+            rows.Add(SearchRow.File(entry, matchStart, matchStart >= 0 ? trimmedQuery.Length : 0,
+                showsFolder: !_searchGroupByFolder));
             shownFiles++;
         }
 

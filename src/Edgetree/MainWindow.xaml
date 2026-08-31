@@ -1687,9 +1687,15 @@
 
         <!-- The search results' own sort menu. Deliberately NOT the folder menu
              above: these are different states over a different list - a flat
-             result set has no 유형/크기 to sort by, and it has 폴더 그룹 which no
-             folder does. Direction doesn't apply to that grouping, so those two
-             rows grey out while it's chosen (SearchSortContextMenu_Opened). -->
+             result set has no 유형/크기 to sort by, and it has 폴더별 묶기 which no
+             folder does.
+
+             THREE blocks since 2026-08-31, and it was one list of five before.
+             폴더별 묶기 stood among the fields as if it were a sixth way of
+             ordering, which made it exclusive with them and left 오름차순/
+             내림차순 greyed out whenever it was chosen. It is a toggle over its
+             own question, so it sits above a separator and every row below it
+             stays live. -->
         <ContextMenu x:Key="SearchSortContextMenu"
                 Style="{StaticResource DarkContextMenuStyle}"
                 Opened="SearchSortContextMenu_Opened"
@@ -1698,7 +1704,8 @@
             <MenuItem Header="{x:Static services:Strings.SortModeFolderGroup}"
                     IsCheckable="True"
                     Tag="group"
-                    Click="SearchSortFieldMenuItem_Click"/>
+                    Click="SearchGroupMenuItem_Click"/>
+            <Separator/>
             <MenuItem Header="{x:Static services:Strings.MenuSortByName}"
                     IsCheckable="True"
                     Tag="name"
@@ -6936,10 +6943,32 @@
                                 </StackPanel>
                                 <!-- File row: per-extension file icon (gated by
                                      ShowFileIcons) + name, indented under the
-                                     folder header. -->
-                                <StackPanel x:Name="FilePanel"
-                                        Orientation="Horizontal"
+                                     folder header - and, while 폴더별 묶기 is off
+                                     and there is no header to indent under, the
+                                     folder itself at the end of the line.
+
+                                     A Grid rather than the StackPanel this was,
+                                     and TWO EQUAL STAR COLUMNS rather than the
+                                     Auto+star it was built as on 2026-08-31.
+                                     Auto sized the name column to each row's own
+                                     filename, so the folder started at a
+                                     different x on every line and the column
+                                     could not be read down (author's screenshot,
+                                     the same day). Splitting the space by ratio
+                                     gives the folder ONE left edge for the whole
+                                     list, and both halves grow with the panel;
+                                     whichever side runs out ellipsises on its
+                                     own. The 1:1 is the only number here - a
+                                     name that outgrows its half trims while the
+                                     folder column still has room, which is the
+                                     price of the straight edge. -->
+                                <Grid x:Name="FilePanel"
                                         Margin="14,0,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
                                     <!-- Cut marks bound as VALUES (SearchRow's
                                          CutOpacity / CutFontStyle), not as
                                          triggers: triggers here applied when a
@@ -6948,6 +6977,7 @@
                                          under it. See the note on those
                                          properties. -->
                                     <Image x:Name="SearchRowIcon"
+                                            Grid.Column="0"
                                             Source="{Binding Icon}"
                                             Opacity="{Binding CutOpacity}"
                                             Width="{DynamicResource IconSize}"
@@ -6960,13 +6990,37 @@
                                          (matched run in the highlight color)
                                          instead of a plain Text binding. -->
                                     <TextBlock x:Name="SearchRowName"
+                                            Grid.Column="1"
                                             local:SearchHighlightBehavior.Row="{Binding}"
                                             Foreground="{DynamicResource FileNameForeground}"
                                             FontSize="{DynamicResource SearchFileFontSize}"
                                             FontStyle="{Binding CutFontStyle}"
                                             VerticalAlignment="Center"
                                             TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
+                                    <!-- The header's font, one step down from
+                                         the name, and the user's own folder
+                                         colour taken a step towards the
+                                         background - the same derived brush a
+                                         hidden or cut row uses, not a second
+                                         alpha over the live one (this app never
+                                         dims text to mark it secondary). In the
+                                         full folder colour it read at the same
+                                         weight as the filename beside it and the
+                                         eye had nothing to land on first
+                                         (2026-08-31). MutedFolderNameForeground
+                                         follows whatever palette is picked, so
+                                         no colour row had to be invented for
+                                         one line of text. -->
+                                    <TextBlock x:Name="SearchRowFolder"
+                                            Grid.Column="2"
+                                            Text="{Binding DirectoryPath}"
+                                            Foreground="{DynamicResource MutedFolderNameForeground}"
+                                            FontSize="{DynamicResource SearchHeaderFontSize}"
+                                            Margin="8,0,0,0"
+                                            VerticalAlignment="Center"
+                                            TextTrimming="CharacterEllipsis"
+                                            Visibility="Collapsed"/>
+                                </Grid>
                                 <!-- "… 더 보기 (N개)" - clickable, raises the page
                                      limit (SearchResultsList_PreviewMouseLeftButtonUp). -->
                                 <TextBlock x:Name="ShowMoreText"
@@ -6987,6 +7041,18 @@
                                     <Setter TargetName="FilePanel"
                                             Property="Visibility"
                                             Value="Collapsed"/>
+                                </DataTrigger>
+                                <!-- No header stands over this row, so the
+                                     indent has nothing to indent under and the
+                                     folder comes back onto the row itself. -->
+                                <DataTrigger Binding="{Binding ShowsFolder}"
+                                        Value="True">
+                                    <Setter TargetName="FilePanel"
+                                            Property="Margin"
+                                            Value="0"/>
+                                    <Setter TargetName="SearchRowFolder"
+                                            Property="Visibility"
+                                            Value="Visible"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsShowMore}"
                                         Value="True">
