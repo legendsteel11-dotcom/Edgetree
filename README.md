@@ -217,6 +217,21 @@ version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
 
+### v2.5.7 (2026-08-30)
+
+- A new setting, Show path bar at top, in Options → General. Switch it on and the path bar sits directly under the header instead of at the bottom. It keeps that place in the search view too.
+- Fixed clicking a bookmarked file reporting that the item could not be found. Folders and files both navigate correctly now.
+- Fixed a folder reached through a bookmark collapsing on its first tree click with Expand on a single click off. The first click keeps the selection, and the second one collapses.
+
+### v2.5.6 (2026-08-29)
+
+- A new setting, Expand on a single click, in Options → General. Switch it off and the first click on a folder selects it, while the second one expands or collapses.
+- Create shortcut has been added to the tree's right-click menu. With several items selected it makes one for each.
+- Shift+Backspace collapses every expanded folder, the same as Shift+clicking the collapse-all icon.
+- Show This PC icon, in Options → General, puts Windows' own This PC icon in the title bar.
+- Fixed the check on a selected thumbnail being hard to see in light mode. Its ink is now taken from the selection color.
+- Fixed the rename box appearing dark in light mode.
+
 ### v2.5.5 (2026-08-27)
 
 - A faint band now marks the full extent of the folder you are in, so you can see at a glance where you are. Its background color can be set separately in the color settings.
