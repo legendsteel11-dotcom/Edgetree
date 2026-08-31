@@ -43,11 +43,19 @@ const EMAIL = 'pjh85336@gmail.com'
            own (사용자 요청) - a label locked inside the first pill made that
            pill longer, so the row read as unequal rather than as a list. That
            is what lets the row take a third (DeskNoise, 2026-08-29) without
-           being redrawn. -->
+           being redrawn.
+
+           EACH LINK GOES TO A LANDING WHERE ONE EXISTS, and to the repository
+           only until then: SweepCap moved off its repo on 2026-08-31, the day
+           sweepcap.vercel.app went up, the way DeskNoise already had. Somebody
+           following a link out of a landing page expects another one, not a
+           file list. The app's own 앱 정보 carries the same three links
+           (AboutWindow.xaml) and is updated with the release that follows,
+           since it ships inside the exe. -->
       <p class="others">
         <span class="others-label">{{ t.footer.otherTool }}</span>
         <a class="other" href="https://tabstick.com/" target="_blank" rel="noopener">{{ t.footer.otherToolName }}</a>
-        <a class="other" href="https://github.com/legendsteel11/SweepCap" target="_blank" rel="noopener">{{ t.footer.otherTool2Name }}</a>
+        <a class="other" href="https://sweepcap.vercel.app/" target="_blank" rel="noopener">{{ t.footer.otherTool2Name }}</a>
         <a class="other" href="https://desk-noise.vercel.app/" target="_blank" rel="noopener">{{ t.footer.otherTool3Name }}</a>
       </p>
 
