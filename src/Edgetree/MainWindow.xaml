@@ -6961,7 +6961,9 @@
                                      own. The 1:1 is the only number here - a
                                      name that outgrows its half trims while the
                                      folder column still has room, which is the
-                                     price of the straight edge. -->
+                                     price of the straight edge. That price is
+                                     paid ONLY while the folder is on screen: see
+                                     SearchRowName's column span. -->
                                 <Grid x:Name="FilePanel"
                                         Margin="14,0,0,0">
                                     <Grid.ColumnDefinitions>
@@ -6989,8 +6991,24 @@
                                     <!-- Inlines built by SearchHighlightBehavior
                                          (matched run in the highlight color)
                                          instead of a plain Text binding. -->
+                                    <!-- Spans BOTH star columns by default, so
+                                         with 폴더별 묶기 on - the folder column
+                                         collapsed and the whole row empty beside
+                                         the name - a long filename still gets
+                                         the full width. Without the span it took
+                                         one star and ellipsised at half the
+                                         panel with nothing to its right
+                                         (2026-08-31, seen in the author's own
+                                         grouped screenshot). The ShowsFolder
+                                         trigger below takes the span back to 1.
+                                         Carried by a span rather than by
+                                         swapping the ColumnDefinition's width,
+                                         because a Setter on a named
+                                         FrameworkElement is the mechanism this
+                                         template already proves works. -->
                                     <TextBlock x:Name="SearchRowName"
                                             Grid.Column="1"
+                                            Grid.ColumnSpan="2"
                                             local:SearchHighlightBehavior.Row="{Binding}"
                                             Foreground="{DynamicResource FileNameForeground}"
                                             FontSize="{DynamicResource SearchFileFontSize}"
@@ -7050,6 +7068,9 @@
                                     <Setter TargetName="FilePanel"
                                             Property="Margin"
                                             Value="0"/>
+                                    <Setter TargetName="SearchRowName"
+                                            Property="Grid.ColumnSpan"
+                                            Value="1"/>
                                     <Setter TargetName="SearchRowFolder"
                                             Property="Visibility"
                                             Value="Visible"/>
