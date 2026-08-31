@@ -1,4 +1,4 @@
-# Edgetree v2.5.7
+# Edgetree v2.5.8
 
 [한국어 안내](README-ko.md)
 
@@ -216,6 +216,12 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v2.5.8 (2026-08-31)
+
+- Group by folder and the sort order in the search results now work independently. Name · Date modified and Ascending · Descending stay available while results are grouped, and with the grouping off each file row carries its folder path on the right.
+- Click a folder header in the search results to go to that folder in the tree. Enter does the same.
+- Fixed a bookmarked file showing an expand arrow in the tree.
 
 ### v2.5.7 (2026-08-30)
 

@@ -45,6 +45,34 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // THREE LINES OUT OF FOUR COMMITS, and the two the search sort round took
+    // are ONE line here. Splitting the grouping from the sort and putting the
+    // folder onto the file rows are the same change seen from two sides - a
+    // reader glancing at this card wants what the search list now does, not
+    // how many commits it took.
+    //
+    // Off the card: the fourth commit repaired a width the round itself had
+    // just introduced, which the standing rule keeps out, and a landing card
+    // line for v2.5.7 that had already shipped.
+    //
+    // The sort line LEADS because it is what the round is. The header click is
+    // the smaller half of the same screen, and the fix is a leftover from the
+    // bookmarked-file work v2.5.7's card already carried - which is exactly
+    // why it is worth a line: the people reading this card are the ones who
+    // read that one.
+    version: 'v2.5.8',
+    ko: [
+      '검색 결과의 `폴더별 묶기`와 정렬 기준이 각각 독립적으로 동작합니다. 묶은 상태에서도 `이름`·`수정한 날짜`와 `오름차순`·`내림차순`을 선택할 수 있고, 묶기를 해제하면 파일마다 폴더 경로가 함께 표시됩니다.',
+      '검색 결과의 폴더 머리글을 클릭하면 트리에서 해당 폴더로 이동합니다. `Enter`로도 동일하게 동작합니다.',
+      '북마크에 추가한 파일에 펼침기호가 표시되던 문제를 수정했습니다.',
+    ],
+    en: [
+      'Group by folder and the sort order in the search results now work independently. Name · Date modified and Ascending · Descending stay available while results are grouped, and with the grouping off each file row carries its folder path on the right.',
+      'Click a folder header in the search results to go to that folder in the tree. Enter does the same.',
+      'Fixed a bookmarked file showing an expand arrow in the tree.',
+    ],
+  },
+  {
     // ONE FEATURE, TWO FIXES. The round went out as 1+1 on the author’s count
     // and the first-click-collapse line was added the same evening, on their
     // own second thought ("필요할것 같아서요") - the option it touches shipped
