@@ -667,6 +667,10 @@ pjh85336@gmail.com 으로 보내주세요.
 
 [TabStick](https://tabstick.com/) — 창에 붙는 인덱스 메모.
 
+[SweepCap](https://sweepcap.vercel.app/) — 단축키를 누른 채 드래그하면 그 자리에서 끝나는 캡처.
+
+[DeskNoise](https://desk-noise.vercel.app/) — 다섯 가지 소리를 세 층으로 섞는 환경음 생성기.
+
 ## 라이선스
 
 MIT — [LICENSE.md](LICENSE.md) 참고. 파일·폴더 아이콘은 Material Icon Theme

@@ -670,10 +670,16 @@ Earlier versions are covered on the
 
 Email pjh85336@gmail.com.
 
-## Another tool by the same maker
+## Other tools by the same maker
 
 [TabStick](https://tabstick.com/) — index notes that stick beside
 the window they belong to.
+
+[SweepCap](https://sweepcap.vercel.app/) — hold Ctrl+Win and drag; the shot is
+on your clipboard and in your Pictures folder the moment you let go.
+
+[DeskNoise](https://desk-noise.vercel.app/) — a background sound generator,
+five sounds mixed across three layers.
 
 ## License
 
