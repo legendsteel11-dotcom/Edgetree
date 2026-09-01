@@ -6498,10 +6498,45 @@ public partial class MainWindow : Window
         // Within the last screenful there is nothing below the row to scroll up
         // into, so the room is made rather than the pin given up - see the
         // 아래 여백 section. Counted in ROWS now, like everything else here.
+        //
+        // BOTH GUARDS BELOW WERE PAID FOR ON 2026-09-02, by a tree that came up
+        // after a restart carrying 385 blank rows it never took back.
+        //
+        // The subtraction puts a MODEL row number on one side and a
+        // SCROLLVIEWER measurement on the other, and those only mean the same
+        // thing once the panel has actually measured the rows the walk counted.
+        // At startup they can be a hundredfold apart: the restore path pinned a
+        // bookmarked file with 40 folders expanded under four drives, so the
+        // walk answered index=363 while the ScrollViewer was still reporting
+        // ExtentHeight=5 and ViewportHeight=1 - a viewport that has not been
+        // given its size yet. 363 - 4 = 359, and 359 blank rows went in
+        // (scrolljump.log 00:29:38.981). The UpdateLayout above cannot prevent
+        // this: it flushes a pass, but a pass over a panel the window has not
+        // sized yet still measures almost nothing.
+        //
+        // So the extent is asked whether it has caught up at all. Nothing is
+        // given up by declining - ArmSettleConfirm below comes back once the
+        // tree stops moving, and by then the panel has real numbers.
+        bool extentHasCaughtUp = scrollViewer.ExtentHeight >= index + 0.5;
         double shortfall = index - scrollViewer.ScrollableHeight;
-        if (shortfall > 0.5)
+        if (!extentHasCaughtUp)
         {
-            SetBottomGap(_bottomGapRows.Count + (int)Math.Ceiling(shortfall), scrollViewer);
+            LogClickLine(
+                $"pin: gap not sized for {item.Name} - extent {scrollViewer.ExtentHeight:F0} " +
+                $"behind index {index} (viewport {scrollViewer.ViewportHeight:F0})");
+        }
+        else if (shortfall > 0.5)
+        {
+            // AND CAPPED AT A SCREENFUL, the rule SettleRowAtTop already works
+            // to and this side never learned. A gap cannot USEFULLY exceed a
+            // viewport of rows - it exists so the target row can reach the top,
+            // and the most that ever takes is a screenful of range below it.
+            // The two askers sat either side of one mechanism with only one of
+            // them bounded, which is why an absurd shortfall could pass through
+            // here untouched while the same absurdity was clamped over there.
+            int room = (int)Math.Ceiling(scrollViewer.ViewportHeight) + 1;
+            int need = Math.Min((int)Math.Ceiling(shortfall), room);
+            SetBottomGap(_bottomGapRows.Count + need, scrollViewer);
         }
 
         double target = Math.Min(index, scrollViewer.ScrollableHeight);
@@ -7498,28 +7533,68 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Same file as the scroll-jump watch so the two line up by timestamp -
-        // a jump with a "gap cleared" beside it points straight at this code.
-        LogScrollLine(
-            $"gap    {(rows > 0 ? $"set {rows} rows" : "cleared")}  (was {_bottomGapRows.Count})  " +
-            $"offset {scrollViewer.VerticalOffset:F0}  extent {scrollViewer.ExtentHeight:F0}");
+        int before = _bottomGapRows.Count;
 
         // Trimmed and grown in place rather than cleared and refilled: a Reset
         // on this collection would throw away the containers of the rows the
         // user is looking at, mid-jump.
-        while (_bottomGapRows.Count > rows)
+        //
+        // THE RESIZE CAN DIE HALFWAY, and until 2026-09-02 that stranded the
+        // rows for the rest of the session. Each RemoveAt runs a layout pass
+        // over a virtualizing panel, and that panel throws "높이는 음수일 수
+        // 없습니다" now and then - a known WPF race this app already recovers
+        // from at the dispatcher (see App.xaml.cs). Recovering there means the
+        // exception unwinds past this method and past the caller, so a clear
+        // that had removed one row of 386 simply stopped at 385, and the
+        // watcher that would have tried again had already unsubscribed itself
+        // on the way in. 385 blank rows, nothing left looking at them, and
+        // seven minutes of navigation in the log that never took one back.
+        //
+        // So the subscription is settled in a finally, against what the
+        // collection ACTUALLY holds rather than what was asked for. A resize
+        // that dies now leaves a watcher armed on the remainder, the next
+        // scroll asks again, and each attempt removes at least one more row -
+        // so it converges instead of stranding.
+        try
         {
-            _bottomGapRows.RemoveAt(_bottomGapRows.Count - 1);
+            while (_bottomGapRows.Count > rows)
+            {
+                _bottomGapRows.RemoveAt(_bottomGapRows.Count - 1);
+            }
+            while (_bottomGapRows.Count < rows)
+            {
+                _bottomGapRows.Add(FileSystemItem.CreateBottomGap());
+            }
         }
-        while (_bottomGapRows.Count < rows)
+        finally
         {
-            _bottomGapRows.Add(FileSystemItem.CreateBottomGap());
-        }
-
-        if (rows > 0)
-        {
+            // The one place the subscription is decided, so it can never
+            // disagree with the row count. Unhooked first either way: += on an
+            // already-hooked handler would run it twice per scroll.
             scrollViewer.ScrollChanged -= TreeScrollViewer_ScrollChanged;
-            scrollViewer.ScrollChanged += TreeScrollViewer_ScrollChanged;
+            if (_bottomGapRows.Count > 0)
+            {
+                scrollViewer.ScrollChanged += TreeScrollViewer_ScrollChanged;
+            }
+
+            // Same file as the scroll-jump watch so the two line up by
+            // timestamp - a jump with a "gap cleared" beside it points straight
+            // at this code.
+            //
+            // WRITTEN AFTER THE RESIZE, NOT BEFORE (2026-09-02). It used to be
+            // the first statement in this method, so it reported the intent and
+            // not the outcome: the incident's log says "gap cleared (was 386)"
+            // on a call that left 385 rows standing, and the only way to catch
+            // that was to read a later JUMP line's gap= field. It now says what
+            // the collection holds, and names the ask separately when the two
+            // differ.
+            int now = _bottomGapRows.Count;
+            string outcome = now == rows
+                ? (now > 0 ? $"set {now} rows" : "cleared")
+                : $"INCOMPLETE at {now} rows (asked {rows})";
+            LogScrollLine(
+                $"gap    {outcome}  (was {before})  " +
+                $"offset {scrollViewer.VerticalOffset:F0}  extent {scrollViewer.ExtentHeight:F0}");
         }
 
         // The new range has to exist before the caller scrolls into it.
@@ -7561,7 +7636,11 @@ public partial class MainWindow : Window
         double gapTop = scrollViewer.ExtentHeight - _bottomGapRows.Count;
         if (scrollViewer.VerticalOffset + scrollViewer.ViewportHeight <= gapTop + 0.5)
         {
-            scrollViewer.ScrollChanged -= TreeScrollViewer_ScrollChanged;
+            // NO UNSUBSCRIBE HERE ANY MORE (2026-09-02). Standing down before
+            // the clear meant a clear that died halfway - see SetBottomGap -
+            // left the rows behind with nothing watching them. SetBottomGap
+            // settles the subscription in its own finally now, against the rows
+            // that actually survived, so this only has to ask.
             SetBottomGap(0, scrollViewer);
         }
     }
