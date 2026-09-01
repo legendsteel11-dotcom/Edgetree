@@ -6534,9 +6534,24 @@ public partial class MainWindow : Window
             // The two askers sat either side of one mechanism with only one of
             // them bounded, which is why an absurd shortfall could pass through
             // here untouched while the same absurdity was clamped over there.
+            //
+            // THE CAP IS ON THE TOTAL, NOT ON THE INCREMENT, and the log is why.
+            // This call ADDS to whatever the gap already holds, and it runs once
+            // per pin, so bounding only what each pin contributes still lets a
+            // sequence of them pile up. That is not hypothetical: scrolljump.log
+            // at 23:00:09 climbed 453 -> 906 -> 1359 -> ... -> 4077 rows in five
+            // seconds, +453 every time, one unbounded shortfall asked over and
+            // over. Thirty-nine gaps in the log have passed 100 rows. Bounding
+            // the total makes the pile-up impossible rather than slower.
+            //
+            // It never SHRINKS a gap that is already larger, though - settle
+            // deliberately grows past one screenful when a row will not come up
+            // (its own `grows < 2` bounds that), and taking those rows away
+            // mid-walk would pull the range out from under the loop that asked
+            // for them.
             int room = (int)Math.Ceiling(scrollViewer.ViewportHeight) + 1;
-            int need = Math.Min((int)Math.Ceiling(shortfall), room);
-            SetBottomGap(_bottomGapRows.Count + need, scrollViewer);
+            int want = _bottomGapRows.Count + (int)Math.Ceiling(shortfall);
+            SetBottomGap(Math.Min(want, Math.Max(room, _bottomGapRows.Count)), scrollViewer);
         }
 
         double target = Math.Min(index, scrollViewer.ScrollableHeight);
