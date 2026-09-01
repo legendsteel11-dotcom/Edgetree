@@ -6258,7 +6258,30 @@ public partial class MainWindow : Window
             int itemIndex = container.Items.IndexOf(item);
             if (hostPanel is not null && itemIndex >= 0)
             {
+                // NAMES THE SCROLLER, AND CLEARED THIS ONE (2026-09-02). Every
+                // navigation was moving the view twice - an approach leaving the
+                // row against the bottom edge, then the pin lifting it to the
+                // top by exactly one viewport less one row - and three calls on
+                // this path could have been making the first move. This was the
+                // prime suspect, on the reasoning that BringIndexIntoView
+                // scrolls the minimum and the minimum IS the bottom edge.
+                //
+                // It measured innocent: "reveal: BringIndexIntoView MUSIC (D:)
+                // idx=1 offset 201 -> 201" while the very next line jumped
+                // 201 -> 365. The scroller was TreeViewItem.OnSelected in
+                // FinishReveal, which is suppressed there now.
+                //
+                // Kept rather than removed. It cost one build to write and it
+                // is the line that will settle the next report of this shape,
+                // which the reasoning above could not - twice in one evening a
+                // reading of this path was confidently wrong and a measurement
+                // was what corrected it.
+                double beforeBring = FindTreeScrollViewer()?.VerticalOffset ?? double.NaN;
                 hostPanel.BringIndexIntoViewPublic(itemIndex);
+                double afterBring = FindTreeScrollViewer()?.VerticalOffset ?? double.NaN;
+                LogClickLine(
+                    $"reveal: BringIndexIntoView {item.Name} idx={itemIndex} " +
+                    $"offset {beforeBring:F0} -> {afterBring:F0}");
             }
 
             if (attempt >= 12)
@@ -6295,7 +6318,33 @@ public partial class MainWindow : Window
             return;
         }
 
-        treeViewItem.BringIntoView();
+        // NOT ON THE LAST STEP WHEN A PIN IS COMING (2026-09-02). FinishReveal
+        // has skipped its own BringIntoView since 2026-07-28 on exactly this
+        // reasoning - a pin computes its own final offset, and scrolling
+        // somewhere else first draws an intermediate frame - but this call, one
+        // level up, kept making that scroll on every step including the last,
+        // so the fix below it was being undone from above.
+        //
+        // What it cost is visible in the log as a constant: BringIntoView
+        // scrolls no further than it has to, which lands the row against the
+        // BOTTOM edge of the viewport, and the pin then lifts the same row to
+        // the TOP. The distance between those two placements is one viewport,
+        // and scrolljump.log shows it over and over as a +75 immediately after
+        // the approach, on a viewport of 76 - two machines placing one row, one
+        // after the other, both of them drawn (author's report, "위치를 보정하는
+        // 그런행동", and their question about computing the position first and
+        // drawing once).
+        //
+        // Only the LAST step is skipped. The intermediate ones still ask,
+        // because that is what gives the next level a viewport to realize into
+        // - the asymmetry the note above this method spells out. And the row
+        // this skips for already has a container: the null check above is what
+        // we just came through, so nothing here needs BringIntoView to
+        // materialize it.
+        if (!pinToTop || index != chain.Count - 1)
+        {
+            treeViewItem.BringIntoView();
+        }
         container.UpdateLayout();
 
         // Expand every folder in the chain, including a folder target itself,
@@ -6328,7 +6377,47 @@ public partial class MainWindow : Window
         // SelectedItemChanged synchronously, and the guard keeps that from
         // re-syncing (and possibly clearing) the favorites list. Cleared right
         // after, so subsequent user-driven selections sync normally again.
-        selected.IsSelected = true;
+        //
+        // AND ITS SCROLL IS SUPPRESSED WHEN A PIN IS COMING (2026-09-02).
+        // Selecting a TreeViewItem makes it scroll itself into view: WPF raises
+        // RequestBringIntoView from TreeViewItem.OnSelected and the ScrollViewer
+        // obeys. The filter-toggle path already handles this exact event for
+        // this exact reason (see the note there, 2026-08-10); this path never
+        // did, and it is what made every jump move the view TWICE.
+        //
+        // The signature is arithmetic, not a hunch. BringIntoView scrolls no
+        // further than it has to, which leaves the row against the BOTTOM edge,
+        // and the pin then lifts the same row to the TOP - so the second move is
+        // always one viewport less one row. click.log 01:39:55 on a viewport of
+        // 48: "reveal done: 4k", then 102 -> 154, then "pin: 4k index=201
+        // offset=154", then 154 -> 201. 154 is 201 - 47. The same pair reads
+        // +75 on a viewport of 76. Reported as 위치를 보정하는 행동, and it is
+        // two machines placing one row rather than any correction.
+        //
+        // Only when this method is going to pin. Without a pin the scroll is
+        // the whole point of the reveal, which is why the BringIntoView below
+        // is called in exactly the opposite case.
+        //
+        // Handled at the container, where the event starts, so the ScrollViewer
+        // never sees it - and released in a finally, because leaving it hooked
+        // would mute every later selection on that row.
+        void SuppressBringIntoView(object _, RequestBringIntoViewEventArgs e) => e.Handled = true;
+
+        if (pinToTop)
+        {
+            selected.RequestBringIntoView += SuppressBringIntoView;
+        }
+        try
+        {
+            selected.IsSelected = true;
+        }
+        finally
+        {
+            if (pinToTop)
+            {
+                selected.RequestBringIntoView -= SuppressBringIntoView;
+            }
+        }
 
         // AFTER the assignment, whose synchronous SelectedItemChanged clears
         // this very flag - the order is what makes the mark survive.
