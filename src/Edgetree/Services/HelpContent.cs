@@ -373,6 +373,12 @@ public static class HelpContent
                     R("제목 표시줄 돋보기", "검색 열기 · 닫기",
                       "The magnifier in the title bar", "Open · close search"),
                     R("폴더 아이콘", "검색 범위 선택", "The folder icon", "Choose where to look"),
+                    // The five rows are two questions since 2026-08-31, and that
+                    // is the half a reader cannot get from the icon: the grouping
+                    // is a toggle that stays on while the sort changes under it.
+                    R("검색창의 정렬 아이콘", "폴더별 묶기 · 이름 · 수정한 날짜 · 오름차순 · 내림차순, 묶기와 정렬은 각각 적용",
+                      "The sort icon in the search bar",
+                      "Group by folder · Name · Date modified · Ascending · Descending - the grouping and the sort apply separately"),
                     // Three rows for what is one conditional behaviour, and the
                     // condition is what each row turns on: with the panel shut
                     // a click can only mean "take me there", and with it open
@@ -741,6 +747,11 @@ public static class HelpContent
                       "Options → General → Icons", "Folders, files and drives switch on and off separately"),
                     R("옵션 → 기본 설정 → 드래그로 이동", "비활성화하면 드래그는 항상 복사, 이동은 Shift",
                       "Options → General → Drag Moves", "Off, a drag always copies and Shift is the way to move"),
+                    // A where, not a whether (2026-08-30): the strip is on either
+                    // way and both seats carry the same controls, so the row says
+                    // where the line goes and nothing about losing anything.
+                    R("옵션 → 기본 설정 → 경로 표시줄 위에 표시", "경로 줄을 트리 위로 이동",
+                      "Options → General → Show path bar at top", "Moves the path line above the tree"),
                     // The cost goes on the row, not in a paragraph: it is the
                     // one setting here that can make the tree slower.
                     R("옵션 → 폴더에 표시할 항목 개수 → 전체 표시", "더 보기 없이 전부, 큰 폴더에서는 느려짐",
