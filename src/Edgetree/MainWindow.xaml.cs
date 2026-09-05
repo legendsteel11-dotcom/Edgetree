@@ -6026,12 +6026,16 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Held for the whole (asynchronous) walk and cleared only when it
-        // finishes (EndFavoriteNavigation). Selection changes the walk itself
-        // causes - e.g. auto-collapse dropping the previously-open drive, which
-        // makes WPF move the tree selection to that drive's root - then skip
-        // the favorites-list sync instead of clearing the favorite we're
-        // navigating to.
+        // Held for the whole (asynchronous) walk and cleared when it finishes
+        // (EndFavoriteNavigation), or by the walk's own catch when it dies
+        // instead of finishing - see RevealChainStep.
+        //
+        // ONE READER, AND IT IS NO LONGER THE ONE THIS NOTE USED TO NAME. The
+        // favorites-list sync sat behind this flag once; it does not any more
+        // (the reasoning is at SyncBookmarkPanelToSelection). What is left is
+        // the accordion gate in the Expanded handler: the walk opens every level
+        // on the way down and each one raises Expanded, so without the guard a
+        // jump would collapse the levels it had just opened.
         _isNavigatingFromFavorite = true;
 
         // Before the walk, not during it: a hidden folder on the way down has
@@ -6165,7 +6169,34 @@ public partial class MainWindow : Window
     // away. Once any step has had to yield and retry, the tree is still
     // realizing rows and nothing measured at the end of the walk can be
     // trusted yet - see FinishReveal, which is what actually reads it.
+    // THE WALK'S GUARD HAS TO COME BACK WHEN THE WALK DIES (2026-09-05).
+    // _isNavigatingFromFavorite is set in NavigateToPath and cleared only by
+    // EndFavoriteNavigation at the ends of this walk. Everything below runs
+    // layout on a virtualizing panel, which is where WPF's measure race throws,
+    // and an escape used to leave the guard standing - with it standing, the
+    // accordion gate refuses every collapse, so 폴더 자동 접기 reads as switched
+    // off until the next navigation sets and clears the guard again.
+    //
+    // A catch that rethrows, NOT a finally, and both halves are deliberate.
+    // Finally is wrong because the retry paths hand off to a later dispatcher
+    // pass and return normally here: clearing then would release the guard
+    // while the walk is still going. The rethrow is what keeps App.xaml.cs's
+    // recovery and its exit.log line, which is the only record that any of this
+    // ever fires.
     private void RevealChainStep(List<FileSystemItem> chain, int index, ItemsControl container, int token, int attempt = 0, bool pinToTop = true, bool settled = true)
+    {
+        try
+        {
+            RevealChainStepCore(chain, index, container, token, attempt, pinToTop, settled);
+        }
+        catch
+        {
+            EndFavoriteNavigation(token);
+            throw;
+        }
+    }
+
+    private void RevealChainStepCore(List<FileSystemItem> chain, int index, ItemsControl container, int token, int attempt, bool pinToTop, bool settled)
     {
         // A newer favorite click superseded this walk while it was waiting on a
         // container - stop rather than risking two walks interleaving their
@@ -6371,7 +6402,24 @@ public partial class MainWindow : Window
     // set - pinned to the top of the viewport. One row for all three: the
     // separate anchor this used to take, so a file could be selected while its
     // parent folder held the top, is gone (see NavigateToPath).
+    // Same guard, same reason as RevealChainStep above - this is the other end
+    // of the same walk, and it runs a selection whose SelectedItemChanged and
+    // whose pin both reach layout. EndFavoriteNavigation below is where an
+    // orderly finish clears it; this catch is for the finish that never comes.
     private void FinishReveal(TreeViewItem selected, int token, bool pinToTop = true, bool settled = true)
+    {
+        try
+        {
+            FinishRevealCore(selected, token, pinToTop, settled);
+        }
+        catch
+        {
+            EndFavoriteNavigation(token);
+            throw;
+        }
+    }
+
+    private void FinishRevealCore(TreeViewItem selected, int token, bool pinToTop, bool settled)
     {
         // Still guarded while this fires: setting IsSelected raises
         // SelectedItemChanged synchronously, and the guard keeps that from
