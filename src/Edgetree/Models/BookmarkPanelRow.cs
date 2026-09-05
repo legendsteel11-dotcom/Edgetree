@@ -15,7 +15,8 @@ public class BookmarkPanelRow : INotifyPropertyChanged
     private ImageSource? _icon;
     private bool _isCurrent;
     private bool _isDirectory = true;
-    private bool _isFilteredOut;
+    private bool _isOutOfTree;
+    private bool _isHiddenFolder;
 
     public BookmarkPanelRow(int number, string path, string name)
     {
@@ -60,22 +61,39 @@ public class BookmarkPanelRow : INotifyPropertyChanged
         set => SetField(ref _isCurrent, value);
     }
 
-    // The file-kind filter would keep this row's target out of the tree, so the
-    // row is drawn muted (2026-09-05, on the author's question).
+    // The tree is not showing this row's target right now, so the row is drawn
+    // muted (2026-09-05, on the author's question, then widened by the author
+    // the same day to cover the second reason).
     //
-    // It marks a row whose CLICK cannot arrive: a filtered file is never put
-    // into its folder's Children, so the reveal walk breaks at the last segment
-    // and lands on the parent folder instead - silently, which is what this is
-    // really for. The row stays clickable and stays where it is; nothing is
-    // hidden, because a bookmark disappearing when a chip is pressed would be a
-    // worse surprise than one that arrives at its folder.
+    // TWO REASONS, ONE LOOK, and they cost the click different things:
     //
-    // Folders never carry it. The filter applies to files only (see
-    // FileSystemService's listing, where folders pass untouched).
-    public bool IsFilteredOut
+    //   a file whose kind 표시할 파일 형식 is filtering out - it is never put
+    //   into its folder's Children, so the reveal walk breaks at the last
+    //   segment and lands on the PARENT FOLDER, silently, which is the part
+    //   this is really for;
+    //
+    //   a folder that 숨기기 has excluded - the click still arrives, because
+    //   the walk reveals hidden folders along its path for the length of the
+    //   jump, and the row it lands on is the one the tree marks as shown-for-
+    //   now.
+    //
+    // Both are "not in the tree as it stands", which is what the muting says,
+    // and neither hides the bookmark: a row disappearing when a chip is pressed
+    // or a folder is excluded would be a worse surprise than one that says why
+    // it looks different.
+    public bool IsOutOfTree
     {
-        get => _isFilteredOut;
-        set => SetField(ref _isFilteredOut, value);
+        get => _isOutOfTree;
+        set => SetField(ref _isOutOfTree, value);
+    }
+
+    // The 숨기기 half of IsOutOfTree, kept apart because the row's right-click
+    // menu offers 숨김 해제 on it - and that is an action only the folder case
+    // has. A filtered file has no per-row undo: the chips are the undo.
+    public bool IsHiddenFolder
+    {
+        get => _isHiddenFolder;
+        set => SetField(ref _isHiddenFolder, value);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

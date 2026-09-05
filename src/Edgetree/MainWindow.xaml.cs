@@ -9266,13 +9266,9 @@ public partial class MainWindow : Window
         UpdateFileFilterIndicator();
 
         // The bookmark panel answers to the chips too: a bookmarked file the
-        // filter now keeps out of the tree is drawn muted (BookmarkPanelRow.
-        // IsFilteredOut). Only the flag is re-asked - no probe, no icon work -
-        // so this costs one string test per bookmark.
-        foreach (var row in _bookmarkPanelRows)
-        {
-            row.IsFilteredOut = !row.IsDirectory && !FileTypeFilter.ShouldShowFile(row.Name);
-        }
+        // filter now keeps out of the tree is drawn muted. Flags only - no
+        // probe, no icon work.
+        RefreshBookmarkPanelExclusionState();
 
         // Every folder already on screen re-reads, the same way a sort or a
         // per-folder cap change does - a filter that only took effect on
@@ -18158,16 +18154,40 @@ public partial class MainWindow : Window
         ApplyBookmarkPanelRowKind(row, isDirectory: !Path.HasExtension(row.Name));
     }
 
+    // ONE PLACE DECIDES WHETHER A BOOKMARK'S TARGET IS IN THE TREE RIGHT NOW.
+    // The answer has two independent reasons and four callers (the row's kind
+    // arriving, the filter chips, 숨기기 and 숨김 해제), and reasons and callers
+    // multiplying is how one of them ends up asking a question the others have
+    // stopped asking.
+    //
+    // Only the exact bookmarked path is tested, not its ancestors. A bookmark
+    // UNDER a hidden folder is still reachable - NavigateToPath reveals the
+    // hidden folders along the way for the length of the jump - so marking it
+    // would say something untrue about the click.
+    private static void ApplyBookmarkPanelRowExclusion(BookmarkPanelRow row)
+    {
+        row.IsHiddenFolder = row.IsDirectory &&
+            FileSystemService.HiddenPaths.Contains(FileSystemService.NormalizeHiddenPath(row.Path));
+        row.IsOutOfTree = row.IsHiddenFolder ||
+            (!row.IsDirectory && !FileTypeFilter.ShouldShowFile(row.Name));
+    }
+
+    private void RefreshBookmarkPanelExclusionState()
+    {
+        foreach (var row in _bookmarkPanelRows)
+        {
+            ApplyBookmarkPanelRowExclusion(row);
+        }
+    }
+
     private void ApplyBookmarkPanelRowKind(BookmarkPanelRow row, bool isDirectory)
     {
         row.IsDirectory = isDirectory;
 
-        // Decided here because this is where the kind is finally known, and the
-        // kind is half the answer - the probe may only arrive after the row is
-        // already on screen. ApplyFileFilter re-asks for every row when the
-        // chips change; between the two, every way the answer can change is
-        // covered.
-        row.IsFilteredOut = !isDirectory && !FileTypeFilter.ShouldShowFile(row.Name);
+        // Asked here because this is where the kind is finally known, and the
+        // kind decides WHICH question gets asked - the probe may only arrive
+        // after the row is already on screen.
+        ApplyBookmarkPanelRowExclusion(row);
 
         // Follows the same two toggles the tree does - someone who turned icons
         // off asked for that everywhere. The slot goes with the icon (the
@@ -18506,6 +18526,21 @@ public partial class MainWindow : Window
         RebuildBookmarkPanelRows();
         BookmarkPanelList.SelectedItem = _bookmarkPanelRows.FirstOrDefault(r =>
             string.Equals(r.Path, row.Path, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // 숨김 해제 on a bookmarked folder the tree is excluding. The menu row only
+    // shows on such a row (see its trigger), and the work is the tree's own
+    // UnhideFolder - the same path the 숨긴 폴더 list and the tree's own menu
+    // take, so the row comes back the one way rather than a second way that can
+    // drift from it.
+    private void UnhideBookmarkFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (BookmarkPanelList.SelectedItem is not BookmarkPanelRow { IsHiddenFolder: true } row)
+        {
+            return;
+        }
+
+        UnhideFolder(row.Path);
     }
 
     private void RemoveBookmarkFromPanel_Click(object sender, RoutedEventArgs e)
@@ -19003,6 +19038,10 @@ public partial class MainWindow : Window
 
         _settings.HiddenFolderPaths.Add(path);
 
+        // Before any of the tree work below, because the bookmark rows do not
+        // read the tree - they read HiddenPaths, which is already current.
+        RefreshBookmarkPanelExclusionState();
+
         // A folder hidden while it is the current selection would leave the
         // tree selected on a row that no longer exists - and the favorites
         // panel syncing to it. Move up to its parent, which is where the eye
@@ -19065,6 +19104,10 @@ public partial class MainWindow : Window
         _settings.HiddenFolderPaths.RemoveAll(
             p => string.Equals(FileSystemService.NormalizeHiddenPath(p), path, StringComparison.OrdinalIgnoreCase));
         _settingsService.Save(_settings);
+
+        // Same as HideFolder: up here, because everything below this point
+        // returns down one of several branches depending on where the row is.
+        RefreshBookmarkPanelExclusionState();
 
         // The row may already be on screen - "숨긴 폴더 표시" is on, or a jump is
         // passing through it - and in that case it is an EXISTING instance that

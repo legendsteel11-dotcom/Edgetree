@@ -4683,6 +4683,52 @@
                 Opened="AnyMenu_Opened"
                 Closed="AnyMenu_Closed"
                 PreviewMouseRightButtonUp="ContextMenu_PreviewMouseRightButtonUp">
+            <!-- ONLY ON A ROW THAT IS ACTUALLY HIDDEN, which is why it and its
+                 separator carry the same trigger: an action that is always
+                 there but only sometimes does anything is worse than one that
+                 appears when it applies. It sits at the top because it is the
+                 answer to the question the muted row just raised.
+                 The ContextMenu takes its DataContext from the row it opened
+                 on, so IsHiddenFolder binds straight through. -->
+            <MenuItem Header="{x:Static services:Strings.MenuUnhideFolder}"
+                    Click="UnhideBookmarkFolder_Click">
+                <MenuItem.Style>
+                    <Style TargetType="MenuItem"
+                            BasedOn="{StaticResource {x:Type MenuItem}}">
+                        <Setter Property="Visibility"
+                                Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsHiddenFolder}"
+                                    Value="True">
+                                <Setter Property="Visibility"
+                                        Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </MenuItem.Style>
+            </MenuItem>
+            <Separator>
+                <Separator.Style>
+                    <!-- BasedOn the SeparatorStyleKey style, not a bare
+                         Separator style. A separator inside a menu is styled
+                         through that key rather than by TargetType, so a local
+                         style without it drops the template and the default
+                         two-tone groove comes back as a bright line (the note
+                         at that style says the same from the other side). -->
+                    <Style TargetType="Separator"
+                            BasedOn="{StaticResource {x:Static MenuItem.SeparatorStyleKey}}">
+                        <Setter Property="Visibility"
+                                Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsHiddenFolder}"
+                                    Value="True">
+                                <Setter Property="Visibility"
+                                        Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Separator.Style>
+            </Separator>
             <MenuItem Header="{x:Static services:Strings.MenuBookmarkRemove}"
                     Click="RemoveBookmarkFromPanel_Click"/>
             <!-- The favorites row's twin carries 전체 해제, so this one does
@@ -4827,7 +4873,7 @@
                                             <Setter Property="Foreground"
                                                     Value="{DynamicResource PanelNameForeground}"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsFilteredOut}"
+                                                <DataTrigger Binding="{Binding IsOutOfTree}"
                                                         Value="True">
                                                     <Setter Property="Foreground"
                                                             Value="{DynamicResource MutedPanelNameForeground}"/>
@@ -4910,11 +4956,12 @@
                                                      still a row you can point
                                                      at and click, and the two
                                                      answers must not fight. It
-                                                     says the file-kind filter
-                                                     would keep this file out of
-                                                     the tree - see
-                                                     BookmarkPanelRow.
-                                                     IsFilteredOut for what that
+                                                     says the tree is not
+                                                     showing this row's target
+                                                     as it stands - filtered
+                                                     file or excluded folder;
+                                                     see BookmarkPanelRow.
+                                                     IsOutOfTree for what each
                                                      costs the click. Colour
                                                      only, no italic: italic
                                                      already means "hidden
@@ -4922,7 +4969,7 @@
                                                      the tree, and two states
                                                      wearing one mark is how
                                                      both stop being read. -->
-                                                <DataTrigger Binding="{Binding IsFilteredOut}"
+                                                <DataTrigger Binding="{Binding IsOutOfTree}"
                                                         Value="True">
                                                     <Setter Property="Foreground"
                                                             Value="{DynamicResource MutedPanelNameForeground}"/>
@@ -4986,7 +5033,7 @@
                                  nothing in the panel ever marks a cut. If a cut
                                  mark is ever added to these rows, this fade is
                                  the thing it collides with. -->
-                            <DataTrigger Binding="{Binding IsFilteredOut}"
+                            <DataTrigger Binding="{Binding IsOutOfTree}"
                                     Value="True">
                                 <Setter TargetName="BookmarkRowIcon"
                                         Property="Opacity"
