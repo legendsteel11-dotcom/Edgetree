@@ -45,6 +45,37 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    // FOUR LINES: one thing to see, three things that were wrong. The panel
+    // line LEADS because it is the only change of the round anyone can look at
+    // - the other three are recognised by people who met them.
+    //
+    // The panel line is the author's own wording, and shorter than the draft
+    // it replaced: 숨겨진 covers both reasons a bookmark can be missing from
+    // the tree (the file-kind filter, and 숨기기), so naming the two mechanisms
+    // separately was spending three clauses on a distinction the reader does
+    // not have to make.
+    //
+    // The auto-collapse line went on at the author's call. It is the one item
+    // here nobody may have noticed - the option quietly stopped applying until
+    // the next jump - and it is on the card because someone who DID notice has
+    // no other way to learn it is fixed.
+    //
+    // Off the card: the F1 rows, the About link, and the check-text addition.
+    version: 'v2.5.9',
+    ko: [
+      '북마크 패널에서 숨겨진 항목이 흐리게 표시됩니다. 숨겨진 북마크 폴더는 우클릭으로 바로 해제할 수 있습니다.',
+      '트리에서 다른 폴더로 이동할 때 목록 아래에 빈 공간이 생기던 문제를 수정했습니다.',
+      '북마크나 폴더로 이동할 때 화면이 두 번 움직이던 것이 한 번에 정리됩니다.',
+      '폴더 자동 접기가 간헐적으로 동작하지 않던 문제를 수정했습니다.',
+    ],
+    en: [
+      'The bookmark panel now mutes an entry the tree is not showing. Right-click an excluded bookmark folder to stop excluding it from there.',
+      'Fixed an empty area appearing below the tree after moving to another folder.',
+      'A jump to a bookmark or a folder now places the row in one movement instead of two.',
+      'Fixed Auto-collapse folders intermittently not running.',
+    ],
+  },
+  {
     // THREE LINES OUT OF FOUR COMMITS, and the two the search sort round took
     // are ONE line here. Splitting the grouping from the sort and putting the
     // folder onto the file rows are the same change seen from two sides - a

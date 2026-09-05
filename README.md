@@ -1,4 +1,4 @@
-# Edgetree v2.5.8
+# Edgetree v2.5.9
 
 [한국어 안내](README-ko.md)
 
@@ -216,6 +216,13 @@ lands in `releases/v<version>/` beside the other two. The script reads its
 version out of the exe it packages, so bumping the csproj is enough.
 
 ## Changelog
+
+### v2.5.9 (2026-09-05)
+
+- The bookmark panel now mutes an entry the tree is not showing. Right-click an excluded bookmark folder to stop excluding it from there.
+- Fixed an empty area appearing below the tree after moving to another folder.
+- A jump to a bookmark or a folder now places the row in one movement instead of two.
+- Fixed Auto-collapse folders intermittently not running.
 
 ### v2.5.8 (2026-08-31)
 
