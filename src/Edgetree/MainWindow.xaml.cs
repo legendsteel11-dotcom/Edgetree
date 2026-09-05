@@ -6671,7 +6671,47 @@ public partial class MainWindow : Window
     // claims. So measure where the row actually is and step until its top edge
     // is the viewport's. Costs nothing when the arithmetic was right, which is
     // the ordinary case - the first measurement returns and nothing is redrawn.
+    // The walk below hands the gap's reclaim watch back through Report, and
+    // every ORDERLY exit goes through Report. An exception does not: the loop
+    // calls UpdateLayout on a virtualizing panel, which is where WPF's known
+    // measure race throws (App.xaml.cs recovers it on the dispatcher, 23 times
+    // since 2026-08-14). Escaping that way left _settlingRowAtTop latched true,
+    // and a latched flag means TreeScrollViewer_ScrollChanged returns at its
+    // first line - the gap rows below the tree have nothing watching them, and
+    // scrolling away and back cannot reclaim them because the handler never
+    // reaches its own test.
+    //
+    // It lasts until the next jump that ENDS ORDERLY, whichever kind: Report
+    // clears the flag unconditionally and every orderly exit goes through it.
+    // So the window is one navigation wide, not a session - worth stating,
+    // because a note that overstates its own defect is the kind that gets an
+    // unrelated report blamed on this line later.
+    //
+    // That is the same failure 2026-09-02 fixed in SetBottomGap from the other
+    // side, one call deeper, and it is the shape worth naming: a safety device
+    // that breaks by the very exception it exists to survive. So the flag comes
+    // back in a finally, not from the reporting path.
+    //
+    // The finally only speaks when Report did not run, so an orderly settle
+    // still logs exactly one line and the aborted one is not silent.
     private void SettleRowAtTop(
+        TreeViewItem anchor, ScrollViewer scrollViewer, int countedIndex, string name)
+    {
+        try
+        {
+            SettleRowAtTopCore(anchor, scrollViewer, countedIndex, name);
+        }
+        finally
+        {
+            if (_settlingRowAtTop)
+            {
+                _settlingRowAtTop = false;
+                LogClickLine($"settle: {name} aborted - gap watch handed back");
+            }
+        }
+    }
+
+    private void SettleRowAtTopCore(
         TreeViewItem anchor, ScrollViewer scrollViewer, int countedIndex, string name)
     {
         double startOffset = scrollViewer.VerticalOffset;
@@ -6692,17 +6732,19 @@ public partial class MainWindow : Window
         int rescrolls = 0;
 
         // Holds the gap's own reclaim watch off while this walks - see
-        // TreeScrollViewer_ScrollChanged. Cleared on every exit below.
+        // TreeScrollViewer_ScrollChanged. Cleared on every orderly exit below,
+        // and by the caller's finally when the walk dies instead of exiting.
         _settlingRowAtTop = true;
 
         // Says what it MEASURED and what it did about it. Added because the
         // first version of this loop was a silent actor: the landing changed
         // and there was no way to tell whether the loop had corrected it,
         // overshot it, or never run at all (2026-08-12).
-        // EVERY exit of this loop goes through here, which is what makes it the
-        // one place that has to hand the gap's watch back. The growth path does
+        // Every ORDERLY exit of this loop goes through here, which is what makes
+        // it the place that hands the gap's watch back. The growth path does
         // NOT report - it continues walking - and that is exactly the case the
-        // watch has to stay off for.
+        // watch has to stay off for. An exception is not an exit this can see,
+        // so the wrapper above owns that one.
         void Report(string outcome)
         {
             _settlingRowAtTop = false;
