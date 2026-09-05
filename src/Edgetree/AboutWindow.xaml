@@ -240,7 +240,7 @@
                         Margin="0,0,0,2"
                         MouseLeftButtonDown="OtherToolLink_MouseLeftButtonDown"/>
                 <TextBlock Text="SweepCap"
-                        Tag="https://github.com/legendsteel11/SweepCap"
+                        Tag="https://sweepcap.vercel.app/"
                         Foreground="{DynamicResource AccentForeground}"
                         FontSize="{DynamicResource DialogFontSize}"
                         Cursor="Hand"
