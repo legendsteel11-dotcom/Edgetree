@@ -335,6 +335,10 @@ function gridRowOverflows(xaml, file) {
   const stack = []   // 열려 있는 Grid, 안쪽이 뒤
   const open = []    // 열려 있는 모든 요소 - Grid 가 언제 닫히는지 알기 위해
   const grids = []
+  // x:Name -> the Grid object that owns the element's row, for the code-behind
+  // check below. The grid object is stored by reference, so `defined` is read
+  // after the walk has filled it in.
+  const namedRows = new Map()
   let m
   while ((m = TAG.exec(xaml))) {
     const [, slash, name, attrs = '', selfSlash] = m
@@ -361,6 +365,10 @@ function gridRowOverflows(xaml, file) {
       stack[stack.length - 1].used.push(
         { row: +row[1], line: xaml.slice(0, m.index).split('\n').length, name })
     }
+    // Read before the `Grid` push below, so a nested grid's own name lands on
+    // the PARENT - the same rule Grid.Row follows a few lines up.
+    const named = /\bx:Name="(\w+)"/.exec(attrs)
+    if (named && stack.length) namedRows.set(named[1], stack[stack.length - 1])
     if (name === 'Grid') {
       const g = { line: xaml.slice(0, m.index).split('\n').length, defined: 0, used: [] }
       stack.push(g)
@@ -382,21 +390,60 @@ function gridRowOverflows(xaml, file) {
         max + ' 까지 씀 - ' + worst.join(', '))
     }
   }
-  return { hits, count: grids.length }
+  return { hits, count: grids.length, namedRows }
+}
+
+// ------------------------------------------------- Grid.SetRow in code-behind
+//
+// The XAML pass above cannot see the other half of the same defect. A row moved
+// or renumbered in XAML leaves `Grid.SetRow(SomePanel, 3)` in code-behind saying
+// the old number, and WPF says nothing - it drops the overflow into the last
+// row. That is the shape the 2026-08-30 round paid 637MB to find, and it is why
+// this half was owed.
+//
+// Only integer literals are checked. A variable (`Grid.SetRow(x, i)`) carries no
+// number to compare, and the calls that use one are the ones that already think
+// about which row they mean.
+//
+// One known limit: the row count comes from the element's XAML parent grid. Code
+// that reparents an element into a different grid is measured against the wrong
+// one, so a hit here is a question for a human, not a verdict.
+function gridSetRowOverflows(cs, csFile, namedRows) {
+  const hits = []
+  let checked = 0
+  for (const m of cs.matchAll(/Grid\.SetRow\(\s*([A-Za-z_]\w*)\s*,\s*(\d+)\s*\)/g)) {
+    const g = namedRows.get(m[1])
+    if (!g) continue                       // not a named element of this window
+    checked++
+    const rows = g.defined === 0 ? 1 : g.defined
+    if (+m[2] + 1 > rows) {
+      hits.push(csFile + ':' + cs.slice(0, m.index).split('\n').length +
+        '  ' + m[1] + ' 의 격자는 행이 ' + rows + '개인데 Grid.SetRow 는 ' + m[2] + ' 을 씀')
+    }
+  }
+  return { hits, checked }
 }
 {
   const files = ['src/Edgetree/MainWindow.xaml', 'src/Edgetree/ColorSettingsWindow.xaml',
                  'src/Edgetree/HelpWindow.xaml', 'src/Edgetree/AboutWindow.xaml',
                  'src/Edgetree/FilterExtensionsWindow.xaml', 'src/Edgetree/PresetNameWindow.xaml']
   const hits = []
+  const codeHits = []
   let grids = 0
+  let calls = 0
   for (const f of files) {
     if (!fs.existsSync(R(f))) continue
     const r = gridRowOverflows(read(f), f)
     hits.push(...r.hits)
     grids += r.count
+    const codeFile = f + '.cs'
+    if (!fs.existsSync(R(codeFile))) continue
+    const c = gridSetRowOverflows(read(codeFile), codeFile, r.namedRows)
+    codeHits.push(...c.hits)
+    calls += c.checked
   }
   report('Grid.Row 가 정의된 행을 넘지 않는가', hits, grids + '개 격자 확인')
+  report('코드 뒤 Grid.SetRow 도 정의된 행 안인가', codeHits, calls + '개 호출 확인')
 }
 
 // ------------------------------------------------------- 문자열의 중괄호와 짝
