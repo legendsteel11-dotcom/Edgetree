@@ -15,6 +15,7 @@ public class BookmarkPanelRow : INotifyPropertyChanged
     private ImageSource? _icon;
     private bool _isCurrent;
     private bool _isDirectory = true;
+    private bool _isFilteredOut;
 
     public BookmarkPanelRow(int number, string path, string name)
     {
@@ -57,6 +58,24 @@ public class BookmarkPanelRow : INotifyPropertyChanged
     {
         get => _isCurrent;
         set => SetField(ref _isCurrent, value);
+    }
+
+    // The file-kind filter would keep this row's target out of the tree, so the
+    // row is drawn muted (2026-09-05, on the author's question).
+    //
+    // It marks a row whose CLICK cannot arrive: a filtered file is never put
+    // into its folder's Children, so the reveal walk breaks at the last segment
+    // and lands on the parent folder instead - silently, which is what this is
+    // really for. The row stays clickable and stays where it is; nothing is
+    // hidden, because a bookmark disappearing when a chip is pressed would be a
+    // worse surprise than one that arrives at its folder.
+    //
+    // Folders never carry it. The filter applies to files only (see
+    // FileSystemService's listing, where folders pass untouched).
+    public bool IsFilteredOut
+    {
+        get => _isFilteredOut;
+        set => SetField(ref _isFilteredOut, value);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

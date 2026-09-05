@@ -1214,6 +1214,19 @@ public partial class MainWindow : Window
         // it; the hover twin is written beside the other two rather than in the
         // hover block below, since the three are one group in the colour window.
         SetBrushColor("PanelNameForeground", light ? _settings.LightPanelNameColorHex : _settings.PanelNameColorHex);
+        // Derived, not a palette row of its own - the same treatment the tree's
+        // two muted names get, and for the same reason: it has to follow
+        // whatever colour the panel's names are set to, and a row in the colour
+        // window would be a sixteenth thing to pick for a state most people
+        // never see (a bookmarked file the current filter keeps out of the
+        // tree). Blended towards the background, so it stays legible in both
+        // themes instead of being drawn at reduced opacity.
+        if (ColorConverter.ConvertFromString(
+                light ? _settings.LightPanelNameColorHex : _settings.PanelNameColorHex) is Color panelNameColor)
+        {
+            SetBrushColor("MutedPanelNameForeground",
+                MoveTowardsBackground(panelNameColor, light, MutedNameBlend));
+        }
         SetBrushColor("PanelNameHighlightForeground", light ? _settings.LightPanelNameHighlightColorHex : _settings.PanelNameHighlightColorHex);
         SetBrushColor("PanelNameHoverForeground", light ? _settings.LightPanelNameHoverColorHex : _settings.PanelNameHoverColorHex);
         // The selection highlight keeps TWO variants behind its one resource
@@ -9251,6 +9264,15 @@ public partial class MainWindow : Window
 
         _settingsService.Save(_settings);
         UpdateFileFilterIndicator();
+
+        // The bookmark panel answers to the chips too: a bookmarked file the
+        // filter now keeps out of the tree is drawn muted (BookmarkPanelRow.
+        // IsFilteredOut). Only the flag is re-asked - no probe, no icon work -
+        // so this costs one string test per bookmark.
+        foreach (var row in _bookmarkPanelRows)
+        {
+            row.IsFilteredOut = !row.IsDirectory && !FileTypeFilter.ShouldShowFile(row.Name);
+        }
 
         // Every folder already on screen re-reads, the same way a sort or a
         // per-folder cap change does - a filter that only took effect on
@@ -18139,6 +18161,13 @@ public partial class MainWindow : Window
     private void ApplyBookmarkPanelRowKind(BookmarkPanelRow row, bool isDirectory)
     {
         row.IsDirectory = isDirectory;
+
+        // Decided here because this is where the kind is finally known, and the
+        // kind is half the answer - the probe may only arrive after the row is
+        // already on screen. ApplyFileFilter re-asks for every row when the
+        // chips change; between the two, every way the answer can change is
+        // covered.
+        row.IsFilteredOut = !isDirectory && !FileTypeFilter.ShouldShowFile(row.Name);
 
         // Follows the same two toggles the tree does - someone who turned icons
         // off asked for that everywhere. The slot goes with the icon (the

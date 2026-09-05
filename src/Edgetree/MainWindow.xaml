@@ -4796,22 +4796,42 @@
                                         TextAlignment="Right"
                                         Margin="0,0,4,0"
                                         VerticalAlignment="Center">
-                                    <!-- THE NAME'S COLOUR, all three states of
+                                    <!-- THE NAME'S COLOUR, all four states of
                                          it, because the number rides the same
                                          row and has to stay readable on the
-                                         same grounds: base, hover, selected.
-                                         Following only the base would leave it
-                                         to be read against a selection
+                                         same grounds: base, filtered, hover,
+                                         selected. Following only the base would
+                                         leave it to be read against a selection
                                          background the name had already moved
                                          off. The trigger order and the
                                          FindAncestor form are the name's own,
                                          a few lines down - one shape for the
-                                         row rather than two that can drift. -->
+                                         row rather than two that can drift.
+
+                                         The filtered state was the author's
+                                         call (2026-09-05) and it is the one
+                                         place this row's rule bends: a number
+                                         is a key you press, and the note above
+                                         this TextBlock says not to dim it. What made that a
+                                         problem in 2026-08-26 was the number
+                                         borrowing a colour chosen to be quiet
+                                         for a WHOLE CLASS of rows; this one is
+                                         a single row saying its target is not
+                                         in the tree right now, and leaving the
+                                         number bright made the row read as
+                                         half-muted rather than muted. The digit
+                                         stays, so the press count is still
+                                         there to read. -->
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Foreground"
                                                     Value="{DynamicResource PanelNameForeground}"/>
                                             <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsFilteredOut}"
+                                                        Value="True">
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource MutedPanelNameForeground}"/>
+                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                                                         Value="True">
                                                     <Setter Property="Foreground"
@@ -4884,6 +4904,29 @@
                                             <Setter Property="Foreground"
                                                     Value="{DynamicResource PanelNameForeground}"/>
                                             <Style.Triggers>
+                                                <!-- FIRST of the three, so hover
+                                                     and selection below still
+                                                     win on it: a muted row is
+                                                     still a row you can point
+                                                     at and click, and the two
+                                                     answers must not fight. It
+                                                     says the file-kind filter
+                                                     would keep this file out of
+                                                     the tree - see
+                                                     BookmarkPanelRow.
+                                                     IsFilteredOut for what that
+                                                     costs the click. Colour
+                                                     only, no italic: italic
+                                                     already means "hidden
+                                                     folder, shown for now" in
+                                                     the tree, and two states
+                                                     wearing one mark is how
+                                                     both stop being read. -->
+                                                <DataTrigger Binding="{Binding IsFilteredOut}"
+                                                        Value="True">
+                                                    <Setter Property="Foreground"
+                                                            Value="{DynamicResource MutedPanelNameForeground}"/>
+                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                                                         Value="True">
                                                     <Setter Property="Foreground"
@@ -4928,6 +4971,26 @@
                                 <Setter TargetName="BookmarkRowIcon"
                                         Property="Visibility"
                                         Value="Collapsed"/>
+                            </DataTrigger>
+                            <!-- The icon joins the name and the number, so the
+                                 whole row reads as one state instead of a muted
+                                 name beside a bright picture. Same 0.4 the tree
+                                 fades a cut row's icon with.
+                                 THE TREE DELIBERATELY DOES NOT DO THIS (see the
+                                 hidden-folder trigger up in the tree template:
+                                 a faded icon there means CUT, and two states
+                                 wearing one mark stop being tellable apart).
+                                 It is safe HERE because this panel has no cut
+                                 state at all - BookmarkPanelRow carries an
+                                 icon, a kind, the cycle mark and this flag, and
+                                 nothing in the panel ever marks a cut. If a cut
+                                 mark is ever added to these rows, this fade is
+                                 the thing it collides with. -->
+                            <DataTrigger Binding="{Binding IsFilteredOut}"
+                                    Value="True">
+                                <Setter TargetName="BookmarkRowIcon"
+                                        Property="Opacity"
+                                        Value="0.4"/>
                             </DataTrigger>
                             <!-- No matching IsDirectory=True trigger: the folder
                                  colour is already the setter above, and in WPF
