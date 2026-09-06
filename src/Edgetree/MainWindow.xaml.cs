@@ -27910,6 +27910,77 @@ public partial class MainWindow : Window
     // checked/enabled state, the cursor, the navigator, the full-resolution
     // decode - was riding every one of those frames, which is what made a
     // floating resize stutter "이미지 사이즈와 관계 없이" (2026-08-09).
+    // INSTRUMENT (Debug only, 2026-09-06). A 512px screenshot at 1:1 read softer
+    // here than the same file in an image editor, on a 100% display where 1:1 is
+    // supposed to be pixel for pixel. Three different faults can do that and
+    // they take three different fixes, so this prints the numbers that tell them
+    // apart rather than inviting a guess:
+    //
+    //   decoded < file   - what is on screen is still the panel-width decode and
+    //                      the full-resolution pass has not landed yet. Fix is in
+    //                      RequestViewerFullResolution's guards.
+    //   net != 1         - the picture is drawn through Stretch=Uniform at `fit`
+    //                      and then multiplied by display/fit. That round trip is
+    //                      exact on paper; in doubles it can miss by a hair, and
+    //                      WPF resamples anything that is not exactly 1.
+    //   frac != 0        - the scale is right and the picture sits on a half
+    //                      device pixel, so HighQuality smears every edge. This
+    //                      is the classic one: the host is centred, and a host
+    //                      width that is not the same parity as the picture puts
+    //                      it on .5 forever.
+    //
+    // Only at 1:1, so a wheel drag cannot fill the log.
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogViewerPixelFidelity()
+    {
+        double display = ViewerDisplayScale;
+        if (_viewerPixelWidth <= 0 || ViewerImage.Source is null ||
+            Math.Abs(display - 1) > 0.0005)
+        {
+            return;
+        }
+
+        double dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        double fit = ViewerFitScale;
+        double net = fit * ViewerZoomScale.ScaleX;
+
+        System.Windows.Point topLeft;
+        System.Windows.Point bottomRight;
+        try
+        {
+            var toWindow = ViewerImage.TransformToAncestor(this);
+            topLeft = toWindow.Transform(new System.Windows.Point(0, 0));
+            bottomRight = toWindow.Transform(
+                new System.Windows.Point(ViewerImage.ActualWidth, ViewerImage.ActualHeight));
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+
+        // The element is stretched Uniform, so the BITMAP sits centred inside it -
+        // that centring is its own chance to land on a half pixel, and it is the
+        // edge the eye actually sees.
+        double elementW = (bottomRight.X - topLeft.X) * dpi;
+        double elementH = (bottomRight.Y - topLeft.Y) * dpi;
+        double bitmapW = _viewerPixelWidth * net * dpi;
+        double bitmapH = _viewerPixelHeight * net * dpi;
+        double bitmapLeft = topLeft.X * dpi + (elementW - bitmapW) / 2;
+        double bitmapTop = topLeft.Y * dpi + (elementH - bitmapH) / 2;
+        // Distance to the NEAREST whole pixel, signed - 0 means aligned and
+        // +-0.5 is the worst case. Written as a floor first, which printed an
+        // aligned edge as 1.000 when it sat a hair under the integer.
+        double offX = bitmapLeft - Math.Round(bitmapLeft);
+        double offY = bitmapTop - Math.Round(bitmapTop);
+
+        LogClickLine(
+            $"pixels: file={_viewerPixelWidth}x{_viewerPixelHeight} decoded={_viewerDecodedWidth} " +
+            $"host={ViewerImageHost.ActualWidth:F2}x{ViewerImageHost.ActualHeight:F2} " +
+            $"fit={fit:F9} rel={ViewerZoomScale.ScaleX:F9} net={net:F12} " +
+            $"bitmapDev={bitmapLeft:F3},{bitmapTop:F3} off={offX:F3},{offY:F3} " +
+            $"bitmapW={bitmapW:F3} dpi={dpi:F2} mode={RenderOptions.GetBitmapScalingMode(ViewerImage)}");
+    }
+
     private void ApplyViewerZoomTransform()
     {
         // The RAW fit here, never the rest scale: this converts to the
@@ -27928,6 +27999,79 @@ public partial class MainWindow : Window
         ViewerMediaScale.ScaleY = relative;
 
         ClampViewerPan();
+        SnapViewerToDevicePixels(display);
+    }
+
+    // 1:1 HAS TO MEAN PIXEL FOR PIXEL, AND IT DID NOT (2026-09-06, measured).
+    //
+    // The picture is drawn Stretch=Uniform inside an element the layout sizes,
+    // and the element CENTRES it. Centring divides by two, so the moment the
+    // element's width and the picture's width differ in parity the picture
+    // starts at x.5 - and HighQuality resampling then smears every edge by half
+    // a pixel even though the scale is exactly 1. On a 675-wide panel (655 after
+    // the 10px inset) a 512px screenshot landed on .5 in BOTH axes while a 769px
+    // one landed whole, which is why two shots of the same screen could look
+    // like two different pictures. It was reported as a quality difference
+    // against an image editor, which draws on the integer grid.
+    //
+    // Only at scales that are whole numbers. At 137% every pixel is resampled
+    // whatever we do, there is no alignment that is more correct than another,
+    // and nudging there would only make the zoom steps feel like they drift.
+    //
+    // After the clamp deliberately: the nudge is under one pixel, and re-running
+    // the clamp on it would just push the picture back onto the half.
+    private void SnapViewerToDevicePixels(double display)
+    {
+        if (_viewerPixelWidth <= 0 || ViewerImage.Source is null ||
+            Math.Abs(display - Math.Round(display)) > 0.0005)
+        {
+            return;
+        }
+
+        double dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        double dpiY = VisualTreeHelper.GetDpi(this).DpiScaleY;
+        if (dpi <= 0 || dpiY <= 0)
+        {
+            return;
+        }
+
+        // MEASURED, not derived. Where the element ends up is the product of the
+        // host's arrangement, the 10px inset, the Uniform stretch and this
+        // transform, and every past attempt in this panel to predict a position
+        // by arithmetic has been right about a layout that had already moved on.
+        // TransformToAncestor asks the visual tree what it actually did.
+        if (!ViewerImage.IsVisible || ViewerImageHost.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        System.Windows.Point topLeft;
+        System.Windows.Point bottomRight;
+        try
+        {
+            var toHost = ViewerImage.TransformToAncestor(ViewerImageHost);
+            topLeft = toHost.Transform(new System.Windows.Point(0, 0));
+            bottomRight = toHost.Transform(
+                new System.Windows.Point(ViewerImage.ActualWidth, ViewerImage.ActualHeight));
+        }
+        catch (InvalidOperationException)
+        {
+            // Not in the tree yet (a picture arriving before the panel is laid
+            // out). The zoom funnel runs again once it is.
+            return;
+        }
+
+        // The bitmap sits centred inside the stretched element, and that
+        // centring is where the half pixel is made.
+        double bitmapLeft = topLeft.X
+            + ((bottomRight.X - topLeft.X) - _viewerPixelWidth * display) / 2;
+        double bitmapTop = topLeft.Y
+            + ((bottomRight.Y - topLeft.Y) - _viewerPixelHeight * display) / 2;
+
+        double devX = bitmapLeft * dpi;
+        double devY = bitmapTop * dpiY;
+        ViewerZoomPan.X += (Math.Round(devX) - devX) / dpi;
+        ViewerZoomPan.Y += (Math.Round(devY) - devY) / dpiY;
     }
 
     // The 10px inset that makes a fitted picture sit like an object on a
@@ -27960,6 +28104,7 @@ public partial class MainWindow : Window
         // ends at. It stays cheap: the request guards on already-pending,
         // already-whole, and already-big-enough before it starts anything.
         RequestViewerFullResolution();
+        LogViewerPixelFidelity();
         UpdateViewerNavigator();
         UpdateViewerZoomBar();
         ViewerImageHost.Cursor = ViewerCanPan
