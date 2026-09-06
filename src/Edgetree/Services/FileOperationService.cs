@@ -7,9 +7,27 @@ namespace SidebarExplorer.App.Services;
 
 public static class FileOperationService
 {
+    // THE CLIPBOARD CAN REFUSE, AND REFUSING MUST NOT END THE APP (issue #3,
+    // 2026-09-06). Windows lets one process hold the clipboard open at a time,
+    // so any other program touching it at that instant makes this throw
+    // CLIPBRD_E_CANT_OPEN. Nothing here caught it, and the only thing the
+    // application-level handler recovers is the virtualization layout race - so
+    // a path copy that lost a race took the window with it.
+    //
+    // The three clipboard calls below have caught this since they were written;
+    // this one was the odd one out rather than a case anybody judged
+    // differently. Silent, like theirs: the path is simply not copied, and a
+    // dialog about a clipboard someone else is using is noise at the moment the
+    // user is reaching for Ctrl+V.
     public static void CopyPathToClipboard(string path)
     {
-        Clipboard.SetText(path);
+        try
+        {
+            Clipboard.SetText(path);
+        }
+        catch (ExternalException)
+        {
+        }
     }
 
     // Where Windows keeps "was this a copy or a cut" - the file list alone
